@@ -181,7 +181,7 @@ class _NavData {
 
 class _NavPagePhysics extends PageScrollPhysics {
   const _NavPagePhysics({ScrollPhysics? parent})
-      : super(parent: parent ?? const ClampingScrollPhysics());
+    : super(parent: parent ?? const ClampingScrollPhysics());
 
   @override
   _NavPagePhysics applyTo(ScrollPhysics? ancestor) {

@@ -21,10 +21,11 @@ abstract final class AppTheme {
       scaffoldBackgroundColor: AppColors.background,
     );
 
-    final defaultTextTheme = GoogleFonts.interTextTheme(baseTheme.textTheme).apply(
-      bodyColor: AppColors.textPrimary,
-      displayColor: AppColors.textPrimary,
-    );
+    final defaultTextTheme = GoogleFonts.interTextTheme(baseTheme.textTheme)
+        .apply(
+          bodyColor: AppColors.textPrimary,
+          displayColor: AppColors.textPrimary,
+        );
 
     return baseTheme.copyWith(
       textTheme: defaultTextTheme.copyWith(

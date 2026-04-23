@@ -8,6 +8,12 @@ import 'package:nextone/models/auth_models.dart';
 class AuthService {
   static String? _authToken;
   static String? _refreshToken;
+  static const Duration _requestTimeout = Duration(seconds: 15);
+  static Future<void>? _warmupFuture;
+
+  static Future<void> warmUpBackend() {
+    return _warmupFuture ??= _pingBackend();
+  }
 
   Future<String?> login({
     required String email,
@@ -30,11 +36,13 @@ class AuthService {
       payload['phone_number'] = normalizedPhone;
     }
 
-    final response = await http.post(
-      Uri.parse('${ApiConstants.baseUrl}${ApiConstants.login}'),
-      headers: _headers(accept: 'application/json'),
-      body: jsonEncode(payload),
-    );
+    final response = await http
+        .post(
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.login}'),
+          headers: _headers(accept: 'application/json'),
+          body: jsonEncode(payload),
+        )
+        .timeout(_requestTimeout);
     _logResponse('login', response);
 
     final error = _handleResponse(response, fallbackMessage: 'Login failed.');
@@ -53,29 +61,33 @@ class AuthService {
     required String password,
     required String role,
   }) async {
-    final response = await http.post(
-      Uri.parse('${ApiConstants.baseUrl}${ApiConstants.register}'),
-      headers: _headers(accept: 'application/json'),
-      body: jsonEncode({
-        'email': email,
-        'first_name': firstName,
-        'last_name': lastName,
-        'phone_number': phoneNumber,
-        'password': password,
-        'role': role,
-      }),
-    );
+    final response = await http
+        .post(
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.register}'),
+          headers: _headers(accept: 'application/json'),
+          body: jsonEncode({
+            'email': email,
+            'first_name': firstName,
+            'last_name': lastName,
+            'phone_number': phoneNumber,
+            'password': password,
+            'role': role,
+          }),
+        )
+        .timeout(_requestTimeout);
     _logResponse('register', response);
 
     return _handleResponse(response, fallbackMessage: 'Registration failed.');
   }
 
   Future<ForgotPasswordResult> forgotPassword({required String email}) async {
-    final response = await http.post(
-      Uri.parse('${ApiConstants.baseUrl}${ApiConstants.forgotPassword}'),
-      headers: _headers(accept: '*/*'),
-      body: jsonEncode({'email': email}),
-    );
+    final response = await http
+        .post(
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.forgotPassword}'),
+          headers: _headers(accept: '*/*'),
+          body: jsonEncode({'email': email}),
+        )
+        .timeout(_requestTimeout);
     _logResponse('forgotPassword', response);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -119,10 +131,12 @@ class AuthService {
 
   Future<AuthProfileResult> profile({String? token}) async {
     final authToken = token ?? _authToken;
-    final response = await http.get(
-      Uri.parse('${ApiConstants.baseUrl}${ApiConstants.profile}'),
-      headers: _headers(accept: 'application/json', token: authToken),
-    );
+    final response = await http
+        .get(
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.profile}'),
+          headers: _headers(accept: 'application/json', token: authToken),
+        )
+        .timeout(_requestTimeout);
     _logResponse('profile', response);
 
     final error = _handleResponse(
@@ -155,11 +169,13 @@ class AuthService {
       throw Exception('Refresh token is required.');
     }
 
-    final response = await http.post(
-      Uri.parse('${ApiConstants.baseUrl}${ApiConstants.refreshToken}'),
-      headers: _headers(accept: 'application/json'),
-      body: jsonEncode({'refresh_token': token.trim()}),
-    );
+    final response = await http
+        .post(
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.refreshToken}'),
+          headers: _headers(accept: 'application/json'),
+          body: jsonEncode({'refresh_token': token.trim()}),
+        )
+        .timeout(_requestTimeout);
     _logResponse('refreshToken', response);
 
     final error = _handleResponse(
@@ -195,11 +211,13 @@ class AuthService {
       payload['refresh_token'] = resolvedRefreshToken.trim();
     }
 
-    final response = await http.post(
-      Uri.parse('${ApiConstants.baseUrl}${ApiConstants.logout}'),
-      headers: _headers(accept: 'application/json', token: resolvedToken),
-      body: jsonEncode(payload),
-    );
+    final response = await http
+        .post(
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.logout}'),
+          headers: _headers(accept: 'application/json', token: resolvedToken),
+          body: jsonEncode(payload),
+        )
+        .timeout(_requestTimeout);
     _logResponse('logout', response);
 
     if (response.statusCode == 401 || response.statusCode == 403) {
@@ -320,5 +338,18 @@ class AuthService {
   void _clearTokens() {
     _authToken = null;
     _refreshToken = null;
+  }
+
+  static Future<void> _pingBackend() async {
+    try {
+      await http
+          .get(
+            Uri.parse('${ApiConstants.baseUrl}${ApiConstants.profile}'),
+            headers: {'accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {
+      // This is a best-effort warm-up call.
+    }
   }
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/routes/app_routes.dart';
+import 'package:nextone/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -31,6 +33,12 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePhonePassword = true;
   bool _isSubmitting = false;
   int _activeLoginTab = 0; // 0 for Email, 1 for Phone
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(AuthService.warmUpBackend());
+  }
 
   @override
   void dispose() {
@@ -82,6 +90,11 @@ class _LoginPageState extends State<LoginPage> {
         context,
         AppRoutes.home,
         (route) => false,
+      );
+    } on TimeoutException {
+      if (!mounted) return;
+      _showSnackBar(
+        'Login request timed out. Please check your internet and try again.',
       );
     } catch (_) {
       if (!mounted) return;
@@ -150,10 +163,7 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 8),
                   Text(
                     'Sign in to your CRM workspace',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 40),
                   // Main Card
@@ -183,19 +193,28 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           child: Row(
                             children: [
-                              Expanded(child: _buildTabButton('Email Login', 0)),
-                              Expanded(child: _buildTabButton('Phone Login', 1)),
+                              Expanded(
+                                child: _buildTabButton('Email Login', 0),
+                              ),
+                              Expanded(
+                                child: _buildTabButton('Phone Login', 1),
+                              ),
                             ],
                           ),
                         ),
                         const SizedBox(height: 32),
                         // Form
-                        _activeLoginTab == 0 ? _buildEmailForm() : _buildPhoneForm(),
+                        _activeLoginTab == 0
+                            ? _buildEmailForm()
+                            : _buildPhoneForm(),
                         const SizedBox(height: 16),
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: () => Navigator.pushNamed(context, AppRoutes.forgotPassword),
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.forgotPassword,
+                            ),
                             child: const Text(
                               'Forgot password?',
                               style: TextStyle(color: Color(0xFFB1916C)),
@@ -239,10 +258,7 @@ class _LoginPageState extends State<LoginPage> {
                   // Footer
                   Text(
                     '© 2024 Next One Realty. All rights reserved.',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
                   ),
                   const SizedBox(height: 20),
                 ],
@@ -269,7 +285,7 @@ class _LoginPageState extends State<LoginPage> {
                     color: Colors.black.withOpacity(0.05),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
-                  )
+                  ),
                 ]
               : null,
         ),
@@ -315,13 +331,19 @@ class _LoginPageState extends State<LoginPage> {
             obscureText: _obscureEmailPassword,
             suffixIcon: IconButton(
               icon: Icon(
-                _obscureEmailPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                _obscureEmailPassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
                 size: 20,
                 color: Colors.grey,
               ),
-              onPressed: () => setState(() => _obscureEmailPassword = !_obscureEmailPassword),
+              onPressed: () => setState(
+                () => _obscureEmailPassword = !_obscureEmailPassword,
+              ),
             ),
-            validator: (value) => (value == null || value.isEmpty) ? 'Password is required' : null,
+            validator: (value) => (value == null || value.isEmpty)
+                ? 'Password is required'
+                : null,
           ),
         ],
       ),
@@ -348,7 +370,8 @@ class _LoginPageState extends State<LoginPage> {
             validator: (value) {
               final digits = _normalizedPhoneDigits(value ?? '');
               if (digits.isEmpty) return 'Phone is required';
-              if (!_indiaPhoneRegex.hasMatch(digits)) return 'Enter valid 10-digit number';
+              if (!_indiaPhoneRegex.hasMatch(digits))
+                return 'Enter valid 10-digit number';
               return null;
             },
           ),
@@ -362,13 +385,19 @@ class _LoginPageState extends State<LoginPage> {
             obscureText: _obscurePhonePassword,
             suffixIcon: IconButton(
               icon: Icon(
-                _obscurePhonePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                _obscurePhonePassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
                 size: 20,
                 color: Colors.grey,
               ),
-              onPressed: () => setState(() => _obscurePhonePassword = !_obscurePhonePassword),
+              onPressed: () => setState(
+                () => _obscurePhonePassword = !_obscurePhonePassword,
+              ),
             ),
-            validator: (value) => (value == null || value.isEmpty) ? 'Password is required' : null,
+            validator: (value) => (value == null || value.isEmpty)
+                ? 'Password is required'
+                : null,
           ),
         ],
       ),

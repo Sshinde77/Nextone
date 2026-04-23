@@ -112,10 +112,11 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   List<_SiteVisit> get _selectedDayVisits {
-    final list = _visits
-        .where((visit) => _isSameDate(visit.dateTime, _selectedDate))
-        .toList()
-      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    final list =
+        _visits
+            .where((visit) => _isSameDate(visit.dateTime, _selectedDate))
+            .toList()
+          ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
     return list;
   }
 
@@ -169,73 +170,75 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-              SizedBox(height: _s(14)),
-              Text(
-                'SCHEDULE',
-                style: TextStyle(
-                  color: AppColors.warning,
-                  fontSize: _fs(10),
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Visits',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: _fs(26),
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  _buildViewToggle(),
-                ],
-              ),
-              SizedBox(height: _s(10)),
-              _buildQuickActions(),
-              SizedBox(height: _s(14)),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: _isCalendarView ? _buildCalendarCard() : _buildSliderCard(),
-              ),
-              SizedBox(height: _s(18)),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      _isSameDate(_selectedDate, DateTime.now())
-                          ? "Today's Visits"
-                          : 'Visits on $_selectedDateLabel',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: _fs(18),
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                  SizedBox(height: _s(14)),
                   Text(
-                    _selectedDateLabel.toUpperCase(),
+                    'SCHEDULE',
                     style: TextStyle(
-                      color: AppColors.textSecondary.withOpacity(0.6),
-                      fontSize: _fs(9),
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
+                      color: AppColors.warning,
+                      fontSize: _fs(10),
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
                     ),
                   ),
-                ],
-              ),
-              SizedBox(height: _s(12)),
-              if (selectedVisits.isEmpty)
-                _buildEmptyState()
-              else
-                ...selectedVisits.map(_buildVisitCard),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Visits',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: _fs(26),
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      _buildViewToggle(),
+                    ],
+                  ),
+                  SizedBox(height: _s(10)),
+                  _buildQuickActions(),
+                  SizedBox(height: _s(14)),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: _isCalendarView
+                        ? _buildCalendarCard()
+                        : _buildSliderCard(),
+                  ),
+                  SizedBox(height: _s(18)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _isSameDate(_selectedDate, DateTime.now())
+                              ? "Today's Visits"
+                              : 'Visits on $_selectedDateLabel',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: _fs(18),
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        _selectedDateLabel.toUpperCase(),
+                        style: TextStyle(
+                          color: AppColors.textSecondary.withOpacity(0.6),
+                          fontSize: _fs(9),
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: _s(12)),
+                  if (selectedVisits.isEmpty)
+                    _buildEmptyState()
+                  else
+                    ...selectedVisits.map(_buildVisitCard),
                   SizedBox(height: _s(90)),
                 ],
               ),
@@ -492,13 +495,22 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
             spacing: _s(10),
             runSpacing: _s(6),
             children: [
-              _statusIndicator(_statusColor(_VisitStatus.scheduled), 'SCHEDULED'),
+              _statusIndicator(
+                _statusColor(_VisitStatus.scheduled),
+                'SCHEDULED',
+              ),
               _statusIndicator(
                 _statusColor(_VisitStatus.inProgress),
                 'IN PROGRESS',
               ),
-              _statusIndicator(_statusColor(_VisitStatus.completed), 'COMPLETED'),
-              _statusIndicator(_statusColor(_VisitStatus.cancelled), 'CANCELLED'),
+              _statusIndicator(
+                _statusColor(_VisitStatus.completed),
+                'COMPLETED',
+              ),
+              _statusIndicator(
+                _statusColor(_VisitStatus.cancelled),
+                'CANCELLED',
+              ),
             ],
           ),
         ],
@@ -621,14 +633,19 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Widget _buildCalendarDays() {
-    final firstDayOfMonth = DateTime(_focusedMonth.year, _focusedMonth.month, 1);
+    final firstDayOfMonth = DateTime(
+      _focusedMonth.year,
+      _focusedMonth.month,
+      1,
+    );
     final firstWeekday = firstDayOfMonth.weekday;
     final daysBefore = firstWeekday - 1;
     final gridStart = firstDayOfMonth.subtract(Duration(days: daysBefore));
 
     final days = List<DateTime>.generate(
       42,
-      (index) => DateTime(gridStart.year, gridStart.month, gridStart.day + index),
+      (index) =>
+          DateTime(gridStart.year, gridStart.month, gridStart.day + index),
     );
 
     return Column(
@@ -956,8 +973,14 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                         value: 'reschedule',
                         child: Text('Reschedule Visit'),
                       ),
-                      PopupMenuItem(value: 'status', child: Text('Update Status')),
-                      PopupMenuItem(value: 'feedback', child: Text('Capture Feedback')),
+                      PopupMenuItem(
+                        value: 'status',
+                        child: Text('Update Status'),
+                      ),
+                      PopupMenuItem(
+                        value: 'feedback',
+                        child: Text('Capture Feedback'),
+                      ),
                     ],
                   ),
                 ],
@@ -1042,7 +1065,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                 vertical: _s(8),
               ),
             ),
-            child: Text('Schedule Visit', style: TextStyle(fontSize: _fs(10.5))),
+            child: Text(
+              'Schedule Visit',
+              style: TextStyle(fontSize: _fs(10.5)),
+            ),
           ),
         ],
       ),
@@ -1051,9 +1077,13 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
   Future<void> _openVisitEditor({_SiteVisit? visit}) async {
     final formKey = GlobalKey<FormState>();
-    final propertyController = TextEditingController(text: visit?.property ?? '');
+    final propertyController = TextEditingController(
+      text: visit?.property ?? '',
+    );
     final leadController = TextEditingController(text: visit?.lead ?? '');
-    final locationController = TextEditingController(text: visit?.location ?? '');
+    final locationController = TextEditingController(
+      text: visit?.location ?? '',
+    );
 
     DateTime selectedDate = visit?.dateTime ?? _selectedDate;
     TimeOfDay selectedTime = visit != null
@@ -1067,7 +1097,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         return StatefulBuilder(
           builder: (context, setLocalState) {
             return AlertDialog(
-              title: Text(visit == null ? 'Schedule Site Visit' : 'Reschedule Visit'),
+              title: Text(
+                visit == null ? 'Schedule Site Visit' : 'Reschedule Visit',
+              ),
               content: SizedBox(
                 width: (_screenWidth * 0.86).clamp(280, 420).toDouble(),
                 child: Form(
@@ -1082,7 +1114,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                             labelText: 'Property Name',
                             prefixIcon: Icon(Icons.home_work_outlined),
                           ),
-                          validator: (value) => (value == null || value.trim().isEmpty)
+                          validator: (value) =>
+                              (value == null || value.trim().isEmpty)
                               ? 'Enter property name'
                               : null,
                         ),
@@ -1093,7 +1126,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                             labelText: 'Lead Name',
                             prefixIcon: Icon(Icons.person_outline),
                           ),
-                          validator: (value) => (value == null || value.trim().isEmpty)
+                          validator: (value) =>
+                              (value == null || value.trim().isEmpty)
                               ? 'Enter lead name'
                               : null,
                         ),
@@ -1104,7 +1138,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                             labelText: 'Location',
                             prefixIcon: Icon(Icons.location_on_outlined),
                           ),
-                          validator: (value) => (value == null || value.trim().isEmpty)
+                          validator: (value) =>
+                              (value == null || value.trim().isEmpty)
                               ? 'Enter location'
                               : null,
                         ),
@@ -1195,12 +1230,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                     Navigator.pop(
                       context,
                       _SiteVisit(
-                        id: visit?.id ?? 'SV-${DateTime.now().millisecondsSinceEpoch}',
+                        id:
+                            visit?.id ??
+                            'SV-${DateTime.now().millisecondsSinceEpoch}',
                         property: propertyController.text.trim(),
                         lead: leadController.text.trim(),
                         location: locationController.text.trim(),
                         dateTime: dateTime,
-                        imageUrl: visit?.imageUrl ?? _demoImages[_visits.length % 4],
+                        imageUrl:
+                            visit?.imageUrl ?? _demoImages[_visits.length % 4],
                         assignee: selectedAssignee,
                         status: visit?.status ?? _VisitStatus.scheduled,
                         feedback: visit?.feedback ?? '',
@@ -1208,7 +1246,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                       ),
                     );
                   },
-                  style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                  ),
                   child: Text(visit == null ? 'Schedule' : 'Save'),
                 ),
               ],
@@ -1283,7 +1323,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                   contentPadding: EdgeInsets.zero,
                   title: Text(member),
                   trailing: member == visit.assignee
-                      ? const Icon(Icons.check_circle, color: AppColors.tertiary)
+                      ? const Icon(
+                          Icons.check_circle,
+                          color: AppColors.tertiary,
+                        )
                       : null,
                   onTap: () => Navigator.pop(context, member),
                 ),
@@ -1332,7 +1375,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                   ),
                   title: Text(_statusLabel(status)),
                   trailing: visit.status == status
-                      ? const Icon(Icons.check_circle, color: AppColors.tertiary)
+                      ? const Icon(
+                          Icons.check_circle,
+                          color: AppColors.tertiary,
+                        )
                       : null,
                   onTap: () => Navigator.pop(context, status),
                 ),
@@ -1368,7 +1414,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                     children: List<Widget>.generate(5, (index) {
                       final star = index + 1;
                       return IconButton(
-                        onPressed: () => setLocalState(() => selectedRating = star),
+                        onPressed: () =>
+                            setLocalState(() => selectedRating = star),
                         icon: Icon(
                           star <= selectedRating
                               ? Icons.star_rounded
@@ -1382,7 +1429,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                     controller: noteController,
                     maxLines: 4,
                     decoration: const InputDecoration(
-                      hintText: 'Write key points discussed during the visit...',
+                      hintText:
+                          'Write key points discussed during the visit...',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -1395,7 +1443,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                  ),
                   child: const Text('Save'),
                 ),
               ],
@@ -1431,7 +1481,11 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
   void _changeMonth(int delta) {
     setState(() {
-      _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month + delta, 1);
+      _focusedMonth = DateTime(
+        _focusedMonth.year,
+        _focusedMonth.month + delta,
+        1,
+      );
       if (_selectedDate.month != _focusedMonth.month ||
           _selectedDate.year != _focusedMonth.year) {
         _selectedDate = DateTime(_focusedMonth.year, _focusedMonth.month, 1);

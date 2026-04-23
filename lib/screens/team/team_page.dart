@@ -152,7 +152,10 @@ class _TeamPageState extends State<TeamPage> {
                     const SizedBox(height: 2),
                     Text(
                       member.role,
-                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -196,7 +199,10 @@ class _TeamPageState extends State<TeamPage> {
           Row(
             children: [
               Expanded(
-                child: _buildStatCard('Leads Handled', member.activeLeads.toString()),
+                child: _buildStatCard(
+                  'Leads Handled',
+                  member.activeLeads.toString(),
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -219,7 +225,11 @@ class _TeamPageState extends State<TeamPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        _buildCircleActionButton(Icons.visibility_outlined, AppColors.info, () {}),
+        _buildCircleActionButton(
+          Icons.visibility_outlined,
+          AppColors.info,
+          () {},
+        ),
         const SizedBox(width: 12),
         _buildCircleActionButton(Icons.edit_outlined, AppColors.warning, () {}),
         const SizedBox(width: 12),
@@ -228,7 +238,11 @@ class _TeamPageState extends State<TeamPage> {
     );
   }
 
-  Widget _buildCircleActionButton(IconData icon, Color color, VoidCallback onPressed) {
+  Widget _buildCircleActionButton(
+    IconData icon,
+    Color color,
+    VoidCallback onPressed,
+  ) {
     return Container(
       width: 40,
       height: 40,
@@ -349,7 +363,10 @@ class _TeamPageState extends State<TeamPage> {
                     const SizedBox(height: 2),
                     Text(
                       member.role,
-                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),

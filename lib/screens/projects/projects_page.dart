@@ -234,27 +234,50 @@ class _ProjectsPageState extends State<ProjectsPage> {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, size: 16, color: AppColors.textSecondary),
+              const Icon(
+                Icons.location_on_outlined,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 4),
               Text(
                 project.location,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
               ),
             ],
           ),
           const Divider(height: 24, color: AppColors.border),
           _buildInfoRow(Icons.layers_outlined, 'Config', project.configuration),
           const SizedBox(height: 8),
-          _buildInfoRow(Icons.link, 'Leads Mapped', '${project.mappedLeads} Leads'),
+          _buildInfoRow(
+            Icons.link,
+            'Leads Mapped',
+            '${project.mappedLeads} Leads',
+          ),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              _buildCircleActionButton(Icons.visibility_outlined, AppColors.info, () {}),
+              _buildCircleActionButton(
+                Icons.visibility_outlined,
+                AppColors.info,
+                () {},
+              ),
               const SizedBox(width: 12),
-              _buildCircleActionButton(Icons.edit_outlined, AppColors.warning, () {}),
+              _buildCircleActionButton(
+                Icons.edit_outlined,
+                AppColors.warning,
+                () {},
+              ),
               const SizedBox(width: 12),
-              _buildCircleActionButton(Icons.delete_outline, AppColors.error, () {}),
+              _buildCircleActionButton(
+                Icons.delete_outline,
+                AppColors.error,
+                () {},
+              ),
             ],
           ),
         ],
@@ -323,7 +346,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
     );
   }
 
-  Widget _buildCircleActionButton(IconData icon, Color color, VoidCallback onPressed) {
+  Widget _buildCircleActionButton(
+    IconData icon,
+    Color color,
+    VoidCallback onPressed,
+  ) {
     return Container(
       width: 36,
       height: 36,
