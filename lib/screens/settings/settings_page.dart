@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/routes/app_routes.dart';
+import 'package:nextone/widgets/crm_app_bar.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -67,27 +68,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Settings',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.notifications_outlined,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
+      appBar: const CrmAppBar(title: 'Settings'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(

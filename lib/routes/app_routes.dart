@@ -5,6 +5,7 @@ import 'package:nextone/screens/auth/forgot_password_page.dart';
 import 'package:nextone/screens/auth/login_page.dart';
 import 'package:nextone/screens/auth/register_page.dart';
 import 'package:nextone/screens/leads/leads_page.dart';
+import 'package:nextone/screens/notifications/notifications_page.dart';
 import 'package:nextone/screens/site_visits/site_visits_page.dart';
 
 class AppRoutes {
@@ -15,6 +16,7 @@ class AppRoutes {
   static const String leads = '/leads';
   static const String followUps = '/follow-ups';
   static const String siteVisits = '/site-visits';
+  static const String notifications = '/notifications';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -32,6 +34,8 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const FollowUpPage());
       case siteVisits:
         return MaterialPageRoute(builder: (_) => const SiteVisitsPage());
+      case notifications:
+        return MaterialPageRoute(builder: (_) => const NotificationsPage());
       default:
         return MaterialPageRoute(
           builder: (_) =>

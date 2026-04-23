@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/constants/app_colors.dart';
 
 class TeamPage extends StatefulWidget {
   const TeamPage({super.key});
@@ -8,11 +10,6 @@ class TeamPage extends StatefulWidget {
 }
 
 class _TeamPageState extends State<TeamPage> {
-  static const Color _pageBg = Color(0xFFF3F4F7);
-  static const Color _primaryBlue = Color(0xFF1268D8);
-  static const Color _mutedText = Color(0xFF6B7280);
-  static const Color _titleText = Color(0xFF0F172A);
-
   final TextEditingController _searchController = TextEditingController();
 
   final List<_TeamMember> _members = const [
@@ -83,70 +80,11 @@ class _TeamPageState extends State<TeamPage> {
     final bestPerformer = _bestPerformer;
 
     return Scaffold(
-      backgroundColor: _pageBg,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: false,
-        titleSpacing: 10,
-        title: const Row(
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Color(0xFFDBEAFE),
-              child: Icon(Icons.person, color: Color(0xFF1D4ED8), size: 18),
-            ),
-            SizedBox(width: 10),
-            Text(
-              'Architectural Lens',
-              style: TextStyle(
-                color: _titleText,
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.search, color: _titleText),
-          ),
-        ],
-      ),
+      backgroundColor: AppColors.background,
+      appBar: const CrmAppBar(title: 'Team'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
         children: [
-          const Text(
-            'MANAGEMENT DASHBOARD',
-            style: TextStyle(
-              letterSpacing: 1.2,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF1E4FB5),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'The Elite Team',
-            style: TextStyle(
-              fontSize: 38,
-              height: 1.05,
-              fontWeight: FontWeight.w800,
-              color: _titleText,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Curating your member performance and lead outcomes in one place.',
-            style: TextStyle(
-              fontSize: 16,
-              height: 1.35,
-              color: _mutedText,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
           const SizedBox(height: 18),
           _buildBestPerformerCard(bestPerformer),
           const SizedBox(height: 16),
@@ -157,7 +95,7 @@ class _TeamPageState extends State<TeamPage> {
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: _titleText,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
@@ -171,9 +109,9 @@ class _TeamPageState extends State<TeamPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE6EAF1)),
+        border: Border.all(color: AppColors.border),
         boxShadow: const [
           BoxShadow(
             color: Color(0x10000000),
@@ -188,7 +126,7 @@ class _TeamPageState extends State<TeamPage> {
           const Text(
             'Best Performer',
             style: TextStyle(
-              color: _mutedText,
+              color: AppColors.textSecondary,
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -206,7 +144,7 @@ class _TeamPageState extends State<TeamPage> {
                     Text(
                       member.name,
                       style: const TextStyle(
-                        color: _titleText,
+                        color: AppColors.textPrimary,
                         fontWeight: FontWeight.w800,
                         fontSize: 24,
                       ),
@@ -214,7 +152,7 @@ class _TeamPageState extends State<TeamPage> {
                     const SizedBox(height: 2),
                     Text(
                       member.role,
-                      style: const TextStyle(color: _mutedText, fontSize: 14),
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -223,7 +161,7 @@ class _TeamPageState extends State<TeamPage> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0A8F3C),
+                        color: AppColors.success,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: const Text(
@@ -243,12 +181,12 @@ class _TeamPageState extends State<TeamPage> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEF2FF),
+                  color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Icon(
                   Icons.person_add_alt_1,
-                  color: Color(0xFF1E40AF),
+                  color: AppColors.primary,
                   size: 18,
                 ),
               ),
@@ -265,31 +203,44 @@ class _TeamPageState extends State<TeamPage> {
                 child: _buildStatCard(
                   'Conversion Rate',
                   '${member.conversionRate.toStringAsFixed(1)}%',
-                  valueColor: const Color(0xFF0A8F3C),
+                  valueColor: AppColors.success,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () {},
-              style: FilledButton.styleFrom(
-                backgroundColor: _primaryBlue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              child: const Text(
-                'Assign Lead',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
+          _buildActionButtonsRow(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtonsRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        _buildCircleActionButton(Icons.visibility_outlined, AppColors.info, () {}),
+        const SizedBox(width: 12),
+        _buildCircleActionButton(Icons.edit_outlined, AppColors.warning, () {}),
+        const SizedBox(width: 12),
+        _buildCircleActionButton(Icons.delete_outline, AppColors.error, () {}),
+      ],
+    );
+  }
+
+  Widget _buildCircleActionButton(IconData icon, Color color, VoidCallback onPressed) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        icon: Icon(icon, size: 20, color: color),
+        onPressed: onPressed,
       ),
     );
   }
@@ -298,7 +249,7 @@ class _TeamPageState extends State<TeamPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F6F8),
+        color: AppColors.secondary,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -309,7 +260,7 @@ class _TeamPageState extends State<TeamPage> {
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: _mutedText,
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 4),
@@ -318,7 +269,7 @@ class _TeamPageState extends State<TeamPage> {
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w800,
-              color: valueColor ?? _titleText,
+              color: valueColor ?? AppColors.textPrimary,
               height: 1,
             ),
           ),
@@ -334,17 +285,17 @@ class _TeamPageState extends State<TeamPage> {
           child: Container(
             height: 50,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.card,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0xFFE3E8F2)),
+              border: Border.all(color: AppColors.border),
             ),
             child: TextField(
               controller: _searchController,
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 hintText: 'Search member',
-                hintStyle: TextStyle(color: _mutedText),
-                prefixIcon: Icon(Icons.search, color: _mutedText),
+                hintStyle: TextStyle(color: AppColors.textSecondary),
+                prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(vertical: 14),
               ),
@@ -355,7 +306,7 @@ class _TeamPageState extends State<TeamPage> {
         FilledButton(
           onPressed: () {},
           style: FilledButton.styleFrom(
-            backgroundColor: _primaryBlue,
+            backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             minimumSize: const Size(132, 50),
             shape: RoundedRectangleBorder(
@@ -373,9 +324,9 @@ class _TeamPageState extends State<TeamPage> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE7EBF2)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         children: [
@@ -390,7 +341,7 @@ class _TeamPageState extends State<TeamPage> {
                     Text(
                       member.name,
                       style: const TextStyle(
-                        color: _titleText,
+                        color: AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
                         fontSize: 18,
                       ),
@@ -398,7 +349,7 @@ class _TeamPageState extends State<TeamPage> {
                     const SizedBox(height: 2),
                     Text(
                       member.role,
-                      style: const TextStyle(color: _mutedText, fontSize: 13),
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                     ),
                   ],
                 ),
@@ -421,24 +372,7 @@ class _TeamPageState extends State<TeamPage> {
             ],
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () {},
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _primaryBlue,
-                side: const BorderSide(color: _primaryBlue, width: 1.6),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              child: const Text(
-                'Assign Lead',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
+          _buildActionButtonsRow(),
         ],
       ),
     );
@@ -448,7 +382,7 @@ class _TeamPageState extends State<TeamPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F6F8),
+        color: AppColors.secondary,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -457,7 +391,7 @@ class _TeamPageState extends State<TeamPage> {
           Text(
             label.toUpperCase(),
             style: const TextStyle(
-              color: _mutedText,
+              color: AppColors.textSecondary,
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: .6,
@@ -467,7 +401,7 @@ class _TeamPageState extends State<TeamPage> {
           Text(
             value,
             style: const TextStyle(
-              color: _titleText,
+              color: AppColors.textPrimary,
               fontSize: 22,
               fontWeight: FontWeight.w800,
             ),
@@ -491,8 +425,8 @@ class _InitialAvatar extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [Color(0xFFBFDBFE), Color(0xFFDBEAFE)],
+        gradient: LinearGradient(
+          colors: [AppColors.primaryLight, AppColors.secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -501,7 +435,7 @@ class _InitialAvatar extends StatelessWidget {
       child: Text(
         name[0],
         style: TextStyle(
-          color: const Color(0xFF1E3A8A),
+          color: AppColors.primaryDark,
           fontWeight: FontWeight.w800,
           fontSize: size * 0.44,
         ),

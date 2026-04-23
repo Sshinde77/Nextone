@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/widgets/crm_app_bar.dart';
 
 class FollowUpPage extends StatefulWidget {
   const FollowUpPage({super.key});
@@ -177,17 +178,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Follow Ups',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+      appBar: const CrmAppBar(title: 'Follow Ups'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

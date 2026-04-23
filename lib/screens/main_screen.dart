@@ -3,6 +3,7 @@ import 'package:nextone/screens/home/home_page.dart';
 import 'package:nextone/screens/leads/leads_page.dart';
 import 'package:nextone/screens/follow_ups/follow_up_page.dart';
 import 'package:nextone/screens/site_visits/site_visits_page.dart';
+import 'package:nextone/screens/projects/projects_page.dart';
 import 'package:nextone/screens/settings/settings_page.dart';
 import 'package:nextone/screens/team/team_page.dart';
 import 'package:nextone/widgets/crm_bottom_nav.dart';
@@ -22,7 +23,7 @@ class _MainScreenState extends State<MainScreen> {
     const LeadsPage(),
     const FollowUpPage(),
     const SiteVisitsPage(),
-    const Center(child: Text('Projects Screen')),
+    const ProjectsPage(),
     const TeamPage(),
     const Center(child: Text('Reports Screen')),
     const SettingsPage(),

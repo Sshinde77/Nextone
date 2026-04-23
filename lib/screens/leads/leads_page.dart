@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/widgets/crm_app_bar.dart';
 
 class LeadsPage extends StatefulWidget {
   const LeadsPage({super.key});
@@ -223,17 +224,7 @@ class _LeadsPageState extends State<LeadsPage> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Lead Management',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+      appBar: const CrmAppBar(title: 'Lead Management'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

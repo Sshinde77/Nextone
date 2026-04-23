@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/routes/app_routes.dart';
+import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/crm_bottom_nav.dart';
 
 class HomePage extends StatefulWidget {
@@ -29,88 +30,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        toolbarHeight: 70,
-        title: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              padding: const EdgeInsets.all(0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: AppColors.primary),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Image.asset(
-                'assets/logo/logo.png',
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Next One',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(
-                  Icons.notifications_outlined,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              Positioned(
-                right: 12,
-                top: 22,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.error,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 4),
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: InkWell(
-              onTap: () {},
-              borderRadius: BorderRadius.circular(20),
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: AppColors.primary.withOpacity(0.1),
-                child: const Icon(
-                  Icons.person_outline,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+      appBar: const CrmAppBar(title: 'Home'),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -205,7 +125,7 @@ class _HomePageState extends State<HomePage> {
               const _SectionCard(
                 title: 'Recent Activity',
                 subtitle: 'Latest updates',
-                trailing: _ViewAllButton(),
+
                 child: _RecentActivityList(),
               ),
               const SizedBox(height: 16),
@@ -220,7 +140,7 @@ class _HomePageState extends State<HomePage> {
               const _SectionCard(
                 title: 'Upcoming Site Visits',
                 subtitle: 'Next 3 days',
-                trailing: _ViewAllButton(),
+
                 child: _UpcomingVisitsList(),
               ),
               const SizedBox(height: 32),
@@ -434,21 +354,21 @@ class _TimeRangePicker extends StatelessWidget {
   }
 }
 
-class _ViewAllButton extends StatelessWidget {
-  const _ViewAllButton();
+// class _ViewAllButton extends StatelessWidget {
+//   const _ViewAllButton();
 
-  @override
-  Widget build(BuildContext context) {
-    return const Text(
-      'View All',
-      style: TextStyle(
-        color: AppColors.primary,
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     // return const Text(
+//     //   'View All',
+//     //   style: TextStyle(
+//     //     color: AppColors.primary,
+//     //     fontSize: 12,
+//     //     fontWeight: FontWeight.bold,
+//     //   ),
+//     // );
+//   }
+// }
 
 class _RevenueLineChart extends StatelessWidget {
   const _RevenueLineChart();
@@ -937,89 +857,89 @@ class _ActivityTile extends StatelessWidget {
   }
 }
 
-class _QuickActionsGrid extends StatelessWidget {
-  const _QuickActionsGrid();
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.5,
-      children: const [
-        _QuickActionCard(
-          icon: Icons.person_add_outlined,
-          label: 'Add Lead',
-          color: Colors.blue,
-        ),
-        _QuickActionCard(
-          icon: Icons.calendar_today_outlined,
-          label: 'Schedule Visit',
-          color: Colors.green,
-        ),
-        _QuickActionCard(
-          icon: Icons.description_outlined,
-          label: 'New Booking',
-          color: Colors.purple,
-        ),
-        _QuickActionCard(
-          icon: Icons.chat_outlined,
-          label: 'Send WhatsApp',
-          color: Colors.teal,
-        ),
-      ],
-    );
-  }
-}
-
-class _QuickActionCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _QuickActionCard({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border.withOpacity(0.5)),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// class _QuickActionsGrid extends StatelessWidget {
+//   const _QuickActionsGrid();
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return GridView.count(
+//       crossAxisCount: 2,
+//       shrinkWrap: true,
+//       physics: const NeverScrollableScrollPhysics(),
+//       mainAxisSpacing: 12,
+//       crossAxisSpacing: 12,
+//       childAspectRatio: 1.5,
+//       children: const [
+//         _QuickActionCard(
+//           icon: Icons.person_add_outlined,
+//           label: 'Add Lead',
+//           color: Colors.blue,
+//         ),
+//         _QuickActionCard(
+//           icon: Icons.calendar_today_outlined,
+//           label: 'Schedule Visit',
+//           color: Colors.green,
+//         ),
+//         _QuickActionCard(
+//           icon: Icons.description_outlined,
+//           label: 'New Booking',
+//           color: Colors.purple,
+//         ),
+//         _QuickActionCard(
+//           icon: Icons.chat_outlined,
+//           label: 'Send WhatsApp',
+//           color: Colors.teal,
+//         ),
+//       ],
+//     );
+//   }
+// }
+//
+// class _QuickActionCard extends StatelessWidget {
+//   final IconData icon;
+//   final String label;
+//   final Color color;
+//
+//   const _QuickActionCard({
+//     required this.icon,
+//     required this.label,
+//     required this.color,
+//   });
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(color: AppColors.border.withOpacity(0.5)),
+//       ),
+//       child: Column(
+//         mainAxisAlignment: MainAxisAlignment.center,
+//         children: [
+//           Container(
+//             padding: const EdgeInsets.all(10),
+//             decoration: BoxDecoration(
+//               color: color.withOpacity(0.1),
+//               shape: BoxShape.circle,
+//             ),
+//             child: Icon(icon, color: color, size: 24),
+//           ),
+//           const SizedBox(height: 8),
+//           Text(
+//             label,
+//             textAlign: TextAlign.center,
+//             style: const TextStyle(
+//               fontSize: 11,
+//               fontWeight: FontWeight.bold,
+//               color: AppColors.textPrimary,
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
 
 class _UpcomingVisitsList extends StatelessWidget {
   const _UpcomingVisitsList();
