@@ -96,9 +96,14 @@ class _LoginPageState extends State<LoginPage> {
       _showSnackBar(
         'Login request timed out. Please check your internet and try again.',
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
-      _showSnackBar('Unable to connect to the server. Please try again.');
+      final message = error.toString().replaceFirst('Exception: ', '').trim();
+      _showSnackBar(
+        message.isEmpty
+            ? 'Unable to connect to the server. Please try again.'
+            : message,
+      );
     } finally {
       if (mounted) {
         setState(() {

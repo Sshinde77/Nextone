@@ -7,6 +7,8 @@ class AuthProvider {
 
   final AuthService _authService;
 
+  String? get currentAuthToken => AuthService.currentAuthToken;
+
   Future<String?> login({
     required String email,
     required String phoneNumber,
@@ -26,6 +28,7 @@ class AuthProvider {
     required String phoneNumber,
     required String password,
     required String role,
+    String? token,
   }) {
     return _authService.register(
       email: email,
@@ -34,6 +37,7 @@ class AuthProvider {
       phoneNumber: phoneNumber,
       password: password,
       role: role,
+      token: token,
     );
   }
 
@@ -51,5 +55,9 @@ class AuthProvider {
 
   Future<String?> logout({String? token, String? refreshToken}) {
     return _authService.logout(token: token, refreshToken: refreshToken);
+  }
+
+  Future<List<Map<String, dynamic>>> users({String? token}) {
+    return _authService.users(token: token);
   }
 }

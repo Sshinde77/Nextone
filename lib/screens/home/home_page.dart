@@ -150,21 +150,49 @@ class _HomePageState extends State<HomePage> {
       ),
       bottomNavigationBar: widget.showBottomNav
           ? CRMAppBottomNav(
-              currentIndex: _currentIndex,
-              onTap: (index) {
-                if (index == 1) {
-                  Navigator.pushNamed(context, AppRoutes.leads);
-                  return;
-                }
-                if (index == 2) {
-                  Navigator.pushNamed(context, AppRoutes.followUps);
-                  return;
-                }
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-            )
+        currentIndex: _currentIndex,
+
+        onDashboard: () {
+          setState(() => _currentIndex = 0);
+        },
+
+        onLeads: () {
+          Navigator.pushNamed(context, AppRoutes.leads);
+        },
+
+        onFollowUps: () {
+          Navigator.pushNamed(context, AppRoutes.followUps);
+        },
+
+        onSiteVisits: () {
+          setState(() => _currentIndex = 3);
+        },
+
+        onProjects: () {
+          setState(() => _currentIndex = 4);
+        },
+
+        onTeam: () {
+          setState(() => _currentIndex = 5);
+        },
+
+        onReports: () {
+          setState(() => _currentIndex = 6);
+        },
+
+        onSettings: () {
+          setState(() => _currentIndex = 7);
+        },
+
+        onMore: () {
+          // optional: analytics / log
+        },
+
+        onLess: () {
+          // optional
+        },
+      )
+
           : null,
     );
   }

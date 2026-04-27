@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:nextone/screens/follow_ups/follow_up_page.dart';
 import 'package:nextone/screens/home/home_page.dart';
 import 'package:nextone/screens/leads/leads_page.dart';
-import 'package:nextone/screens/follow_ups/follow_up_page.dart';
-import 'package:nextone/screens/site_visits/site_visits_page.dart';
 import 'package:nextone/screens/projects/projects_page.dart';
 import 'package:nextone/screens/settings/settings_page.dart';
+import 'package:nextone/screens/site_visits/site_visits_page.dart';
 import 'package:nextone/screens/team/team_page.dart';
 import 'package:nextone/widgets/crm_bottom_nav.dart';
 
@@ -29,6 +29,13 @@ class _MainScreenState extends State<MainScreen> {
     const SettingsPage(),
   ];
 
+  void _setIndex(int index) {
+    if (_currentIndex == index) return;
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -36,11 +43,16 @@ class _MainScreenState extends State<MainScreen> {
       body: _screens[_currentIndex],
       bottomNavigationBar: CRMAppBottomNav(
         currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onDashboard: () => _setIndex(0),
+        onLeads: () => _setIndex(1),
+        onFollowUps: () => _setIndex(2),
+        onSiteVisits: () => _setIndex(3),
+        onProjects: () => _setIndex(4),
+        onTeam: () => _setIndex(5),
+        onReports: () => _setIndex(6),
+        onSettings: () => _setIndex(7),
+        onMore: () {},
+        onLess: () {},
       ),
     );
   }

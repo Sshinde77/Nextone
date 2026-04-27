@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/team/add_team_member_page.dart';
+import 'package:nextone/screens/team/team_member_details_page.dart';
 
 class TeamPage extends StatefulWidget {
   const TeamPage({super.key});
@@ -11,44 +14,11 @@ class TeamPage extends StatefulWidget {
 
 class _TeamPageState extends State<TeamPage> {
   final TextEditingController _searchController = TextEditingController();
+  final AuthProvider _authProvider = AuthProvider();
+  bool _isLoadingMembers = true;
+  String? _membersLoadError;
 
-  final List<_TeamMember> _members = const [
-    _TeamMember(
-      name: 'Sarah Chen',
-      role: 'Senior Portfolio Director',
-      activeLeads: 142,
-      closedLeads: 35,
-      conversionRate: 24.8,
-    ),
-    _TeamMember(
-      name: 'Marcus Vane',
-      role: 'Residential Specialist',
-      activeLeads: 96,
-      closedLeads: 17,
-      conversionRate: 17.7,
-    ),
-    _TeamMember(
-      name: 'Julianne Frost',
-      role: 'Commercial Associate',
-      activeLeads: 89,
-      closedLeads: 15,
-      conversionRate: 16.9,
-    ),
-    _TeamMember(
-      name: 'Arlo Sterling',
-      role: 'Acquisition Manager',
-      activeLeads: 114,
-      closedLeads: 21,
-      conversionRate: 18.4,
-    ),
-    _TeamMember(
-      name: 'Ivy Morgan',
-      role: 'Client Success Executive',
-      activeLeads: 74,
-      closedLeads: 14,
-      conversionRate: 18.9,
-    ),
-  ];
+  final List<_TeamMember> _members = [];
 
   List<_TeamMember> get _filteredMembers {
     final query = _searchController.text.toLowerCase();
@@ -62,10 +32,20 @@ class _TeamPageState extends State<TeamPage> {
     }).toList();
   }
 
-  _TeamMember get _bestPerformer {
+  _TeamMember? get _bestPerformer {
+    if (_members.isEmpty) {
+      return null;
+    }
+
     return _members.reduce(
       (a, b) => a.conversionRate >= b.conversionRate ? a : b,
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMembers();
   }
 
   @override
@@ -82,25 +62,104 @@ class _TeamPageState extends State<TeamPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const CrmAppBar(title: 'Team'),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
-        children: [
-          const SizedBox(height: 18),
-          _buildBestPerformerCard(bestPerformer),
-          const SizedBox(height: 16),
-          _buildSearchAndCreateRow(),
-          const SizedBox(height: 16),
-          Text(
-            'Team Members (${members.length})',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
+      body: RefreshIndicator(
+        onRefresh: _loadMembers,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+          children: [
+            const SizedBox(height: 18),
+            if (_isLoadingMembers)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_membersLoadError != null)
+              _buildInfoCard(
+                message: _membersLoadError!,
+                actionLabel: 'Retry',
+                onActionTap: _loadMembers,
+              )
+            else ...[
+              if (bestPerformer != null) _buildBestPerformerCard(bestPerformer),
+              if (bestPerformer != null) const SizedBox(height: 16),
+            ],
+            _buildSearchAndCreateRow(),
+            const SizedBox(height: 16),
+            Text(
+              'Team Members (${members.length})',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          ...members.map(_buildMemberCard),
-        ],
+            const SizedBox(height: 12),
+            if (!_isLoadingMembers &&
+                _membersLoadError == null &&
+                members.isEmpty)
+              _buildInfoCard(
+                message: 'No team members found.',
+                actionLabel: 'Refresh',
+                onActionTap: _loadMembers,
+              )
+            else
+              ...members.map(_buildMemberCard),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadMembers() async {
+    setState(() {
+      _isLoadingMembers = true;
+      _membersLoadError = null;
+    });
+
+    try {
+      final users = await _authProvider.users(
+        token: _authProvider.currentAuthToken,
+      );
+      final members = users.map(_TeamMember.fromApi).toList();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _members
+          ..clear()
+          ..addAll(members);
+        _isLoadingMembers = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _members.clear();
+        _isLoadingMembers = false;
+        _membersLoadError = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _openCreateMember() async {
+    final created = await Navigator.push<TeamMemberCreationResult>(
+      context,
+      MaterialPageRoute(builder: (_) => const AddTeamMemberPage()),
+    );
+
+    if (!mounted || created == null) {
+      return;
+    }
+
+    await _loadMembers();
+  }
+
+  void _viewMemberDetails(_TeamMember member) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TeamMemberDetailsPage(memberData: member.originalData),
       ),
     );
   }
@@ -215,20 +274,20 @@ class _TeamPageState extends State<TeamPage> {
             ],
           ),
           const SizedBox(height: 14),
-          _buildActionButtonsRow(),
+          _buildActionButtonsRow(member),
         ],
       ),
     );
   }
 
-  Widget _buildActionButtonsRow() {
+  Widget _buildActionButtonsRow(_TeamMember member) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         _buildCircleActionButton(
           Icons.visibility_outlined,
           AppColors.info,
-          () {},
+          () => _viewMemberDetails(member),
         ),
         const SizedBox(width: 12),
         _buildCircleActionButton(Icons.edit_outlined, AppColors.warning, () {}),
@@ -247,9 +306,9 @@ class _TeamPageState extends State<TeamPage> {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         shape: BoxShape.circle,
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: IconButton(
         padding: EdgeInsets.zero,
@@ -300,7 +359,7 @@ class _TeamPageState extends State<TeamPage> {
             height: 50,
             decoration: BoxDecoration(
               color: AppColors.card,
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: BorderRadius.circular(13),
               border: Border.all(color: AppColors.border),
             ),
             child: TextField(
@@ -318,7 +377,7 @@ class _TeamPageState extends State<TeamPage> {
         ),
         const SizedBox(width: 8),
         FilledButton(
-          onPressed: () {},
+          onPressed: _openCreateMember,
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
@@ -389,7 +448,7 @@ class _TeamPageState extends State<TeamPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildActionButtonsRow(),
+          _buildActionButtonsRow(member),
         ],
       ),
     );
@@ -427,6 +486,43 @@ class _TeamPageState extends State<TeamPage> {
       ),
     );
   }
+
+  Widget _buildInfoCard({
+    required String message,
+    required String actionLabel,
+    required VoidCallback onActionTap,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            message,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: onActionTap,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(actionLabel),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _InitialAvatar extends StatelessWidget {
@@ -442,7 +538,7 @@ class _InitialAvatar extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [AppColors.primaryLight, AppColors.secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -450,7 +546,7 @@ class _InitialAvatar extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Text(
-        name[0],
+        name.isEmpty ? '?' : name[0].toUpperCase(),
         style: TextStyle(
           color: AppColors.primaryDark,
           fontWeight: FontWeight.w800,
@@ -467,6 +563,7 @@ class _TeamMember {
   final int activeLeads;
   final int closedLeads;
   final double conversionRate;
+  final Map<String, dynamic> originalData;
 
   const _TeamMember({
     required this.name,
@@ -474,5 +571,92 @@ class _TeamMember {
     required this.activeLeads,
     required this.closedLeads,
     required this.conversionRate,
+    required this.originalData,
   });
+
+  factory _TeamMember.fromApi(Map<String, dynamic> json) {
+    final firstName = _toCleanString(
+      json['first_name'] ?? json['firstName'] ?? json['firstname'],
+    );
+    final lastName = _toCleanString(
+      json['last_name'] ?? json['lastName'] ?? json['lastname'],
+    );
+    final fullName = _toCleanString(json['name']);
+    final email = _toCleanString(json['email']);
+    final role = _toCleanString(json['role']);
+
+    final resolvedName = [
+      if (firstName.isNotEmpty) firstName,
+      if (lastName.isNotEmpty) lastName,
+    ].join(' ').trim();
+
+    final activeLeads = _toInt(
+      json['active_leads'] ?? json['activeLeads'] ?? json['leads_count'],
+    );
+    final closedLeads = _toInt(
+      json['closed_leads'] ?? json['closedLeads'] ?? json['closed_count'],
+    );
+    final conversionRate = _toDouble(
+      json['conversion_rate'] ?? json['conversionRate'],
+    );
+
+    final safeName = resolvedName.isNotEmpty
+        ? resolvedName
+        : (fullName.isNotEmpty
+            ? fullName
+            : (email.isNotEmpty ? email : 'Unknown'));
+
+    return _TeamMember(
+      name: safeName,
+      role: role.isNotEmpty ? _readableRole(role) : 'Team Member',
+      activeLeads: activeLeads,
+      closedLeads: closedLeads,
+      conversionRate: conversionRate,
+      originalData: json,
+    );
+  }
+
+  static int _toInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    if (value is String) {
+      return int.tryParse(value) ?? 0;
+    }
+    return 0;
+  }
+
+  static double _toDouble(dynamic value) {
+    if (value is double) {
+      return value;
+    }
+    if (value is num) {
+      return value.toDouble();
+    }
+    if (value is String) {
+      return double.tryParse(value) ?? 0;
+    }
+    return 0;
+  }
+
+  static String _toCleanString(dynamic value) {
+    if (value is String) {
+      return value.trim();
+    }
+    return '';
+  }
+
+  static String _readableRole(String role) {
+    return role
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .map(
+          (part) =>
+              '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+        )
+        .join(' ');
+  }
 }

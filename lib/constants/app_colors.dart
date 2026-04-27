@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // 🌟 Brand Colors (from your UI)
-  static const Color primary = Color(0xFFB1916C); // beige gold
+  static const Color primary = Color(0xFFB1916C);
   static const Color primaryLight = Color(0xFFD6C2A8);
   static const Color primaryDark = Color(0xFF8A6E4F);
 
-  static const Color secondary = Color(0xFFE8E3DC); // sidebar / soft bg
+  static const Color secondary = Color(0xFFE8E3DC);
   static const Color tertiary = Color(
     0xFF2E7D6B,
   ); // subtle green (used in stats)

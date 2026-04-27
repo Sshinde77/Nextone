@@ -3,12 +3,38 @@ import 'package:nextone/constants/app_colors.dart';
 
 class CRMAppBottomNav extends StatefulWidget {
   final int currentIndex;
-  final Function(int) onTap;
+
+  final VoidCallback onDashboard;
+  final VoidCallback onLeads;
+  final VoidCallback onFollowUps;
+  final VoidCallback onSiteVisits;
+  final VoidCallback onProjects;
+  final VoidCallback onTeam;
+  final VoidCallback onReports;
+  final VoidCallback onSettings;
+  final VoidCallback onMore;
+  final VoidCallback onLess;
+
+  final int? leadsBadgeCount;
+  final int? followUpsBadgeCount;
+  final double height;
 
   const CRMAppBottomNav({
     super.key,
     required this.currentIndex,
-    required this.onTap,
+    required this.onDashboard,
+    required this.onLeads,
+    required this.onFollowUps,
+    required this.onSiteVisits,
+    required this.onProjects,
+    required this.onTeam,
+    required this.onReports,
+    required this.onSettings,
+    required this.onMore,
+    required this.onLess,
+    this.leadsBadgeCount,
+    this.followUpsBadgeCount,
+    this.height = 76,
   });
 
   @override
@@ -16,185 +42,386 @@ class CRMAppBottomNav extends StatefulWidget {
 }
 
 class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
-  static const int _loopCycles = 10000;
-  late final PageController _pageController;
-  late int _currentPage;
+  bool _isExpanded = false;
 
-  final List<_NavData> items = [
-    _NavData(Icons.dashboard_outlined, "Dashboard"),
-    _NavData(Icons.people_alt_outlined, "Leads"),
-    _NavData(Icons.check_circle_outline, "Follow-ups"),
-    _NavData(Icons.location_on_outlined, "Visits"),
-    _NavData(Icons.apartment_outlined, "Projects"),
-    _NavData(Icons.groups_outlined, "Team"),
-    _NavData(Icons.person, "Profile"),
-    _NavData(Icons.settings, "Settings"),
-  ];
+  bool get _isExpandedIndex => widget.currentIndex >= 4;
 
   @override
   void initState() {
     super.initState();
-    _currentPage = _loopStartPage + widget.currentIndex;
-    _pageController = PageController(
-      initialPage: _currentPage,
-      viewportFraction: 0.27,
-    );
+    _isExpanded = _isExpandedIndex;
   }
 
   @override
   void didUpdateWidget(covariant CRMAppBottomNav oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentIndex != widget.currentIndex &&
-        _activeIndex != widget.currentIndex) {
-      _animateToIndex(widget.currentIndex);
+    if (_isExpanded != _isExpandedIndex) {
+      setState(() {
+        _isExpanded = _isExpandedIndex;
+      });
     }
   }
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
+  void _handleMore() {
+    if (_isExpanded) return;
+    setState(() => _isExpanded = true);
+    widget.onMore();
   }
 
-  int get _loopStartPage => items.length * _loopCycles;
-
-  int get _activeIndex => _normaliseIndex(_currentPage);
-
-  int _normaliseIndex(int page) => page % items.length;
-
-  int _nearestPageForIndex(int index) {
-    final current = _pageController.hasClients
-        ? (_pageController.page ?? _currentPage.toDouble()).round()
-        : _currentPage;
-    final currentIndex = _normaliseIndex(current);
-    var pageOffset = index - currentIndex;
-
-    if (pageOffset.abs() > items.length / 2) {
-      pageOffset += pageOffset.isNegative ? items.length : -items.length;
-    }
-
-    return current + pageOffset;
-  }
-
-  void _animateToIndex(int index) {
-    final targetPage = _nearestPageForIndex(index);
-    _currentPage = targetPage;
-
-    if (_pageController.hasClients) {
-      _pageController.animateToPage(
-        targetPage,
-        duration: const Duration(milliseconds: 420),
-        curve: Curves.easeOutCubic,
-      );
-    }
-  }
-
-  void _onTap(int index) {
-    widget.onTap(index);
-    _animateToIndex(index);
+  void _handleLess() {
+    if (!_isExpanded) return;
+    setState(() => _isExpanded = false);
+    widget.onLess();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 85,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 20),
-        ],
-      ),
-      child: PageView.builder(
-        controller: _pageController,
-        physics: const _NavPagePhysics(),
-        onPageChanged: (page) {
-          _currentPage = page;
-          final index = _normaliseIndex(page);
-
-          if (index != widget.currentIndex) {
-            widget.onTap(index);
-          }
-
-          if (!mounted) return;
-          setState(() {});
-        },
-        itemBuilder: (context, page) {
-          final index = _normaliseIndex(page);
-          final isActive = widget.currentIndex == index;
-
-          return GestureDetector(
-            onTap: () => _onTap(index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? AppColors.primary.withOpacity(0.1)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  AnimatedScale(
-                    scale: isActive ? 1.2 : 1.0,
-                    duration: const Duration(milliseconds: 250),
-                    child: Icon(
-                      items[index].icon,
-                      color: isActive
-                          ? AppColors.primary
-                          : AppColors.textSecondary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    items[index].label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: isActive
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      color: isActive
-                          ? AppColors.primary
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                ],
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1A000000),
+              blurRadius: 20,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Material(
+            color: AppColors.surface,
+            child: SizedBox(
+              height: widget.height,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 280),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: _isExpanded
+                    ? _ExpandedNavBar(
+                        key: const ValueKey<String>('expanded-nav'),
+                        currentIndex: widget.currentIndex,
+                        onProjects: widget.onProjects,
+                        onTeam: widget.onTeam,
+                        onReports: widget.onReports,
+                        onSettings: widget.onSettings,
+                        onLess: _handleLess,
+                      )
+                    : _MainNavBar(
+                        key: const ValueKey<String>('main-nav'),
+                        currentIndex: widget.currentIndex,
+                        onDashboard: widget.onDashboard,
+                        onLeads: widget.onLeads,
+                        onFollowUps: widget.onFollowUps,
+                        onSiteVisits: widget.onSiteVisits,
+                        onMore: _handleMore,
+                        leadsBadgeCount: widget.leadsBadgeCount,
+                        followUpsBadgeCount: widget.followUpsBadgeCount,
+                      ),
               ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 }
 
-class _NavData {
-  final IconData icon;
-  final String label;
+class _MainNavBar extends StatelessWidget {
+  final int currentIndex;
+  final VoidCallback onDashboard;
+  final VoidCallback onLeads;
+  final VoidCallback onFollowUps;
+  final VoidCallback onSiteVisits;
+  final VoidCallback onMore;
+  final int? leadsBadgeCount;
+  final int? followUpsBadgeCount;
 
-  _NavData(this.icon, this.label);
+  const _MainNavBar({
+    super.key,
+    required this.currentIndex,
+    required this.onDashboard,
+    required this.onLeads,
+    required this.onFollowUps,
+    required this.onSiteVisits,
+    required this.onMore,
+    this.leadsBadgeCount,
+    this.followUpsBadgeCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _NavItem(
+                    icon: Icons.dashboard_outlined,
+                    label: 'Dashboard',
+                    isActive: currentIndex == 0,
+                    onTap: onDashboard,
+                  ),
+                ),
+                Expanded(
+                  child: _NavItem(
+                    icon: Icons.people_alt_outlined,
+                    label: 'Leads',
+                    isActive: currentIndex == 1,
+                    onTap: onLeads,
+                    badgeCount: leadsBadgeCount,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          _CenterNavButton(
+            icon: Icons.keyboard_arrow_up_rounded,
+            color: AppColors.primary,
+            shadowColor: AppColors.primary.withValues(alpha: 0.35),
+            onTap: onMore,
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _NavItem(
+                    icon: Icons.check_circle_outline,
+                    label: 'Follow-ups',
+                    isActive: currentIndex == 2,
+                    onTap: onFollowUps,
+                    badgeCount: followUpsBadgeCount,
+                  ),
+                ),
+                Expanded(
+                  child: _NavItem(
+                    icon: Icons.location_on_outlined,
+                    label: 'Visits',
+                    isActive: currentIndex == 3,
+                    onTap: onSiteVisits,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _NavPagePhysics extends PageScrollPhysics {
-  const _NavPagePhysics({ScrollPhysics? parent})
-    : super(parent: parent ?? const ClampingScrollPhysics());
+class _ExpandedNavBar extends StatelessWidget {
+  final int currentIndex;
+  final VoidCallback onProjects;
+  final VoidCallback onTeam;
+  final VoidCallback onReports;
+  final VoidCallback onSettings;
+  final VoidCallback onLess;
+
+  const _ExpandedNavBar({
+    super.key,
+    required this.currentIndex,
+    required this.onProjects,
+    required this.onTeam,
+    required this.onReports,
+    required this.onSettings,
+    required this.onLess,
+  });
 
   @override
-  _NavPagePhysics applyTo(ScrollPhysics? ancestor) {
-    return _NavPagePhysics(parent: buildParent(ancestor));
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: _NavItem(
+              icon: Icons.apartment_outlined,
+              label: 'Projects',
+              isActive: currentIndex == 4,
+              onTap: onProjects,
+            ),
+          ),
+          Expanded(
+            child: _NavItem(
+              icon: Icons.groups_outlined,
+              label: 'Team',
+              isActive: currentIndex == 5,
+              onTap: onTeam,
+            ),
+          ),
+          const SizedBox(width: 4),
+          _CenterNavButton(
+            icon: Icons.keyboard_arrow_down_rounded,
+            color: AppColors.primaryDark,
+            shadowColor: AppColors.primaryDark.withValues(alpha: 0.25),
+            onTap: onLess,
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: _NavItem(
+              icon: Icons.bar_chart_outlined,
+              label: 'Reports',
+              isActive: currentIndex == 6,
+              onTap: onReports,
+            ),
+          ),
+          Expanded(
+            child: _NavItem(
+              icon: Icons.settings_outlined,
+              label: 'Settings',
+              isActive: currentIndex == 7,
+              onTap: onSettings,
+            ),
+          ),
+        ],
+      ),
+    );
   }
+}
 
-  // Increase thresholds so a light touch doesn't switch tabs.
-  @override
-  double get dragStartDistanceMotionThreshold => 20.0;
+class _CenterNavButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final Color shadowColor;
+  final VoidCallback onTap;
+
+  const _CenterNavButton({
+    required this.icon,
+    required this.color,
+    required this.shadowColor,
+    required this.onTap,
+  });
 
   @override
-  double get minFlingDistance => 80.0;
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkResponse(
+        onTap: onTap,
+        radius: 28,
+        containedInkWell: true,
+        customBorder: const CircleBorder(),
+        child: Container(
+          height: 52,
+          width: 52,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: shadowColor,
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 28),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+  final int? badgeCount;
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+    this.badgeCount,
+  });
 
   @override
-  double get minFlingVelocity => 1200.0;
+  Widget build(BuildContext context) {
+    final Color itemColor =
+        isActive ? AppColors.primary : AppColors.textSecondary;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          height: double.infinity,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(icon, size: 22, color: itemColor),
+                  if ((badgeCount ?? 0) > 0)
+                    Positioned(
+                      right: -8,
+                      top: -6,
+                      child: _Badge(count: badgeCount!),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                    color: itemColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final int count;
+
+  const _Badge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final String text = count > 99 ? '99+' : count.toString();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: AppColors.primaryDark,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 9,
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
 }
