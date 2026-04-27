@@ -1,26 +1,193 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/team/add_team_member_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
-class TeamMemberDetailsPage extends StatelessWidget {
+class TeamMemberDetailsPage extends StatefulWidget {
   final Map<String, dynamic> memberData;
 
   const TeamMemberDetailsPage({super.key, required this.memberData});
 
   @override
+  State<TeamMemberDetailsPage> createState() => _TeamMemberDetailsPageState();
+}
+
+class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
+  final AuthProvider _authProvider = AuthProvider();
+
+  late Map<String, dynamic> _memberData;
+  String? _memberId;
+  bool _isLoading = true;
+  String? _loadError;
+  bool _isDeleting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _memberData = Map<String, dynamic>.from(widget.memberData);
+    _memberId = _extractMemberId(_memberData);
+    _fetchMemberDetails();
+  }
+
+  Future<void> _fetchMemberDetails() async {
+    final memberId = _memberId;
+    if (memberId == null || memberId.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Unable to load member details: missing user id.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final details = await _authProvider.usersDetail(
+        id: memberId,
+        token: _authProvider.currentAuthToken,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _memberData = {..._memberData, ...details};
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _loadError = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _deleteMember() async {
+    final memberId = _memberId;
+    if (memberId == null || memberId.isEmpty) {
+      _showSnackBar('Unable to delete member: missing user id.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Member'),
+          content: const Text('Are you sure you want to delete this member?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isDeleting = true;
+    });
+
+    try {
+      await _authProvider.deleteUser(
+        id: memberId,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Member deleted successfully.');
+      Navigator.pop(context, 'deleted');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
+      }
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _openEditMember() async {
+    final memberId = _memberId;
+    if (memberId == null || memberId.isEmpty) {
+      _showSnackBar('Unable to edit member: missing user id.');
+      return;
+    }
+
+    final updated = await Navigator.push<TeamMemberCreationResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddTeamMemberPage(
+          memberId: memberId,
+          memberData: _memberData,
+        ),
+      ),
+    );
+
+    if (!mounted || updated == null) {
+      return;
+    }
+
+    Navigator.pop(context, 'updated');
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final firstName = memberData['first_name'] ?? '';
-    final lastName = memberData['last_name'] ?? '';
-    final fullName = '$firstName $lastName'.trim();
-    final email = memberData['email'] ?? 'N/A';
-    final phoneNumber = memberData['phone_number'] ?? 'N/A';
-    final role = _readableRole(memberData['role'] ?? 'Team Member');
-    final isActive = memberData['is_active'] ?? false;
-    final lastLoginStr = memberData['last_login'];
-    
+    final firstName = _asString(
+      _memberData['first_name'] ??
+          _memberData['firstName'] ??
+          _memberData['firstname'],
+    );
+    final lastName = _asString(
+      _memberData['last_name'] ?? _memberData['lastName'] ?? _memberData['lastname'],
+    );
+    final fullName = _buildFullName(firstName, lastName, _memberData);
+    final email = _fallbackValue(_asString(_memberData['email']), fallback: 'N/A');
+    final phoneNumber = _fallbackValue(
+      _asString(_memberData['phone_number'] ?? _memberData['phoneNumber']),
+      fallback: 'N/A',
+    );
+    final role = _readableRole(
+      _asString(_memberData['role']).isNotEmpty
+          ? _asString(_memberData['role'])
+          : 'Team Member',
+    );
+    final isActive = _asBool(_memberData['is_active'] ?? _memberData['isActive']);
+    final lastLoginStr = _asString(_memberData['last_login'] ?? _memberData['lastLogin']);
+
     DateTime? lastLogin;
-    if (lastLoginStr != null) {
+    if (lastLoginStr.isNotEmpty) {
       lastLogin = DateTime.tryParse(lastLoginStr);
     }
 
@@ -31,44 +198,96 @@ class TeamMemberDetailsPage extends StatelessWidget {
         showBackButton: true,
         onBackTap: () => Navigator.pop(context),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Column(
-          children: [
-            _buildHeader(fullName, role, isActive),
-            const SizedBox(height: 24),
-            _buildStatsSection(),
-            const SizedBox(height: 24),
-            _buildInfoSection(
-              title: 'Personal Information',
-              items: [
-                _InfoItem(icon: Icons.email_outlined, label: 'Email Address', value: email),
-                _InfoItem(icon: Icons.phone_android_outlined, label: 'Phone Number', value: phoneNumber),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _buildInfoSection(
-              title: 'System Information',
-              items: [
-                _InfoItem(
-                  icon: Icons.history_rounded,
-                  label: 'Last Login',
-                  value: lastLogin != null 
-                    ? DateFormat('MMM dd, yyyy - hh:mm a').format(lastLogin)
-                    : 'Never',
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _fetchMemberDetails,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                child: Column(
+                  children: [
+                    if (_loadError != null) ...[
+                      _buildErrorCard(_loadError!),
+                      const SizedBox(height: 16),
+                    ],
+                    _buildHeader(fullName, role, isActive),
+                    const SizedBox(height: 24),
+                    _buildStatsSection(_memberData),
+                    const SizedBox(height: 24),
+                    _buildInfoSection(
+                      title: 'Personal Information',
+                      items: [
+                        _InfoItem(
+                          icon: Icons.email_outlined,
+                          label: 'Email Address',
+                          value: email,
+                        ),
+                        _InfoItem(
+                          icon: Icons.phone_android_outlined,
+                          label: 'Phone Number',
+                          value: phoneNumber,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _buildInfoSection(
+                      title: 'System Information',
+                      items: [
+                        _InfoItem(
+                          icon: Icons.history_rounded,
+                          label: 'Last Login',
+                          value: lastLogin != null
+                              ? DateFormat('MMM dd, yyyy - hh:mm a').format(lastLogin)
+                              : 'Never',
+                        ),
+                        _InfoItem(
+                          icon: Icons.security_outlined,
+                          label: 'Access Level',
+                          value: role,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    _buildActionButtons(),
+                    const SizedBox(height: 40),
+                  ],
                 ),
-                _InfoItem(
-                  icon: Icons.security_outlined,
-                  label: 'Access Level',
-                  value: role,
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 32),
-            _buildActionButtons(),
-            const SizedBox(height: 40),
-          ],
-        ),
+    );
+  }
+
+  Widget _buildErrorCard(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            message,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          FilledButton(
+            onPressed: _fetchMemberDetails,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }
@@ -170,13 +389,22 @@ class TeamMemberDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsSection() {
+  Widget _buildStatsSection(Map<String, dynamic> memberData) {
+    final activeLeads = _readInt(
+      memberData['active_leads'] ??
+          memberData['activeLeads'] ??
+          memberData['leads_count'],
+    );
+    final conversionRate = _readNum(
+      memberData['conversion_rate'] ?? memberData['conversionRate'],
+    );
+
     return Row(
       children: [
         Expanded(
           child: _buildStatItem(
             label: 'Total Leads',
-            value: memberData['active_leads']?.toString() ?? '0',
+            value: activeLeads.toString(),
             color: AppColors.info,
           ),
         ),
@@ -184,7 +412,7 @@ class TeamMemberDetailsPage extends StatelessWidget {
         Expanded(
           child: _buildStatItem(
             label: 'Conversion',
-            value: '${memberData['conversion_rate']?.toString() ?? '0'}%',
+            value: '${conversionRate.toStringAsFixed(1)}%',
             color: AppColors.success,
           ),
         ),
@@ -192,7 +420,11 @@ class TeamMemberDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem({required String label, required String value, required Color color}) {
+  Widget _buildStatItem({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -246,45 +478,47 @@ class TeamMemberDetailsPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          ...items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.background,
-                    borderRadius: BorderRadius.circular(12),
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(item.icon, size: 20, color: AppColors.primary),
                   ),
-                  child: Icon(item.icon, size: 20, color: AppColors.primary),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.label,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w500,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.label,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                      Text(
-                        item.value,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
+                        Text(
+                          item.value,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -306,16 +540,16 @@ class TeamMemberDetailsPage extends StatelessWidget {
               icon: Icons.edit_outlined,
               label: 'Edit Member',
               color: AppColors.primary,
-              onTap: () {},
+              onTap: _isDeleting ? null : _openEditMember,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: _buildRoundedButton(
               icon: Icons.delete_outline,
-              label: 'Delete Member',
+              label: _isDeleting ? 'Deleting...' : 'Delete Member',
               color: AppColors.error,
-              onTap: () {},
+              onTap: _isDeleting ? null : _deleteMember,
             ),
           ),
         ],
@@ -327,17 +561,19 @@ class TeamMemberDetailsPage extends StatelessWidget {
     required IconData icon,
     required String label,
     required Color color,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
+    final isDisabled = onTap == null;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withOpacity(isDisabled ? 0.05 : 0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withOpacity(isDisabled ? 0.12 : 0.2)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -364,6 +600,87 @@ class TeamMemberDetailsPage extends StatelessWidget {
         .where((part) => part.trim().isNotEmpty)
         .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
+  }
+
+  String? _extractMemberId(Map<String, dynamic> source) {
+    final keys = ['id', 'user_id', 'userId', 'uuid'];
+    for (final key in keys) {
+      final value = source[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+    return null;
+  }
+
+  String _buildFullName(String firstName, String lastName, Map<String, dynamic> source) {
+    final combined = '$firstName $lastName'.trim();
+    if (combined.isNotEmpty) {
+      return combined;
+    }
+
+    final fromName = _asString(source['name']);
+    if (fromName.isNotEmpty) {
+      return fromName;
+    }
+
+    final fromEmail = _asString(source['email']);
+    if (fromEmail.isNotEmpty) {
+      return fromEmail;
+    }
+
+    return 'Unknown Member';
+  }
+
+  String _fallbackValue(String value, {required String fallback}) {
+    return value.isNotEmpty ? value : fallback;
+  }
+
+  String _asString(dynamic value) {
+    if (value is String) {
+      return value.trim();
+    }
+    return '';
+  }
+
+  bool _asBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1';
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    return false;
+  }
+
+  int _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    if (value is String) {
+      return int.tryParse(value) ?? 0;
+    }
+    return 0;
+  }
+
+  double _readNum(dynamic value) {
+    if (value is double) {
+      return value;
+    }
+    if (value is num) {
+      return value.toDouble();
+    }
+    if (value is String) {
+      return double.tryParse(value) ?? 0;
+    }
+    return 0;
   }
 }
 

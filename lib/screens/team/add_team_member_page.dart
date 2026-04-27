@@ -14,7 +14,16 @@ class TeamMemberCreationResult {
 }
 
 class AddTeamMemberPage extends StatefulWidget {
-  const AddTeamMemberPage({super.key});
+  final String? memberId;
+  final Map<String, dynamic>? memberData;
+
+  const AddTeamMemberPage({
+    super.key,
+    this.memberId,
+    this.memberData,
+  });
+
+  bool get isEditMode => memberId != null && memberId!.trim().isNotEmpty;
 
   @override
   State<AddTeamMemberPage> createState() => _AddTeamMemberPageState();
@@ -40,6 +49,15 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
     _RoleOption(label: 'External Caller', value: 'external_caller'),
   ];
 
+  bool get _isEditMode => widget.isEditMode;
+  String? get _memberId => widget.memberId?.trim();
+
+  @override
+  void initState() {
+    super.initState();
+    _prefillDataForEdit();
+  }
+
   @override
   void dispose() {
     _firstNameController.dispose();
@@ -50,11 +68,35 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
     super.dispose();
   }
 
+  void _prefillDataForEdit() {
+    final data = widget.memberData;
+    if (!_isEditMode || data == null) {
+      return;
+    }
+
+    _firstNameController.text = _readString(
+      data['first_name'] ?? data['firstName'] ?? data['firstname'],
+    );
+    _lastNameController.text = _readString(
+      data['last_name'] ?? data['lastName'] ?? data['lastname'],
+    );
+    _emailController.text = _readString(data['email']);
+    _phoneController.text = _readString(
+      data['phone_number'] ?? data['phoneNumber'],
+    );
+
+    final incomingRole = _readString(data['role']);
+    if (incomingRole.isNotEmpty &&
+        _roles.any((role) => role.value == incomingRole)) {
+      _selectedRoleValue = incomingRole;
+    }
+  }
+
   _RoleOption get _selectedRole {
     return _roles.firstWhere((role) => role.value == _selectedRoleValue);
   }
 
-  Future<void> _createMember() async {
+  Future<void> _submitMember() async {
     final form = _formKey.currentState;
     if (form == null || !form.validate()) {
       return;
@@ -66,6 +108,37 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
     });
 
     try {
+      if (_isEditMode) {
+        final memberId = _memberId;
+        if (memberId == null || memberId.isEmpty) {
+          _showSnackBar('Unable to update member: missing user id.');
+          return;
+        }
+
+        await _authProvider.editUser(
+          id: memberId,
+          firstName: _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim(),
+          phoneNumber: _phoneController.text.trim(),
+          token: _authProvider.currentAuthToken,
+        );
+
+        if (!mounted) {
+          return;
+        }
+
+        _showSnackBar('Team member updated successfully.');
+        Navigator.pop(
+          context,
+          TeamMemberCreationResult(
+            fullName:
+                '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
+            roleLabel: _selectedRole.label,
+          ),
+        );
+        return;
+      }
+
       final error = await _authProvider.register(
         email: _emailController.text.trim(),
         firstName: _firstNameController.text.trim(),
@@ -94,11 +167,11 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
           roleLabel: _selectedRole.label,
         ),
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
-      _showSnackBar('Unable to connect to the server. Please try again.');
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) {
         setState(() {
@@ -106,6 +179,13 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
         });
       }
     }
+  }
+
+  String _readString(dynamic value) {
+    if (value is String) {
+      return value.trim();
+    }
+    return '';
   }
 
   void _showSnackBar(String message) {
@@ -116,10 +196,16 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
 
   @override
   Widget build(BuildContext context) {
+    final pageTitle = _isEditMode ? 'Edit Team Member' : 'Add Team Member';
+    final sectionTitle = _isEditMode
+        ? 'Update Team Member'
+        : 'Create New Team Member';
+    final submitLabel = _isEditMode ? 'Update Member' : 'Create Member';
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const CrmAppBar(
-        title: 'Add Team Member',
+      appBar: CrmAppBar(
+        title: pageTitle,
         showBackButton: true,
         showNotificationIcon: false,
       ),
@@ -138,9 +224,9 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Create New Team Member',
-                    style: TextStyle(
+                  Text(
+                    sectionTitle,
+                    style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -185,6 +271,8 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _emailController,
+                    readOnly: _isEditMode,
+                    enabled: !_isEditMode,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
@@ -192,6 +280,9 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                       prefixIcon: Icon(Icons.alternate_email),
                     ),
                     validator: (value) {
+                      if (_isEditMode) {
+                        return null;
+                      }
                       final email = value?.trim() ?? '';
                       if (email.isEmpty) {
                         return 'Email is required.';
@@ -236,58 +327,62 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                           ),
                         )
                         .toList(),
-                    onChanged: (value) {
-                      if (value == null) {
-                        return;
-                      }
-                      setState(() {
-                        _selectedRoleValue = value;
-                      });
-                    },
+                    onChanged: _isEditMode
+                        ? null
+                        : (value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setState(() {
+                              _selectedRoleValue = value;
+                            });
+                          },
                   ),
-                  const SizedBox(height: 16),
-                  _buildLabel('PASSWORD'),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) {
-                      if (!_isSubmitting) {
-                        _createMember();
-                      }
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Harsh@123',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
+                  if (!_isEditMode) ...[
+                    const SizedBox(height: 16),
+                    _buildLabel('PASSWORD'),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) {
+                        if (!_isSubmitting) {
+                          _submitMember();
+                        }
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Harsh@123',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
                         ),
                       ),
+                      validator: (value) {
+                        if ((value ?? '').isEmpty) {
+                          return 'Password is required.';
+                        }
+                        if ((value ?? '').length < 6) {
+                          return 'Password must be at least 6 characters.';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if ((value ?? '').isEmpty) {
-                        return 'Password is required.';
-                      }
-                      if ((value ?? '').length < 6) {
-                        return 'Password must be at least 6 characters.';
-                      }
-                      return null;
-                    },
-                  ),
+                  ],
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : _createMember,
+                      onPressed: _isSubmitting ? null : _submitMember,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -302,7 +397,7 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                             ),
                             const SizedBox(width: 12),
                           ],
-                          const Text('Create Member'),
+                          Text(submitLabel),
                         ],
                       ),
                     ),

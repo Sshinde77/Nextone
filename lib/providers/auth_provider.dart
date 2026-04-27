@@ -60,4 +60,36 @@ class AuthProvider {
   Future<List<Map<String, dynamic>>> users({String? token}) {
     return _authService.users(token: token);
   }
+
+  Future<Map<String, dynamic>> usersDetail({required String id, String? token}) {
+    return _authService.usersDetail(id: id, token: token);
+  }
+
+  Future<void> deleteUser({required String id, String? token}) {
+    return _authService.deleteUser(id: id, token: token);
+  }
+
+  Future<void> editUser({
+    required String id,
+    required String firstName,
+    required String lastName,
+    required String phoneNumber,
+    String? token,
+  }) {
+    return _authService.editUser(
+      id: id,
+      firstName: firstName,
+      lastName: lastName,
+      phoneNumber: phoneNumber,
+      token: token,
+    );
+  }
+
+  Future<void> editUserRole({
+    required String id,
+    required String role,
+    String? token,
+  }) {
+    return _authService.editUserRole(id: id, role: role, token: token);
+  }
 }

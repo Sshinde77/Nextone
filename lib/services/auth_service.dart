@@ -366,6 +366,172 @@ class AuthService {
     throw Exception('Users response format is not valid.');
   }
 
+  Future<Map<String, dynamic>> usersDetail({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.usersdetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'usersDetail',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('usersDetail', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch user details.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      if (body is Map<String, dynamic>) {
+        final dynamic data = body['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return body;
+      }
+    } catch (_) {
+      // Fall through to generic error below.
+    }
+
+    throw Exception('User details response format is not valid.');
+  }
+
+  Future<void> deleteUser({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.deleteuser.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteUser',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response = await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteUser', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete user.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
+  Future<void> editUser({
+    required String id,
+    required String firstName,
+    required String lastName,
+    required String phoneNumber,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.edituser.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'first_name': firstName.trim(),
+      'last_name': lastName.trim(),
+      'phone_number': phoneNumber.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'editUser',
+      method: 'PUT',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .put(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('editUser', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update user.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
+  Future<void> editUserRole({
+    required String id,
+    required String role,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    final normalizedRole = role.trim();
+
+    if (normalizedId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+    if (normalizedRole.isEmpty) {
+      throw Exception('Role is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.edituserrole.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({'role': normalizedRole});
+
+    _logRequest(
+      endpoint: 'editUserRole',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('editUserRole', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to change user role.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
   Map<String, String> _headers({required String accept, String? token}) {
     final headers = {'accept': accept, 'Content-Type': 'application/json'};
 

@@ -11,4 +11,8 @@ class ApiConstants {
 
   // User Endpoints
   static const String users = '/users';
+  static const String usersdetail = '/users/{id}';
+  static const String deleteuser = '/users/{id}';
+  static const String edituser = '/users/{id}';
+  static const String edituserrole = '/users/{id}/role';
 }

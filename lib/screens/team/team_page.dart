@@ -17,6 +17,14 @@ class _TeamPageState extends State<TeamPage> {
   final AuthProvider _authProvider = AuthProvider();
   bool _isLoadingMembers = true;
   String? _membersLoadError;
+  final Set<String> _deletingMemberIds = <String>{};
+  final Set<String> _changingRoleMemberIds = <String>{};
+  final List<_RoleOption> _roleOptions = const [
+    _RoleOption(label: 'Admin', value: 'admin'),
+    _RoleOption(label: 'Sales Manager', value: 'sales_manager'),
+    _RoleOption(label: 'Sales Executive', value: 'sales_executive'),
+    _RoleOption(label: 'External Caller', value: 'external_caller'),
+  ];
 
   final List<_TeamMember> _members = [];
 
@@ -155,13 +163,226 @@ class _TeamPageState extends State<TeamPage> {
     await _loadMembers();
   }
 
-  void _viewMemberDetails(_TeamMember member) {
-    Navigator.push(
+  Future<void> _viewMemberDetails(_TeamMember member) async {
+    final action = await Navigator.push<Object?>(
       context,
       MaterialPageRoute(
         builder: (_) => TeamMemberDetailsPage(memberData: member.originalData),
       ),
     );
+    if (!mounted) {
+      return;
+    }
+
+    if (action == true || action == 'updated' || action == 'deleted') {
+      await _loadMembers();
+    }
+  }
+
+  Future<void> _openEditMember(_TeamMember member) async {
+    if (member.id.isEmpty) {
+      _showSnackBar('Unable to edit member: missing user id.');
+      return;
+    }
+
+    final updated = await Navigator.push<TeamMemberCreationResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddTeamMemberPage(
+          memberId: member.id,
+          memberData: member.originalData,
+        ),
+      ),
+    );
+
+    if (!mounted || updated == null) {
+      return;
+    }
+
+    await _loadMembers();
+  }
+
+  Future<void> _deleteMember(_TeamMember member) async {
+    if (member.id.isEmpty) {
+      _showSnackBar('Unable to delete member: missing user id.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Member'),
+          content: Text(
+            'Are you sure you want to delete ${member.name}?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _deletingMemberIds.add(member.id);
+    });
+
+    try {
+      await _authProvider.deleteUser(
+        id: member.id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _members.removeWhere((m) => m.id == member.id);
+      });
+      _showSnackBar('Member deleted successfully.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _deletingMemberIds.remove(member.id);
+        });
+      }
+    }
+  }
+
+  Future<void> _openChangeRoleSheet(_TeamMember member) async {
+    if (!mounted) {
+      return;
+    }
+    if (member.id.isEmpty) {
+      _showSnackBar('Unable to change role: missing user id.');
+      return;
+    }
+
+    final selectedRole = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    'Change Role',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ..._roleOptions.map((option) {
+                  final roleLabel = _TeamMember.readableRole(option.value);
+                  final isSelected =
+                      member.role.toLowerCase() == roleLabel.toLowerCase();
+
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    title: Text(option.label),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle, color: AppColors.success)
+                        : null,
+                    onTap: () => Navigator.pop(context, option.value),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selectedRole == null) {
+      return;
+    }
+
+    final currentRoleValue = _roleOptions
+        .firstWhere(
+          (option) =>
+              _TeamMember.readableRole(option.value).toLowerCase() ==
+              member.role.toLowerCase(),
+          orElse: () => _RoleOption(label: '', value: ''),
+        )
+        .value;
+    if (selectedRole == currentRoleValue) {
+      return;
+    }
+
+    final index = _members.indexWhere((m) => m.id == member.id);
+    if (index < 0) {
+      return;
+    }
+
+    setState(() {
+      _changingRoleMemberIds.add(member.id);
+    });
+
+    try {
+      await _authProvider.editUserRole(
+        id: member.id,
+        role: selectedRole,
+        token: _authProvider.currentAuthToken,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        final updatedData = Map<String, dynamic>.from(
+          _members[index].originalData,
+        )..['role'] = selectedRole;
+        _members[index] = _members[index].copyWith(
+          role: _TeamMember.readableRole(selectedRole),
+          originalData: updatedData,
+        );
+      });
+
+      _showSnackBar('Role changed to ${_TeamMember.readableRole(selectedRole)}.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _changingRoleMemberIds.remove(member.id);
+        });
+      }
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _buildBestPerformerCard(_TeamMember member) {
@@ -281,18 +502,39 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Widget _buildActionButtonsRow(_TeamMember member) {
+    final isDeleting = member.id.isNotEmpty && _deletingMemberIds.contains(member.id);
+    final isChangingRole =
+        member.id.isNotEmpty && _changingRoleMemberIds.contains(member.id);
+    final isBusy = isDeleting || isChangingRole;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         _buildCircleActionButton(
           Icons.visibility_outlined,
           AppColors.info,
-          () => _viewMemberDetails(member),
+          isBusy ? null : () => _viewMemberDetails(member),
         ),
         const SizedBox(width: 12),
-        _buildCircleActionButton(Icons.edit_outlined, AppColors.warning, () {}),
+        _buildCircleActionButton(
+          Icons.edit_outlined,
+          AppColors.warning,
+          isBusy ? null : () => _openEditMember(member),
+        ),
         const SizedBox(width: 12),
-        _buildCircleActionButton(Icons.delete_outline, AppColors.error, () {}),
+        _buildCircleActionButton(
+          Icons.manage_accounts_outlined,
+          AppColors.primary,
+          isBusy ? null : () => _openChangeRoleSheet(member),
+          isLoading: isChangingRole,
+        ),
+        const SizedBox(width: 12),
+        _buildCircleActionButton(
+          Icons.delete_outline,
+          AppColors.error,
+          isBusy ? null : () => _deleteMember(member),
+          isLoading: isDeleting,
+        ),
       ],
     );
   }
@@ -300,21 +542,32 @@ class _TeamPageState extends State<TeamPage> {
   Widget _buildCircleActionButton(
     IconData icon,
     Color color,
-    VoidCallback onPressed,
-  ) {
+    VoidCallback? onPressed, {
+    bool isLoading = false,
+  }) {
+    final isDisabled = onPressed == null || isLoading;
+
     return Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withOpacity(isDisabled ? 0.05 : 0.1),
         shape: BoxShape.circle,
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withOpacity(isDisabled ? 0.12 : 0.2)),
       ),
-      child: IconButton(
-        padding: EdgeInsets.zero,
-        icon: Icon(icon, size: 20, color: color),
-        onPressed: onPressed,
-      ),
+      child: isLoading
+          ? Padding(
+              padding: const EdgeInsets.all(10),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+              ),
+            )
+          : IconButton(
+              padding: EdgeInsets.zero,
+              icon: Icon(icon, size: 20, color: color),
+              onPressed: onPressed,
+            ),
     );
   }
 
@@ -558,6 +811,7 @@ class _InitialAvatar extends StatelessWidget {
 }
 
 class _TeamMember {
+  final String id;
   final String name;
   final String role;
   final int activeLeads;
@@ -566,6 +820,7 @@ class _TeamMember {
   final Map<String, dynamic> originalData;
 
   const _TeamMember({
+    required this.id,
     required this.name,
     required this.role,
     required this.activeLeads,
@@ -575,6 +830,9 @@ class _TeamMember {
   });
 
   factory _TeamMember.fromApi(Map<String, dynamic> json) {
+    final id = _toCleanString(
+      json['id'] ?? json['user_id'] ?? json['userId'] ?? json['uuid'],
+    );
     final firstName = _toCleanString(
       json['first_name'] ?? json['firstName'] ?? json['firstname'],
     );
@@ -607,12 +865,33 @@ class _TeamMember {
             : (email.isNotEmpty ? email : 'Unknown'));
 
     return _TeamMember(
+      id: id,
       name: safeName,
-      role: role.isNotEmpty ? _readableRole(role) : 'Team Member',
+      role: role.isNotEmpty ? readableRole(role) : 'Team Member',
       activeLeads: activeLeads,
       closedLeads: closedLeads,
       conversionRate: conversionRate,
       originalData: json,
+    );
+  }
+
+  _TeamMember copyWith({
+    String? id,
+    String? name,
+    String? role,
+    int? activeLeads,
+    int? closedLeads,
+    double? conversionRate,
+    Map<String, dynamic>? originalData,
+  }) {
+    return _TeamMember(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      role: role ?? this.role,
+      activeLeads: activeLeads ?? this.activeLeads,
+      closedLeads: closedLeads ?? this.closedLeads,
+      conversionRate: conversionRate ?? this.conversionRate,
+      originalData: originalData ?? this.originalData,
     );
   }
 
@@ -649,7 +928,7 @@ class _TeamMember {
     return '';
   }
 
-  static String _readableRole(String role) {
+  static String readableRole(String role) {
     return role
         .split('_')
         .where((part) => part.trim().isNotEmpty)
@@ -659,4 +938,11 @@ class _TeamMember {
         )
         .join(' ');
   }
+}
+
+class _RoleOption {
+  final String label;
+  final String value;
+
+  const _RoleOption({required this.label, required this.value});
 }
