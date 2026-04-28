@@ -366,6 +366,243 @@ class AuthService {
     throw Exception('Users response format is not valid.');
   }
 
+  Future<LeadsListResult> leads({
+    String? token,
+    String? source,
+    String? from,
+    String? to,
+    String? search,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+
+    if (source != null && source.trim().isNotEmpty) {
+      query['source'] = source.trim();
+    }
+    if (from != null && from.trim().isNotEmpty) {
+      query['from'] = from.trim();
+    }
+    if (to != null && to.trim().isNotEmpty) {
+      query['to'] = to.trim();
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
+
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.leads}')
+        .replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'leads',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('leads', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch leads.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+
+      final resolvedCurrentPage =
+          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
+          page;
+      final resolvedPerPage =
+          _readIntFromMap(pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
+          perPage;
+      final resolvedTotalItems =
+          _readIntFromMap(pagination, ['total', 'total_items', 'totalItems', 'count']) ??
+          items.length;
+      final resolvedTotalPages =
+          _readIntFromMap(pagination, ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
+          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Leads response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> createLead({
+    required String name,
+    required String phone,
+    required String email,
+    required String source,
+    required String assignedTo,
+    required String budget,
+    required String locationPreference,
+    required String notes,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createsleads}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'name': name.trim(),
+      'phone': phone.trim(),
+      'email': email.trim(),
+      'source': source.trim(),
+      'assigned_to': assignedTo.trim(),
+      'budget': budget.trim(),
+      'location_preference': locationPreference.trim(),
+      'notes': notes.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'createLead',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('createLead', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create lead.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final leadMap = _extractLeadMap(decoded);
+      if (leadMap != null) {
+        return leadMap;
+      }
+    } catch (_) {
+      // Fall through and return submitted payload as a fallback.
+    }
+
+    return <String, dynamic>{
+      'name': name.trim(),
+      'phone': phone.trim(),
+      'email': email.trim(),
+      'source': source.trim(),
+      'assigned_to': assignedTo.trim(),
+      'budget': budget.trim(),
+      'location_preference': locationPreference.trim(),
+      'notes': notes.trim(),
+    };
+  }
+
+  Future<Map<String, dynamic>> editLead({
+    required String id,
+    required String name,
+    required String phone,
+    required String email,
+    required String source,
+    required String assignedTo,
+    required String budget,
+    required String locationPreference,
+    required String notes,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.editleads.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'name': name.trim(),
+      'phone': phone.trim(),
+      'email': email.trim(),
+      'source': source.trim(),
+      'assigned_to': assignedTo.trim(),
+      'budget': budget.trim(),
+      'location_preference': locationPreference.trim(),
+      'notes': notes.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'editLead',
+      method: 'PUT',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    var response = await http
+        .put(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('editLead', response);
+
+    if (response.statusCode == 404 || response.statusCode == 405) {
+      _logRequest(
+        endpoint: 'editLead',
+        method: 'PATCH',
+        uri: uri,
+        headers: headers,
+        body: body,
+      );
+      response = await http
+          .patch(uri, headers: headers, body: body)
+          .timeout(_requestTimeout);
+      _logResponse('editLead', response);
+    }
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update lead.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final leadMap = _extractLeadMap(decoded);
+      if (leadMap != null) {
+        return leadMap;
+      }
+    } catch (_) {
+      // Fall through and return submitted payload as a fallback.
+    }
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      'name': name.trim(),
+      'phone': phone.trim(),
+      'email': email.trim(),
+      'source': source.trim(),
+      'assigned_to': assignedTo.trim(),
+      'budget': budget.trim(),
+      'location_preference': locationPreference.trim(),
+      'notes': notes.trim(),
+    };
+  }
+
   Future<Map<String, dynamic>> usersDetail({
     required String id,
     String? token,
@@ -681,6 +918,119 @@ class AuthService {
     return source.map(
       (key, value) => MapEntry(key.toString(), value),
     );
+  }
+
+  List<Map<String, dynamic>> _extractLeadsItems(dynamic source) {
+    List<Map<String, dynamic>>? readList(dynamic candidate) {
+      if (candidate is List) {
+        return candidate
+            .whereType<Map>()
+            .map(_stringDynamicMap)
+            .toList();
+      }
+      return null;
+    }
+
+    final fromRootList = readList(source);
+    if (fromRootList != null) {
+      return fromRootList;
+    }
+
+    if (source is! Map<String, dynamic>) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    for (final key in ['data', 'leads', 'items', 'results', 'rows']) {
+      final fromKey = readList(source[key]);
+      if (fromKey != null) {
+        return fromKey;
+      }
+    }
+
+    final dynamic data = source['data'];
+    if (data is Map<String, dynamic>) {
+      for (final key in ['leads', 'items', 'results', 'data', 'rows']) {
+        final fromNested = readList(data[key]);
+        if (fromNested != null) {
+          return fromNested;
+        }
+      }
+    }
+
+    return const <Map<String, dynamic>>[];
+  }
+
+  Map<String, dynamic> _extractPaginationMap(dynamic source) {
+    if (source is Map<String, dynamic>) {
+      if (source['pagination'] is Map<String, dynamic>) {
+        return source['pagination'] as Map<String, dynamic>;
+      }
+      if (source['meta'] is Map<String, dynamic>) {
+        return source['meta'] as Map<String, dynamic>;
+      }
+
+      final dynamic data = source['data'];
+      if (data is Map<String, dynamic>) {
+        if (data['pagination'] is Map<String, dynamic>) {
+          return data['pagination'] as Map<String, dynamic>;
+        }
+        if (data['meta'] is Map<String, dynamic>) {
+          return data['meta'] as Map<String, dynamic>;
+        }
+        return data;
+      }
+
+      return source;
+    }
+
+    return const <String, dynamic>{};
+  }
+
+  int? _readIntFromMap(Map<String, dynamic> map, List<String> keys) {
+    for (final key in keys) {
+      final dynamic value = map[key];
+      if (value is int) {
+        return value;
+      }
+      if (value is num) {
+        return value.toInt();
+      }
+      if (value is String) {
+        final parsed = int.tryParse(value);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _extractLeadMap(dynamic source) {
+    if (source is Map<String, dynamic>) {
+      final data = source['data'];
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+
+      for (final key in ['lead', 'item', 'result']) {
+        final dynamic value = source[key];
+        if (value is Map<String, dynamic>) {
+          return value;
+        }
+      }
+      return source;
+    }
+    return null;
+  }
+
+  int _deriveTotalPages({required int total, required int perPage}) {
+    if (total <= 0) {
+      return 1;
+    }
+    if (perPage <= 0) {
+      return 1;
+    }
+    return (total / perPage).ceil();
   }
 
   void _clearTokens() {

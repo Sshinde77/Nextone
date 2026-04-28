@@ -15,4 +15,9 @@ class ApiConstants {
   static const String deleteuser = '/users/{id}';
   static const String edituser = '/users/{id}';
   static const String edituserrole = '/users/{id}/role';
+
+  // Leads Endpoints
+  static const String leads = '/leads';
+  static const String createsleads = '/leads';
+  static const String editleads = '/leads/{id}';
 }

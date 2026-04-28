@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/leads/lead_form_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class LeadsPage extends StatefulWidget {
@@ -14,195 +17,18 @@ class LeadsPage extends StatefulWidget {
 class _LeadsPageState extends State<LeadsPage> {
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedLeadIds = <String>{};
+  final AuthProvider _authProvider = AuthProvider();
+
+  Timer? _searchDebounce;
+  bool _isLoadingLeads = true;
+  String? _loadError;
 
   int _currentPage = 1;
-  final int _pageSize = 5;
+  final int _pageSize = 20;
+  int _totalPages = 1;
+  int _totalItems = 0;
   String _searchQuery = '';
-
-  final List<_LeadModel> _allLeads = <_LeadModel>[
-    _LeadModel(
-      id: 'L-2026-0001',
-      name: 'Rajesh Khanna',
-      status: 'Site Visit Scheduled',
-      priority: 'Hot',
-      priorityColor: const Color(0xFFE53935),
-      nextFollowUpDate: '2026-04-25',
-      budget: 'INR 8.0 Cr',
-      phone: '+91 98765 11111',
-      profileImageUrl: 'https://i.pravatar.cc/160?img=11',
-      assignee: _PersonModel(
-        name: 'Amit Kumar',
-        imageUrl: 'https://i.pravatar.cc/160?img=21',
-      ),
-    ),
-    _LeadModel(
-      id: 'L-2026-0002',
-      name: 'Meera Reddy',
-      status: 'Qualified',
-      priority: 'Warm',
-      priorityColor: const Color(0xFFFB8C00),
-      nextFollowUpDate: '2026-04-24',
-      budget: 'INR 50 L',
-      phone: '+91 98765 33333',
-      profileImageUrl: 'https://i.pravatar.cc/160?img=12',
-      assignee: _PersonModel(
-        name: 'Sneha Gupta',
-        imageUrl: 'https://i.pravatar.cc/160?img=22',
-      ),
-    ),
-    _LeadModel(
-      id: 'L-2026-0003',
-      name: 'Suresh Iyer',
-      status: 'Negotiation',
-      priority: 'Hot',
-      priorityColor: const Color(0xFFE53935),
-      nextFollowUpDate: '2026-04-23',
-      budget: 'INR 15.0 Cr',
-      phone: '+91 98765 44444',
-      profileImageUrl: 'https://i.pravatar.cc/160?img=13',
-      assignee: _PersonModel(
-        name: 'Priya Menon',
-        imageUrl: 'https://i.pravatar.cc/160?img=23',
-      ),
-    ),
-    _LeadModel(
-      id: 'L-2026-0004',
-      name: 'Ananya Sharma',
-      status: 'New',
-      priority: 'Cold',
-      priorityColor: const Color(0xFF1E88E5),
-      nextFollowUpDate: '2026-04-28',
-      budget: 'INR 1.0 Cr',
-      phone: '+91 98765 55555',
-      profileImageUrl: 'https://i.pravatar.cc/160?img=14',
-      assignee: _PersonModel(
-        name: 'Rohan Das',
-        imageUrl: 'https://i.pravatar.cc/160?img=24',
-      ),
-    ),
-    _LeadModel(
-      id: 'L-2026-0005',
-      name: 'Vikram Rao',
-      status: 'Follow-up Pending',
-      priority: 'Warm',
-      priorityColor: const Color(0xFFFB8C00),
-      nextFollowUpDate: '2026-04-27',
-      budget: 'INR 2.2 Cr',
-      phone: '+91 98670 11122',
-      profileImageUrl: 'https://i.pravatar.cc/160?img=15',
-      assignee: _PersonModel(
-        name: 'Neha Joshi',
-        imageUrl: 'https://i.pravatar.cc/160?img=25',
-      ),
-    ),
-    _LeadModel(
-      id: 'L-2026-0006',
-      name: 'Arjun Malhotra',
-      status: 'Proposal Shared',
-      priority: 'Warm',
-      priorityColor: const Color(0xFFFB8C00),
-      nextFollowUpDate: '2026-04-29',
-      budget: 'INR 3.4 Cr',
-      phone: '+91 98111 90210',
-      profileImageUrl: 'https://i.pravatar.cc/160?img=16',
-      assignee: _PersonModel(
-        name: 'Amit Kumar',
-        imageUrl: 'https://i.pravatar.cc/160?img=21',
-      ),
-    ),
-    _LeadModel(
-      id: 'L-2026-0007',
-      name: 'Kavya Nair',
-      status: 'Demo Scheduled',
-      priority: 'Hot',
-      priorityColor: const Color(0xFFE53935),
-      nextFollowUpDate: '2026-04-26',
-      budget: 'INR 95 L',
-      phone: '+91 99220 77123',
-      profileImageUrl: 'https://i.pravatar.cc/160?img=17',
-      assignee: _PersonModel(
-        name: 'Sneha Gupta',
-        imageUrl: 'https://i.pravatar.cc/160?img=22',
-      ),
-    ),
-    _LeadModel(
-      id: 'L-2026-0008',
-      name: 'Nitin Verma',
-      status: 'Closed Won',
-      priority: 'Hot',
-      priorityColor: const Color(0xFFE53935),
-      nextFollowUpDate: '2026-05-02',
-      budget: 'INR 6.8 Cr',
-      phone: '+91 99887 66110',
-      profileImageUrl: 'https://i.pravatar.cc/160?img=18',
-      assignee: _PersonModel(
-        name: 'Rohan Das',
-        imageUrl: 'https://i.pravatar.cc/160?img=24',
-      ),
-    ),
-    _LeadModel(
-      id: 'L-2026-0009',
-      name: 'Pooja Kapoor',
-      status: 'Contacted',
-      priority: 'Cold',
-      priorityColor: const Color(0xFF1E88E5),
-      nextFollowUpDate: '2026-04-30',
-      budget: 'INR 42 L',
-      phone: '+91 98701 88221',
-      profileImageUrl: 'https://i.pravatar.cc/160?img=19',
-      assignee: _PersonModel(
-        name: 'Priya Menon',
-        imageUrl: 'https://i.pravatar.cc/160?img=23',
-      ),
-    ),
-    _LeadModel(
-      id: 'L-2026-0010',
-      name: 'Dev Patel',
-      status: 'Re-engagement',
-      priority: 'Warm',
-      priorityColor: const Color(0xFFFB8C00),
-      nextFollowUpDate: '2026-05-01',
-      budget: 'INR 1.8 Cr',
-      phone: '+91 98100 77331',
-      profileImageUrl: 'https://i.pravatar.cc/160?img=20',
-      assignee: _PersonModel(
-        name: 'Neha Joshi',
-        imageUrl: 'https://i.pravatar.cc/160?img=25',
-      ),
-    ),
-  ];
-
-  List<_LeadModel> get _filteredLeads {
-    final query = _searchQuery.trim().toLowerCase();
-    if (query.isEmpty) {
-      return _allLeads;
-    }
-    return _allLeads.where((lead) {
-      return lead.name.toLowerCase().contains(query) ||
-          lead.id.toLowerCase().contains(query) ||
-          lead.status.toLowerCase().contains(query) ||
-          lead.assignee.name.toLowerCase().contains(query);
-    }).toList();
-  }
-
-  int get _totalPages {
-    if (_filteredLeads.isEmpty) {
-      return 1;
-    }
-    return (_filteredLeads.length / _pageSize).ceil();
-  }
-
-  List<_LeadModel> get _currentPageLeads {
-    final leads = _filteredLeads;
-    if (leads.isEmpty) {
-      return const <_LeadModel>[];
-    }
-
-    final safePage = _currentPage.clamp(1, _totalPages);
-    final start = (safePage - 1) * _pageSize;
-    final end = math.min(start + _pageSize, leads.length);
-    return leads.sublist(start, end);
-  }
+  List<_LeadModel> _currentPageLeads = <_LeadModel>[];
 
   bool get _isAllCurrentPageSelected {
     final leads = _currentPageLeads;
@@ -213,9 +39,100 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadLeads();
+  }
+
+  @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadLeads() async {
+    setState(() {
+      _isLoadingLeads = true;
+      _loadError = null;
+    });
+
+    try {
+      final result = await _authProvider.leads(
+        token: _authProvider.currentAuthToken,
+        search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+        page: _currentPage,
+        perPage: _pageSize,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      final pageLeads = result.items.map(_LeadModel.fromApi).toList();
+      final pageLeadIds = pageLeads.map((lead) => lead.id).toSet();
+
+      setState(() {
+        _currentPageLeads = pageLeads;
+        _currentPage = result.currentPage <= 0 ? 1 : result.currentPage;
+        _totalPages = result.totalPages <= 0 ? 1 : result.totalPages;
+        _totalItems = result.totalItems;
+        _selectedLeadIds.removeWhere((id) => !pageLeadIds.contains(id));
+        _isLoadingLeads = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _currentPageLeads = <_LeadModel>[];
+        _totalItems = 0;
+        _totalPages = 1;
+        _isLoadingLeads = false;
+        _selectedLeadIds.clear();
+        _loadError = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _searchQuery = value;
+        _currentPage = 1;
+        _selectedLeadIds.clear();
+      });
+      _loadLeads();
+    });
+  }
+
+  Future<void> _openCreateLead() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const LeadFormPage()),
+    );
+
+    if (created == true && mounted) {
+      _loadLeads();
+    }
+  }
+
+  Future<void> _openEditLead(_LeadModel lead) async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => LeadFormPage(
+          leadId: lead.id,
+          leadData: lead.rawData,
+        ),
+      ),
+    );
+
+    if (updated == true && mounted) {
+      _loadLeads();
+    }
   }
 
   @override
@@ -225,22 +142,26 @@ class _LeadsPageState extends State<LeadsPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const CrmAppBar(title: 'Lead Management'),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildToolbar(),
-            const SizedBox(height: 16),
-            if (selectedCount > 0) ...[
-              _buildBulkActionBar(selectedCount),
+      body: RefreshIndicator(
+        onRefresh: _loadLeads,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildToolbar(),
               const SizedBox(height: 16),
+              if (selectedCount > 0) ...[
+                _buildBulkActionBar(selectedCount),
+                const SizedBox(height: 16),
+              ],
+              _buildLeadsSection(),
+              const SizedBox(height: 16),
+              _buildPagination(),
+              const SizedBox(height: 100),
             ],
-            _buildLeadsSection(),
-            const SizedBox(height: 16),
-            _buildPagination(),
-            const SizedBox(height: 100),
-          ],
+          ),
         ),
       ),
     );
@@ -267,13 +188,7 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
           child: TextField(
             controller: _searchController,
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-                _currentPage = 1;
-                _selectedLeadIds.clear();
-              });
-            },
+            onChanged: _onSearchChanged,
             decoration: const InputDecoration(
               hintText: 'Search by name, lead id, status, assignee',
               prefixIcon: Icon(Icons.search, size: 20),
@@ -284,7 +199,7 @@ class _LeadsPageState extends State<LeadsPage> {
         );
 
         final addButton = FilledButton.icon(
-          onPressed: () {},
+          onPressed: _openCreateLead,
           icon: const Icon(Icons.add, size: 18),
           label: const Text('Add Lead'),
           style: FilledButton.styleFrom(
@@ -385,7 +300,33 @@ class _LeadsPageState extends State<LeadsPage> {
         children: [
           _buildListHeader(leads),
           const SizedBox(height: 8),
-          if (leads.isEmpty)
+          if (_isLoadingLeads)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 48),
+              child: CircularProgressIndicator(),
+            )
+          else if (_loadError != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                children: [
+                  Text(
+                    _loadError!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton(
+                    onPressed: _loadLeads,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+          else if (leads.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 48),
               child: Text(
@@ -400,6 +341,7 @@ class _LeadsPageState extends State<LeadsPage> {
                 child: _LeadCard(
                   lead: lead,
                   isSelected: _selectedLeadIds.contains(lead.id),
+                  onEdit: () => _openEditLead(lead),
                   onSelectionChanged: (selected) {
                     setState(() {
                       if (selected) {
@@ -446,7 +388,7 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
           const Spacer(),
           Text(
-            '${_filteredLeads.length} total leads',
+            '$_totalItems total leads',
             style: const TextStyle(
               fontWeight: FontWeight.w600,
               color: AppColors.textSecondary,
@@ -459,8 +401,8 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Widget _buildPagination() {
-    final totalItems = _filteredLeads.length;
-    final totalPages = _totalPages;
+    final totalItems = _totalItems;
+    final totalPages = _totalPages <= 0 ? 1 : _totalPages;
     final currentPage = _currentPage.clamp(1, totalPages);
 
     final start = totalItems == 0 ? 0 : ((currentPage - 1) * _pageSize) + 1;
@@ -492,12 +434,13 @@ class _LeadsPageState extends State<LeadsPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                onPressed: currentPage > 1
+                onPressed: !_isLoadingLeads && currentPage > 1
                     ? () {
                         setState(() {
                           _currentPage -= 1;
                           _selectedLeadIds.clear();
                         });
+                        _loadLeads();
                       }
                     : null,
                 icon: const Icon(Icons.chevron_left),
@@ -507,12 +450,13 @@ class _LeadsPageState extends State<LeadsPage> {
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               IconButton(
-                onPressed: currentPage < totalPages
+                onPressed: !_isLoadingLeads && currentPage < totalPages
                     ? () {
                         setState(() {
                           _currentPage += 1;
                           _selectedLeadIds.clear();
                         });
+                        _loadLeads();
                       }
                     : null,
                 icon: const Icon(Icons.chevron_right),
@@ -530,11 +474,13 @@ class _LeadCard extends StatelessWidget {
     required this.lead,
     required this.isSelected,
     required this.onSelectionChanged,
+    required this.onEdit,
   });
 
   final _LeadModel lead;
   final bool isSelected;
   final ValueChanged<bool> onSelectionChanged;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -654,7 +600,10 @@ class _LeadCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  _buildActionIcons(isVeryCompact: isVeryCompact),
+                  _buildActionIcons(
+                    isVeryCompact: isVeryCompact,
+                    onEdit: onEdit,
+                  ),
                 ],
               ),
             ],
@@ -748,7 +697,10 @@ class _LeadCard extends StatelessWidget {
     );
   }
 
-  Widget _buildActionIcons({required bool isVeryCompact}) {
+  Widget _buildActionIcons({
+    required bool isVeryCompact,
+    required VoidCallback onEdit,
+  }) {
     final iconSize = isVeryCompact ? 16.0 : 18.0;
     final buttonSize = isVeryCompact ? 30.0 : 34.0;
 
@@ -769,7 +721,7 @@ class _LeadCard extends StatelessWidget {
         ),
         _actionIcon(
           Icons.edit_outlined,
-          onTap: () {},
+          onTap: onEdit,
           iconSize: iconSize,
           buttonSize: buttonSize,
         ),
@@ -884,6 +836,12 @@ class _LeadModel {
     required this.phone,
     required this.profileImageUrl,
     required this.assignee,
+    required this.email,
+    required this.source,
+    required this.assignedToId,
+    required this.locationPreference,
+    required this.notes,
+    required this.rawData,
   });
 
   final String id;
@@ -896,6 +854,167 @@ class _LeadModel {
   final String phone;
   final String profileImageUrl;
   final _PersonModel assignee;
+  final String email;
+  final String source;
+  final String assignedToId;
+  final String locationPreference;
+  final String notes;
+  final Map<String, dynamic> rawData;
+
+  factory _LeadModel.fromApi(Map<String, dynamic> json) {
+    final id = _readString(
+      json['id'] ?? json['lead_id'] ?? json['leadId'],
+      fallback: 'N/A',
+    );
+    final firstName = _readString(
+      json['first_name'] ?? json['firstName'],
+    );
+    final lastName = _readString(
+      json['last_name'] ?? json['lastName'],
+    );
+    final fullName = _readString(
+      json['name'] ??
+          json['full_name'] ??
+          json['fullName'] ??
+          json['contact_name'] ??
+          json['customer_name'],
+    );
+    final resolvedName = [
+      if (firstName.isNotEmpty) firstName,
+      if (lastName.isNotEmpty) lastName,
+    ].join(' ').trim();
+
+    final status = _readString(
+      json['status'] ?? json['stage'] ?? json['current_status'],
+      fallback: 'Unknown',
+    );
+    final priorityRaw = _readString(
+      json['priority'] ?? json['temperature'],
+      fallback: 'Warm',
+    );
+    final nextFollowUpDate = _readDate(
+      json['next_follow_up_date'] ??
+          json['nextFollowUpDate'] ??
+          json['follow_up_date'],
+    );
+    final budget = _readBudget(
+      json['budget'] ?? json['budget_value'] ?? json['budget_range'],
+    );
+    final phone = _readString(
+      json['phone_number'] ?? json['phone'] ?? json['mobile'],
+      fallback: 'N/A',
+    );
+    final profileImageUrl = _readString(
+      json['profile_image'] ??
+          json['profileImage'] ??
+          json['avatar'] ??
+          json['image_url'],
+    );
+
+    final assigned = json['assigned_to'] ?? json['assignee'];
+    final assignedToId = assigned is Map<String, dynamic>
+        ? _readString(
+            assigned['id'] ?? assigned['user_id'] ?? assigned['userId'] ?? assigned['uuid'],
+          )
+        : _readString(assigned);
+    final assigneeName = assigned is Map<String, dynamic>
+        ? _readString(
+            assigned['name'] ??
+                assigned['full_name'] ??
+                assigned['fullName'] ??
+                assigned['first_name'],
+            fallback: 'Unassigned',
+          )
+        : 'Unassigned';
+    final assigneeImage = assigned is Map<String, dynamic>
+        ? _readString(
+            assigned['image'] ??
+                assigned['avatar'] ??
+                assigned['profile_image'] ??
+                assigned['image_url'],
+          )
+        : '';
+
+    final email = _readString(json['email']);
+    final source = _readString(json['source']);
+    final locationPreference = _readString(
+      json['location_preference'] ?? json['locationPreference'],
+    );
+    final notes = _readString(json['notes']);
+
+    final priorityLabel = _readPriorityLabel(priorityRaw);
+    return _LeadModel(
+      id: id,
+      name: resolvedName.isNotEmpty
+          ? resolvedName
+          : (fullName.isNotEmpty ? fullName : 'Unknown Lead'),
+      status: status,
+      priority: priorityLabel,
+      priorityColor: _priorityColor(priorityLabel),
+      nextFollowUpDate: nextFollowUpDate,
+      budget: budget,
+      phone: phone,
+      profileImageUrl: profileImageUrl,
+      assignee: _PersonModel(name: assigneeName, imageUrl: assigneeImage),
+      email: email,
+      source: source,
+      assignedToId: assignedToId,
+      locationPreference: locationPreference,
+      notes: notes,
+      rawData: Map<String, dynamic>.from(json),
+    );
+  }
+
+  static String _readString(dynamic value, {String fallback = ''}) {
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+    return fallback;
+  }
+
+  static String _readDate(dynamic value) {
+    final raw = _readString(value);
+    if (raw.isEmpty) {
+      return 'N/A';
+    }
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) {
+      return raw;
+    }
+    final month = parsed.month.toString().padLeft(2, '0');
+    final day = parsed.day.toString().padLeft(2, '0');
+    return '${parsed.year}-$month-$day';
+  }
+
+  static String _readBudget(dynamic value) {
+    if (value is num) {
+      return 'INR ${value.toString()}';
+    }
+    final asString = _readString(value);
+    return asString.isEmpty ? 'N/A' : asString;
+  }
+
+  static String _readPriorityLabel(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'high' || normalized == 'hot') {
+      return 'Hot';
+    }
+    if (normalized == 'low' || normalized == 'cold') {
+      return 'Cold';
+    }
+    return 'Warm';
+  }
+
+  static Color _priorityColor(String label) {
+    switch (label.toLowerCase()) {
+      case 'hot':
+        return const Color(0xFFE53935);
+      case 'cold':
+        return const Color(0xFF1E88E5);
+      default:
+        return const Color(0xFFFB8C00);
+    }
+  }
 }
 
 class _PersonModel {

@@ -92,4 +92,74 @@ class AuthProvider {
   }) {
     return _authService.editUserRole(id: id, role: role, token: token);
   }
+
+  Future<LeadsListResult> leads({
+    String? token,
+    String? source,
+    String? from,
+    String? to,
+    String? search,
+    int page = 1,
+    int perPage = 20,
+  }) {
+    return _authService.leads(
+      token: token,
+      source: source,
+      from: from,
+      to: to,
+      search: search,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
+  Future<Map<String, dynamic>> createLead({
+    required String name,
+    required String phone,
+    required String email,
+    required String source,
+    required String assignedTo,
+    required String budget,
+    required String locationPreference,
+    required String notes,
+    String? token,
+  }) {
+    return _authService.createLead(
+      name: name,
+      phone: phone,
+      email: email,
+      source: source,
+      assignedTo: assignedTo,
+      budget: budget,
+      locationPreference: locationPreference,
+      notes: notes,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> editLead({
+    required String id,
+    required String name,
+    required String phone,
+    required String email,
+    required String source,
+    required String assignedTo,
+    required String budget,
+    required String locationPreference,
+    required String notes,
+    String? token,
+  }) {
+    return _authService.editLead(
+      id: id,
+      name: name,
+      phone: phone,
+      email: email,
+      source: source,
+      assignedTo: assignedTo,
+      budget: budget,
+      locationPreference: locationPreference,
+      notes: notes,
+      token: token,
+    );
+  }
 }
