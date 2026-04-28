@@ -16,8 +16,28 @@ class ApiConstants {
   static const String edituser = '/users/{id}';
   static const String edituserrole = '/users/{id}/role';
 
-  // Leads Endpoints
+  //leads Endpoints
   static const String leads = '/leads';
   static const String createsleads = '/leads';
+  static const String leadsdetail = '/leads/{id}';
+  static const String deleteleads = '/leads/{id}'; 
   static const String editleads = '/leads/{id}';
+  static const String updatestatusleads = '/leads/{id}/status';
+  static const String reassignmemberleads = '/leads/{id}/assign';
+
+  //followup Endpoints
+  static const String followups = '/tasks';
+  static const String createfollowups = '/tasks';
+  static const String followupsdetail = '/tasks/{id}';
+  static const String deletefollowups = '/tasks/{id}';
+  static const String editfollowups = '/tasks/{id}';
+  static const String completestatusfollowups = '/tasks/{id}/complete';
+
+  //project Endpoints
+  static const String projects = '/projects';
+  static const String createprojects = '/projects';
+  static const String projectsdetail = '/projects/{id}';
+  static const String deleteprojects = '/projects/{id}';
+  static const String editprojects = '/projects/{id}';
+
 }

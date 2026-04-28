@@ -128,7 +128,10 @@ class _TeamPageState extends State<TeamPage> {
       final users = await _authProvider.users(
         token: _authProvider.currentAuthToken,
       );
-      final members = users.map(_TeamMember.fromApi).toList();
+      final members = users
+          .where(_TeamMember.isActiveUser)
+          .map(_TeamMember.fromApi)
+          .toList();
       if (!mounted) {
         return;
       }
@@ -908,6 +911,20 @@ class _TeamMember {
     return 0;
   }
 
+  static bool _toBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1' || normalized == 'yes';
+    }
+    return false;
+  }
+
   static double _toDouble(dynamic value) {
     if (value is double) {
       return value;
@@ -926,6 +943,12 @@ class _TeamMember {
       return value.trim();
     }
     return '';
+  }
+
+  static bool isActiveUser(Map<String, dynamic> json) {
+    return _toBool(
+      json['is_active'] ?? json['isActive'] ?? json['active'] ?? json['status'],
+    );
   }
 
   static String readableRole(String role) {

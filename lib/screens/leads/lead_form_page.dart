@@ -33,6 +33,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
 
   bool _isSubmitting = false;
   bool _isLoadingAssignees = true;
+  bool _isLoadingLeadDetails = false;
   String? _assigneeLoadError;
   String? _selectedAssigneeId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
@@ -41,6 +42,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
   void initState() {
     super.initState();
     _prefillLeadData();
+    _loadLeadDetails();
     _loadAssigneeOptions();
   }
 
@@ -57,7 +59,10 @@ class _LeadFormPageState extends State<LeadFormPage> {
   }
 
   void _prefillLeadData() {
-    final data = widget.leadData;
+    _applyLeadData(widget.leadData);
+  }
+
+  void _applyLeadData(Map<String, dynamic>? data) {
     if (data == null) {
       return;
     }
@@ -91,6 +96,43 @@ class _LeadFormPageState extends State<LeadFormPage> {
     }
   }
 
+  Future<void> _loadLeadDetails() async {
+    if (!widget.isEditMode) {
+      return;
+    }
+
+    final leadId = widget.leadId?.trim();
+    if (leadId == null || leadId.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingLeadDetails = true;
+    });
+
+    try {
+      final details = await _authProvider.leadDetail(
+        id: leadId,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _applyLeadData(details);
+      });
+    } catch (_) {
+      // Keep list-prefilled values as fallback when detail fetch fails.
+    } finally {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingLeadDetails = false;
+      });
+    }
+  }
+
   Future<void> _loadAssigneeOptions() async {
     setState(() {
       _isLoadingAssignees = true;
@@ -104,11 +146,16 @@ class _LeadFormPageState extends State<LeadFormPage> {
           .where((user) => user != null)
           .cast<_AssigneeOption>()
           .toList();
-      filtered.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      final uniqueById = <String, _AssigneeOption>{};
+      for (final option in filtered) {
+        uniqueById[option.id] = option;
+      }
+      final uniqueOptions = uniqueById.values.toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
       final validSelection =
           _selectedAssigneeId != null &&
-              filtered.any((option) => option.id == _selectedAssigneeId)
+              uniqueOptions.any((option) => option.id == _selectedAssigneeId)
           ? _selectedAssigneeId
           : null;
 
@@ -116,7 +163,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
         return;
       }
       setState(() {
-        _assigneeOptions = filtered;
+        _assigneeOptions = uniqueOptions;
         _selectedAssigneeId = validSelection;
         _isLoadingAssignees = false;
       });
@@ -133,6 +180,13 @@ class _LeadFormPageState extends State<LeadFormPage> {
   }
 
   _AssigneeOption? _assigneeFromApi(Map<String, dynamic> user) {
+    final isActive = _readBool(
+      user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'],
+    );
+    if (!isActive) {
+      return null;
+    }
+
     final roleRaw = _readString(
       user['role'] ?? user['user_role'] ?? user['userRole'] ?? user['designation'],
     );
@@ -177,6 +231,20 @@ class _LeadFormPageState extends State<LeadFormPage> {
     return '';
   }
 
+  bool _readBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1' || normalized == 'yes';
+    }
+    return false;
+  }
+
   Future<void> _submit() async {
     final form = _formKey.currentState;
     if (form == null || !form.validate()) {
@@ -189,6 +257,10 @@ class _LeadFormPageState extends State<LeadFormPage> {
 
     if (_isLoadingAssignees) {
       _showSnackBar('Please wait while assignees are loading.');
+      return;
+    }
+    if (_isLoadingLeadDetails) {
+      _showSnackBar('Please wait while lead details are loading.');
       return;
     }
 

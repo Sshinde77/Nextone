@@ -4,8 +4,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/screens/leads/lead_form_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LeadsPage extends StatefulWidget {
   const LeadsPage({super.key});
@@ -133,6 +135,22 @@ class _LeadsPageState extends State<LeadsPage> {
     if (updated == true && mounted) {
       _loadLeads();
     }
+  }
+
+  Future<void> _callLead(String phoneNumber) async {
+    final launchUri = Uri(
+      scheme: 'tel',
+      path: phoneNumber.trim(),
+    );
+    await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _viewLeadDetail(String leadId) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LeadDetailPage(leadId: leadId),
+      ),
+    );
   }
 
   @override
@@ -342,6 +360,8 @@ class _LeadsPageState extends State<LeadsPage> {
                   lead: lead,
                   isSelected: _selectedLeadIds.contains(lead.id),
                   onEdit: () => _openEditLead(lead),
+                  onView: () => _viewLeadDetail(lead.id),
+                  onCall: () => _callLead(lead.phone),
                   onSelectionChanged: (selected) {
                     setState(() {
                       if (selected) {
@@ -389,7 +409,7 @@ class _LeadsPageState extends State<LeadsPage> {
           const Spacer(),
           Text(
             '$_totalItems total leads',
-            style: const TextStyle(
+            style: const TextStyle(v
               fontWeight: FontWeight.w600,
               color: AppColors.textSecondary,
               fontSize: 12,
@@ -475,12 +495,16 @@ class _LeadCard extends StatelessWidget {
     required this.isSelected,
     required this.onSelectionChanged,
     required this.onEdit,
+    required this.onView,
+    required this.onCall,
   });
 
   final _LeadModel lead;
   final bool isSelected;
   final ValueChanged<bool> onSelectionChanged;
   final VoidCallback onEdit;
+  final VoidCallback onView;
+  final VoidCallback onCall;
 
   @override
   Widget build(BuildContext context) {
@@ -603,6 +627,8 @@ class _LeadCard extends StatelessWidget {
                   _buildActionIcons(
                     isVeryCompact: isVeryCompact,
                     onEdit: onEdit,
+                    onView: onView,
+                    onCall: onCall,
                   ),
                 ],
               ),
@@ -700,6 +726,8 @@ class _LeadCard extends StatelessWidget {
   Widget _buildActionIcons({
     required bool isVeryCompact,
     required VoidCallback onEdit,
+    required VoidCallback onView,
+    required VoidCallback onCall,
   }) {
     final iconSize = isVeryCompact ? 16.0 : 18.0;
     final buttonSize = isVeryCompact ? 30.0 : 34.0;
@@ -709,13 +737,13 @@ class _LeadCard extends StatelessWidget {
       children: [
         _actionIcon(
           Icons.call_outlined,
-          onTap: () {},
+          onTap: onCall,
           iconSize: iconSize,
           buttonSize: buttonSize,
         ),
         _actionIcon(
           Icons.visibility_outlined,
-          onTap: () {},
+          onTap: onView,
           iconSize: iconSize,
           buttonSize: buttonSize,
         ),
@@ -917,6 +945,12 @@ class _LeadModel {
             assigned['id'] ?? assigned['user_id'] ?? assigned['userId'] ?? assigned['uuid'],
           )
         : _readString(assigned);
+    final assignedNameFromRoot = _readString(
+      json['assigned_name'] ??
+          json['assignedName'] ??
+          json['assignee_name'] ??
+          json['assigneeName'],
+    );
     final assigneeName = assigned is Map<String, dynamic>
         ? _readString(
             assigned['name'] ??
@@ -925,7 +959,7 @@ class _LeadModel {
                 assigned['first_name'],
             fallback: 'Unassigned',
           )
-        : 'Unassigned';
+        : (assignedNameFromRoot.isNotEmpty ? assignedNameFromRoot : 'Unassigned');
     final assigneeImage = assigned is Map<String, dynamic>
         ? _readString(
             assigned['image'] ??

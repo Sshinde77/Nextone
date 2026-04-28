@@ -113,6 +113,89 @@ class AuthProvider {
     );
   }
 
+  Future<LeadsListResult> followUps({
+    String? token,
+    String? dueFrom,
+    String? dueTo,
+    String? search,
+    int? page,
+    int? perPage,
+  }) {
+    return _authService.followUps(
+      token: token,
+      dueFrom: dueFrom,
+      dueTo: dueTo,
+      search: search,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
+  Future<void> deleteFollowUp({required String id, String? token}) {
+    return _authService.deleteFollowUp(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> createFollowUp({
+    required String title,
+    required String leadId,
+    required String dueDate,
+    required String priority,
+    required String notes,
+    String? token,
+  }) {
+    return _authService.createFollowUp(
+      title: title,
+      leadId: leadId,
+      dueDate: dueDate,
+      priority: priority,
+      notes: notes,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> editFollowUp({
+    required String id,
+    String? title,
+    String? leadId,
+    String? dueDate,
+    String? priority,
+    String? notes,
+    String? token,
+  }) {
+    return _authService.editFollowUp(
+      id: id,
+      title: title,
+      leadId: leadId,
+      dueDate: dueDate,
+      priority: priority,
+      notes: notes,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> followUpDetail({
+    required String id,
+    String? token,
+  }) {
+    return _authService.followUpDetail(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> completeFollowUpStatus({
+    required String id,
+    required bool isCompleted,
+    String? token,
+  }) {
+    return _authService.completeFollowUpStatus(
+      id: id,
+      isCompleted: isCompleted,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> leadDetail({required String id, String? token}) {
+    return _authService.leadDetail(id: id, token: token);
+  }
+
   Future<Map<String, dynamic>> createLead({
     required String name,
     required String phone,
@@ -161,5 +244,125 @@ class AuthProvider {
       notes: notes,
       token: token,
     );
+  }
+
+  Future<Map<String, dynamic>> updateLeadStatus({
+    required String id,
+    required String status,
+    String note = '',
+    String? token,
+  }) {
+    return _authService.updateLeadStatus(
+      id: id,
+      status: status,
+      note: note,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> reassignLead({
+    required String id,
+    required String assignedTo,
+    String note = '',
+    String? token,
+  }) {
+    return _authService.reassignLead(
+      id: id,
+      assignedTo: assignedTo,
+      note: note,
+      token: token,
+    );
+  }
+
+  Future<LeadsListResult> projects({
+    String? token,
+    String? search,
+    int page = 1,
+    int perPage = 20,
+  }) {
+    return _authService.projects(
+      token: token,
+      search: search,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
+  Future<Map<String, dynamic>> createProject({
+    required String name,
+    required String developer,
+    required String city,
+    required String locality,
+    required String address,
+    required List<String> configurations,
+    required String priceRange,
+    required int totalUnits,
+    required String possessionDate,
+    required String reraNumber,
+    required List<String> amenities,
+    required String status,
+    required String description,
+    String? token,
+  }) {
+    return _authService.createProject(
+      name: name,
+      developer: developer,
+      city: city,
+      locality: locality,
+      address: address,
+      configurations: configurations,
+      priceRange: priceRange,
+      totalUnits: totalUnits,
+      possessionDate: possessionDate,
+      reraNumber: reraNumber,
+      amenities: amenities,
+      status: status,
+      description: description,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> projectDetail({required String id, String? token}) {
+    return _authService.projectDetail(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> editProject({
+    required String id,
+    required String name,
+    required String developer,
+    required String city,
+    required String locality,
+    required String address,
+    required List<String> configurations,
+    required String priceRange,
+    required int totalUnits,
+    required String possessionDate,
+    required String reraNumber,
+    required List<String> amenities,
+    required String status,
+    required String description,
+    String? token,
+  }) {
+    return _authService.editProject(
+      id: id,
+      name: name,
+      developer: developer,
+      city: city,
+      locality: locality,
+      address: address,
+      configurations: configurations,
+      priceRange: priceRange,
+      totalUnits: totalUnits,
+      possessionDate: possessionDate,
+      reraNumber: reraNumber,
+      amenities: amenities,
+      status: status,
+      description: description,
+      token: token,
+    );
+  }
+
+  Future<void> deleteProject({required String id, String? token}) {
+    return _authService.deleteProject(id: id, token: token);
   }
 }

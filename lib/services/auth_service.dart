@@ -445,6 +445,405 @@ class AuthService {
     }
   }
 
+  Future<LeadsListResult> followUps({
+    String? token,
+    String? dueFrom,
+    String? dueTo,
+    String? search,
+    int? page,
+    int? perPage,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{};
+
+    if (page != null && page > 0) {
+      query['page'] = page.toString();
+    }
+    if (perPage != null && perPage > 0) {
+      query['per_page'] = perPage.toString();
+    }
+
+    if (dueFrom != null && dueFrom.trim().isNotEmpty) {
+      query['due_from'] = dueFrom.trim();
+    }
+    if (dueTo != null && dueTo.trim().isNotEmpty) {
+      query['due_to'] = dueTo.trim();
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
+
+    final uri = query.isEmpty
+        ? Uri.parse('${ApiConstants.baseUrl}${ApiConstants.followups}')
+        : Uri.parse('${ApiConstants.baseUrl}${ApiConstants.followups}')
+            .replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'followUps',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('followUps', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch follow-ups.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+
+      final resolvedCurrentPage =
+          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
+          (page ?? 1);
+      final resolvedPerPage =
+          _readIntFromMap(pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
+          (perPage ?? items.length);
+      final resolvedTotalItems =
+          _readIntFromMap(pagination, ['total', 'total_items', 'totalItems', 'count']) ??
+          items.length;
+      final resolvedTotalPages =
+          _readIntFromMap(pagination, ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
+          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Follow-ups response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> createFollowUp({
+    required String title,
+    required String leadId,
+    required String dueDate,
+    required String priority,
+    required String notes,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createfollowups}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'title': title.trim(),
+      'lead_id': leadId.trim(),
+      'due_date': dueDate.trim(),
+      'priority': priority.trim(),
+      'notes': notes.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'createFollowUp',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('createFollowUp', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create follow-up.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // fall through
+    }
+
+    return <String, dynamic>{
+      'title': title.trim(),
+      'lead_id': leadId.trim(),
+      'due_date': dueDate.trim(),
+      'priority': priority.trim(),
+      'notes': notes.trim(),
+    };
+  }
+
+  Future<Map<String, dynamic>> editFollowUp({
+    required String id,
+    String? title,
+    String? leadId,
+    String? dueDate,
+    String? priority,
+    String? notes,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Follow-up id is required.');
+    }
+
+    final payload = <String, dynamic>{};
+    if (title != null && title.trim().isNotEmpty) {
+      payload['title'] = title.trim();
+    }
+    if (leadId != null && leadId.trim().isNotEmpty) {
+      payload['lead_id'] = leadId.trim();
+    }
+    if (dueDate != null && dueDate.trim().isNotEmpty) {
+      payload['due_date'] = dueDate.trim();
+    }
+    if (priority != null && priority.trim().isNotEmpty) {
+      payload['priority'] = priority.trim();
+    }
+    if (notes != null) {
+      payload['notes'] = notes.trim();
+    }
+    if (payload.isEmpty) {
+      throw Exception('No fields provided for follow-up update.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.editfollowups.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    final body = jsonEncode(payload);
+
+    _logRequest(
+      endpoint: 'editFollowUp',
+      method: 'PUT',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .put(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('editFollowUp', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update follow-up.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // Some endpoints may return empty/non-json body on update.
+    }
+
+    return <String, dynamic>{'id': normalizedId, ...payload};
+  }
+
+  Future<Map<String, dynamic>> followUpDetail({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Follow-up id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.followupsdetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'followUpDetail',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('followUpDetail', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch follow-up details.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // Fall through to generic error below.
+    }
+
+    throw Exception('Follow-up details response format is not valid.');
+  }
+
+  Future<Map<String, dynamic>> completeFollowUpStatus({
+    required String id,
+    required bool isCompleted,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Follow-up id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.completestatusfollowups.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({'is_completed': isCompleted});
+
+    _logRequest(
+      endpoint: 'completeFollowUpStatus',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('completeFollowUpStatus', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update follow-up status.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // Some endpoints may return empty/non-json body.
+    }
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      'is_completed': isCompleted,
+    };
+  }
+
+  Future<void> deleteFollowUp({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Follow-up id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.deletefollowups.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteFollowUp',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response = await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteFollowUp', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete follow-up.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> leadDetail({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.leadsdetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'leadDetail',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('leadDetail', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch lead details.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final leadMap = _extractLeadMap(body);
+      if (leadMap != null) {
+        return leadMap;
+      }
+    } catch (_) {
+      // Fall through to generic error below.
+    }
+
+    throw Exception('Lead details response format is not valid.');
+  }
+
   Future<Map<String, dynamic>> createLead({
     required String name,
     required String phone,
@@ -600,6 +999,138 @@ class AuthService {
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
       'notes': notes.trim(),
+    };
+  }
+
+  Future<Map<String, dynamic>> updateLeadStatus({
+    required String id,
+    required String status,
+    String note = '',
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final normalizedStatus = status.trim();
+    if (normalizedStatus.isEmpty) {
+      throw Exception('Status is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.updatestatusleads.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'status': normalizedStatus,
+      'note': note.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'updateLeadStatus',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('updateLeadStatus', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update lead status.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final leadMap = _extractLeadMap(decoded);
+      if (leadMap != null) {
+        return leadMap;
+      }
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // Fall through to fallback payload.
+    }
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      'status': normalizedStatus,
+      'note': note.trim(),
+    };
+  }
+
+  Future<Map<String, dynamic>> reassignLead({
+    required String id,
+    required String assignedTo,
+    String note = '',
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final normalizedAssignee = assignedTo.trim();
+    if (normalizedAssignee.isEmpty) {
+      throw Exception('Assigned user id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.reassignmemberleads.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'assigned_to': normalizedAssignee,
+      'note': note.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'reassignLead',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('reassignLead', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to reassign lead.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final leadMap = _extractLeadMap(decoded);
+      if (leadMap != null) {
+        return leadMap;
+      }
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // Fall through to fallback payload.
+    }
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      'assigned_to': normalizedAssignee,
+      'note': note.trim(),
     };
   }
 
@@ -763,6 +1294,297 @@ class AuthService {
     final error = _handleResponse(
       response,
       fallbackMessage: 'Unable to change user role.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
+  Future<LeadsListResult> projects({
+    String? token,
+    String? search,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
+
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.projects}')
+        .replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'projects',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('projects', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch projects.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+
+      final resolvedCurrentPage =
+          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
+          page;
+      final resolvedPerPage =
+          _readIntFromMap(pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
+          perPage;
+      final resolvedTotalItems =
+          _readIntFromMap(pagination, ['total', 'total_items', 'totalItems', 'count']) ??
+          items.length;
+      final resolvedTotalPages =
+          _readIntFromMap(pagination, ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
+          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Projects response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> createProject({
+    required String name,
+    required String developer,
+    required String city,
+    required String locality,
+    required String address,
+    required List<String> configurations,
+    required String priceRange,
+    required int totalUnits,
+    required String possessionDate,
+    required String reraNumber,
+    required List<String> amenities,
+    required String status,
+    required String description,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createprojects}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'name': name.trim(),
+      'developer': developer.trim(),
+      'city': city.trim(),
+      'locality': locality.trim(),
+      'address': address.trim(),
+      'configurations': configurations,
+      'price_range': priceRange.trim(),
+      'total_units': totalUnits,
+      'possession_date': possessionDate.trim(),
+      'rera_number': reraNumber.trim(),
+      'amenities': amenities,
+      'status': status.trim(),
+      'description': description.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'createProject',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    _logResponse('createProject', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create project.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final projectMap = _extractLeadMap(decoded);
+      if (projectMap != null) {
+        return projectMap;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'name': name.trim(),
+      'developer': developer.trim(),
+      'city': city.trim(),
+      'locality': locality.trim(),
+      'address': address.trim(),
+      'configurations': configurations,
+      'price_range': priceRange.trim(),
+      'total_units': totalUnits,
+      'possession_date': possessionDate.trim(),
+      'rera_number': reraNumber.trim(),
+      'amenities': amenities,
+      'status': status.trim(),
+      'description': description.trim(),
+    };
+  }
+
+  Future<Map<String, dynamic>> projectDetail({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.projectsdetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'projectDetail',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('projectDetail', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch project details.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final projectMap = _extractLeadMap(decoded);
+      if (projectMap != null) {
+        return projectMap;
+      }
+    } catch (_) {}
+
+    throw Exception('Project details response format is not valid.');
+  }
+
+  Future<Map<String, dynamic>> editProject({
+    required String id,
+    required String name,
+    required String developer,
+    required String city,
+    required String locality,
+    required String address,
+    required List<String> configurations,
+    required String priceRange,
+    required int totalUnits,
+    required String possessionDate,
+    required String reraNumber,
+    required List<String> amenities,
+    required String status,
+    required String description,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.editprojects.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'name': name.trim(),
+      'developer': developer.trim(),
+      'city': city.trim(),
+      'locality': locality.trim(),
+      'address': address.trim(),
+      'configurations': configurations,
+      'price_range': priceRange.trim(),
+      'total_units': totalUnits,
+      'possession_date': possessionDate.trim(),
+      'rera_number': reraNumber.trim(),
+      'amenities': amenities,
+      'status': status.trim(),
+      'description': description.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'editProject',
+      method: 'PUT',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http.put(uri, headers: headers, body: body).timeout(_requestTimeout);
+    _logResponse('editProject', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update project.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final projectMap = _extractLeadMap(decoded);
+      if (projectMap != null) {
+        return projectMap;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{'id': normalizedId};
+  }
+
+  Future<void> deleteProject({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.deleteprojects.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteProject',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response = await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteProject', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete project.',
     );
     if (error != null) {
       throw Exception(error);
@@ -940,7 +1762,7 @@ class AuthService {
       return const <Map<String, dynamic>>[];
     }
 
-    for (final key in ['data', 'leads', 'items', 'results', 'rows']) {
+    for (final key in ['data', 'leads', 'projects', 'items', 'results', 'rows']) {
       final fromKey = readList(source[key]);
       if (fromKey != null) {
         return fromKey;
@@ -949,7 +1771,7 @@ class AuthService {
 
     final dynamic data = source['data'];
     if (data is Map<String, dynamic>) {
-      for (final key in ['leads', 'items', 'results', 'data', 'rows']) {
+      for (final key in ['leads', 'projects', 'items', 'results', 'data', 'rows']) {
         final fromNested = readList(data[key]);
         if (fromNested != null) {
           return fromNested;

@@ -1,8 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/follow_ups/follow_up_detail_page.dart';
+import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class FollowUpPage extends StatefulWidget {
   const FollowUpPage({super.key});
@@ -14,10 +19,13 @@ class FollowUpPage extends StatefulWidget {
 class _FollowUpPageState extends State<FollowUpPage> {
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedFollowUpIds = <String>{};
+  final AuthProvider _authProvider = AuthProvider();
 
   int _currentPage = 1;
   final int _pageSize = 5;
   String _searchQuery = '';
+  bool _isLoadingFollowUps = false;
+  String? _loadError;
 
   final List<_FollowUpModel> _allFollowUps = <_FollowUpModel>[
     _FollowUpModel(
@@ -124,6 +132,286 @@ class _FollowUpPageState extends State<FollowUpPage> {
     ),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadFollowUps();
+  }
+
+  Future<void> _openCreateFollowUp() async {
+    final payload = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (_) => const FollowUpFormPage()),
+    );
+    if (!mounted || payload == null) {
+      return;
+    }
+
+    final created = _modelFromPayload(
+      payload: payload,
+      id: 'FU-${DateTime.now().millisecondsSinceEpoch}',
+      assignee: const _PersonModel(name: 'You', imageUrl: ''),
+    );
+
+    setState(() {
+      _allFollowUps.insert(0, created);
+      _currentPage = 1;
+    });
+  }
+
+  Future<void> _openEditFollowUp(_FollowUpModel followUp) async {
+    final due = _combineDueDateTime(followUp.dueDate, followUp.dueTime);
+    final payload = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => FollowUpFormPage(
+          followUpId: followUp.id,
+          followUpData: <String, dynamic>{
+            'title': followUp.customerName,
+            'lead_id': followUp.leadId,
+            'due_date': due.toUtc().toIso8601String(),
+            'priority': followUp.priority.toLowerCase(),
+            'notes': followUp.notes,
+          },
+        ),
+      ),
+    );
+    if (!mounted || payload == null) {
+      return;
+    }
+
+    final updated = _modelFromPayload(
+      payload: payload,
+      id: followUp.id,
+      assignee: followUp.assignee,
+    );
+
+    final index = _allFollowUps.indexWhere((item) => item.id == followUp.id);
+    if (index < 0) {
+      return;
+    }
+
+    setState(() {
+      _allFollowUps[index] = updated;
+    });
+  }
+
+  Future<void> _viewFollowUp(_FollowUpModel followUp) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FollowUpDetailPage(followUpId: followUp.id),
+      ),
+    );
+  }
+
+  Future<void> _deleteFollowUp(_FollowUpModel followUp) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Follow Up'),
+          content: Text('Are you sure you want to delete "${followUp.customerName}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    try {
+      await _authProvider.deleteFollowUp(
+        id: followUp.id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _allFollowUps.removeWhere((item) => item.id == followUp.id);
+        _selectedFollowUpIds.remove(followUp.id);
+      });
+      _showSnackBar('Follow-up deleted successfully.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _callFollowUp(_FollowUpModel followUp) async {
+    final phone = followUp.assignee.phone.trim();
+    if (phone.isEmpty) {
+      _showSnackBar('Phone number is not available for this follow-up.');
+      return;
+    }
+
+    final launchUri = Uri(
+      scheme: 'tel',
+      path: phone,
+    );
+    await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+  }
+
+  void _markFollowUpComplete(_FollowUpModel followUp) {
+    _confirmAndCompleteFollowUp(followUp);
+  }
+
+  Future<void> _confirmAndCompleteFollowUp(_FollowUpModel followUp) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Mark As Complete'),
+          content: Text('Mark "${followUp.customerName}" as completed?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+              child: const Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    try {
+      await _authProvider.completeFollowUpStatus(
+        id: followUp.id,
+        isCompleted: true,
+        token: _authProvider.currentAuthToken,
+      );
+
+      final index = _allFollowUps.indexWhere((item) => item.id == followUp.id);
+      if (index < 0 || !mounted) {
+        return;
+      }
+
+      setState(() {
+        _allFollowUps[index] = _allFollowUps[index].copyWith(
+          status: 'Completed',
+          statusColor: const Color(0xFF2E7D32),
+        );
+      });
+      _showSnackBar('Follow-up marked as complete.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  _FollowUpModel _modelFromPayload({
+    required Map<String, dynamic> payload,
+    required String id,
+    required _PersonModel assignee,
+  }) {
+    final dueRaw = _readString(payload['due_date']);
+    final due = DateTime.tryParse(dueRaw)?.toLocal() ?? DateTime.now();
+    final priority = _readString(payload['priority']).toLowerCase();
+    final title = _readString(payload['title']);
+
+    return _FollowUpModel(
+      id: id,
+      leadId: _readString(payload['lead_id']),
+      customerName: title.isEmpty ? 'Follow Up' : title,
+      status: 'Pending',
+      statusColor: const Color(0xFFFB8C00),
+      priority: _labelPriority(priority),
+      priorityColor: _priorityColor(priority),
+      dueDate: DateFormat('yyyy-MM-dd').format(due),
+      dueTime: DateFormat('hh:mm a').format(due),
+      channel: 'Call',
+      notes: _readString(payload['notes']),
+      assignee: assignee,
+    );
+  }
+
+  DateTime _combineDueDateTime(String dateValue, String timeValue) {
+    final datePart = DateTime.tryParse(dateValue) ?? DateTime.now();
+    final parsedTime = _parseTimeOfDay(timeValue);
+    return DateTime(
+      datePart.year,
+      datePart.month,
+      datePart.day,
+      parsedTime.hour,
+      parsedTime.minute,
+    );
+  }
+
+  TimeOfDay _parseTimeOfDay(String value) {
+    final formats = <String>['hh:mm a', 'HH:mm', 'h:mm a'];
+    for (final format in formats) {
+      try {
+        final dt = DateFormat(format).parseStrict(value);
+        return TimeOfDay(hour: dt.hour, minute: dt.minute);
+      } catch (_) {
+        // continue
+      }
+    }
+    return TimeOfDay.now();
+  }
+
+  String _labelPriority(String value) {
+    switch (value) {
+      case 'high':
+        return 'High';
+      case 'medium':
+        return 'Medium';
+      case 'low':
+        return 'Low';
+      default:
+        return 'Medium';
+    }
+  }
+
+  Color _priorityColor(String value) {
+    switch (value) {
+      case 'high':
+        return const Color(0xFFE53935);
+      case 'low':
+        return const Color(0xFF1E88E5);
+      case 'medium':
+      default:
+        return const Color(0xFFFB8C00);
+    }
+  }
+
+  String _readString(dynamic value) {
+    if (value is String) {
+      return value.trim();
+    }
+    if (value is num || value is bool) {
+      return value.toString().trim();
+    }
+    return '';
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   List<_FollowUpModel> get _filteredFollowUps {
     final query = _searchQuery.trim().toLowerCase();
     if (query.isEmpty) {
@@ -172,6 +460,129 @@ class _FollowUpPageState extends State<FollowUpPage> {
     super.dispose();
   }
 
+  Future<void> _loadFollowUps() async {
+    setState(() {
+      _isLoadingFollowUps = true;
+      _loadError = null;
+    });
+
+    try {
+      final result = await _authProvider.followUps(
+        token: _authProvider.currentAuthToken,
+      );
+
+      final mapped = result.items.map(_followUpFromApi).whereType<_FollowUpModel>().toList();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _allFollowUps
+          ..clear()
+          ..addAll(mapped);
+        _isLoadingFollowUps = false;
+        _currentPage = 1;
+        _selectedFollowUpIds.clear();
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingFollowUps = false;
+        _loadError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  _FollowUpModel? _followUpFromApi(Map<String, dynamic> json) {
+    final id = _readString(json['id'] ?? json['task_id'] ?? json['taskId']);
+    if (id.isEmpty) {
+      return null;
+    }
+
+    final title = _readString(json['title']);
+    final leadId = _readString(json['lead_id'] ?? json['leadId']);
+    final priorityRaw = _readString(json['priority']).toLowerCase();
+    final statusRaw = _readString(json['status']).toLowerCase();
+    final notes = _readString(json['notes']);
+    final dueRaw = _readString(json['due_date'] ?? json['dueDate']);
+    final due = DateTime.tryParse(dueRaw)?.toLocal() ?? DateTime.now();
+
+    final assigned = json['assigned_to'];
+    String assigneeName = _readString(json['assigned_name'] ?? json['assignedName']);
+    String assigneeImage = '';
+    String assigneePhone = _readString(json['assigned_phone'] ?? json['assignedPhone']);
+    if (assigned is Map<String, dynamic>) {
+      assigneeName = _readString(
+        assigned['name'] ??
+            assigned['full_name'] ??
+            assigned['fullName'] ??
+            assigned['first_name'],
+      );
+      assigneeImage = _readString(
+        assigned['image'] ??
+            assigned['avatar'] ??
+            assigned['profile_image'] ??
+            assigned['image_url'],
+      );
+      assigneePhone = _readString(
+        assigned['phone'] ?? assigned['phone_number'] ?? assigned['mobile'],
+      );
+    } else if (assigned is String && assigned.trim().isNotEmpty) {
+      assigneeName = assigned.trim();
+    }
+    if (assigneeName.isEmpty) {
+      assigneeName = 'Unassigned';
+    }
+
+    return _FollowUpModel(
+      id: id,
+      leadId: leadId.isEmpty ? 'N/A' : leadId,
+      customerName: title.isEmpty ? 'Follow Up' : title,
+      status: _labelStatus(statusRaw),
+      statusColor: _statusColor(statusRaw),
+      priority: _labelPriority(priorityRaw),
+      priorityColor: _priorityColor(priorityRaw),
+      dueDate: DateFormat('yyyy-MM-dd').format(due),
+      dueTime: DateFormat('hh:mm a').format(due),
+      channel: 'Call',
+      notes: notes,
+      assignee: _PersonModel(
+        name: assigneeName,
+        imageUrl: assigneeImage,
+        phone: assigneePhone,
+      ),
+    );
+  }
+
+  String _labelStatus(String value) {
+    if (value.isEmpty) {
+      return 'Pending';
+    }
+    final normalized = value.replaceAll('_', ' ');
+    return normalized
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+  }
+
+  Color _statusColor(String value) {
+    switch (value) {
+      case 'completed':
+      case 'done':
+        return const Color(0xFF2E7D32);
+      case 'overdue':
+      case 'missed':
+        return const Color(0xFFD32F2F);
+      case 'scheduled':
+        return const Color(0xFF1E88E5);
+      case 'pending':
+      default:
+        return const Color(0xFFFB8C00);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedCount = _selectedFollowUpIds.length;
@@ -186,6 +597,36 @@ class _FollowUpPageState extends State<FollowUpPage> {
           children: [
             _buildToolbar(),
             const SizedBox(height: 16),
+            if (_isLoadingFollowUps)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_loadError != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _loadError!,
+                      style: const TextStyle(color: AppColors.error),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton(
+                      onPressed: _loadFollowUps,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
             if (selectedCount > 0) ...[
               _buildBulkActionBar(selectedCount),
               const SizedBox(height: 16),
@@ -193,6 +634,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
             _buildFollowUpSection(),
             const SizedBox(height: 16),
             _buildPagination(),
+            ],
             const SizedBox(height: 100),
           ],
         ),
@@ -231,7 +673,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
         );
 
         final addButton = FilledButton.icon(
-          onPressed: () {},
+          onPressed: _openCreateFollowUp,
           icon: const Icon(Icons.add, size: 18),
           label: const Text('Add Follow Up'),
           style: FilledButton.styleFrom(
@@ -334,6 +776,11 @@ class _FollowUpPageState extends State<FollowUpPage> {
                 child: _FollowUpCard(
                   followUp: followUp,
                   isSelected: _selectedFollowUpIds.contains(followUp.id),
+                  onView: () => _viewFollowUp(followUp),
+                  onDelete: () => _deleteFollowUp(followUp),
+                  onEdit: () => _openEditFollowUp(followUp),
+                  onCall: () => _callFollowUp(followUp),
+                  onComplete: () => _markFollowUpComplete(followUp),
                   onSelectionChanged: (selected) {
                     setState(() {
                       if (selected) {
@@ -458,11 +905,21 @@ class _FollowUpCard extends StatelessWidget {
   const _FollowUpCard({
     required this.followUp,
     required this.isSelected,
+    required this.onView,
+    required this.onDelete,
+    required this.onEdit,
+    required this.onCall,
+    required this.onComplete,
     required this.onSelectionChanged,
   });
 
   final _FollowUpModel followUp;
   final bool isSelected;
+  final VoidCallback onView;
+  final VoidCallback onDelete;
+  final VoidCallback onEdit;
+  final VoidCallback onCall;
+  final VoidCallback onComplete;
   final ValueChanged<bool> onSelectionChanged;
 
   @override
@@ -506,7 +963,7 @@ class _FollowUpCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${followUp.id} • ${followUp.leadId}',
+                      'Assigned To: ${followUp.assignee.name}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -516,15 +973,15 @@ class _FollowUpCard extends StatelessWidget {
                   ],
                 ),
               ),
-              _statusChip(followUp.status, followUp.statusColor),
+              _statusChip(followUp.priority, followUp.priorityColor),
             ],
           ),
           const SizedBox(height: 10),
           _metaRow(
-            'Priority',
-            followUp.priority,
-            followUp.priorityColor,
-            Icons.flag_outlined,
+            'Assigned To',
+            followUp.assignee.name,
+            AppColors.textPrimary,
+            Icons.person_outline,
           ),
           const SizedBox(height: 8),
           _metaRow(
@@ -567,16 +1024,25 @@ class _FollowUpCard extends StatelessWidget {
                 ),
               ),
               IconButton(
-                onPressed: () {},
+                onPressed: onCall,
                 icon: const Icon(Icons.call_outlined),
               ),
               IconButton(
-                onPressed: () {},
+                onPressed: onComplete,
                 icon: const Icon(Icons.check_circle_outline),
               ),
               IconButton(
-                onPressed: () {},
+                onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined),
+              ),
+              IconButton(
+                onPressed: onView,
+                icon: const Icon(Icons.visibility_outlined),
+              ),
+              IconButton(
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline),
+                color: AppColors.error,
               ),
             ],
           ),
@@ -720,11 +1186,46 @@ class _FollowUpModel {
   final String channel;
   final String notes;
   final _PersonModel assignee;
+
+  _FollowUpModel copyWith({
+    String? id,
+    String? leadId,
+    String? customerName,
+    String? status,
+    Color? statusColor,
+    String? priority,
+    Color? priorityColor,
+    String? dueDate,
+    String? dueTime,
+    String? channel,
+    String? notes,
+    _PersonModel? assignee,
+  }) {
+    return _FollowUpModel(
+      id: id ?? this.id,
+      leadId: leadId ?? this.leadId,
+      customerName: customerName ?? this.customerName,
+      status: status ?? this.status,
+      statusColor: statusColor ?? this.statusColor,
+      priority: priority ?? this.priority,
+      priorityColor: priorityColor ?? this.priorityColor,
+      dueDate: dueDate ?? this.dueDate,
+      dueTime: dueTime ?? this.dueTime,
+      channel: channel ?? this.channel,
+      notes: notes ?? this.notes,
+      assignee: assignee ?? this.assignee,
+    );
+  }
 }
 
 class _PersonModel {
-  const _PersonModel({required this.name, required this.imageUrl});
+  const _PersonModel({
+    required this.name,
+    required this.imageUrl,
+    this.phone = '',
+  });
 
   final String name;
   final String imageUrl;
+  final String phone;
 }
