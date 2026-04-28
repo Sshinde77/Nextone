@@ -409,7 +409,7 @@ class _LeadsPageState extends State<LeadsPage> {
           const Spacer(),
           Text(
             '$_totalItems total leads',
-            style: const TextStyle(v
+            style: const TextStyle(
               fontWeight: FontWeight.w600,
               color: AppColors.textSecondary,
               fontSize: 12,
