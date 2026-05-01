@@ -20,7 +20,7 @@ class ApiConstants {
   static const String leads = '/leads';
   static const String createsleads = '/leads';
   static const String leadsdetail = '/leads/{id}';
-  static const String deleteleads = '/leads/{id}'; 
+  static const String deleteleads = '/leads/{id}';
   static const String editleads = '/leads/{id}';
   static const String updatestatusleads = '/leads/{id}/status';
   static const String reassignmemberleads = '/leads/{id}/assign';
@@ -40,4 +40,11 @@ class ApiConstants {
   static const String deleteprojects = '/projects/{id}';
   static const String editprojects = '/projects/{id}';
 
+  //site visit Endpoints
+  static const String sitevisits = '/site-visits';
+  static const String createsitevisits = '/site-visits';
+  static const String sitevisitsdetail = '/site-visits/{id}';
+  static const String editsitevisits = '/site-visits/{id}';
+  static const String updatestatussitevisits = '/site-visits/{id}/status';
+  static const String submitfeedbacksitevisits = '/site-visits/{id}/feedback';
 }

@@ -141,7 +141,9 @@ class _LoginPageState extends State<LoginPage> {
                     decoration: BoxDecoration(
                       color: AppColors.card,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFB1916C)), // Kept original color
+                      border: Border.all(
+                          color:
+                              const Color(0xFFB1916C)), // Kept original color
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.05),
@@ -168,7 +170,8 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 8),
                   Text(
                     'Sign in to your CRM workspace',
-                    style: const TextStyle(fontSize: 16, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                        fontSize: 16, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 40),
                   // Main Card
@@ -263,7 +266,8 @@ class _LoginPageState extends State<LoginPage> {
                   // Footer
                   Text(
                     '© 2024 Next One Realty. All rights reserved.',
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12),
                   ),
                   const SizedBox(height: 20),
                 ],
@@ -438,7 +442,8 @@ class _LoginPageState extends State<LoginPage> {
       validator: validator,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+        hintStyle:
+            const TextStyle(color: AppColors.textSecondary, fontSize: 14),
         prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
         suffixIcon: suffixIcon,
         filled: true,

@@ -208,7 +208,8 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.check_circle_outline),
-                label: Text(_isUpdatingStatus ? 'Updating...' : 'Update Status'),
+                label:
+                    Text(_isUpdatingStatus ? 'Updating...' : 'Update Status'),
               ),
             ),
           ],
@@ -263,7 +264,8 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
                 ),
               ),
               const SizedBox(width: 10),
-              _pill(priorityLabel, priorityColor.withOpacity(0.12), priorityColor),
+              _pill(priorityLabel, priorityColor.withOpacity(0.12),
+                  priorityColor),
             ],
           ),
           const SizedBox(height: 12),
@@ -275,7 +277,8 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
                 completed ? const Color(0xFF2E7D32) : const Color(0xFFFB8C00),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.schedule_outlined, size: 16, color: AppColors.textSecondary),
+              const Icon(Icons.schedule_outlined,
+                  size: 16, color: AppColors.textSecondary),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -464,7 +467,8 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
       }
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Status updated successfully.')));
+        ..showSnackBar(
+            const SnackBar(content: Text('Status updated successfully.')));
     } catch (e) {
       if (!mounted) {
         return;

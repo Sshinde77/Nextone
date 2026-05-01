@@ -189,9 +189,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           ),
                           const SizedBox(height: 32),
                           ElevatedButton(
-                            onPressed: _isSubmitting
-                                ? null
-                                : _submitForgotPassword,
+                            onPressed:
+                                _isSubmitting ? null : _submitForgotPassword,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [

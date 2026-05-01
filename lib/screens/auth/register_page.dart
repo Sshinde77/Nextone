@@ -361,9 +361,8 @@ class _RegisterPageState extends State<RegisterPage> {
                               ),
                               const SizedBox(height: 32),
                               ElevatedButton(
-                                onPressed: _isSubmitting
-                                    ? null
-                                    : _submitRegister,
+                                onPressed:
+                                    _isSubmitting ? null : _submitRegister,
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [

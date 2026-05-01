@@ -34,7 +34,6 @@ class _LeadFormPageState extends State<LeadFormPage> {
   bool _isSubmitting = false;
   bool _isLoadingAssignees = true;
   bool _isLoadingLeadDetails = false;
-  bool _isAssigneeOpen = false;
   String? _assigneeLoadError;
   String? _selectedAssigneeId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
@@ -69,10 +68,16 @@ class _LeadFormPageState extends State<LeadFormPage> {
     }
 
     _nameController.text = _readString(
-      data['name'] ?? data['full_name'] ?? data['fullName'] ?? data['contact_name'],
+      data['name'] ??
+          data['full_name'] ??
+          data['fullName'] ??
+          data['contact_name'],
     );
     _phoneController.text = _readString(
-      data['phone'] ?? data['phone_number'] ?? data['phoneNumber'] ?? data['mobile'],
+      data['phone'] ??
+          data['phone_number'] ??
+          data['phoneNumber'] ??
+          data['mobile'],
     );
     _emailController.text = _readString(data['email']);
     _sourceController.text = _readString(data['source']);
@@ -87,7 +92,10 @@ class _LeadFormPageState extends State<LeadFormPage> {
     final assigned = data['assigned_to'] ?? data['assignee'];
     if (assigned is Map<String, dynamic>) {
       _selectedAssigneeId = _readString(
-        assigned['id'] ?? assigned['user_id'] ?? assigned['userId'] ?? assigned['uuid'],
+        assigned['id'] ??
+            assigned['user_id'] ??
+            assigned['userId'] ??
+            assigned['uuid'],
       );
     } else {
       _selectedAssigneeId = _readString(assigned);
@@ -141,7 +149,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
     });
 
     try {
-      final users = await _authProvider.users(token: _authProvider.currentAuthToken);
+      final users =
+          await _authProvider.users(token: _authProvider.currentAuthToken);
       final filtered = users
           .map(_assigneeFromApi)
           .where((user) => user != null)
@@ -154,8 +163,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
       final uniqueOptions = uniqueById.values.toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
-      final validSelection =
-          _selectedAssigneeId != null &&
+      final validSelection = _selectedAssigneeId != null &&
               uniqueOptions.any((option) => option.id == _selectedAssigneeId)
           ? _selectedAssigneeId
           : null;
@@ -189,33 +197,44 @@ class _LeadFormPageState extends State<LeadFormPage> {
     }
 
     final roleRaw = _readString(
-      user['role'] ?? user['user_role'] ?? user['userRole'] ?? user['designation'],
+      user['role'] ??
+          user['user_role'] ??
+          user['userRole'] ??
+          user['designation'],
     );
     final normalizedRole = _normalizeRole(roleRaw);
-    if (normalizedRole != 'sale_executive' && normalizedRole != 'sales_manager') {
+    if (normalizedRole != 'sale_executive' &&
+        normalizedRole != 'sales_manager') {
       return null;
     }
 
-    final id = _readString(user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid']);
+    final id = _readString(
+        user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid']);
     if (id.isEmpty) {
       return null;
     }
 
     final firstName = _readString(user['first_name'] ?? user['firstName']);
     final lastName = _readString(user['last_name'] ?? user['lastName']);
-    final combinedName = [if (firstName.isNotEmpty) firstName, if (lastName.isNotEmpty) lastName]
-        .join(' ')
-        .trim();
+    final combinedName = [
+      if (firstName.isNotEmpty) firstName,
+      if (lastName.isNotEmpty) lastName
+    ].join(' ').trim();
 
     final displayName = combinedName.isNotEmpty
         ? combinedName
-        : _readString(user['name'] ?? user['full_name'] ?? user['fullName'] ?? user['email']);
+        : _readString(user['name'] ??
+            user['full_name'] ??
+            user['fullName'] ??
+            user['email']);
 
-    return _AssigneeOption(id: id, name: displayName.isEmpty ? 'User $id' : displayName);
+    return _AssigneeOption(
+        id: id, name: displayName.isEmpty ? 'User $id' : displayName);
   }
 
   String _normalizeRole(String value) {
-    final normalized = value.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+    final normalized =
+        value.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
     if (normalized == 'sales_executive') {
       return 'sale_executive';
     }
@@ -306,7 +325,9 @@ class _LeadFormPageState extends State<LeadFormPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(widget.isEditMode ? 'Lead updated successfully.' : 'Lead created successfully.');
+      _showSnackBar(widget.isEditMode
+          ? 'Lead updated successfully.'
+          : 'Lead created successfully.');
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) {
@@ -326,6 +347,58 @@ class _LeadFormPageState extends State<LeadFormPage> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _openAssigneeMenu(BuildContext context) async {
+    if (_isSubmitting || _isLoadingAssignees || _assigneeOptions.isEmpty) {
+      return;
+    }
+
+    final fieldContext = context;
+    final renderBox = fieldContext.findRenderObject() as RenderBox?;
+    if (renderBox == null) {
+      return;
+    }
+
+    final overlay =
+        Overlay.of(fieldContext).context.findRenderObject() as RenderBox;
+    final topLeft = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
+    final bottomLeft = renderBox.localToGlobal(
+      Offset(0, renderBox.size.height),
+      ancestor: overlay,
+    );
+
+    final selected = await showMenu<String>(
+      context: fieldContext,
+      color: Colors.white,
+      elevation: 4,
+      constraints: BoxConstraints.tightFor(width: renderBox.size.width),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      position: RelativeRect.fromLTRB(
+        topLeft.dx,
+        bottomLeft.dy + 6,
+        overlay.size.width - topLeft.dx - renderBox.size.width,
+        overlay.size.height - bottomLeft.dy,
+      ),
+      items: _assigneeOptions
+          .map(
+            (user) => PopupMenuItem<String>(
+              value: user.id,
+              child: Text(user.name),
+            ),
+          )
+          .toList(),
+    );
+
+    if (!mounted || selected == null) {
+      return;
+    }
+    setState(() {
+      _selectedAssigneeId = selected;
+    });
   }
 
   @override
@@ -367,7 +440,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
                           if (text.isEmpty) {
                             return 'Email is required.';
                           }
-                          final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+                          final emailRegex =
+                              RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
                           if (!emailRegex.hasMatch(text)) {
                             return 'Enter a valid email address.';
                           }
@@ -420,7 +494,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(widget.isEditMode ? 'Update Lead' : 'Create Lead'),
+                        : Text(
+                            widget.isEditMode ? 'Update Lead' : 'Create Lead'),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -466,71 +541,37 @@ class _LeadFormPageState extends State<LeadFormPage> {
           ),
         ),
         const SizedBox(height: 6),
-        GestureDetector(
-          onTap: (_isSubmitting || _isLoadingAssignees)
-              ? null
-              : () {
-                  setState(() {
-                    _isAssigneeOpen = !_isAssigneeOpen;
-                  });
-                },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  selectedLabel ?? 'Select assignee',
-                  style: TextStyle(
-                    color: selectedLabel == null ? Colors.grey : Colors.black,
-                  ),
+        Builder(
+          builder: (fieldContext) {
+            return GestureDetector(
+              onTap: (_isSubmitting || _isLoadingAssignees)
+                  ? null
+                  : () => _openAssigneeMenu(fieldContext),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
                 ),
-                Icon(
-                  _isAssigneeOpen
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      selectedLabel ?? 'Select assignee',
+                      style: TextStyle(
+                        color:
+                            selectedLabel == null ? Colors.grey : Colors.black,
+                      ),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
-        if (_isAssigneeOpen)
-          Container(
-            margin: const EdgeInsets.only(top: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
-            ),
-            child: Column(
-              children: _assigneeOptions.map((user) {
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedAssigneeId = user.id;
-                      _isAssigneeOpen = false;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                    child: Row(
-                      children: [
-                        Text(user.name),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
         if (_isLoadingAssignees) ...[
           const SizedBox(height: 8),
           const Text(

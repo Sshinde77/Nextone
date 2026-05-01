@@ -36,7 +36,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
 
   DateTime? _selectedPossessionDate;
   String _status = 'active';
-  bool _isStatusOpen = false;
   bool _isSubmitting = false;
 
   @override
@@ -102,7 +101,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
 
   String _listToCsv(dynamic value) {
     if (value is List) {
-      return value.map((e) => _readString(e)).where((e) => e.isNotEmpty).join(', ');
+      return value
+          .map((e) => _readString(e))
+          .where((e) => e.isNotEmpty)
+          .join(', ');
     }
     return _readString(value);
   }
@@ -156,7 +158,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       final configurations = _csvToList(_configurationsController.text);
       final priceRange = _priceRangeController.text.trim();
       final totalUnits = int.parse(_totalUnitsController.text.trim());
-      final possessionDate = DateFormat('yyyy-MM-dd').format(_selectedPossessionDate!);
+      final possessionDate =
+          DateFormat('yyyy-MM-dd').format(_selectedPossessionDate!);
       final reraNumber = _reraNumberController.text.trim();
       final amenities = _csvToList(_amenitiesController.text);
       final description = _descriptionController.text.trim();
@@ -225,6 +228,59 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _openStatusMenu(BuildContext context) async {
+    if (_isSubmitting) {
+      return;
+    }
+
+    const statuses = <String>['active', 'inactive'];
+    final fieldContext = context;
+    final renderBox = fieldContext.findRenderObject() as RenderBox?;
+    if (renderBox == null) {
+      return;
+    }
+
+    final overlay =
+        Overlay.of(fieldContext).context.findRenderObject() as RenderBox;
+    final topLeft = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
+    final bottomLeft = renderBox.localToGlobal(
+      Offset(0, renderBox.size.height),
+      ancestor: overlay,
+    );
+
+    final selected = await showMenu<String>(
+      context: fieldContext,
+      color: Colors.white,
+      elevation: 4,
+      constraints: BoxConstraints.tightFor(width: renderBox.size.width),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      position: RelativeRect.fromLTRB(
+        topLeft.dx,
+        bottomLeft.dy + 6,
+        overlay.size.width - topLeft.dx - renderBox.size.width,
+        overlay.size.height - bottomLeft.dy,
+      ),
+      items: statuses
+          .map(
+            (status) => PopupMenuItem<String>(
+              value: status,
+              child: Text(status[0].toUpperCase() + status.substring(1)),
+            ),
+          )
+          .toList(),
+    );
+
+    if (!mounted || selected == null) {
+      return;
+    }
+    setState(() {
+      _status = selected;
+    });
   }
 
   @override
@@ -334,7 +390,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                   _buildTextField(
                     controller: _descriptionController,
                     label: 'Description',
-                    hintText: 'Premium residential project in the heart of Andheri West',
+                    hintText:
+                        'Premium residential project in the heart of Andheri West',
                     minLines: 3,
                     maxLines: 5,
                   ),
@@ -347,7 +404,9 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                         minimumSize: const Size(0, 48),
                         backgroundColor: AppColors.primary,
                       ),
-                      child: Text(widget.isEditMode ? 'Update Project' : 'Create Project'),
+                      child: Text(widget.isEditMode
+                          ? 'Update Project'
+                          : 'Create Project'),
                     ),
                   ),
                 ],
@@ -378,7 +437,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
             decoration: _fieldDecoration(hintText: 'Select possession date'),
             child: Row(
               children: [
-                const Icon(Icons.calendar_month_outlined, size: 18, color: AppColors.textSecondary),
+                const Icon(Icons.calendar_month_outlined,
+                    size: 18, color: AppColors.textSecondary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -400,7 +460,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   }
 
   Widget _buildStatusDropdown() {
-    const statuses = <String>['active', 'inactive'];
     final selectedStatusLabel = _status[0].toUpperCase() + _status.substring(1);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,70 +473,32 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           ),
         ),
         const SizedBox(height: 6),
-        GestureDetector(
-          onTap: _isSubmitting
-              ? null
-              : () {
-                  setState(() {
-                    _isStatusOpen = !_isStatusOpen;
-                  });
-                },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  selectedStatusLabel,
-                  style: const TextStyle(color: Colors.black),
+        Builder(
+          builder: (fieldContext) {
+            return GestureDetector(
+              onTap: _isSubmitting ? null : () => _openStatusMenu(fieldContext),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
                 ),
-                Icon(
-                  _isStatusOpen
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      selectedStatusLabel,
+                      style: const TextStyle(color: Colors.black),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
-        if (_isStatusOpen)
-          Container(
-            margin: const EdgeInsets.only(top: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
-            ),
-            child: Column(
-              children: statuses.map((status) {
-                final statusLabel = status[0].toUpperCase() + status.substring(1);
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      _status = status;
-                      _isStatusOpen = false;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                    child: Row(
-                      children: [
-                        Text(statusLabel),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
       ],
     );
   }

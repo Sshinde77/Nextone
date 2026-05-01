@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/routes/app_routes.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -16,871 +16,910 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
-  final PageController _summaryPageController = PageController(
-    viewportFraction: 0.5,
-  );
-
-  @override
-  void dispose() {
-    _summaryPageController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
-    final navReservedHeight = 76.0 + 12.0; // CRMAppBottomNav height + bottom margin
-    final bodyBottomPadding = widget.showBottomNav
-        ? bottomInset + navReservedHeight + 16.0
-        : 32.0;
+    final navReservedHeight = 76.0 + 12.0;
+    final bodyBottomPadding =
+        widget.showBottomNav ? bottomInset + navReservedHeight + 16.0 : 32.0;
+    final compactText = MediaQuery.of(
+      context,
+    ).copyWith(textScaler: const TextScaler.linear(0.88));
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const CrmAppBar(title: 'Home'),
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, bodyBottomPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Summary Cards Slider
-              SizedBox(
-                height: 140,
-                child: PageView(
-                  padEnds: false,
-                  controller: _summaryPageController,
-                  children: const [
-                    _SummaryCard(
-                      icon: Icons.people_outline,
-                      label: 'Total Leads',
-                      value: '1250',
-                      trend: '\u2197 +12.5%',
-                      trendColor: AppColors.success,
-                    ),
-                    _SummaryCard(
-                      icon: Icons.phone_outlined,
-                      label: 'Active Leads',
-                      value: '420',
-                      trend: '\u2197 +8.2%',
-                      trendColor: AppColors.success,
-                    ),
-                    _SummaryCard(
-                      icon: Icons.location_on_outlined,
-                      label: 'Site Visits',
-                      value: '145',
-                      trend: '\u2197 +15.3%',
-                      trendColor: AppColors.success,
-                    ),
-                    _SummaryCard(
-                      icon: Icons.description_outlined,
-                      label: 'Bookings',
-                      value: '12',
-                      trend: '\u2197 +5.7%',
-                      trendColor: AppColors.success,
-                    ),
-                    _SummaryCard(
-                      icon: Icons.currency_rupee,
-                      label: 'Revenue',
-                      value: '\u20B94.50 Cr',
-                      trend: '\u2197 +18.9%',
-                      trendColor: AppColors.success,
-                    ),
-                    _SummaryCard(
-                      icon: Icons.trending_up,
-                      label: 'Commission',
-                      value: '\u20B985.00 L',
-                      trend: '\u2198 -3.2%',
-                      trendColor: AppColors.error,
-                    ),
-                  ],
-                ),
+          padding: EdgeInsets.fromLTRB(12, 12, 12, bodyBottomPadding),
+          child: MediaQuery(
+            data: compactText,
+            child: Transform.scale(
+              scale: 0.92,
+              alignment: Alignment.topCenter,
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _OverviewCards(),
+                  SizedBox(height: 12),
+                  _RevenueDualSection(),
+                  SizedBox(height: 12),
+                  _CommissionPipelineActivitySection(),
+                  SizedBox(height: 12),
+                  _QuickActionsSection(),
+                  SizedBox(height: 12),
+                  _UpcomingVisitsSection(),
+                  SizedBox(height: 100),
+                ],
               ),
-              const SizedBox(height: 24),
-
-              // Revenue & Bookings
-              const _SectionCard(
-                title: 'Revenue & Bookings',
-                subtitle: 'Monthly performance overview',
-                trailing: _TimeRangePicker(),
-                child: SizedBox(height: 220, child: _RevenueLineChart()),
-              ),
-              const SizedBox(height: 16),
-
-              // Lead Sources
-              const _SectionCard(
-                title: 'Lead Sources',
-                subtitle: 'Distribution by source',
-                child: SizedBox(height: 300, child: _LeadSourcesPieChart()),
-              ),
-              const SizedBox(height: 16),
-
-              const _SectionCard(
-                title: 'Commission Overview',
-                subtitle: 'Earned vs Pending',
-                child: SizedBox(height: 220, child: _CommissionBarChart()),
-              ),
-              const SizedBox(height: 16),
-
-              const _SectionCard(
-                title: 'Lead Pipeline',
-                subtitle: 'Current lead distribution',
-                child: _LeadPipelineList(),
-              ),
-              const SizedBox(height: 16),
-
-              const _SectionCard(
-                title: 'Recent Activity',
-                subtitle: 'Latest updates',
-
-                child: _RecentActivityList(),
-              ),
-              const SizedBox(height: 16),
-
-              // const _SectionCard(
-              //   title: 'Quick Actions',
-              //   subtitle: 'Frequently used actions',
-              //   child: _QuickActionsGrid(),
-              // ),
-              const SizedBox(height: 16),
-
-              const _SectionCard(
-                title: 'Upcoming Site Visits',
-                subtitle: 'Next 3 days',
-
-                child: _UpcomingVisitsList(),
-              ),
-              const SizedBox(height: 102),
-            ],
+            ),
           ),
         ),
       ),
       bottomNavigationBar: widget.showBottomNav
           ? CRMAppBottomNav(
-        currentIndex: _currentIndex,
-
-        onDashboard: () {
-          setState(() => _currentIndex = 0);
-        },
-
-        onLeads: () {
-          Navigator.pushNamed(context, AppRoutes.leads);
-        },
-
-        onFollowUps: () {
-          Navigator.pushNamed(context, AppRoutes.followUps);
-        },
-
-        onSiteVisits: () {
-          setState(() => _currentIndex = 3);
-        },
-
-        onProjects: () {
-          setState(() => _currentIndex = 4);
-        },
-
-        onTeam: () {
-          setState(() => _currentIndex = 5);
-        },
-
-        onReports: () {
-          setState(() => _currentIndex = 6);
-        },
-
-        onSettings: () {
-          setState(() => _currentIndex = 7);
-        },
-
-        onMore: () {
-          // optional: analytics / log
-        },
-
-        onLess: () {
-          // optional
-        },
-      )
-
+              currentIndex: _currentIndex,
+              onDashboard: () {
+                setState(() => _currentIndex = 0);
+              },
+              onLeads: () {
+                Navigator.pushNamed(context, AppRoutes.leads);
+              },
+              onFollowUps: () {
+                Navigator.pushNamed(context, AppRoutes.followUps);
+              },
+              onSiteVisits: () {
+                setState(() => _currentIndex = 3);
+              },
+              onProjects: () {
+                setState(() => _currentIndex = 4);
+              },
+              onTeam: () {
+                setState(() => _currentIndex = 5);
+              },
+              onReports: () {
+                setState(() => _currentIndex = 6);
+              },
+              onSettings: () {
+                setState(() => _currentIndex = 7);
+              },
+              onMore: () {},
+              onLess: () {},
+            )
           : null,
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final String trend;
-  final Color trendColor;
-
-  const _SummaryCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.trend,
-    required this.trendColor,
-  });
+class _OverviewCards extends StatelessWidget {
+  const _OverviewCards();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.42,
+      children: const [
+        _MetricCard(
+          title: 'Total Leads',
+          value: '0',
+          icon: Icons.group_outlined,
+          iconColor: Color(0xFF2C7BE5),
+          iconBg: Color(0xFFE7F1FF),
+          trend: '0%',
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(icon, color: AppColors.textSecondary, size: 20),
-                Text(
+        _MetricCard(
+          title: 'Total Site Visits',
+          value: '0',
+          icon: Icons.calendar_month_outlined,
+          iconColor: Color(0xFF8B5CF6),
+          iconBg: Color(0xFFF0E8FF),
+          trend: '0%',
+        ),
+        _MetricCard(
+          title: 'Total Follow ups',
+          value: '0',
+          icon: Icons.call_outlined,
+          iconColor: Color(0xFF16A34A),
+          iconBg: Color(0xFFE6F8ED),
+          trend: '0%',
+        ),
+        _MetricCard(
+          title: 'Total Projects',
+          value: '0',
+          icon: Icons.apartment_outlined,
+          iconColor: Color(0xFF2563EB),
+          iconBg: Color(0xFFE7EEFF),
+          trend: '0%',
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.trend,
+  });
+
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String trend;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardCard(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE9E9),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
                   trend,
-                  style: TextStyle(
-                    color: trendColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
               ),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 36,
+              height: 0.95,
+              fontWeight: FontWeight.w800,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SectionCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Widget child;
-  final Widget? trailing;
-
-  const _SectionCard({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-    this.trailing,
-  });
+class _RevenueDualSection extends StatelessWidget {
+  const _RevenueDualSection();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 15,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+    return Column(
+      children: const [
+        _RevenueCard(),
+        SizedBox(height: 10),
+        _RevenueCard(),
+      ],
+    );
+  }
+}
+
+class _RevenueCard extends StatelessWidget {
+  const _RevenueCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+            children: const [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                      'Revenue',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 2),
                     Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 11,
+                      'Monthly performance overview',
+                      style: TextStyle(
+                        fontSize: 12,
                         color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (trailing != null) trailing!,
+              _SegmentToggle(),
             ],
           ),
-          const SizedBox(height: 24),
-          child,
+          const SizedBox(height: 14),
+          const SizedBox(height: 190, child: _RevenueChart()),
         ],
       ),
     );
   }
 }
 
-class _TimeRangePicker extends StatelessWidget {
-  const _TimeRangePicker();
+class _SegmentToggle extends StatelessWidget {
+  const _SegmentToggle();
 
   @override
   Widget build(BuildContext context) {
+    Widget chip(String label, bool selected) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: selected ? AppColors.textPrimary : AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.all(3),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFFF3F5F9),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildOption('Week', false),
-          _buildOption('Month', true),
-          _buildOption('Year', false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOption(String text, bool isSelected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: isSelected ? AppColors.textPrimary : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 10,
-          color: isSelected ? Colors.white : AppColors.textSecondary,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        ),
+        children: [chip('Week', false), chip('Month', true), chip('Year', false)],
       ),
     );
   }
 }
 
-// class _ViewAllButton extends StatelessWidget {
-//   const _ViewAllButton();
-
-//   @override
-//   Widget build(BuildContext context) {
-//     // return const Text(
-//     //   'View All',
-//     //   style: TextStyle(
-//     //     color: AppColors.primary,
-//     //     fontSize: 12,
-//     //     fontWeight: FontWeight.bold,
-//     //   ),
-//     // );
-//   }
-// }
-
-class _RevenueLineChart extends StatelessWidget {
-  const _RevenueLineChart();
+class _RevenueChart extends StatelessWidget {
+  const _RevenueChart();
 
   @override
   Widget build(BuildContext context) {
     return LineChart(
       LineChartData(
+        minX: 0,
+        maxX: 2,
+        minY: 0,
+        maxY: 1,
+        lineTouchData: const LineTouchData(enabled: false),
+        borderData: FlBorderData(show: false),
         gridData: FlGridData(
           show: true,
-          drawVerticalLine: false,
-          horizontalInterval: 5,
+          verticalInterval: 1,
+          horizontalInterval: 0.25,
           getDrawingHorizontalLine: (value) => FlLine(
-            color: AppColors.border.withOpacity(0.5),
+            color: AppColors.border.withOpacity(0.75),
             strokeWidth: 1,
-            dashArray: [5, 5],
+            dashArray: [3, 5],
+          ),
+          getDrawingVerticalLine: (value) => FlLine(
+            color: AppColors.border.withOpacity(0.55),
+            strokeWidth: 1,
+            dashArray: [3, 5],
           ),
         ),
         titlesData: FlTitlesData(
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 28,
+              interval: 0.25,
+              getTitlesWidget: (value, meta) => Text(
+                value.toStringAsFixed(value == value.roundToDouble() ? 0 : 2),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
+              reservedSize: 26,
+              interval: 1,
               getTitlesWidget: (value, meta) {
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-                if (value >= 0 && value < months.length) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 10.0),
-                    child: Text(
-                      months[value.toInt()],
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppColors.textSecondary,
-                      ),
+                if (value == 1) {
+                  return const Text(
+                    'Apr 2026',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   );
                 }
-                return const Text('');
+                return const SizedBox.shrink();
               },
             ),
           ),
-          leftTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          rightTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 30,
-              getTitlesWidget: (value, meta) {
-                return Text(
-                  '${value.toInt()}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textSecondary,
-                  ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: const [FlSpot(1, 1)],
+            color: AppColors.primary,
+            isCurved: true,
+            barWidth: 0,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, p, bar, index) {
+                return FlDotCirclePainter(
+                  radius: 3,
+                  color: Colors.white,
+                  strokeColor: AppColors.primary,
+                  strokeWidth: 2,
                 );
               },
             ),
           ),
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-        ),
-        borderData: FlBorderData(show: false),
-        lineBarsData: [
-          LineChartBarData(
-            spots: const [
-              FlSpot(0, 4),
-              FlSpot(1, 6),
-              FlSpot(2, 5),
-              FlSpot(3, 8),
-              FlSpot(4, 13),
-              FlSpot(5, 17),
-            ],
-            isCurved: true,
-            color: Colors.orange,
-            barWidth: 3,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                colors: [
-                  Colors.orange.withOpacity(0.2),
-                  Colors.orange.withOpacity(0.01),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _LeadSourcesPieChart extends StatelessWidget {
-  const _LeadSourcesPieChart();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: PieChart(
-            PieChartData(
-              sectionsSpace: 4,
-              centerSpaceRadius: 50,
-              sections: [
-                PieChartSectionData(
-                  color: Colors.blue,
-                  value: 30,
-                  title: '',
-                  radius: 25,
-                ),
-                PieChartSectionData(
-                  color: Colors.lightBlue,
-                  value: 15,
-                  title: '',
-                  radius: 25,
-                ),
-                PieChartSectionData(
-                  color: Colors.orange,
-                  value: 10,
-                  title: '',
-                  radius: 25,
-                ),
-                PieChartSectionData(
-                  color: Colors.teal,
-                  value: 15,
-                  title: '',
-                  radius: 25,
-                ),
-                PieChartSectionData(
-                  color: Colors.pink,
-                  value: 10,
-                  title: '',
-                  radius: 25,
-                ),
-                PieChartSectionData(
-                  color: Colors.cyan,
-                  value: 10,
-                  title: '',
-                  radius: 25,
-                ),
-                PieChartSectionData(
-                  color: Colors.amber,
-                  value: 10,
-                  title: '',
-                  radius: 25,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          alignment: WrapAlignment.center,
-          children: const [
-            _ChartLegend(color: Colors.blue, label: 'Website'),
-            _ChartLegend(color: Colors.lightBlue, label: 'Facebook'),
-            _ChartLegend(color: Colors.orange, label: 'Google Ads'),
-            _ChartLegend(color: Colors.teal, label: 'Referral'),
-            _ChartLegend(color: Colors.pink, label: '99acres'),
-            _ChartLegend(color: Colors.cyan, label: 'MagicBricks'),
-            _ChartLegend(color: Colors.amber, label: 'Walk-in'),
-            _ChartLegend(color: Colors.black54, label: 'Other'),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ChartLegend extends StatelessWidget {
-  final Color color;
-  final String label;
-
-  const _ChartLegend({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
-        ),
-      ],
-    );
-  }
-}
-
-class _CommissionBarChart extends StatelessWidget {
-  const _CommissionBarChart();
-
-  @override
-  Widget build(BuildContext context) {
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        maxY: 20,
-        barTouchData: BarTouchData(enabled: false),
-        titlesData: FlTitlesData(
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-                if (value >= 0 && value < months.length) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Text(
-                      months[value.toInt()],
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  );
-                }
-                return const Text('');
-              },
-            ),
-          ),
-          leftTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-        ),
-        gridData: const FlGridData(show: false),
-        borderData: FlBorderData(show: false),
-        barGroups: [
-          _makeGroupData(0, 10, 6),
-          _makeGroupData(1, 14, 8),
-          _makeGroupData(2, 12, 11),
-          _makeGroupData(3, 10, 6),
-          _makeGroupData(4, 16, 12),
-          _makeGroupData(5, 18, 14),
-        ],
-      ),
-    );
-  }
-
-  BarChartGroupData _makeGroupData(int x, double y1, double y2) {
-    return BarChartGroupData(
-      barsSpace: 4,
-      x: x,
-      barRods: [
-        BarChartRodData(
-          toY: y1,
-          color: AppColors.success,
-          width: 8,
-          borderRadius: BorderRadius.circular(2),
-        ),
-        BarChartRodData(
-          toY: y2,
-          color: Colors.orange,
-          width: 8,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ],
-    );
-  }
-}
-
-class _LeadPipelineList extends StatelessWidget {
-  const _LeadPipelineList();
+class _CommissionPipelineActivitySection extends StatelessWidget {
+  const _CommissionPipelineActivitySection();
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: const [
-        _PipelineItem(label: 'New', count: 180, total: 250, color: Colors.blue),
-        _PipelineItem(
-          label: 'Contacted',
-          count: 220,
-          total: 250,
-          color: Colors.lightBlue,
-        ),
-        _PipelineItem(
-          label: 'Qualified',
-          count: 150,
-          total: 250,
-          color: Colors.teal,
-        ),
-        _PipelineItem(
-          label: 'Site Visit',
-          count: 145,
-          total: 250,
-          color: Colors.orange,
-        ),
-        _PipelineItem(
-          label: 'Negotiation',
-          count: 80,
-          total: 250,
-          color: Colors.deepOrange,
-        ),
-        _PipelineItem(
-          label: 'Booking',
-          count: 45,
-          total: 250,
-          color: Colors.amber,
-        ),
+        _CommissionCard(),
+        SizedBox(height: 10),
+        _PipelineCard(),
+        SizedBox(height: 10),
+        _ActivityCard(),
       ],
     );
   }
 }
 
-class _PipelineItem extends StatelessWidget {
-  final String label;
-  final int count;
-  final int total;
-  final Color color;
-
-  const _PipelineItem({
-    required this.label,
-    required this.count,
-    required this.total,
-    required this.color,
-  });
+class _CommissionCard extends StatelessWidget {
+  const _CommissionCard();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+    return _DashboardCard(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                    ),
+          const Text(
+            'Commission Overview',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            'Earnings and projections',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
+              color: const Color(0xFFF9FBFF),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEAF2FF),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                  child: const Icon(
+                    Icons.sync_rounded,
+                    color: AppColors.primary,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Coming Soon',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Real-time commission tracking',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary.withOpacity(0.9),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PipelineCard extends StatelessWidget {
+  const _PipelineCard();
+
+  @override
+  Widget build(BuildContext context) {
+    const rows = [
+      ('Qualified', 0, Color(0xFF1D86FF)),
+      ('Site Visit', 1, Color(0xFF12B886)),
+      ('Negotiation', 0, Color(0xFF3BA2F6)),
+      ('Booking', 0, Color(0xFF0D63B8)),
+      ('Closed Won', 0, Color(0xFF20C073)),
+      ('Closed Lost', 0, Color(0xFFEF4444)),
+    ];
+
+    return _DashboardCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Lead Pipeline',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            'Current lead distribution',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 14),
+          ...rows.map((r) {
+            final label = r.$1;
+            final value = r.$2;
+            final color = r.$3;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration:
+                            BoxDecoration(color: color, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '$value',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: value == 0 ? 0.02 : 1,
+                      minHeight: 5,
+                      backgroundColor: AppColors.border.withOpacity(0.8),
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
                     ),
                   ),
                 ],
               ),
-              Text(
-                '$count',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.bold,
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityCard extends StatelessWidget {
+  const _ActivityCard();
+
+  @override
+  Widget build(BuildContext context) {
+    const items = [
+      (
+        Icons.chat_bubble_outline,
+        Color(0xFFE7ECF3),
+        Color(0xFF6B7280),
+        'bdfbdfb',
+        'Kaushal Sakpal1 · Shubham Shinde',
+        '13m ago'
+      ),
+      (
+        Icons.notifications_none,
+        Color(0xFFE7ECF3),
+        Color(0xFF6B7280),
+        'Site visit rescheduled for Kaushal...',
+        'Kaushal Sakpal1 · Skyline Heights · Aditya Jha',
+        '13m ago'
+      ),
+      (
+        Icons.refresh,
+        Color(0xFFE8F2FF),
+        Color(0xFF1D86FF),
+        'Site visit scheduled for 2026-05-02',
+        'Kaushal Sakpal1 · Shubham Shinde',
+        '17m ago'
+      ),
+      (
+        Icons.chat_bubble_outline,
+        Color(0xFFE7ECF3),
+        Color(0xFF6B7280),
+        'Visit feedback: positive reaction. Nex...',
+        'Kaushal Sakpal1 · Shubham Shinde',
+        '1h ago'
+      ),
+      (
+        Icons.check_circle_outline,
+        Color(0xFFEAF8EF),
+        Color(0xFF12B886),
+        'Site visit done for Kaushal Sakpal1',
+        'Kaushal Sakpal1 · Skyline Heights · Aditya Jha',
+        '1h ago'
+      ),
+      (
+        Icons.person_add_alt_1,
+        Color(0xFFE8F2FF),
+        Color(0xFF1D86FF),
+        'Lead assigned to Aditya Bobya',
+        'Kaushal Sakpal1 · Shubham Shinde',
+        '29 Apr'
+      ),
+    ];
+
+    return _DashboardCard(
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Recent Activity',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {},
+                child: const Text(
+                  'View All',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Latest updates',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: item.$2,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(item.$1, color: item.$3, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.$4,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.$5,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.$6,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActionsSection extends StatelessWidget {
+  const _QuickActionsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    const actions = [
+      ('Add Lead', Icons.person_add_alt_1, Color(0xFF1D86FF)),
+      ('Schedule\nVisit', Icons.calendar_today_outlined, Color(0xFF12B886)),
+      ('New Booking', Icons.description_outlined, Color(0xFF8B5CF6)),
+      ('Send\nWhatsApp', Icons.chat_bubble_outline, Color(0xFF14B8A6)),
+    ];
+
+    return _DashboardCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Quick Actions',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          GridView.builder(
+            itemCount: actions.length,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.78,
+            ),
+            itemBuilder: (context, index) {
+              final a = actions[index];
+              return Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F9FC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border.withOpacity(0.8)),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: a.$3,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(a.$2, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      a.$1,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UpcomingVisitsSection extends StatelessWidget {
+  const _UpcomingVisitsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardCard(
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Upcoming Site Visits',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {},
+                child: const Text(
+                  'View All',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          LinearProgressIndicator(
-            value: count / total,
-            backgroundColor: AppColors.card,
-            color: color,
-            minHeight: 6,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RecentActivityList extends StatelessWidget {
-  const _RecentActivityList();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: const [
-        _ActivityTile(
-          icon: Icons.person_add_alt_1,
-          color: Colors.blue,
-          title: 'New lead assigned',
-          subtitle: 'Rajesh Khanna - Lodha Park',
-          time: '5 min ago',
-        ),
-        _ActivityTile(
-          icon: Icons.location_on_outlined,
-          color: Colors.green,
-          title: 'Site visit completed',
-          subtitle: 'Suresh Iyer - Site visit done',
-          time: '1 hour ago',
-        ),
-        _ActivityTile(
-          icon: Icons.description_outlined,
-          color: Colors.purple,
-          title: 'New booking',
-          subtitle: 'Karthik Menon - Unit T-301',
-          time: '2 hours ago',
-        ),
-      ],
-    );
-  }
-}
-
-class _ActivityTile extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final String time;
-
-  const _ActivityTile({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.time,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: const Color(0xFFF8FAFE),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE8F2FF),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.location_on_outlined,
+                    size: 18,
+                    color: AppColors.primary,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Kaushal Sakpal1',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Skyline Heights, Andheri West',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  time,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 10,
-                  ),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '3:04 AM',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Rescheduled',
+                      style: TextStyle(
+                        color: Color(0xFFF59E0B),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -891,216 +930,33 @@ class _ActivityTile extends StatelessWidget {
   }
 }
 
-// class _QuickActionsGrid extends StatelessWidget {
-//   const _QuickActionsGrid();
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return GridView.count(
-//       crossAxisCount: 2,
-//       shrinkWrap: true,
-//       physics: const NeverScrollableScrollPhysics(),
-//       mainAxisSpacing: 12,
-//       crossAxisSpacing: 12,
-//       childAspectRatio: 1.5,
-//       children: const [
-//         _QuickActionCard(
-//           icon: Icons.person_add_outlined,
-//           label: 'Add Lead',
-//           color: Colors.blue,
-//         ),
-//         _QuickActionCard(
-//           icon: Icons.calendar_today_outlined,
-//           label: 'Schedule Visit',
-//           color: Colors.green,
-//         ),
-//         _QuickActionCard(
-//           icon: Icons.description_outlined,
-//           label: 'New Booking',
-//           color: Colors.purple,
-//         ),
-//         _QuickActionCard(
-//           icon: Icons.chat_outlined,
-//           label: 'Send WhatsApp',
-//           color: Colors.teal,
-//         ),
-//       ],
-//     );
-//   }
-// }
-//
-// class _QuickActionCard extends StatelessWidget {
-//   final IconData icon;
-//   final String label;
-//   final Color color;
-//
-//   const _QuickActionCard({
-//     required this.icon,
-//     required this.label,
-//     required this.color,
-//   });
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Container(
-//       decoration: BoxDecoration(
-//         color: Colors.white,
-//         borderRadius: BorderRadius.circular(12),
-//         border: Border.all(color: AppColors.border.withOpacity(0.5)),
-//       ),
-//       child: Column(
-//         mainAxisAlignment: MainAxisAlignment.center,
-//         children: [
-//           Container(
-//             padding: const EdgeInsets.all(10),
-//             decoration: BoxDecoration(
-//               color: color.withOpacity(0.1),
-//               shape: BoxShape.circle,
-//             ),
-//             child: Icon(icon, color: color, size: 24),
-//           ),
-//           const SizedBox(height: 8),
-//           Text(
-//             label,
-//             textAlign: TextAlign.center,
-//             style: const TextStyle(
-//               fontSize: 11,
-//               fontWeight: FontWeight.bold,
-//               color: AppColors.textPrimary,
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-
-class _UpcomingVisitsList extends StatelessWidget {
-  const _UpcomingVisitsList();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: const [
-        _VisitTile(
-          name: 'Rajesh Khanna',
-          project: 'Lodha Park',
-          time: '10:00 AM',
-          status: 'confirmed',
-        ),
-        _VisitTile(
-          name: 'Priya Nair',
-          project: 'Godrej Emerald',
-          time: '2:00 PM',
-          status: 'scheduled',
-        ),
-        _VisitTile(
-          name: 'Vikram Shah',
-          project: 'Prestige Jindal',
-          time: '11:30 AM',
-          status: 'scheduled',
-        ),
-      ],
-    );
-  }
-}
-
-class _VisitTile extends StatelessWidget {
-  final String name;
-  final String project;
-  final String time;
-  final String status;
-
-  const _VisitTile({
-    required this.name,
-    required this.project,
-    required this.time,
-    required this.status,
+class _DashboardCard extends StatelessWidget {
+  const _DashboardCard({
+    required this.child,
+    this.padding = const EdgeInsets.all(14),
   });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      width: double.infinity,
+      padding: padding,
       decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.location_on_outlined,
-              color: AppColors.textSecondary,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-                Text(
-                  project,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                time,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: status == 'confirmed'
-                      ? Colors.black
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(4),
-                  border: status != 'confirmed'
-                      ? Border.all(color: AppColors.border)
-                      : null,
-                ),
-                child: Text(
-                  status.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.bold,
-                    color: status == 'confirmed'
-                        ? Colors.white
-                        : AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFD6E4F5)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
+      child: child,
     );
   }
 }
-

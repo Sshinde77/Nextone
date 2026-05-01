@@ -210,7 +210,8 @@ class _FollowUpPageState extends State<FollowUpPage> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Delete Follow Up'),
-          content: Text('Are you sure you want to delete "${followUp.customerName}"?'),
+          content: Text(
+              'Are you sure you want to delete "${followUp.customerName}"?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -482,7 +483,10 @@ class _FollowUpPageState extends State<FollowUpPage> {
         token: _authProvider.currentAuthToken,
       );
 
-      final mapped = result.items.map(_followUpFromApi).whereType<_FollowUpModel>().toList();
+      final mapped = result.items
+          .map(_followUpFromApi)
+          .whereType<_FollowUpModel>()
+          .toList();
       if (!mounted) {
         return;
       }
@@ -521,9 +525,11 @@ class _FollowUpPageState extends State<FollowUpPage> {
     final due = DateTime.tryParse(dueRaw)?.toLocal() ?? DateTime.now();
 
     final assigned = json['assigned_to'];
-    String assigneeName = _readString(json['assigned_name'] ?? json['assignedName']);
+    String assigneeName =
+        _readString(json['assigned_name'] ?? json['assignedName']);
     String assigneeImage = '';
-    String assigneePhone = _readString(json['assigned_phone'] ?? json['assignedPhone']);
+    String assigneePhone =
+        _readString(json['assigned_phone'] ?? json['assignedPhone']);
     if (assigned is Map<String, dynamic>) {
       assigneeName = _readString(
         assigned['name'] ??
@@ -639,13 +645,13 @@ class _FollowUpPageState extends State<FollowUpPage> {
                 ),
               )
             else ...[
-            if (_isBulkSelectionMode && selectedCount > 0) ...[
-              _buildBulkActionBar(selectedCount),
+              if (_isBulkSelectionMode && selectedCount > 0) ...[
+                _buildBulkActionBar(selectedCount),
+                const SizedBox(height: 16),
+              ],
+              _buildFollowUpSection(),
               const SizedBox(height: 16),
-            ],
-            _buildFollowUpSection(),
-            const SizedBox(height: 16),
-            _buildPagination(),
+              _buildPagination(),
             ],
             const SizedBox(height: 100),
           ],
@@ -820,7 +826,9 @@ class _FollowUpPageState extends State<FollowUpPage> {
                   priorityColor: followUp.priorityColor,
                   nextFollowUpDate: '${followUp.dueDate} - ${followUp.dueTime}',
                   budget: followUp.channel,
-                  phone: followUp.assignee.phone.isEmpty ? 'N/A' : followUp.assignee.phone,
+                  phone: followUp.assignee.phone.isEmpty
+                      ? 'N/A'
+                      : followUp.assignee.phone,
                   profileImageUrl: followUp.assignee.imageUrl,
                   assigneeName: followUp.assignee.name,
                   assigneeImageUrl: followUp.assignee.imageUrl,
@@ -919,9 +927,8 @@ class _FollowUpPageState extends State<FollowUpPage> {
     final totalPages = _totalPages;
     final currentPage = _currentPage.clamp(1, totalPages);
     final start = totalItems == 0 ? 0 : ((currentPage - 1) * _pageSize) + 1;
-    final end = totalItems == 0
-        ? 0
-        : math.min(currentPage * _pageSize, totalItems);
+    final end =
+        totalItems == 0 ? 0 : math.min(currentPage * _pageSize, totalItems);
 
     return Container(
       width: double.infinity,

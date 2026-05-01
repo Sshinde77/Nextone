@@ -310,7 +310,8 @@ class _TeamPageState extends State<TeamPage> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                     title: Text(option.label),
                     trailing: isSelected
-                        ? const Icon(Icons.check_circle, color: AppColors.success)
+                        ? const Icon(Icons.check_circle,
+                            color: AppColors.success)
                         : null,
                     onTap: () => Navigator.pop(context, option.value),
                   );
@@ -368,7 +369,8 @@ class _TeamPageState extends State<TeamPage> {
         );
       });
 
-      _showSnackBar('Role changed to ${_TeamMember.readableRole(selectedRole)}.');
+      _showSnackBar(
+          'Role changed to ${_TeamMember.readableRole(selectedRole)}.');
     } catch (error) {
       if (!mounted) {
         return;
@@ -506,7 +508,8 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Widget _buildActionButtonsRow(_TeamMember member) {
-    final isDeleting = member.id.isNotEmpty && _deletingMemberIds.contains(member.id);
+    final isDeleting =
+        member.id.isNotEmpty && _deletingMemberIds.contains(member.id);
     final isChangingRole =
         member.id.isNotEmpty && _changingRoleMemberIds.contains(member.id);
     final isBusy = isDeleting || isChangingRole;
@@ -650,8 +653,10 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Widget _buildMemberCard(_TeamMember member) {
-    final isDeleting = member.id.isNotEmpty && _deletingMemberIds.contains(member.id);
-    final isChangingRole = member.id.isNotEmpty && _changingRoleMemberIds.contains(member.id);
+    final isDeleting =
+        member.id.isNotEmpty && _deletingMemberIds.contains(member.id);
+    final isChangingRole =
+        member.id.isNotEmpty && _changingRoleMemberIds.contains(member.id);
     final isBusy = isDeleting || isChangingRole;
     final conversionColor =
         member.conversionRate >= 30 ? AppColors.success : AppColors.warning;

@@ -141,7 +141,8 @@ class AuthService {
   }
 
   Future<ForgotPasswordResult> forgotPassword({required String email}) async {
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.forgotPassword}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.forgotPassword}');
     final headers = _headers(accept: '*/*');
     final body = jsonEncode({'email': email});
     _logRequest(
@@ -247,7 +248,8 @@ class AuthService {
       throw Exception('Refresh token is required.');
     }
 
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.refreshToken}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.refreshToken}');
     final headers = _headers(accept: 'application/json');
     final body = jsonEncode({'refresh_token': token.trim()});
     _logRequest(
@@ -342,7 +344,8 @@ class AuthService {
       headers: headers,
     );
 
-    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
     _logResponse('users', response);
 
     final error = _handleResponse(
@@ -404,7 +407,8 @@ class AuthService {
       headers: headers,
     );
 
-    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
     _logResponse('leads', response);
 
     final error = _handleResponse(
@@ -420,18 +424,19 @@ class AuthService {
       final items = _extractLeadsItems(body);
       final pagination = _extractPaginationMap(body);
 
-      final resolvedCurrentPage =
-          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
+      final resolvedCurrentPage = _readIntFromMap(
+              pagination, ['page', 'current_page', 'currentPage']) ??
           page;
-      final resolvedPerPage =
-          _readIntFromMap(pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
+      final resolvedPerPage = _readIntFromMap(
+              pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
           perPage;
-      final resolvedTotalItems =
-          _readIntFromMap(pagination, ['total', 'total_items', 'totalItems', 'count']) ??
+      final resolvedTotalItems = _readIntFromMap(
+              pagination, ['total', 'total_items', 'totalItems', 'count']) ??
           items.length;
-      final resolvedTotalPages =
-          _readIntFromMap(pagination, ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
-          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+      final resolvedTotalPages = _readIntFromMap(pagination,
+              ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
 
       return LeadsListResult(
         items: items,
@@ -485,7 +490,8 @@ class AuthService {
       headers: headers,
     );
 
-    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
     _logResponse('followUps', response);
 
     final error = _handleResponse(
@@ -501,18 +507,19 @@ class AuthService {
       final items = _extractLeadsItems(body);
       final pagination = _extractPaginationMap(body);
 
-      final resolvedCurrentPage =
-          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
+      final resolvedCurrentPage = _readIntFromMap(
+              pagination, ['page', 'current_page', 'currentPage']) ??
           (page ?? 1);
-      final resolvedPerPage =
-          _readIntFromMap(pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
+      final resolvedPerPage = _readIntFromMap(
+              pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
           (perPage ?? items.length);
-      final resolvedTotalItems =
-          _readIntFromMap(pagination, ['total', 'total_items', 'totalItems', 'count']) ??
+      final resolvedTotalItems = _readIntFromMap(
+              pagination, ['total', 'total_items', 'totalItems', 'count']) ??
           items.length;
-      final resolvedTotalPages =
-          _readIntFromMap(pagination, ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
-          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+      final resolvedTotalPages = _readIntFromMap(pagination,
+              ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
 
       return LeadsListResult(
         items: items,
@@ -535,7 +542,8 @@ class AuthService {
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createfollowups}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createfollowups}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({
       'title': title.trim(),
@@ -623,7 +631,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.editfollowups.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.editfollowups.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: '*/*', token: resolvedToken);
     final body = jsonEncode(payload);
@@ -675,7 +684,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.followupsdetail.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.followupsdetail.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: '*/*', token: resolvedToken);
     _logRequest(
@@ -685,7 +695,8 @@ class AuthService {
       headers: headers,
     );
 
-    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
     _logResponse('followUpDetail', response);
 
     final error = _handleResponse(
@@ -723,7 +734,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.completestatusfollowups.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.completestatusfollowups.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({'is_completed': isCompleted});
@@ -768,6 +780,356 @@ class AuthService {
     };
   }
 
+  Future<LeadsListResult> siteVisits({
+    String? token,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.sitevisits}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'siteVisits',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('siteVisits', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch site visits.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+
+      final resolvedCurrentPage = _readIntFromMap(
+              pagination, ['page', 'current_page', 'currentPage']) ??
+          page;
+      final resolvedPerPage = _readIntFromMap(
+              pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
+          perPage;
+      final resolvedTotalItems = _readIntFromMap(
+              pagination, ['total', 'total_items', 'totalItems', 'count']) ??
+          items.length;
+      final resolvedTotalPages = _readIntFromMap(pagination,
+              ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Site visits response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> siteVisitDetail({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Site visit id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.sitevisitsdetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'siteVisitDetail',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('siteVisitDetail', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch site visit details.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) {
+        return data;
+      }
+    } catch (_) {}
+
+    throw Exception('Site visit details response format is not valid.');
+  }
+
+  Future<Map<String, dynamic>> createSiteVisit({
+    required String leadId,
+    required String projectId,
+    required String visitDate,
+    required String visitTime,
+    required String assignedTo,
+    required String notes,
+    required bool transportArranged,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createsitevisits}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'lead_id': leadId.trim(),
+      'project_id': projectId.trim(),
+      'visit_date': visitDate.trim(),
+      'visit_time': visitTime.trim(),
+      'assigned_to': assignedTo.trim(),
+      'notes': notes.trim(),
+      'transport_arranged': transportArranged,
+    });
+
+    _logRequest(
+      endpoint: 'createSiteVisit',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('createSiteVisit', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create site visit.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) {
+        return data;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'lead_id': leadId.trim(),
+      'project_id': projectId.trim(),
+      'visit_date': visitDate.trim(),
+      'visit_time': visitTime.trim(),
+      'assigned_to': assignedTo.trim(),
+      'notes': notes.trim(),
+      'transport_arranged': transportArranged,
+    };
+  }
+
+  Future<Map<String, dynamic>> editSiteVisit({
+    required String id,
+    String? visitDate,
+    String? visitTime,
+    String? rescheduleReason,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Site visit id is required.');
+    }
+
+    final payload = <String, dynamic>{};
+    if (visitDate != null && visitDate.trim().isNotEmpty) {
+      payload['visit_date'] = visitDate.trim();
+    }
+    if (visitTime != null && visitTime.trim().isNotEmpty) {
+      payload['visit_time'] = visitTime.trim();
+    }
+    if (rescheduleReason != null) {
+      payload['reschedule_reason'] = rescheduleReason.trim();
+    }
+    if (payload.isEmpty) {
+      throw Exception('No fields provided for site visit update.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.editsitevisits.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode(payload);
+
+    _logRequest(
+      endpoint: 'editSiteVisit',
+      method: 'PUT',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .put(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('editSiteVisit', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update site visit.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) {
+        return data;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{'id': normalizedId, ...payload};
+  }
+
+  Future<Map<String, dynamic>> updateSiteVisitStatus({
+    required String id,
+    required String status,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    final normalizedStatus = status.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Site visit id is required.');
+    }
+    if (normalizedStatus.isEmpty) {
+      throw Exception('Status is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.updatestatussitevisits.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({'status': normalizedStatus});
+
+    _logRequest(
+      endpoint: 'updateSiteVisitStatus',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('updateSiteVisitStatus', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update site visit status.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) {
+        return data;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{'id': normalizedId, 'status': normalizedStatus};
+  }
+
+  Future<Map<String, dynamic>> submitSiteVisitFeedback({
+    required String id,
+    required int rating,
+    required String clientReaction,
+    required String interestedIn,
+    required String nextStep,
+    required String remarks,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Site visit id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.submitfeedbacksitevisits
+        .replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'rating': rating,
+      'client_reaction': clientReaction.trim(),
+      'interested_in': interestedIn.trim(),
+      'next_step': nextStep.trim(),
+      'remarks': remarks.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'submitSiteVisitFeedback',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('submitSiteVisitFeedback', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to submit site visit feedback.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) {
+        return data;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      'rating': rating,
+      'client_reaction': clientReaction.trim(),
+      'interested_in': interestedIn.trim(),
+      'next_step': nextStep.trim(),
+      'remarks': remarks.trim(),
+    };
+  }
+
   Future<void> deleteFollowUp({
     required String id,
     String? token,
@@ -778,7 +1140,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.deletefollowups.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.deletefollowups.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
@@ -788,7 +1151,8 @@ class AuthService {
       headers: headers,
     );
 
-    final response = await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
     _logResponse('deleteFollowUp', response);
 
     final error = _handleResponse(
@@ -810,7 +1174,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.leadsdetail.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.leadsdetail.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
@@ -820,7 +1185,8 @@ class AuthService {
       headers: headers,
     );
 
-    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
     _logResponse('leadDetail', response);
 
     final error = _handleResponse(
@@ -856,7 +1222,8 @@ class AuthService {
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createsleads}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createsleads}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({
       'name': name.trim(),
@@ -1019,7 +1386,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.updatestatusleads.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.updatestatusleads.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({
@@ -1085,7 +1453,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.reassignmemberleads.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.reassignmemberleads.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({
@@ -1144,7 +1513,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.usersdetail.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.usersdetail.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
@@ -1154,7 +1524,8 @@ class AuthService {
       headers: headers,
     );
 
-    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
     _logResponse('usersDetail', response);
 
     final error = _handleResponse(
@@ -1201,7 +1572,8 @@ class AuthService {
       headers: headers,
     );
 
-    final response = await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
     _logResponse('deleteUser', response);
 
     final error = _handleResponse(
@@ -1273,7 +1645,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.edituserrole.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.edituserrole.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({'role': normalizedRole});
@@ -1325,7 +1698,8 @@ class AuthService {
       headers: headers,
     );
 
-    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
     _logResponse('projects', response);
 
     final error = _handleResponse(
@@ -1341,18 +1715,19 @@ class AuthService {
       final items = _extractLeadsItems(body);
       final pagination = _extractPaginationMap(body);
 
-      final resolvedCurrentPage =
-          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
+      final resolvedCurrentPage = _readIntFromMap(
+              pagination, ['page', 'current_page', 'currentPage']) ??
           page;
-      final resolvedPerPage =
-          _readIntFromMap(pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
+      final resolvedPerPage = _readIntFromMap(
+              pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
           perPage;
-      final resolvedTotalItems =
-          _readIntFromMap(pagination, ['total', 'total_items', 'totalItems', 'count']) ??
+      final resolvedTotalItems = _readIntFromMap(
+              pagination, ['total', 'total_items', 'totalItems', 'count']) ??
           items.length;
-      final resolvedTotalPages =
-          _readIntFromMap(pagination, ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
-          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+      final resolvedTotalPages = _readIntFromMap(pagination,
+              ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
 
       return LeadsListResult(
         items: items,
@@ -1383,7 +1758,8 @@ class AuthService {
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createprojects}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createprojects}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({
       'name': name.trim(),
@@ -1409,7 +1785,9 @@ class AuthService {
       body: body,
     );
 
-    final response = await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
     _logResponse('createProject', response);
 
     final error = _handleResponse(
@@ -1455,7 +1833,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.projectsdetail.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.projectsdetail.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
@@ -1465,7 +1844,8 @@ class AuthService {
       headers: headers,
     );
 
-    final response = await http.get(uri, headers: headers).timeout(_requestTimeout);
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
     _logResponse('projectDetail', response);
 
     final error = _handleResponse(
@@ -1510,7 +1890,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.editprojects.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.editprojects.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({
@@ -1537,7 +1918,9 @@ class AuthService {
       body: body,
     );
 
-    final response = await http.put(uri, headers: headers, body: body).timeout(_requestTimeout);
+    final response = await http
+        .put(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
     _logResponse('editProject', response);
 
     final error = _handleResponse(
@@ -1569,7 +1952,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.deleteprojects.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.deleteprojects.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
@@ -1579,7 +1963,8 @@ class AuthService {
       headers: headers,
     );
 
-    final response = await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
     _logResponse('deleteProject', response);
 
     final error = _handleResponse(
@@ -1745,10 +2130,7 @@ class AuthService {
   List<Map<String, dynamic>> _extractLeadsItems(dynamic source) {
     List<Map<String, dynamic>>? readList(dynamic candidate) {
       if (candidate is List) {
-        return candidate
-            .whereType<Map>()
-            .map(_stringDynamicMap)
-            .toList();
+        return candidate.whereType<Map>().map(_stringDynamicMap).toList();
       }
       return null;
     }
@@ -1762,7 +2144,14 @@ class AuthService {
       return const <Map<String, dynamic>>[];
     }
 
-    for (final key in ['data', 'leads', 'projects', 'items', 'results', 'rows']) {
+    for (final key in [
+      'data',
+      'leads',
+      'projects',
+      'items',
+      'results',
+      'rows'
+    ]) {
       final fromKey = readList(source[key]);
       if (fromKey != null) {
         return fromKey;
@@ -1771,7 +2160,14 @@ class AuthService {
 
     final dynamic data = source['data'];
     if (data is Map<String, dynamic>) {
-      for (final key in ['leads', 'projects', 'items', 'results', 'data', 'rows']) {
+      for (final key in [
+        'leads',
+        'projects',
+        'items',
+        'results',
+        'data',
+        'rows'
+      ]) {
         final fromNested = readList(data[key]);
         if (fromNested != null) {
           return fromNested;

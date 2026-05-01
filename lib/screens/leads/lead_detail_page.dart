@@ -80,7 +80,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
 
   Future<void> _loadAssigneeOptions() async {
     try {
-      final users = await _authProvider.users(token: _authProvider.currentAuthToken);
+      final users =
+          await _authProvider.users(token: _authProvider.currentAuthToken);
       final options = users
           .map(_assigneeFromApi)
           .where((u) => u != null)
@@ -114,29 +115,39 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     }
 
     final roleRaw = _readString(
-      user['role'] ?? user['user_role'] ?? user['userRole'] ?? user['designation'],
+      user['role'] ??
+          user['user_role'] ??
+          user['userRole'] ??
+          user['designation'],
     );
     final normalizedRole = _normalizeRole(roleRaw);
-    if (normalizedRole != 'sale_executive' && normalizedRole != 'sales_manager') {
+    if (normalizedRole != 'sale_executive' &&
+        normalizedRole != 'sales_manager') {
       return null;
     }
 
-    final id = _readString(user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid']);
+    final id = _readString(
+        user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid']);
     if (id.isEmpty) {
       return null;
     }
 
     final firstName = _readString(user['first_name'] ?? user['firstName']);
     final lastName = _readString(user['last_name'] ?? user['lastName']);
-    final combinedName = [if (firstName.isNotEmpty) firstName, if (lastName.isNotEmpty) lastName]
-        .join(' ')
-        .trim();
+    final combinedName = [
+      if (firstName.isNotEmpty) firstName,
+      if (lastName.isNotEmpty) lastName
+    ].join(' ').trim();
 
     final displayName = combinedName.isNotEmpty
         ? combinedName
-        : _readString(user['name'] ?? user['full_name'] ?? user['fullName'] ?? user['email']);
+        : _readString(user['name'] ??
+            user['full_name'] ??
+            user['fullName'] ??
+            user['email']);
 
-    return _AssigneeOption(id: id, name: displayName.isEmpty ? 'User $id' : displayName);
+    return _AssigneeOption(
+        id: id, name: displayName.isEmpty ? 'User $id' : displayName);
   }
 
   Future<void> _makeCall(String phoneNumber) async {
@@ -233,7 +244,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       return;
     }
 
-    if (_selectedNextStatus == null || !nextStatuses.contains(_selectedNextStatus)) {
+    if (_selectedNextStatus == null ||
+        !nextStatuses.contains(_selectedNextStatus)) {
       _selectedNextStatus = nextStatuses.first;
     }
     _statusNoteController.clear();
@@ -280,7 +292,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                           await _submitStatusChange();
                           if (mounted) Navigator.of(context).pop();
                         },
-                  child: Text(_isSubmittingStatus ? 'Updating...' : 'Update Status'),
+                  child: Text(
+                      _isSubmittingStatus ? 'Updating...' : 'Update Status'),
                 ),
               ),
             ],
@@ -340,7 +353,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                           await _submitReassignment();
                           if (mounted) Navigator.of(context).pop();
                         },
-                  child: Text(_isSubmittingReassign ? 'Reassigning...' : 'Reassign Lead'),
+                  child: Text(_isSubmittingReassign
+                      ? 'Reassigning...'
+                      : 'Reassign Lead'),
                 ),
               ),
             ],
@@ -359,18 +374,22 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         showBackButton: true,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary))
           : _errorMessage != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(_errorMessage!, style: const TextStyle(color: AppColors.error)),
+                      Text(_errorMessage!,
+                          style: const TextStyle(color: AppColors.error)),
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _fetchLeadDetails,
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                        child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary),
+                        child: const Text('Retry',
+                            style: TextStyle(color: Colors.white)),
                       ),
                     ],
                   ),
@@ -402,7 +421,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                                 _lead!.email,
                                 onTap: () => _sendEmail(_lead!.email),
                               ),
-                              _buildInfoTile(Icons.source_outlined, 'Source', _lead!.source),
+                              _buildInfoTile(Icons.source_outlined, 'Source',
+                                  _lead!.source),
                               _buildInfoTile(
                                 Icons.location_on_outlined,
                                 'Location Preference',
@@ -426,7 +446,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                                   Icons.phone_outlined,
                                   'Phone',
                                   _lead!.assignedTo!.phone,
-                                  onTap: () => _makeCall(_lead!.assignedTo!.phone),
+                                  onTap: () =>
+                                      _makeCall(_lead!.assignedTo!.phone),
                                 ),
                               ]),
                             const SizedBox(height: 100),
@@ -618,7 +639,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     );
   }
 
-  Widget _buildInfoTile(IconData icon, String label, String value, {VoidCallback? onTap}) {
+  Widget _buildInfoTile(IconData icon, String label, String value,
+      {VoidCallback? onTap}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -653,14 +675,17 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: onTap != null ? AppColors.primary : AppColors.textPrimary,
+                      color: onTap != null
+                          ? AppColors.primary
+                          : AppColors.textPrimary,
                     ),
                   ),
                 ],
               ),
             ),
             if (onTap != null)
-              const Icon(Icons.chevron_right, color: AppColors.border, size: 20),
+              const Icon(Icons.chevron_right,
+                  color: AppColors.border, size: 20),
           ],
         ),
       ),
@@ -689,7 +714,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   }
 
   String _normalizeRole(String value) {
-    final normalized = value.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+    final normalized =
+        value.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
     if (normalized == 'sales_executive') {
       return 'sale_executive';
     }
@@ -707,7 +733,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     }
     return normalized
         .split('_')
-        .map((part) => part.isEmpty ? part : '${part[0].toUpperCase()}${part.substring(1)}')
+        .map((part) => part.isEmpty
+            ? part
+            : '${part[0].toUpperCase()}${part.substring(1)}')
         .join(' ');
   }
 

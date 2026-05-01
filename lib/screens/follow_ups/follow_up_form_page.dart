@@ -29,8 +29,6 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
 
   bool _isSubmitting = false;
   bool _isLoadingLeads = true;
-  bool _isLeadOpen = false;
-  bool _isPriorityOpen = false;
   String? _leadLoadError;
   String? _selectedLeadId;
   String _selectedPriority = 'high';
@@ -87,7 +85,8 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
         perPage: 200,
       );
 
-      final mapped = result.items.map(_leadFromApi).whereType<_LeadOption>().toList();
+      final mapped =
+          result.items.map(_leadFromApi).whereType<_LeadOption>().toList();
       final uniqueById = <String, _LeadOption>{};
       for (final item in mapped) {
         uniqueById[item.id] = item;
@@ -95,9 +94,10 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
       final leads = uniqueById.values.toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
-      final validSelection = _selectedLeadId != null && leads.any((l) => l.id == _selectedLeadId)
-          ? _selectedLeadId
-          : null;
+      final validSelection =
+          _selectedLeadId != null && leads.any((l) => l.id == _selectedLeadId)
+              ? _selectedLeadId
+              : null;
 
       if (!mounted) {
         return;
@@ -134,13 +134,16 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
           json['contact_name'] ??
           json['customer_name'],
     );
-    final resolvedName = [if (firstName.isNotEmpty) firstName, if (lastName.isNotEmpty) lastName]
-        .join(' ')
-        .trim();
+    final resolvedName = [
+      if (firstName.isNotEmpty) firstName,
+      if (lastName.isNotEmpty) lastName
+    ].join(' ').trim();
 
     return _LeadOption(
       id: id,
-      name: resolvedName.isNotEmpty ? resolvedName : (fullName.isNotEmpty ? fullName : id),
+      name: resolvedName.isNotEmpty
+          ? resolvedName
+          : (fullName.isNotEmpty ? fullName : id),
     );
   }
 
@@ -258,6 +261,111 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _openLeadMenu(BuildContext context) async {
+    if (_isSubmitting || _isLoadingLeads || _leadOptions.isEmpty) {
+      return;
+    }
+
+    final fieldContext = context;
+    final renderBox = fieldContext.findRenderObject() as RenderBox?;
+    if (renderBox == null) {
+      return;
+    }
+
+    final overlay =
+        Overlay.of(fieldContext).context.findRenderObject() as RenderBox;
+    final topLeft = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
+    final bottomLeft = renderBox.localToGlobal(
+      Offset(0, renderBox.size.height),
+      ancestor: overlay,
+    );
+
+    final selected = await showMenu<String>(
+      context: fieldContext,
+      color: Colors.white,
+      elevation: 4,
+      constraints: BoxConstraints.tightFor(width: renderBox.size.width),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      position: RelativeRect.fromLTRB(
+        topLeft.dx,
+        bottomLeft.dy + 6,
+        overlay.size.width - topLeft.dx - renderBox.size.width,
+        overlay.size.height - bottomLeft.dy,
+      ),
+      items: _leadOptions
+          .map(
+            (lead) => PopupMenuItem<String>(
+              value: lead.id,
+              child: Text(lead.name),
+            ),
+          )
+          .toList(),
+    );
+
+    if (!mounted || selected == null) {
+      return;
+    }
+    setState(() {
+      _selectedLeadId = selected;
+    });
+  }
+
+  Future<void> _openPriorityMenu(BuildContext context) async {
+    if (_isSubmitting) {
+      return;
+    }
+
+    const priorities = <String>['high', 'medium', 'low'];
+    final fieldContext = context;
+    final renderBox = fieldContext.findRenderObject() as RenderBox?;
+    if (renderBox == null) {
+      return;
+    }
+
+    final overlay =
+        Overlay.of(fieldContext).context.findRenderObject() as RenderBox;
+    final topLeft = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
+    final bottomLeft = renderBox.localToGlobal(
+      Offset(0, renderBox.size.height),
+      ancestor: overlay,
+    );
+
+    final selected = await showMenu<String>(
+      context: fieldContext,
+      color: Colors.white,
+      elevation: 4,
+      constraints: BoxConstraints.tightFor(width: renderBox.size.width),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      position: RelativeRect.fromLTRB(
+        topLeft.dx,
+        bottomLeft.dy + 6,
+        overlay.size.width - topLeft.dx - renderBox.size.width,
+        overlay.size.height - bottomLeft.dy,
+      ),
+      items: priorities
+          .map(
+            (priority) => PopupMenuItem<String>(
+              value: priority,
+              child: Text(priority[0].toUpperCase() + priority.substring(1)),
+            ),
+          )
+          .toList(),
+    );
+
+    if (!mounted || selected == null) {
+      return;
+    }
+    setState(() {
+      _selectedPriority = selected;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final dueDateText = _selectedDueDate == null
@@ -300,7 +408,8 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
                   _buildTextField(
                     controller: _notesController,
                     label: 'Notes',
-                    hintText: 'Client asked to call after 10am. Discuss pricing.',
+                    hintText:
+                        'Client asked to call after 10am. Discuss pricing.',
                     minLines: 3,
                     maxLines: 5,
                   ),
@@ -319,7 +428,9 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(widget.isEditMode ? 'Update Follow Up' : 'Create Follow Up'),
+                          : Text(widget.isEditMode
+                              ? 'Update Follow Up'
+                              : 'Create Follow Up'),
                     ),
                   ),
                 ],
@@ -352,71 +463,38 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
           ),
         ),
         const SizedBox(height: 6),
-        GestureDetector(
-          onTap: (_isSubmitting || _isLoadingLeads)
-              ? null
-              : () {
-                  setState(() {
-                    _isLeadOpen = !_isLeadOpen;
-                  });
-                },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  selectedLeadLabel ?? 'Select lead',
-                  style: TextStyle(
-                    color: selectedLeadLabel == null ? Colors.grey : Colors.black,
-                  ),
+        Builder(
+          builder: (fieldContext) {
+            return GestureDetector(
+              onTap: (_isSubmitting || _isLoadingLeads)
+                  ? null
+                  : () => _openLeadMenu(fieldContext),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
                 ),
-                Icon(
-                  _isLeadOpen
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      selectedLeadLabel ?? 'Select lead',
+                      style: TextStyle(
+                        color: selectedLeadLabel == null
+                            ? Colors.grey
+                            : Colors.black,
+                      ),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
-        if (_isLeadOpen)
-          Container(
-            margin: const EdgeInsets.only(top: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
-            ),
-            child: Column(
-              children: _leadOptions.map((lead) {
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedLeadId = lead.id;
-                      _isLeadOpen = false;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                    child: Row(
-                      children: [
-                        Text(lead.name),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
         if (_isLoadingLeads) ...[
           const SizedBox(height: 8),
           const Text(
@@ -459,13 +537,16 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
             decoration: _fieldDecoration(hintText: 'Select due date and time'),
             child: Row(
               children: [
-                const Icon(Icons.calendar_month_outlined, size: 18, color: AppColors.textSecondary),
+                const Icon(Icons.calendar_month_outlined,
+                    size: 18, color: AppColors.textSecondary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     valueText,
                     style: TextStyle(
-                      color: _selectedDueDate == null ? AppColors.textSecondary : AppColors.textPrimary,
+                      color: _selectedDueDate == null
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -479,7 +560,6 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
   }
 
   Widget _buildPriorityDropdown() {
-    const priorities = <String>['high', 'medium', 'low'];
     final selectedPriorityLabel =
         _selectedPriority[0].toUpperCase() + _selectedPriority.substring(1);
     return Column(
@@ -494,70 +574,33 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
           ),
         ),
         const SizedBox(height: 6),
-        GestureDetector(
-          onTap: _isSubmitting
-              ? null
-              : () {
-                  setState(() {
-                    _isPriorityOpen = !_isPriorityOpen;
-                  });
-                },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  selectedPriorityLabel,
-                  style: const TextStyle(color: Colors.black),
+        Builder(
+          builder: (fieldContext) {
+            return GestureDetector(
+              onTap:
+                  _isSubmitting ? null : () => _openPriorityMenu(fieldContext),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
                 ),
-                Icon(
-                  _isPriorityOpen
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      selectedPriorityLabel,
+                      style: const TextStyle(color: Colors.black),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
-        if (_isPriorityOpen)
-          Container(
-            margin: const EdgeInsets.only(top: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
-            ),
-            child: Column(
-              children: priorities.map((priority) {
-                final priorityLabel = priority[0].toUpperCase() + priority.substring(1);
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedPriority = priority;
-                      _isPriorityOpen = false;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                    child: Row(
-                      children: [
-                        Text(priorityLabel),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
       ],
     );
   }

@@ -89,10 +89,17 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
     List<String> readList(dynamic value) {
       if (value is List) {
-        return value.map((e) => readString(e)).where((e) => e.isNotEmpty).toList();
+        return value
+            .map((e) => readString(e))
+            .where((e) => e.isNotEmpty)
+            .toList();
       }
       if (value is String && value.trim().isNotEmpty) {
-        return value.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+        return value
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
       }
       return const <String>[];
     }
@@ -111,7 +118,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
       reraNumber: readString(payload['rera_number']),
       amenities: readList(payload['amenities']),
       status: readString(payload['status']),
-      brochureUrl: payload['brochure_url'] == null ? null : readString(payload['brochure_url']),
+      brochureUrl: payload['brochure_url'] == null
+          ? null
+          : readString(payload['brochure_url']),
       description: readString(payload['description']),
       createdBy: readString(payload['created_by']),
       totalLeads: readString(payload['total_leads']),
@@ -163,7 +172,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Widget _buildSummaryCard() {
-    final totalLeads = _projects.fold<int>(0, (sum, item) => sum + item.mappedLeads);
+    final totalLeads =
+        _projects.fold<int>(0, (sum, item) => sum + item.mappedLeads);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -173,7 +183,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
       ),
       child: Row(
         children: [
-          _buildSummaryStat('Total Projects', '${_projects.length}', AppColors.primary),
+          _buildSummaryStat(
+              'Total Projects', '${_projects.length}', AppColors.primary),
           const SizedBox(width: 8),
           _buildSummaryStat('Total Leads', '$totalLeads', AppColors.success),
         ],
@@ -195,12 +206,14 @@ class _ProjectsPageState extends State<ProjectsPage> {
           children: [
             Text(
               label,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+              style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w600, color: color),
             ),
             const SizedBox(height: 4),
             Text(
               value,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color),
+              style: TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.w800, color: color),
             ),
           ],
         ),
@@ -239,7 +252,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             minimumSize: const Size(120, 50),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999)),
           ),
           child: const Text('Add Project'),
         ),
@@ -249,23 +263,25 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   Widget _buildProjectCard(_Project project) {
     final normalizedStatus = project.status.toLowerCase();
-    final priorityColor = normalizedStatus == 'active'
-        ? AppColors.success
-        : AppColors.warning;
+    final priorityColor =
+        normalizedStatus == 'active' ? AppColors.success : AppColors.warning;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: DataCard(
         name: project.name,
         leadId: project.location,
-        status: normalizedStatus.isEmpty ? 'N/A' : normalizedStatus.toUpperCase(),
+        status:
+            normalizedStatus.isEmpty ? 'N/A' : normalizedStatus.toUpperCase(),
         priority: normalizedStatus == 'active' ? 'Active' : 'Planned',
         priorityColor: priorityColor,
-        nextFollowUpDate: project.possessionDate.isEmpty ? 'N/A' : project.possessionDate,
+        nextFollowUpDate:
+            project.possessionDate.isEmpty ? 'N/A' : project.possessionDate,
         budget: project.priceRange.isEmpty ? 'N/A' : project.priceRange,
         phone: '${project.mappedLeads} leads',
         profileImageUrl: '',
-        assigneeName: project.developer.isEmpty ? 'Unknown Developer' : project.developer,
+        assigneeName:
+            project.developer.isEmpty ? 'Unknown Developer' : project.developer,
         assigneeImageUrl: '',
         actions: [
           DataCardAction(
@@ -288,7 +304,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   Widget _buildStatusBadge(String status) {
     final normalized = status.toLowerCase();
-    final color = normalized == 'active' ? AppColors.success : AppColors.warning;
+    final color =
+        normalized == 'active' ? AppColors.success : AppColors.warning;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -297,7 +314,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
       ),
       child: Text(
         normalized.isEmpty ? 'N/A' : normalized.toUpperCase(),
-        style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 10),
+        style:
+            TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 10),
       ),
     );
   }
@@ -329,7 +347,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
     );
   }
 
-  Widget _buildCircleActionButton(IconData icon, Color color, VoidCallback onPressed) {
+  Widget _buildCircleActionButton(
+      IconData icon, Color color, VoidCallback onPressed) {
     return Container(
       width: 36,
       height: 36,
@@ -373,7 +392,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
         border: Border.all(color: AppColors.border),
       ),
       child: const Center(
-        child: Text('No projects found.', style: TextStyle(color: AppColors.textSecondary)),
+        child: Text('No projects found.',
+            style: TextStyle(color: AppColors.textSecondary)),
       ),
     );
   }
@@ -401,7 +421,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
   Future<void> _openProjectDetails(_Project project) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ProjectDetailPage(projectId: project.id, initialData: project.toPayload()),
+        builder: (_) => ProjectDetailPage(
+            projectId: project.id, initialData: project.toPayload()),
       ),
     );
   }
@@ -413,8 +434,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
         title: const Text('Delete Project'),
         content: Text('Delete "${project.name}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
         ],
       ),
     );

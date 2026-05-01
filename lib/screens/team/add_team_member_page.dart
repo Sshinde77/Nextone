@@ -201,7 +201,8 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
       return;
     }
 
-    final overlay = Overlay.of(fieldContext).context.findRenderObject() as RenderBox;
+    final overlay =
+        Overlay.of(fieldContext).context.findRenderObject() as RenderBox;
     final topLeft = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
     final bottomLeft = renderBox.localToGlobal(
       Offset(0, renderBox.size.height),
@@ -244,9 +245,8 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
   @override
   Widget build(BuildContext context) {
     final pageTitle = _isEditMode ? 'Edit Team Member' : 'Add Team Member';
-    final sectionTitle = _isEditMode
-        ? 'Update Team Member'
-        : 'Create New Team Member';
+    final sectionTitle =
+        _isEditMode ? 'Update Team Member' : 'Create New Team Member';
     final submitLabel = _isEditMode ? 'Update Member' : 'Create Member';
 
     return Scaffold(
@@ -368,7 +368,8 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                             ? null
                             : () => _openRoleMenu(fieldContext),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 14),
                           decoration: BoxDecoration(
                             border: Border.all(color: AppColors.border),
                             borderRadius: BorderRadius.circular(12),

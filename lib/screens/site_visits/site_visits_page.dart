@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
+import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class SiteVisitsPage extends StatefulWidget {
@@ -24,6 +27,10 @@ class _SiteVisit {
     this.status = _VisitStatus.scheduled,
     this.feedback = '',
     this.rating = 0,
+    this.leadId = '',
+    this.projectId = '',
+    this.assigneeId = '',
+    this.rawData = const <String, dynamic>{},
   });
 
   final String id;
@@ -37,9 +44,14 @@ class _SiteVisit {
   _VisitStatus status;
   String feedback;
   int rating;
+  String leadId;
+  String projectId;
+  String assigneeId;
+  Map<String, dynamic> rawData;
 }
 
 class _SiteVisitsPageState extends State<SiteVisitsPage> {
+  final AuthProvider _authProvider = AuthProvider();
   static const List<String> _teamMembers = <String>[
     'Aarav Patel',
     'Priya Sharma',
@@ -56,6 +68,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   ];
 
   bool _isCalendarView = false;
+  bool _isLoadingVisits = false;
+  String? _loadError;
   late DateTime _focusedMonth;
   late DateTime _selectedDate;
   late List<_SiteVisit> _visits;
@@ -66,63 +80,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     final now = DateTime.now();
     _focusedMonth = DateTime(now.year, now.month, 1);
     _selectedDate = DateTime(now.year, now.month, now.day);
-
-    _visits = <_SiteVisit>[
-      _SiteVisit(
-        id: 'SV-1001',
-        property: 'The Glass Pavilion',
-        lead: 'Julianne Moore',
-        location: 'Beverly Hills, CA',
-        transport: 'Cab',
-        dateTime: DateTime(now.year, now.month, now.day, 10, 30),
-        imageUrl: _demoImages[0],
-        assignee: _teamMembers[1],
-        status: _VisitStatus.scheduled,
-      ),
-      _SiteVisit(
-        id: 'SV-1002',
-        property: 'Skyloft Penthouse',
-        lead: 'Robert Sterling',
-        location: 'Downtown Metro',
-        transport: 'Self',
-        dateTime: DateTime(now.year, now.month, now.day, 14, 00),
-        imageUrl: _demoImages[1],
-        assignee: _teamMembers[2],
-        status: _VisitStatus.inProgress,
-      ),
-      _SiteVisit(
-        id: 'SV-1003',
-        property: 'Azure Bay Residence',
-        lead: 'Sarah Jenkins',
-        location: 'Malibu Shores',
-        transport: 'Company Car',
-        dateTime: DateTime(now.year, now.month, now.day + 1, 16, 45),
-        imageUrl: _demoImages[2],
-        assignee: _teamMembers[0],
-        status: _VisitStatus.completed,
-        rating: 4,
-        feedback: 'Client liked the sea-facing balcony and parking layout.',
-      ),
-      _SiteVisit(
-        id: 'SV-1004',
-        property: 'Luma Heights',
-        lead: 'Adrian Blake',
-        location: 'West Valley',
-        transport: 'Bike',
-        dateTime: DateTime(now.year, now.month, now.day + 2, 12, 15),
-        imageUrl: _demoImages[3],
-        assignee: _teamMembers[3],
-        status: _VisitStatus.cancelled,
-      ),
-    ];
+    _visits = <_SiteVisit>[];
+    _loadSiteVisits();
   }
 
   List<_SiteVisit> get _selectedDayVisits {
-    final list =
-        _visits
-            .where((visit) => _isSameDate(visit.dateTime, _selectedDate))
-            .toList()
-          ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    final list = _visits
+        .where((visit) => _isSameDate(visit.dateTime, _selectedDate))
+        .toList()
+      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
     return list;
   }
 
@@ -260,7 +226,11 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                     ],
                   ),
                   SizedBox(height: _s(12)),
-                  if (visibleVisits.isEmpty)
+                  if (_isLoadingVisits)
+                    const Center(child: CircularProgressIndicator())
+                  else if (_loadError != null)
+                    _buildErrorState()
+                  else if (visibleVisits.isEmpty)
                     _buildEmptyState()
                   else
                     ...visibleVisits.map(_buildVisitCard),
@@ -296,7 +266,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         SizedBox(width: _s(8)),
         Expanded(
           child: FilledButton.icon(
-            onPressed: () => _openVisitEditor(),
+            onPressed: _openScheduleForm,
             icon: Icon(Icons.add, size: _s(16)),
             label: Text(compact ? 'Add' : 'Schedule'),
             style: FilledButton.styleFrom(
@@ -717,8 +687,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                               color: !isCurrentMonth
                                   ? AppColors.textSecondary.withOpacity(0.35)
                                   : isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textPrimary,
+                                      ? AppColors.primary
+                                      : AppColors.textPrimary,
                               fontWeight: isSelected
                                   ? FontWeight.bold
                                   : FontWeight.w500,
@@ -747,11 +717,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       return [SizedBox(height: _s(4))];
     }
 
-    final uniqueColors = visits
-        .map((v) => _statusColor(v.status))
-        .toSet()
-        .take(2)
-        .toList();
+    final uniqueColors =
+        visits.map((v) => _statusColor(v.status)).toSet().take(2).toList();
 
     return uniqueColors.map(_dot).toList();
   }
@@ -836,7 +803,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                 SizedBox(width: _s(10)),
                 Expanded(
                   child: Text(
-                    '${visit.property}\n${visit.lead}',
+                    '${visit.lead}\n${visit.property}',
                     style: TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w700,
@@ -938,7 +905,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                 SizedBox(width: _s(6)),
                 _cardActionButton(
                   icon: Icons.visibility_outlined,
-                  onTap: () => _handleVisitAction('feedback', visit),
+                  onTap: () => _handleVisitAction('view', visit),
                 ),
                 SizedBox(width: _s(6)),
                 _cardActionButton(
@@ -1110,7 +1077,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           ),
           SizedBox(height: _s(10)),
           FilledButton(
-            onPressed: () => _openVisitEditor(),
+            onPressed: _openScheduleForm,
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(
@@ -1131,226 +1098,87 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     );
   }
 
-  Future<void> _openVisitEditor({_SiteVisit? visit}) async {
-    final formKey = GlobalKey<FormState>();
-    final propertyController = TextEditingController(
-      text: visit?.property ?? '',
-    );
-    final leadController = TextEditingController(text: visit?.lead ?? '');
-    final locationController = TextEditingController(
-      text: visit?.location ?? '',
-    );
+  Future<void> _openScheduleForm() async {
+    if (_isCalendarView) {
+      setState(() {
+        _isCalendarView = false;
+      });
+    }
 
-    DateTime selectedDate = visit?.dateTime ?? _selectedDate;
-    TimeOfDay selectedTime = visit != null
-        ? TimeOfDay(hour: visit.dateTime.hour, minute: visit.dateTime.minute)
-        : TimeOfDay.now();
-    String selectedAssignee = visit?.assignee ?? _teamMembers.first;
-
-    final result = await showDialog<_SiteVisit>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setLocalState) {
-            return AlertDialog(
-              title: Text(
-                visit == null ? 'Schedule Site Visit' : 'Reschedule Visit',
-              ),
-              content: SizedBox(
-                width: (_screenWidth * 0.86).clamp(280, 420).toDouble(),
-                child: Form(
-                  key: formKey,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextFormField(
-                          controller: propertyController,
-                          decoration: const InputDecoration(
-                            labelText: 'Property Name',
-                            prefixIcon: Icon(Icons.home_work_outlined),
-                          ),
-                          validator: (value) =>
-                              (value == null || value.trim().isEmpty)
-                              ? 'Enter property name'
-                              : null,
-                        ),
-                        const SizedBox(height: 10),
-                        TextFormField(
-                          controller: leadController,
-                          decoration: const InputDecoration(
-                            labelText: 'Lead Name',
-                            prefixIcon: Icon(Icons.person_outline),
-                          ),
-                          validator: (value) =>
-                              (value == null || value.trim().isEmpty)
-                              ? 'Enter lead name'
-                              : null,
-                        ),
-                        const SizedBox(height: 10),
-                        TextFormField(
-                          controller: locationController,
-                          decoration: const InputDecoration(
-                            labelText: 'Location',
-                            prefixIcon: Icon(Icons.location_on_outlined),
-                          ),
-                          validator: (value) =>
-                              (value == null || value.trim().isEmpty)
-                              ? 'Enter location'
-                              : null,
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField<String>(
-                          value: selectedAssignee,
-                          isExpanded: true,
-                          menuMaxHeight: 220,
-                          borderRadius: BorderRadius.circular(14),
-                          dropdownColor: Colors.white,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                          decoration: const InputDecoration(
-                            labelText: 'Assign To',
-                            hintText: 'Select team member',
-                            prefixIcon: Icon(Icons.groups_outlined),
-                          ),
-                          items: _teamMembers
-                              .map(
-                                (member) => DropdownMenuItem<String>(
-                                  value: member,
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 2,
-                                    ),
-                                    child: Text(member),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setLocalState(() => selectedAssignee = value);
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () async {
-                                  final picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: selectedDate,
-                                    firstDate: DateTime.now().subtract(
-                                      const Duration(days: 90),
-                                    ),
-                                    lastDate: DateTime.now().add(
-                                      const Duration(days: 365),
-                                    ),
-                                  );
-                                  if (picked != null) {
-                                    setLocalState(() => selectedDate = picked);
-                                  }
-                                },
-                                icon: const Icon(Icons.calendar_month),
-                                label: Text(
-                                  '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () async {
-                                  final picked = await showTimePicker(
-                                    context: context,
-                                    initialTime: selectedTime,
-                                  );
-                                  if (picked != null) {
-                                    setLocalState(() => selectedTime = picked);
-                                  }
-                                },
-                                icon: const Icon(Icons.schedule),
-                                label: Text(selectedTime.format(context)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (!(formKey.currentState?.validate() ?? false)) return;
-                    final dateTime = DateTime(
-                      selectedDate.year,
-                      selectedDate.month,
-                      selectedDate.day,
-                      selectedTime.hour,
-                      selectedTime.minute,
-                    );
-                    Navigator.pop(
-                      context,
-                      _SiteVisit(
-                        id:
-                            visit?.id ??
-                            'SV-${DateTime.now().millisecondsSinceEpoch}',
-                        property: propertyController.text.trim(),
-                        lead: leadController.text.trim(),
-                        location: locationController.text.trim(),
-                        transport: visit?.transport ?? 'Self',
-                        dateTime: dateTime,
-                        imageUrl:
-                            visit?.imageUrl ?? _demoImages[_visits.length % 4],
-                        assignee: selectedAssignee,
-                        status: visit?.status ?? _VisitStatus.scheduled,
-                        feedback: visit?.feedback ?? '',
-                        rating: visit?.rating ?? 0,
-                      ),
-                    );
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                  ),
-                  child: Text(visit == null ? 'Schedule' : 'Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    final created = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (_) => const SiteVisitFormPage()),
     );
 
-    propertyController.dispose();
-    leadController.dispose();
-    locationController.dispose();
+    if (created == null || !mounted) {
+      return;
+    }
+    await _loadSiteVisits();
 
-    if (result == null) return;
-
-    setState(() {
-      final index = _visits.indexWhere((item) => item.id == result.id);
-      if (index >= 0) {
-        _visits[index] = result;
-      } else {
-        _visits.add(result);
-      }
-      _selectedDate = DateTime(
-        result.dateTime.year,
-        result.dateTime.month,
-        result.dateTime.day,
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Site visit scheduled successfully.')),
       );
-      _focusedMonth = DateTime(result.dateTime.year, result.dateTime.month, 1);
-    });
+  }
+
+  Future<void> _openEditVisitForm(_SiteVisit visit) async {
+    final visitData = <String, dynamic>{
+      'lead_id': visit.leadId,
+      'lead_name': visit.lead,
+      'project_id': visit.projectId,
+      'project_name': visit.property,
+      'assigned_to': visit.assigneeId,
+      'assignee_name': visit.assignee,
+      'visit_date': DateTime(
+        visit.dateTime.year,
+        visit.dateTime.month,
+        visit.dateTime.day,
+      ).toIso8601String(),
+      'visit_time':
+          '${visit.dateTime.hour.toString().padLeft(2, '0')}:${visit.dateTime.minute.toString().padLeft(2, '0')}',
+      'notes': visit.feedback,
+      'transport_arranged': visit.transport.toLowerCase() != 'self',
+    };
+
+    final updated = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => SiteVisitFormPage(
+          visitId: visit.id,
+          visitData: visitData,
+        ),
+      ),
+    );
+
+    if (updated == null || !mounted) {
+      return;
+    }
+    await _loadSiteVisits();
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Site visit updated successfully.')),
+      );
+  }
+
+  void _openVisitDetails(_SiteVisit visit) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SiteVisitDetailsPage(
+          visitId: visit.id,
+          visitData: visit.rawData,
+        ),
+      ),
+    );
   }
 
   Future<void> _handleVisitAction(String action, _SiteVisit visit) async {
+    if (action == 'view') {
+      _openVisitDetails(visit);
+      return;
+    }
     if (action == 'reschedule') {
-      await _openVisitEditor(visit: visit);
+      await _openEditVisitForm(visit);
       return;
     }
     if (action == 'assign') {
@@ -1458,9 +1286,25 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     );
 
     if (status == null) return;
-    setState(() {
-      visit.status = status;
-    });
+    try {
+      await _authProvider.updateSiteVisitStatus(
+        id: visit.id,
+        status: _apiStatus(status),
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        visit.status = status;
+      });
+      _showSnackBar('Site visit status updated.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   Future<void> _captureFeedback(_SiteVisit visit) async {
@@ -1526,13 +1370,33 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     final savedNote = noteController.text.trim();
     noteController.dispose();
     if (result != true) return;
-    setState(() {
-      visit.feedback = savedNote;
-      visit.rating = selectedRating;
-      if (visit.status == _VisitStatus.scheduled) {
-        visit.status = _VisitStatus.completed;
+    try {
+      await _authProvider.submitSiteVisitFeedback(
+        id: visit.id,
+        rating: selectedRating,
+        clientReaction: selectedRating >= 4 ? 'positive' : 'neutral',
+        interestedIn: visit.property,
+        nextStep: 'follow_up',
+        remarks: savedNote,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
       }
-    });
+      setState(() {
+        visit.feedback = savedNote;
+        visit.rating = selectedRating;
+        if (visit.status == _VisitStatus.scheduled) {
+          visit.status = _VisitStatus.completed;
+        }
+      });
+      _showSnackBar('Feedback submitted.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   int _countByStatus(_VisitStatus status) {
@@ -1617,5 +1481,211 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       case _VisitStatus.cancelled:
         return AppColors.error;
     }
+  }
+
+  Future<void> _loadSiteVisits() async {
+    setState(() {
+      _isLoadingVisits = true;
+      _loadError = null;
+    });
+
+    try {
+      final result = await _authProvider.siteVisits(
+        token: _authProvider.currentAuthToken,
+        page: 1,
+        perPage: 200,
+      );
+      final mapped = result.items
+          .map(_visitFromApi)
+          .whereType<_SiteVisit>()
+          .toList()
+        ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _visits = mapped;
+        _isLoadingVisits = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingVisits = false;
+        _loadError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  _SiteVisit? _visitFromApi(Map<String, dynamic> json) {
+    final id = _readString(json['id']);
+    if (id.isEmpty) {
+      return null;
+    }
+
+    final leadMap = json['lead'] is Map<String, dynamic>
+        ? (json['lead'] as Map<String, dynamic>)
+        : const <String, dynamic>{};
+    final projectMap = json['project'] is Map<String, dynamic>
+        ? (json['project'] as Map<String, dynamic>)
+        : const <String, dynamic>{};
+    final assignedToMap = json['assigned_to'] is Map<String, dynamic>
+        ? (json['assigned_to'] as Map<String, dynamic>)
+        : const <String, dynamic>{};
+
+    final visitDate = _readString(json['visit_date']);
+    final visitTime = _readString(json['visit_time']);
+    final parsedDateTime = _parseVisitDateTime(visitDate, visitTime);
+
+    final leadName = _readString(
+      json['lead_name'] ??
+      leadMap['name'] ?? leadMap['full_name'] ?? leadMap['first_name'],
+    );
+    final projectName = _readString(json['project_name'] ?? projectMap['name']);
+    final assigneeName = _readString(
+      json['assigned_to_name'] ??
+          json['assigned_to'] ??
+          assignedToMap['full_name'] ??
+          assignedToMap['name'] ??
+          assignedToMap['first_name'],
+    );
+    final status = _statusFromApi(_readString(json['status']));
+    final feedbackMap = json['feedback'] is Map<String, dynamic>
+        ? (json['feedback'] as Map<String, dynamic>)
+        : const <String, dynamic>{};
+    final rating = _readInt(feedbackMap['rating']) ?? 0;
+    final feedbackText = _readString(
+      feedbackMap['remarks'] ??
+          feedbackMap['feedback'] ??
+          json['remarks'] ??
+          json['feedback'],
+    );
+
+    return _SiteVisit(
+      id: id,
+      property: projectName.isEmpty ? 'N/A' : projectName,
+      lead: leadName.isEmpty ? 'N/A' : leadName,
+      location: _readString(
+        projectMap['address'] ?? projectMap['locality'] ?? projectMap['city'],
+      ).isEmpty
+          ? 'N/A'
+          : _readString(
+              projectMap['address'] ??
+                  projectMap['locality'] ??
+                  projectMap['city'],
+            ),
+      transport: _readString(json['transport_arranged']).isEmpty
+          ? (json['transport_arranged'] == true ? 'true' : 'false')
+          : _readString(json['transport_arranged']),
+      dateTime: parsedDateTime,
+      imageUrl: _demoImages[id.hashCode.abs() % _demoImages.length],
+      assignee: assigneeName.isEmpty ? 'Unassigned' : assigneeName,
+      status: status,
+      feedback: feedbackText,
+      rating: rating,
+      leadId: _readString(json['lead_id'] ?? leadMap['id']),
+      projectId: _readString(json['project_id'] ?? projectMap['id']),
+      assigneeId: _readString(json['assigned_to'] ?? assignedToMap['id']),
+      rawData: json,
+    );
+  }
+
+  _VisitStatus _statusFromApi(String status) {
+    final normalized = status.trim().toLowerCase();
+    switch (normalized) {
+      case 'done':
+      case 'completed':
+        return _VisitStatus.completed;
+      case 'in_progress':
+      case 'in progress':
+        return _VisitStatus.inProgress;
+      case 'cancelled':
+      case 'canceled':
+        return _VisitStatus.cancelled;
+      case 'scheduled':
+      default:
+        return _VisitStatus.scheduled;
+    }
+  }
+
+  String _apiStatus(_VisitStatus status) {
+    switch (status) {
+      case _VisitStatus.completed:
+        return 'done';
+      case _VisitStatus.inProgress:
+        return 'in_progress';
+      case _VisitStatus.cancelled:
+        return 'cancelled';
+      case _VisitStatus.scheduled:
+        return 'scheduled';
+    }
+  }
+
+  DateTime _parseVisitDateTime(String dateValue, String timeValue) {
+    final date = DateTime.tryParse(dateValue)?.toLocal() ?? DateTime.now();
+    final parts = timeValue.split(':');
+    if (parts.length >= 2) {
+      final hour = int.tryParse(parts[0]) ?? 0;
+      final minute = int.tryParse(parts[1]) ?? 0;
+      return DateTime(date.year, date.month, date.day, hour, minute);
+    }
+    return date;
+  }
+
+  String _readString(dynamic value) {
+    if (value is String) {
+      return value.trim();
+    }
+    if (value is num || value is bool) {
+      return value.toString().trim();
+    }
+    return '';
+  }
+
+  int? _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    if (value is String) {
+      return int.tryParse(value.trim());
+    }
+    return null;
+  }
+
+  Widget _buildErrorState() {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(_s(16)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(_s(16)),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _loadError ?? 'Unable to load site visits.',
+            style: TextStyle(color: AppColors.error, fontSize: _fs(12)),
+          ),
+          SizedBox(height: _s(10)),
+          FilledButton(
+            onPressed: _loadSiteVisits,
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }

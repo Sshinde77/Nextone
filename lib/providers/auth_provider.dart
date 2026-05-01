@@ -3,7 +3,7 @@ import 'package:nextone/services/auth_service.dart';
 
 class AuthProvider {
   AuthProvider({AuthService? authService})
-    : _authService = authService ?? AuthService();
+      : _authService = authService ?? AuthService();
 
   final AuthService _authService;
 
@@ -61,7 +61,8 @@ class AuthProvider {
     return _authService.users(token: token);
   }
 
-  Future<Map<String, dynamic>> usersDetail({required String id, String? token}) {
+  Future<Map<String, dynamic>> usersDetail(
+      {required String id, String? token}) {
     return _authService.usersDetail(id: id, token: token);
   }
 
@@ -188,6 +189,95 @@ class AuthProvider {
     return _authService.completeFollowUpStatus(
       id: id,
       isCompleted: isCompleted,
+      token: token,
+    );
+  }
+
+  Future<LeadsListResult> siteVisits({
+    String? token,
+    int page = 1,
+    int perPage = 20,
+  }) {
+    return _authService.siteVisits(
+      token: token,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
+  Future<Map<String, dynamic>> siteVisitDetail({
+    required String id,
+    String? token,
+  }) {
+    return _authService.siteVisitDetail(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> createSiteVisit({
+    required String leadId,
+    required String projectId,
+    required String visitDate,
+    required String visitTime,
+    required String assignedTo,
+    required String notes,
+    required bool transportArranged,
+    String? token,
+  }) {
+    return _authService.createSiteVisit(
+      leadId: leadId,
+      projectId: projectId,
+      visitDate: visitDate,
+      visitTime: visitTime,
+      assignedTo: assignedTo,
+      notes: notes,
+      transportArranged: transportArranged,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> editSiteVisit({
+    required String id,
+    String? visitDate,
+    String? visitTime,
+    String? rescheduleReason,
+    String? token,
+  }) {
+    return _authService.editSiteVisit(
+      id: id,
+      visitDate: visitDate,
+      visitTime: visitTime,
+      rescheduleReason: rescheduleReason,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> updateSiteVisitStatus({
+    required String id,
+    required String status,
+    String? token,
+  }) {
+    return _authService.updateSiteVisitStatus(
+      id: id,
+      status: status,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> submitSiteVisitFeedback({
+    required String id,
+    required int rating,
+    required String clientReaction,
+    required String interestedIn,
+    required String nextStep,
+    required String remarks,
+    String? token,
+  }) {
+    return _authService.submitSiteVisitFeedback(
+      id: id,
+      rating: rating,
+      clientReaction: clientReaction,
+      interestedIn: interestedIn,
+      nextStep: nextStep,
+      remarks: remarks,
       token: token,
     );
   }
@@ -322,7 +412,8 @@ class AuthProvider {
     );
   }
 
-  Future<Map<String, dynamic>> projectDetail({required String id, String? token}) {
+  Future<Map<String, dynamic>> projectDetail(
+      {required String id, String? token}) {
     return _authService.projectDetail(id: id, token: token);
   }
 

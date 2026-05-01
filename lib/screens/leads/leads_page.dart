@@ -496,9 +496,8 @@ class _LeadsPageState extends State<LeadsPage> {
     final currentPage = _currentPage.clamp(1, totalPages);
 
     final start = totalItems == 0 ? 0 : ((currentPage - 1) * _pageSize) + 1;
-    final end = totalItems == 0
-        ? 0
-        : math.min(currentPage * _pageSize, totalItems);
+    final end =
+        totalItems == 0 ? 0 : math.min(currentPage * _pageSize, totalItems);
 
     return Container(
       width: double.infinity,
@@ -651,7 +650,10 @@ class _LeadModel {
     final assigned = json['assigned_to'] ?? json['assignee'];
     final assignedToId = assigned is Map<String, dynamic>
         ? _readString(
-            assigned['id'] ?? assigned['user_id'] ?? assigned['userId'] ?? assigned['uuid'],
+            assigned['id'] ??
+                assigned['user_id'] ??
+                assigned['userId'] ??
+                assigned['uuid'],
           )
         : _readString(assigned);
     final assignedNameFromRoot = _readString(
@@ -668,7 +670,9 @@ class _LeadModel {
                 assigned['first_name'],
             fallback: 'Unassigned',
           )
-        : (assignedNameFromRoot.isNotEmpty ? assignedNameFromRoot : 'Unassigned');
+        : (assignedNameFromRoot.isNotEmpty
+            ? assignedNameFromRoot
+            : 'Unassigned');
     final assigneeImage = assigned is Map<String, dynamic>
         ? _readString(
             assigned['image'] ??

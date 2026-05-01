@@ -170,10 +170,13 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
           _memberData['firstname'],
     );
     final lastName = _asString(
-      _memberData['last_name'] ?? _memberData['lastName'] ?? _memberData['lastname'],
+      _memberData['last_name'] ??
+          _memberData['lastName'] ??
+          _memberData['lastname'],
     );
     final fullName = _buildFullName(firstName, lastName, _memberData);
-    final email = _fallbackValue(_asString(_memberData['email']), fallback: 'N/A');
+    final email =
+        _fallbackValue(_asString(_memberData['email']), fallback: 'N/A');
     final phoneNumber = _fallbackValue(
       _asString(_memberData['phone_number'] ?? _memberData['phoneNumber']),
       fallback: 'N/A',
@@ -183,8 +186,10 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
           ? _asString(_memberData['role'])
           : 'Team Member',
     );
-    final isActive = _asBool(_memberData['is_active'] ?? _memberData['isActive']);
-    final lastLoginStr = _asString(_memberData['last_login'] ?? _memberData['lastLogin']);
+    final isActive =
+        _asBool(_memberData['is_active'] ?? _memberData['isActive']);
+    final lastLoginStr =
+        _asString(_memberData['last_login'] ?? _memberData['lastLogin']);
 
     DateTime? lastLogin;
     if (lastLoginStr.isNotEmpty) {
@@ -204,7 +209,8 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
               onRefresh: _fetchMemberDetails,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                 child: Column(
                   children: [
                     if (_loadError != null) ...[
@@ -238,7 +244,8 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
                           icon: Icons.history_rounded,
                           label: 'Last Login',
                           value: lastLogin != null
-                              ? DateFormat('MMM dd, yyyy - hh:mm a').format(lastLogin)
+                              ? DateFormat('MMM dd, yyyy - hh:mm a')
+                                  .format(lastLogin)
                               : 'Never',
                         ),
                         _InfoItem(
@@ -457,7 +464,8 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
     );
   }
 
-  Widget _buildInfoSection({required String title, required List<_InfoItem> items}) {
+  Widget _buildInfoSection(
+      {required String title, required List<_InfoItem> items}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -598,7 +606,8 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
     return role
         .split('_')
         .where((part) => part.trim().isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
   }
 
@@ -613,7 +622,8 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
     return null;
   }
 
-  String _buildFullName(String firstName, String lastName, Map<String, dynamic> source) {
+  String _buildFullName(
+      String firstName, String lastName, Map<String, dynamic> source) {
     final combined = '$firstName $lastName'.trim();
     if (combined.isNotEmpty) {
       return combined;
