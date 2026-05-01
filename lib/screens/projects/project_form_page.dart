@@ -36,6 +36,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
 
   DateTime? _selectedPossessionDate;
   String _status = 'active';
+  bool _isStatusOpen = false;
   bool _isSubmitting = false;
 
   @override
@@ -400,6 +401,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
 
   Widget _buildStatusDropdown() {
     const statuses = <String>['active', 'inactive'];
+    final selectedStatusLabel = _status[0].toUpperCase() + _status.substring(1);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -412,28 +414,70 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           ),
         ),
         const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          value: _status,
-          decoration: _fieldDecoration(hintText: 'Select status'),
-          items: statuses
-              .map(
-                (status) => DropdownMenuItem<String>(
-                  value: status,
-                  child: Text(status[0].toUpperCase() + status.substring(1)),
-                ),
-              )
-              .toList(),
-          onChanged: _isSubmitting
+        GestureDetector(
+          onTap: _isSubmitting
               ? null
-              : (value) {
-                  if (value == null) {
-                    return;
-                  }
+              : () {
                   setState(() {
-                    _status = value;
+                    _isStatusOpen = !_isStatusOpen;
                   });
                 },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  selectedStatusLabel,
+                  style: const TextStyle(color: Colors.black),
+                ),
+                Icon(
+                  _isStatusOpen
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                ),
+              ],
+            ),
+          ),
         ),
+        if (_isStatusOpen)
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+            ),
+            child: Column(
+              children: statuses.map((status) {
+                final statusLabel = status[0].toUpperCase() + status.substring(1);
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _status = status;
+                      _isStatusOpen = false;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(statusLabel),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
       ],
     );
   }

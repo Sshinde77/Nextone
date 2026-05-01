@@ -17,6 +17,7 @@ class _SiteVisit {
     required this.property,
     required this.lead,
     required this.location,
+    required this.transport,
     required this.dateTime,
     required this.imageUrl,
     required this.assignee,
@@ -29,6 +30,7 @@ class _SiteVisit {
   String property;
   String lead;
   String location;
+  String transport;
   DateTime dateTime;
   String imageUrl;
   String assignee;
@@ -53,7 +55,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=400&q=80',
   ];
 
-  bool _isCalendarView = true;
+  bool _isCalendarView = false;
   late DateTime _focusedMonth;
   late DateTime _selectedDate;
   late List<_SiteVisit> _visits;
@@ -71,6 +73,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         property: 'The Glass Pavilion',
         lead: 'Julianne Moore',
         location: 'Beverly Hills, CA',
+        transport: 'Cab',
         dateTime: DateTime(now.year, now.month, now.day, 10, 30),
         imageUrl: _demoImages[0],
         assignee: _teamMembers[1],
@@ -81,6 +84,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         property: 'Skyloft Penthouse',
         lead: 'Robert Sterling',
         location: 'Downtown Metro',
+        transport: 'Self',
         dateTime: DateTime(now.year, now.month, now.day, 14, 00),
         imageUrl: _demoImages[1],
         assignee: _teamMembers[2],
@@ -91,6 +95,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         property: 'Azure Bay Residence',
         lead: 'Sarah Jenkins',
         location: 'Malibu Shores',
+        transport: 'Company Car',
         dateTime: DateTime(now.year, now.month, now.day + 1, 16, 45),
         imageUrl: _demoImages[2],
         assignee: _teamMembers[0],
@@ -103,6 +108,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         property: 'Luma Heights',
         lead: 'Adrian Blake',
         location: 'West Valley',
+        transport: 'Bike',
         dateTime: DateTime(now.year, now.month, now.day + 2, 12, 15),
         imageUrl: _demoImages[3],
         assignee: _teamMembers[3],
@@ -118,6 +124,25 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
             .toList()
           ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
     return list;
+  }
+
+  List<_SiteVisit> get _allVisitsSorted {
+    final list = List<_SiteVisit>.from(_visits)
+      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    return list;
+  }
+
+  List<_SiteVisit> get _visibleVisits {
+    return _isCalendarView ? _selectedDayVisits : _allVisitsSorted;
+  }
+
+  String get _visitSectionTitle {
+    if (_isCalendarView) {
+      return _isSameDate(_selectedDate, DateTime.now())
+          ? "Today's Visits"
+          : 'Visits on $_selectedDateLabel';
+    }
+    return 'All Scheduled Visits';
   }
 
   String get _selectedDateLabel {
@@ -156,7 +181,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedVisits = _selectedDayVisits;
+    final visibleVisits = _visibleVisits;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const CrmAppBar(title: 'Site Visits'),
@@ -200,21 +225,20 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                   SizedBox(height: _s(10)),
                   _buildQuickActions(),
                   SizedBox(height: _s(14)),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: _isCalendarView
-                        ? _buildCalendarCard()
-                        : _buildSliderCard(),
-                  ),
-                  SizedBox(height: _s(18)),
+                  if (_isCalendarView) ...[
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: _buildCalendarCard(),
+                    ),
+                    SizedBox(height: _s(18)),
+                  ] else
+                    SizedBox(height: _s(8)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
                         child: Text(
-                          _isSameDate(_selectedDate, DateTime.now())
-                              ? "Today's Visits"
-                              : 'Visits on $_selectedDateLabel',
+                          _visitSectionTitle,
                           style: TextStyle(
                             color: AppColors.primary,
                             fontSize: _fs(18),
@@ -223,22 +247,23 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      Text(
-                        _selectedDateLabel.toUpperCase(),
-                        style: TextStyle(
-                          color: AppColors.textSecondary.withOpacity(0.6),
-                          fontSize: _fs(9),
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.3,
+                      if (_isCalendarView)
+                        Text(
+                          _selectedDateLabel.toUpperCase(),
+                          style: TextStyle(
+                            color: AppColors.textSecondary.withOpacity(0.6),
+                            fontSize: _fs(9),
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                   SizedBox(height: _s(12)),
-                  if (selectedVisits.isEmpty)
+                  if (visibleVisits.isEmpty)
                     _buildEmptyState()
                   else
-                    ...selectedVisits.map(_buildVisitCard),
+                    ...visibleVisits.map(_buildVisitCard),
                   SizedBox(height: _s(90)),
                 ],
               ),
@@ -358,16 +383,16 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _toggleItem(
-            'Calendar',
-            Icons.calendar_today_rounded,
-            _isCalendarView,
-            () => setState(() => _isCalendarView = true),
-          ),
-          _toggleItem(
             'List',
             Icons.list_rounded,
             !_isCalendarView,
             () => setState(() => _isCalendarView = false),
+          ),
+          _toggleItem(
+            'Calendar',
+            Icons.calendar_today_rounded,
+            _isCalendarView,
+            () => setState(() => _isCalendarView = true),
           ),
         ],
       ),
@@ -766,225 +791,161 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   Widget _buildVisitCard(_SiteVisit visit) {
     final statusColor = _statusColor(visit.status);
     final statusLabel = _statusLabel(visit.status);
+    final date = visit.dateTime;
+    final dateOnly =
+        '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final timeOnly = _formatTime(date);
+    final initials = _projectInitials(visit.property);
+    final assigneeInitials = _projectInitials(visit.assignee);
 
-    return Container(
-      margin: EdgeInsets.only(bottom: _s(12)),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(_s(16)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: _s(10),
-            offset: Offset(0, _s(3)),
-          ),
-        ],
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Padding(
+      padding: EdgeInsets.only(bottom: _s(12)),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(_s(12)),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F8FB),
+          borderRadius: BorderRadius.circular(_s(16)),
+          border: Border.all(color: const Color(0xFFCFE0F6)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: _s(8),
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: _s(4),
-              decoration: BoxDecoration(
-                color: statusColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(_s(16)),
-                  bottomLeft: Radius.circular(_s(16)),
-                ),
-              ),
-            ),
-            SizedBox(width: _s(10)),
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: _s(10)),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(_s(12)),
-                child: Image.network(
-                  visit.imageUrl,
-                  width: _s(66),
-                  height: _s(66),
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      width: _s(66),
-                      height: _s(66),
-                      color: AppColors.surface,
-                      child: const Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    width: _s(66),
-                    height: _s(66),
-                    color: AppColors.surface,
-                    child: const Icon(
-                      Icons.broken_image_outlined,
-                      color: AppColors.textSecondary,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: _s(18),
+                  backgroundColor: const Color(0xFFE8ECF3),
+                  child: Text(
+                    initials,
+                    style: TextStyle(
+                      color: const Color(0xFF0A7AF6),
+                      fontWeight: FontWeight.w800,
+                      fontSize: _fs(12),
                     ),
                   ),
                 ),
-              ),
-            ),
-            SizedBox(width: _s(10)),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: _s(12)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      visit.property,
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: _fs(13),
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                SizedBox(width: _s(10)),
+                Expanded(
+                  child: Text(
+                    '${visit.property}\n${visit.lead}',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: _fs(13.2),
+                      height: 1.35,
                     ),
-                    SizedBox(height: _s(3)),
-                    Text(
-                      'Lead: ${visit.lead}',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: _fs(10.5),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: _s(6)),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on_rounded,
-                          size: _s(10),
-                          color: AppColors.textSecondary,
-                        ),
-                        SizedBox(width: _s(3)),
-                        Expanded(
-                          child: Text(
-                            visit.location,
-                            style: TextStyle(
-                              color: AppColors.textSecondary.withOpacity(0.7),
-                              fontSize: _fs(8.8),
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.2,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: _s(7)),
-                    Wrap(
-                      spacing: _s(6),
-                      runSpacing: _s(4),
-                      children: [
-                        _miniChip(
-                          icon: Icons.badge_outlined,
-                          label: visit.assignee,
-                        ),
-                        _miniChip(
-                          icon: Icons.flag_outlined,
-                          label: statusLabel,
-                          background: statusColor.withOpacity(0.12),
-                          textColor: statusColor,
-                        ),
-                      ],
-                    ),
-                    if (visit.feedback.isNotEmpty) ...[
-                      SizedBox(height: _s(6)),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.star_rounded,
-                            size: _s(12),
-                            color: AppColors.warning.withOpacity(0.9),
-                          ),
-                          SizedBox(width: _s(3)),
-                          Text(
-                            '${visit.rating}/5',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: _fs(9.5),
-                            ),
-                          ),
-                          SizedBox(width: _s(6)),
-                          Expanded(
-                            child: Text(
-                              visit.feedback,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: _fs(9.2),
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
-              ),
+                _miniChip(
+                  label: statusLabel.toUpperCase(),
+                  background: const Color(0xFFEDE6EF),
+                  textColor: const Color(0xFFD11F8A),
+                ),
+              ],
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(0, _s(8), _s(8), _s(8)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: _s(8),
-                      vertical: _s(5),
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(_s(10)),
-                    ),
-                    child: Text(
-                      _formatTime(visit.dateTime),
-                      style: TextStyle(
-                        color: statusColor.withOpacity(0.9),
-                        fontSize: _fs(8.8),
-                        fontWeight: FontWeight.bold,
-                      ),
+            SizedBox(height: _s(12)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _visitInfoBlock(
+                    label: 'Project',
+                    icon: Icons.apartment_outlined,
+                    value: visit.property,
+                  ),
+                ),
+                SizedBox(width: _s(14)),
+                Expanded(
+                  child: _visitInfoBlock(
+                    label: 'Transport',
+                    icon: Icons.local_taxi_outlined,
+                    value: visit.transport,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: _s(8)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _visitInfoBlock(
+                    label: 'Date',
+                    icon: Icons.calendar_today_outlined,
+                    value: dateOnly,
+                  ),
+                ),
+                SizedBox(width: _s(14)),
+                Expanded(
+                  child: _visitInfoBlock(
+                    label: 'Time',
+                    icon: Icons.schedule_outlined,
+                    value: timeOnly,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: _s(10)),
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: _s(14),
+                  backgroundColor: const Color(0xFFE8ECF3),
+                  child: Text(
+                    assigneeInitials,
+                    style: TextStyle(
+                      color: const Color(0xFF3E6DC8),
+                      fontSize: _fs(9),
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  SizedBox(height: _s(5)),
-                  PopupMenuButton<String>(
-                    onSelected: (value) => _handleVisitAction(value, visit),
-                    icon: Icon(
-                      Icons.more_horiz_rounded,
-                      color: AppColors.textSecondary,
-                      size: _s(18),
+                ),
+                SizedBox(width: _s(8)),
+                Expanded(
+                  child: Text(
+                    visit.assignee,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: _fs(12.3),
+                      fontWeight: FontWeight.w600,
                     ),
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: 'assign',
-                        child: Text('Assign Team Member'),
-                      ),
-                      PopupMenuItem(
-                        value: 'reschedule',
-                        child: Text('Reschedule Visit'),
-                      ),
-                      PopupMenuItem(
-                        value: 'status',
-                        child: Text('Update Status'),
-                      ),
-                      PopupMenuItem(
-                        value: 'feedback',
-                        child: Text('Capture Feedback'),
-                      ),
-                    ],
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
+                ),
+                _cardActionButton(
+                  icon: Icons.call_outlined,
+                  onTap: () => _handleVisitAction('assign', visit),
+                ),
+                SizedBox(width: _s(6)),
+                _cardActionButton(
+                  icon: Icons.check_circle_outline,
+                  onTap: () => _handleVisitAction('status', visit),
+                ),
+                SizedBox(width: _s(6)),
+                _cardActionButton(
+                  icon: Icons.edit_outlined,
+                  onTap: () => _handleVisitAction('reschedule', visit),
+                ),
+                SizedBox(width: _s(6)),
+                _cardActionButton(
+                  icon: Icons.visibility_outlined,
+                  onTap: () => _handleVisitAction('feedback', visit),
+                ),
+                SizedBox(width: _s(6)),
+                _cardActionButton(
+                  icon: Icons.delete_outline,
+                  onTap: () {},
+                )
+              ],
             ),
           ],
         ),
@@ -992,8 +953,105 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     );
   }
 
-  Widget _miniChip({
+  Widget _visitInfoBlock({
+    required String label,
     required IconData icon,
+    required String value,
+    Color iconColor = AppColors.textSecondary,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: _fs(9.8),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        SizedBox(height: _s(4)),
+        Row(
+          children: [
+            Icon(icon, size: _s(13), color: iconColor),
+            SizedBox(width: _s(6)),
+            Expanded(
+              child: Text(
+                value,
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: _fs(11.2),
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _visitDetailRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: _s(82),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: _fs(9.5),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: _fs(10.5),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _cardActionButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(_s(10)),
+      child: Container(
+        width: _s(34),
+        height: _s(34),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF2F8),
+          borderRadius: BorderRadius.circular(_s(10)),
+        ),
+        child: Icon(icon, size: _s(16), color: AppColors.textSecondary),
+      ),
+    );
+  }
+
+  String _projectInitials(String project) {
+    final cleaned = project.trim();
+    if (cleaned.isEmpty) return 'NA';
+    final parts = cleaned.split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    final letters = parts.take(2).map((p) => p[0].toUpperCase()).join();
+    if (letters.length == 1) {
+      return '${letters}X';
+    }
+    return letters;
+  }
+
+  Widget _miniChip({
     required String label,
     Color? background,
     Color? textColor,
@@ -1007,8 +1065,6 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: _s(10), color: textColor ?? AppColors.textSecondary),
-          SizedBox(width: _s(3)),
           Text(
             label,
             style: TextStyle(
@@ -1146,15 +1202,26 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
                           value: selectedAssignee,
+                          isExpanded: true,
+                          menuMaxHeight: 220,
+                          borderRadius: BorderRadius.circular(14),
+                          dropdownColor: Colors.white,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded),
                           decoration: const InputDecoration(
-                            labelText: 'Assign to Team Member',
+                            labelText: 'Assign To',
+                            hintText: 'Select team member',
                             prefixIcon: Icon(Icons.groups_outlined),
                           ),
                           items: _teamMembers
                               .map(
                                 (member) => DropdownMenuItem<String>(
                                   value: member,
-                                  child: Text(member),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
+                                    child: Text(member),
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -1236,6 +1303,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                         property: propertyController.text.trim(),
                         lead: leadController.text.trim(),
                         location: locationController.text.trim(),
+                        transport: visit?.transport ?? 'Self',
                         dateTime: dateTime,
                         imageUrl:
                             visit?.imageUrl ?? _demoImages[_visits.length % 4],

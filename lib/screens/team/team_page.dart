@@ -4,6 +4,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/team/add_team_member_page.dart';
 import 'package:nextone/screens/team/team_member_details_page.dart';
+import 'package:nextone/widgets/data_card.dart';
 
 class TeamPage extends StatefulWidget {
   const TeamPage({super.key});
@@ -649,62 +650,44 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Widget _buildMemberCard(_TeamMember member) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              _InitialAvatar(name: member.name, size: 44),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      member.name,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 18,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      member.role,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    final isDeleting = member.id.isNotEmpty && _deletingMemberIds.contains(member.id);
+    final isChangingRole = member.id.isNotEmpty && _changingRoleMemberIds.contains(member.id);
+    final isBusy = isDeleting || isChangingRole;
+    final conversionColor =
+        member.conversionRate >= 30 ? AppColors.success : AppColors.warning;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: DataCard(
+        name: member.name,
+        leadId: member.role,
+        status: 'TEAM MEMBER',
+        priority: '${member.conversionRate.toStringAsFixed(1)}% Conv.',
+        priorityColor: conversionColor,
+        nextFollowUpDate: 'Closed Leads: ${member.closedLeads}',
+        budget: 'Active Leads: ${member.activeLeads}',
+        phone: 'N/A',
+        profileImageUrl: '',
+        assigneeName: member.role,
+        assigneeImageUrl: '',
+        actions: [
+          DataCardAction(
+            icon: Icons.visibility_outlined,
+            onTap: isBusy ? () {} : () => _viewMemberDetails(member),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildMiniStat('Leads', member.activeLeads.toString()),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildMiniStat(
-                  'Conv.',
-                  '${member.conversionRate.toStringAsFixed(1)}%',
-                ),
-              ),
-            ],
+          DataCardAction(
+            icon: Icons.edit_outlined,
+            onTap: isBusy ? () {} : () => _openEditMember(member),
           ),
-          const SizedBox(height: 12),
-          _buildActionButtonsRow(member),
+          DataCardAction(
+            icon: Icons.manage_accounts_outlined,
+            onTap: isBusy ? () {} : () => _openChangeRoleSheet(member),
+          ),
+          DataCardAction(
+            icon: Icons.delete_outline,
+            color: AppColors.error,
+            onTap: isBusy ? () {} : () => _deleteMember(member),
+          ),
         ],
       ),
     );

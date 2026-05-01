@@ -7,6 +7,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_detail_page.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/data_card.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class FollowUpPage extends StatefulWidget {
@@ -20,6 +21,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedFollowUpIds = <String>{};
   final AuthProvider _authProvider = AuthProvider();
+  bool _isBulkSelectionMode = false;
 
   int _currentPage = 1;
   final int _pageSize = 5;
@@ -239,6 +241,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
       setState(() {
         _allFollowUps.removeWhere((item) => item.id == followUp.id);
         _selectedFollowUpIds.remove(followUp.id);
+        _syncBulkSelectionMode();
       });
       _showSnackBar('Follow-up deleted successfully.');
     } catch (e) {
@@ -454,6 +457,14 @@ class _FollowUpPageState extends State<FollowUpPage> {
     return followUps.every((item) => _selectedFollowUpIds.contains(item.id));
   }
 
+  void _syncBulkSelectionMode() {
+    if (_selectedFollowUpIds.isEmpty && _isBulkSelectionMode) {
+      _isBulkSelectionMode = false;
+    } else if (_selectedFollowUpIds.isNotEmpty && !_isBulkSelectionMode) {
+      _isBulkSelectionMode = true;
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -482,6 +493,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
         _isLoadingFollowUps = false;
         _currentPage = 1;
         _selectedFollowUpIds.clear();
+        _isBulkSelectionMode = false;
       });
     } catch (e) {
       if (!mounted) {
@@ -627,7 +639,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
                 ),
               )
             else ...[
-            if (selectedCount > 0) ...[
+            if (_isBulkSelectionMode && selectedCount > 0) ...[
               _buildBulkActionBar(selectedCount),
               const SizedBox(height: 16),
             ],
@@ -661,10 +673,11 @@ class _FollowUpPageState extends State<FollowUpPage> {
                 _searchQuery = value;
                 _currentPage = 1;
                 _selectedFollowUpIds.clear();
+                _isBulkSelectionMode = false;
               });
             },
             decoration: const InputDecoration(
-              hintText: 'Search by customer, follow-up id, lead id, status',
+              hintText: 'Search by customer, status',
               prefixIcon: Icon(Icons.search, size: 20),
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(vertical: 13),
@@ -709,15 +722,15 @@ class _FollowUpPageState extends State<FollowUpPage> {
 
   Widget _buildBulkActionBar(int selectedCount) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFEFF4FF),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD4E2FF)),
       ),
-      child: Wrap(
-        runSpacing: 8,
-        spacing: 8,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '$selectedCount selected',
@@ -726,20 +739,46 @@ class _FollowUpPageState extends State<FollowUpPage> {
               color: AppColors.textPrimary,
             ),
           ),
-          OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.check_circle_outline, size: 16),
-            label: const Text('Mark Done'),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.check_circle_outline, size: 16),
+                  label: const Text('Mark Done'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 40),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.schedule_outlined, size: 16),
+                  label: const Text('Reschedule'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 40),
+                  ),
+                ),
+              ),
+            ],
           ),
-          OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.schedule_outlined, size: 16),
-            label: const Text('Reschedule'),
-          ),
-          OutlinedButton.icon(
-            onPressed: () => setState(_selectedFollowUpIds.clear),
-            icon: const Icon(Icons.clear, size: 16),
-            label: const Text('Clear'),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => setState(() {
+                _selectedFollowUpIds.clear();
+                _isBulkSelectionMode = false;
+              }),
+              icon: const Icon(Icons.clear, size: 16),
+              label: const Text('Clear'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 40),
+              ),
+            ),
           ),
         ],
       ),
@@ -773,14 +812,49 @@ class _FollowUpPageState extends State<FollowUpPage> {
             ...followUps.map(
               (followUp) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: _FollowUpCard(
-                  followUp: followUp,
+                child: DataCard(
+                  name: followUp.customerName,
+                  leadId: '',
+                  status: followUp.status,
+                  priority: followUp.priority,
+                  priorityColor: followUp.priorityColor,
+                  nextFollowUpDate: '${followUp.dueDate} - ${followUp.dueTime}',
+                  budget: followUp.channel,
+                  phone: followUp.assignee.phone.isEmpty ? 'N/A' : followUp.assignee.phone,
+                  profileImageUrl: followUp.assignee.imageUrl,
+                  assigneeName: followUp.assignee.name,
+                  assigneeImageUrl: followUp.assignee.imageUrl,
+                  actions: [
+                    DataCardAction(
+                      icon: Icons.call_outlined,
+                      onTap: () => _callFollowUp(followUp),
+                    ),
+                    DataCardAction(
+                      icon: Icons.check_circle_outline,
+                      onTap: () => _markFollowUpComplete(followUp),
+                    ),
+                    DataCardAction(
+                      icon: Icons.edit_outlined,
+                      onTap: () => _openEditFollowUp(followUp),
+                    ),
+                    DataCardAction(
+                      icon: Icons.visibility_outlined,
+                      onTap: () => _viewFollowUp(followUp),
+                    ),
+                    DataCardAction(
+                      icon: Icons.delete_outline,
+                      color: AppColors.error,
+                      onTap: () => _deleteFollowUp(followUp),
+                    ),
+                  ],
+                  bulkSelectionMode: _isBulkSelectionMode,
                   isSelected: _selectedFollowUpIds.contains(followUp.id),
-                  onView: () => _viewFollowUp(followUp),
-                  onDelete: () => _deleteFollowUp(followUp),
-                  onEdit: () => _openEditFollowUp(followUp),
-                  onCall: () => _callFollowUp(followUp),
-                  onComplete: () => _markFollowUpComplete(followUp),
+                  onLongPress: () {
+                    setState(() {
+                      _isBulkSelectionMode = true;
+                      _selectedFollowUpIds.add(followUp.id);
+                    });
+                  },
                   onSelectionChanged: (selected) {
                     setState(() {
                       if (selected) {
@@ -788,6 +862,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
                       } else {
                         _selectedFollowUpIds.remove(followUp.id);
                       }
+                      _syncBulkSelectionMode();
                     });
                   },
                 ),
@@ -801,28 +876,31 @@ class _FollowUpPageState extends State<FollowUpPage> {
   Widget _buildListHeader(List<_FollowUpModel> currentPageFollowUps) {
     return Row(
       children: [
-        Checkbox(
-          value: _isAllCurrentPageSelected,
-          onChanged: (value) {
-            final shouldSelect = value ?? false;
-            setState(() {
-              for (final item in currentPageFollowUps) {
-                if (shouldSelect) {
-                  _selectedFollowUpIds.add(item.id);
-                } else {
-                  _selectedFollowUpIds.remove(item.id);
+        if (_isBulkSelectionMode) ...[
+          Checkbox(
+            value: _isAllCurrentPageSelected,
+            onChanged: (value) {
+              final shouldSelect = value ?? false;
+              setState(() {
+                for (final item in currentPageFollowUps) {
+                  if (shouldSelect) {
+                    _selectedFollowUpIds.add(item.id);
+                  } else {
+                    _selectedFollowUpIds.remove(item.id);
+                  }
                 }
-              }
-            });
-          },
-        ),
-        const Text(
-          'Select all on this page',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+                _syncBulkSelectionMode();
+              });
+            },
           ),
-        ),
+          const Text(
+            'Select all on this page',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
         const Spacer(),
         Text(
           '${_filteredFollowUps.length} total follow-ups',
@@ -873,6 +951,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
                         setState(() {
                           _currentPage -= 1;
                           _selectedFollowUpIds.clear();
+                          _isBulkSelectionMode = false;
                         });
                       }
                     : null,
@@ -888,6 +967,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
                         setState(() {
                           _currentPage += 1;
                           _selectedFollowUpIds.clear();
+                          _isBulkSelectionMode = false;
                         });
                       }
                     : null,

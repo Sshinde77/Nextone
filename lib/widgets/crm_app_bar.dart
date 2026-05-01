@@ -65,7 +65,7 @@ class CrmAppBar extends StatelessWidget implements PreferredSizeWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: AppColors.primary),
+              border: Border.all(color: Color(0xFFB1916C)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),

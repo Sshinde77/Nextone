@@ -7,6 +7,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/screens/leads/lead_form_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/data_card.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LeadsPage extends StatefulWidget {
@@ -20,6 +21,7 @@ class _LeadsPageState extends State<LeadsPage> {
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedLeadIds = <String>{};
   final AuthProvider _authProvider = AuthProvider();
+  bool _isBulkSelectionMode = false;
 
   Timer? _searchDebounce;
   bool _isLoadingLeads = true;
@@ -38,6 +40,14 @@ class _LeadsPageState extends State<LeadsPage> {
       return false;
     }
     return leads.every((lead) => _selectedLeadIds.contains(lead.id));
+  }
+
+  void _syncBulkSelectionMode() {
+    if (_selectedLeadIds.isEmpty && _isBulkSelectionMode) {
+      _isBulkSelectionMode = false;
+    } else if (_selectedLeadIds.isNotEmpty && !_isBulkSelectionMode) {
+      _isBulkSelectionMode = true;
+    }
   }
 
   @override
@@ -107,6 +117,7 @@ class _LeadsPageState extends State<LeadsPage> {
         _searchQuery = value;
         _currentPage = 1;
         _selectedLeadIds.clear();
+        _isBulkSelectionMode = false;
       });
       _loadLeads();
     });
@@ -208,7 +219,7 @@ class _LeadsPageState extends State<LeadsPage> {
             controller: _searchController,
             onChanged: _onSearchChanged,
             decoration: const InputDecoration(
-              hintText: 'Search by name, lead id, status, assignee',
+              hintText: 'Search by name, status, assignee',
               prefixIcon: Icon(Icons.search, size: 20),
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(vertical: 13),
@@ -253,16 +264,15 @@ class _LeadsPageState extends State<LeadsPage> {
 
   Widget _buildBulkActionBar(int selectedCount) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFEFF4FF),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD4E2FF)),
       ),
-      child: Wrap(
-        runSpacing: 8,
-        spacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '$selectedCount selected',
@@ -271,25 +281,48 @@ class _LeadsPageState extends State<LeadsPage> {
               color: AppColors.textPrimary,
             ),
           ),
-          OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
-            label: const Text('Assign'),
-            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+                  label: const Text('Assign'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 40),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.flag_outlined, size: 16),
+                  label: const Text('Update Status'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 40),
+                  ),
+                ),
+              ),
+            ],
           ),
-          OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.flag_outlined, size: 16),
-            label: const Text('Update Status'),
-            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
-          ),
-          OutlinedButton.icon(
-            onPressed: () {
-              setState(_selectedLeadIds.clear);
-            },
-            icon: const Icon(Icons.clear, size: 16),
-            label: const Text('Clear'),
-            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _selectedLeadIds.clear();
+                  _isBulkSelectionMode = false;
+                });
+              },
+              icon: const Icon(Icons.clear, size: 16),
+              label: const Text('Clear'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 40),
+              ),
+            ),
           ),
         ],
       ),
@@ -356,12 +389,45 @@ class _LeadsPageState extends State<LeadsPage> {
             ...leads.map(
               (lead) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: _LeadCard(
-                  lead: lead,
+                child: DataCard(
+                  name: lead.name,
+                  leadId: '',
+                  status: lead.status,
+                  priority: lead.priority,
+                  priorityColor: lead.priorityColor,
+                  nextFollowUpDate: lead.nextFollowUpDate,
+                  budget: lead.budget,
+                  phone: lead.phone,
+                  profileImageUrl: lead.profileImageUrl,
+                  assigneeName: lead.assignee.name,
+                  assigneeImageUrl: lead.assignee.imageUrl,
+                  actions: [
+                    DataCardAction(
+                      icon: Icons.call_outlined,
+                      onTap: () => _callLead(lead.phone),
+                    ),
+                    DataCardAction(
+                      icon: Icons.visibility_outlined,
+                      onTap: () => _viewLeadDetail(lead.id),
+                    ),
+                    DataCardAction(
+                      icon: Icons.edit_outlined,
+                      onTap: () => _openEditLead(lead),
+                    ),
+                    DataCardAction(
+                      icon: Icons.delete_outline,
+                      color: const Color(0xFFD32F2F),
+                      onTap: () {},
+                    ),
+                  ],
+                  bulkSelectionMode: _isBulkSelectionMode,
                   isSelected: _selectedLeadIds.contains(lead.id),
-                  onEdit: () => _openEditLead(lead),
-                  onView: () => _viewLeadDetail(lead.id),
-                  onCall: () => _callLead(lead.phone),
+                  onLongPress: () {
+                    setState(() {
+                      _isBulkSelectionMode = true;
+                      _selectedLeadIds.add(lead.id);
+                    });
+                  },
                   onSelectionChanged: (selected) {
                     setState(() {
                       if (selected) {
@@ -369,6 +435,7 @@ class _LeadsPageState extends State<LeadsPage> {
                       } else {
                         _selectedLeadIds.remove(lead.id);
                       }
+                      _syncBulkSelectionMode();
                     });
                   },
                 ),
@@ -384,28 +451,31 @@ class _LeadsPageState extends State<LeadsPage> {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(
         children: [
-          Checkbox(
-            value: _isAllCurrentPageSelected,
-            onChanged: (value) {
-              final shouldSelect = value ?? false;
-              setState(() {
-                for (final lead in currentPageLeads) {
-                  if (shouldSelect) {
-                    _selectedLeadIds.add(lead.id);
-                  } else {
-                    _selectedLeadIds.remove(lead.id);
+          if (_isBulkSelectionMode) ...[
+            Checkbox(
+              value: _isAllCurrentPageSelected,
+              onChanged: (value) {
+                final shouldSelect = value ?? false;
+                setState(() {
+                  for (final lead in currentPageLeads) {
+                    if (shouldSelect) {
+                      _selectedLeadIds.add(lead.id);
+                    } else {
+                      _selectedLeadIds.remove(lead.id);
+                    }
                   }
-                }
-              });
-            },
-          ),
-          const Text(
-            'Select all on this page',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
+                  _syncBulkSelectionMode();
+                });
+              },
             ),
-          ),
+            const Text(
+              'Select all on this page',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
           const Spacer(),
           Text(
             '$_totalItems total leads',
@@ -459,6 +529,7 @@ class _LeadsPageState extends State<LeadsPage> {
                         setState(() {
                           _currentPage -= 1;
                           _selectedLeadIds.clear();
+                          _isBulkSelectionMode = false;
                         });
                         _loadLeads();
                       }
@@ -475,6 +546,7 @@ class _LeadsPageState extends State<LeadsPage> {
                         setState(() {
                           _currentPage += 1;
                           _selectedLeadIds.clear();
+                          _isBulkSelectionMode = false;
                         });
                         _loadLeads();
                       }
@@ -486,369 +558,6 @@ class _LeadsPageState extends State<LeadsPage> {
         ],
       ),
     );
-  }
-}
-
-class _LeadCard extends StatelessWidget {
-  const _LeadCard({
-    required this.lead,
-    required this.isSelected,
-    required this.onSelectionChanged,
-    required this.onEdit,
-    required this.onView,
-    required this.onCall,
-  });
-
-  final _LeadModel lead;
-  final bool isSelected;
-  final ValueChanged<bool> onSelectionChanged;
-  final VoidCallback onEdit;
-  final VoidCallback onView;
-  final VoidCallback onCall;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFF7FAFF) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isSelected ? const Color(0xFFBDD3FF) : AppColors.border,
-        ),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isVeryCompact = constraints.maxWidth < 380;
-
-          return Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Checkbox(
-                    value: isSelected,
-                    onChanged: (value) => onSelectionChanged(value ?? false),
-                  ),
-                  const SizedBox(width: 4),
-                  _ProfileAvatar(
-                    imageUrl: lead.profileImageUrl,
-                    name: lead.name,
-                    radius: 22,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          lead.name,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          lead.id,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Align(
-                      alignment: Alignment.topRight,
-                      child: _buildStatusChip(
-                        maxWidth: isVeryCompact ? 120 : 170,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _buildInfoPair(
-                left: _metaItem(
-                  'Priority',
-                  lead.priority,
-                  dotColor: lead.priorityColor,
-                ),
-                right: _metaItem(
-                  'Next Follow-up',
-                  lead.nextFollowUpDate,
-                  icon: Icons.calendar_month_outlined,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildInfoPair(
-                left: _metaItem(
-                  'Budget',
-                  lead.budget,
-                  icon: Icons.account_balance_wallet_outlined,
-                ),
-                right: _metaItem(
-                  'Phone',
-                  lead.phone,
-                  icon: Icons.phone_outlined,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        _ProfileAvatar(
-                          imageUrl: lead.assignee.imageUrl,
-                          name: lead.assignee.name,
-                          radius: 15,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            lead.assignee.name,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _buildActionIcons(
-                    isVeryCompact: isVeryCompact,
-                    onEdit: onEdit,
-                    onView: onView,
-                    onCall: onCall,
-                  ),
-                ],
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildStatusChip({required double maxWidth}) {
-    return Container(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5EAF2),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Text(
-        lead.status,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: Color(0xFFC2185B),
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoPair({required Widget left, required Widget right}) {
-    return Row(
-      children: [
-        Expanded(child: left),
-        const SizedBox(width: 8),
-        Expanded(child: right),
-      ],
-    );
-  }
-
-  Widget _metaItem(
-    String label,
-    String value, {
-    Color? valueColor,
-    Color? dotColor,
-    IconData? icon,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            if (dotColor != null) ...[
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: dotColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-            ],
-            if (icon != null) ...[
-              Icon(icon, size: 14, color: AppColors.textSecondary),
-              const SizedBox(width: 6),
-            ],
-            Expanded(
-              child: Text(
-                value,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: valueColor ?? AppColors.textPrimary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionIcons({
-    required bool isVeryCompact,
-    required VoidCallback onEdit,
-    required VoidCallback onView,
-    required VoidCallback onCall,
-  }) {
-    final iconSize = isVeryCompact ? 16.0 : 18.0;
-    final buttonSize = isVeryCompact ? 30.0 : 34.0;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _actionIcon(
-          Icons.call_outlined,
-          onTap: onCall,
-          iconSize: iconSize,
-          buttonSize: buttonSize,
-        ),
-        _actionIcon(
-          Icons.visibility_outlined,
-          onTap: onView,
-          iconSize: iconSize,
-          buttonSize: buttonSize,
-        ),
-        _actionIcon(
-          Icons.edit_outlined,
-          onTap: onEdit,
-          iconSize: iconSize,
-          buttonSize: buttonSize,
-        ),
-        _actionIcon(
-          Icons.delete_outline,
-          onTap: () {},
-          color: const Color(0xFFD32F2F),
-          iconSize: iconSize,
-          buttonSize: buttonSize,
-        ),
-      ],
-    );
-  }
-
-  Widget _actionIcon(
-    IconData icon, {
-    required VoidCallback onTap,
-    required double iconSize,
-    required double buttonSize,
-    Color? color,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(left: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF6F8FC),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: IconButton(
-        onPressed: onTap,
-        icon: Icon(
-          icon,
-          size: iconSize,
-          color: color ?? AppColors.textSecondary,
-        ),
-        constraints: BoxConstraints.tightFor(
-          width: buttonSize,
-          height: buttonSize,
-        ),
-        padding: EdgeInsets.zero,
-        splashRadius: 18,
-      ),
-    );
-  }
-}
-
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({
-    required this.imageUrl,
-    required this.name,
-    this.radius = 18,
-  });
-
-  final String imageUrl;
-  final String name;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    final size = radius * 2;
-
-    return ClipOval(
-      child: Image.network(
-        imageUrl,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (context, _, __) {
-          return Container(
-            width: size,
-            height: size,
-            color: const Color(0xFFE9EEF7),
-            alignment: Alignment.center,
-            child: Text(
-              _initials(name),
-              style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w700,
-                fontSize: radius * 0.7,
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  String _initials(String fullName) {
-    final parts = fullName
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .toList();
-    if (parts.isEmpty) {
-      return '?';
-    }
-    if (parts.length == 1) {
-      return parts[0][0].toUpperCase();
-    }
-    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   }
 }
 

@@ -194,6 +194,53 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _openRoleMenu(BuildContext context) async {
+    final fieldContext = context;
+    final renderBox = fieldContext.findRenderObject() as RenderBox?;
+    if (renderBox == null) {
+      return;
+    }
+
+    final overlay = Overlay.of(fieldContext).context.findRenderObject() as RenderBox;
+    final topLeft = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
+    final bottomLeft = renderBox.localToGlobal(
+      Offset(0, renderBox.size.height),
+      ancestor: overlay,
+    );
+
+    final selected = await showMenu<String>(
+      context: fieldContext,
+      color: Colors.white,
+      elevation: 4,
+      constraints: BoxConstraints.tightFor(width: renderBox.size.width),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      position: RelativeRect.fromLTRB(
+        topLeft.dx,
+        bottomLeft.dy + 6,
+        overlay.size.width - topLeft.dx - renderBox.size.width,
+        overlay.size.height - bottomLeft.dy,
+      ),
+      items: _roles
+          .map(
+            (role) => PopupMenuItem<String>(
+              value: role.value,
+              child: Text(role.label),
+            ),
+          )
+          .toList(),
+    );
+
+    if (!mounted || selected == null) {
+      return;
+    }
+    setState(() {
+      _selectedRoleValue = selected;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final pageTitle = _isEditMode ? 'Edit Team Member' : 'Add Team Member';
@@ -314,29 +361,32 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                   const SizedBox(height: 16),
                   _buildLabel('ROLE'),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: _selectedRoleValue,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.badge_outlined),
-                    ),
-                    items: _roles
-                        .map(
-                          (role) => DropdownMenuItem<String>(
-                            value: role.value,
-                            child: Text(role.label),
+                  Builder(
+                    builder: (fieldContext) {
+                      return GestureDetector(
+                        onTap: (_isEditMode || _isSubmitting)
+                            ? null
+                            : () => _openRoleMenu(fieldContext),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.border),
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white,
                           ),
-                        )
-                        .toList(),
-                    onChanged: _isEditMode
-                        ? null
-                        : (value) {
-                            if (value == null) {
-                              return;
-                            }
-                            setState(() {
-                              _selectedRoleValue = value;
-                            });
-                          },
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _selectedRole.label,
+                                style: const TextStyle(color: Colors.black),
+                              ),
+                              const Icon(Icons.keyboard_arrow_down),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   if (!_isEditMode) ...[
                     const SizedBox(height: 16),

@@ -122,7 +122,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F3F1),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -139,9 +139,9 @@ class _LoginPageState extends State<LoginPage> {
                     height: 100,
                     padding: const EdgeInsets.all(0),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.card,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.primary),
+                      border: Border.all(color: const Color(0xFFB1916C)), // Kept original color
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.05),
@@ -162,22 +162,22 @@ class _LoginPageState extends State<LoginPage> {
                     style: GoogleFonts.playfairDisplay(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: const Color(0xFF1A2B4C),
+                      color: AppColors.primary,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Sign in to your CRM workspace',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    style: const TextStyle(fontSize: 16, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 40),
                   // Main Card
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.card,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                      border: Border.all(color: AppColors.border),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.02),
@@ -193,7 +193,7 @@ class _LoginPageState extends State<LoginPage> {
                         Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1EDE8),
+                            color: AppColors.secondary,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -222,7 +222,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             child: const Text(
                               'Forgot password?',
-                              style: TextStyle(color: Color(0xFFB1916C)),
+                              style: TextStyle(color: AppColors.primary),
                             ),
                           ),
                         ),
@@ -231,7 +231,7 @@ class _LoginPageState extends State<LoginPage> {
                         ElevatedButton(
                           onPressed: _isSubmitting ? null : _submitLogin,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFB1916C),
+                            backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             minimumSize: const Size(double.infinity, 54),
                             shape: RoundedRectangleBorder(
@@ -263,7 +263,7 @@ class _LoginPageState extends State<LoginPage> {
                   // Footer
                   Text(
                     '© 2024 Next One Realty. All rights reserved.',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                   ),
                   const SizedBox(height: 20),
                 ],
@@ -282,7 +282,7 @@ class _LoginPageState extends State<LoginPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isActive ? Colors.white : Colors.transparent,
+          color: isActive ? AppColors.card : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           boxShadow: isActive
               ? [
@@ -298,7 +298,7 @@ class _LoginPageState extends State<LoginPage> {
           child: Text(
             title,
             style: TextStyle(
-              color: isActive ? const Color(0xFFB1916C) : Colors.grey[600],
+              color: isActive ? AppColors.primary : AppColors.textSecondary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -340,7 +340,7 @@ class _LoginPageState extends State<LoginPage> {
                     ? Icons.visibility_outlined
                     : Icons.visibility_off_outlined,
                 size: 20,
-                color: Colors.grey,
+                color: AppColors.textSecondary,
               ),
               onPressed: () => setState(
                 () => _obscureEmailPassword = !_obscureEmailPassword,
@@ -394,7 +394,7 @@ class _LoginPageState extends State<LoginPage> {
                     ? Icons.visibility_outlined
                     : Icons.visibility_off_outlined,
                 size: 20,
-                color: Colors.grey,
+                color: AppColors.textSecondary,
               ),
               onPressed: () => setState(
                 () => _obscurePhonePassword = !_obscurePhonePassword,
@@ -415,7 +415,7 @@ class _LoginPageState extends State<LoginPage> {
       style: const TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w500,
-        color: Color(0xFF4A4A4A),
+        color: AppColors.textPrimary,
       ),
     );
   }
@@ -438,11 +438,11 @@ class _LoginPageState extends State<LoginPage> {
       validator: validator,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFFA0AEC0), fontSize: 14),
-        prefixIcon: Icon(icon, color: const Color(0xFFA0AEC0), size: 20),
+        hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+        prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: const Color(0xFFF7F5F2),
+        fillColor: AppColors.secondary,
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -454,7 +454,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFB1916C), width: 1),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1),
         ),
       ),
     );

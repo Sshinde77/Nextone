@@ -34,6 +34,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
   bool _isSubmitting = false;
   bool _isLoadingAssignees = true;
   bool _isLoadingLeadDetails = false;
+  bool _isAssigneeOpen = false;
   String? _assigneeLoadError;
   String? _selectedAssigneeId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
@@ -445,6 +446,14 @@ class _LeadFormPageState extends State<LeadFormPage> {
   }
 
   Widget _buildAssigneeDropdown() {
+    String? selectedLabel;
+    for (final user in _assigneeOptions) {
+      if (user.id == _selectedAssigneeId) {
+        selectedLabel = user.name;
+        break;
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -457,32 +466,71 @@ class _LeadFormPageState extends State<LeadFormPage> {
           ),
         ),
         const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          value: _selectedAssigneeId,
-          isExpanded: true,
-          decoration: _fieldDecoration(hintText: 'Select assignee'),
-          items: _assigneeOptions
-              .map(
-                (user) => DropdownMenuItem<String>(
-                  value: user.id,
-                  child: Text(user.name),
-                ),
-              )
-              .toList(),
-          onChanged: (_isSubmitting || _isLoadingAssignees)
+        GestureDetector(
+          onTap: (_isSubmitting || _isLoadingAssignees)
               ? null
-              : (value) {
+              : () {
                   setState(() {
-                    _selectedAssigneeId = value;
+                    _isAssigneeOpen = !_isAssigneeOpen;
                   });
                 },
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Please select assignee.';
-            }
-            return null;
-          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  selectedLabel ?? 'Select assignee',
+                  style: TextStyle(
+                    color: selectedLabel == null ? Colors.grey : Colors.black,
+                  ),
+                ),
+                Icon(
+                  _isAssigneeOpen
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                ),
+              ],
+            ),
+          ),
         ),
+        if (_isAssigneeOpen)
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+            ),
+            child: Column(
+              children: _assigneeOptions.map((user) {
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedAssigneeId = user.id;
+                      _isAssigneeOpen = false;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(user.name),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         if (_isLoadingAssignees) ...[
           const SizedBox(height: 8),
           const Text(

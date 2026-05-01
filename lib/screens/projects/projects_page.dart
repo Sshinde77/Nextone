@@ -4,6 +4,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/projects/project_detail_page.dart';
 import 'package:nextone/screens/projects/project_form_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/data_card.dart';
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});
@@ -247,71 +248,38 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Widget _buildProjectCard(_Project project) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  project.name,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 20,
-                  ),
-                ),
-              ),
-              _buildStatusBadge(project.status),
-            ],
+    final normalizedStatus = project.status.toLowerCase();
+    final priorityColor = normalizedStatus == 'active'
+        ? AppColors.success
+        : AppColors.warning;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DataCard(
+        name: project.name,
+        leadId: project.location,
+        status: normalizedStatus.isEmpty ? 'N/A' : normalizedStatus.toUpperCase(),
+        priority: normalizedStatus == 'active' ? 'Active' : 'Planned',
+        priorityColor: priorityColor,
+        nextFollowUpDate: project.possessionDate.isEmpty ? 'N/A' : project.possessionDate,
+        budget: project.priceRange.isEmpty ? 'N/A' : project.priceRange,
+        phone: '${project.mappedLeads} leads',
+        profileImageUrl: '',
+        assigneeName: project.developer.isEmpty ? 'Unknown Developer' : project.developer,
+        assigneeImageUrl: '',
+        actions: [
+          DataCardAction(
+            icon: Icons.visibility_outlined,
+            onTap: () => _openProjectDetails(project),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.location_on_outlined, size: 16, color: AppColors.textSecondary),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  project.location,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                ),
-              ),
-            ],
+          DataCardAction(
+            icon: Icons.edit_outlined,
+            onTap: () => _openEditProject(project),
           ),
-          const Divider(height: 24, color: AppColors.border),
-          _buildInfoRow(Icons.layers_outlined, 'Config', project.configurationText),
-          const SizedBox(height: 8),
-          _buildInfoRow(Icons.link, 'Leads', '${project.mappedLeads}'),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              _buildCircleActionButton(
-                Icons.visibility_outlined,
-                AppColors.info,
-                () => _openProjectDetails(project),
-              ),
-              const SizedBox(width: 12),
-              _buildCircleActionButton(
-                Icons.edit_outlined,
-                AppColors.warning,
-                () => _openEditProject(project),
-              ),
-              const SizedBox(width: 12),
-              _buildCircleActionButton(
-                Icons.delete_outline,
-                AppColors.error,
-                _isDeleting ? () {} : () => _deleteProject(project),
-              ),
-            ],
+          DataCardAction(
+            icon: Icons.delete_outline,
+            color: AppColors.error,
+            onTap: _isDeleting ? () {} : () => _deleteProject(project),
           ),
         ],
       ),

@@ -189,16 +189,6 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
         ),
         const SizedBox(height: 12),
         _buildSectionCard(
-          title: 'Identifiers',
-          icon: Icons.badge_outlined,
-          children: [
-            _kv('Task ID', _readString(data['id'])),
-            _kv('Lead ID', _readString(data['lead_id'])),
-            _kv('Assigned To ID', _readString(data['assigned_to'])),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _buildSectionCard(
           title: 'Completion',
           icon: Icons.task_alt_outlined,
           children: [

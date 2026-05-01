@@ -29,6 +29,8 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
 
   bool _isSubmitting = false;
   bool _isLoadingLeads = true;
+  bool _isLeadOpen = false;
+  bool _isPriorityOpen = false;
   String? _leadLoadError;
   String? _selectedLeadId;
   String _selectedPriority = 'high';
@@ -330,6 +332,14 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
   }
 
   Widget _buildLeadDropdown() {
+    String? selectedLeadLabel;
+    for (final lead in _leadOptions) {
+      if (lead.id == _selectedLeadId) {
+        selectedLeadLabel = lead.name;
+        break;
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -342,32 +352,71 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
           ),
         ),
         const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          value: _selectedLeadId,
-          isExpanded: true,
-          decoration: _fieldDecoration(hintText: 'Select lead'),
-          items: _leadOptions
-              .map(
-                (lead) => DropdownMenuItem<String>(
-                  value: lead.id,
-                  child: Text(lead.name),
-                ),
-              )
-              .toList(),
-          onChanged: (_isSubmitting || _isLoadingLeads)
+        GestureDetector(
+          onTap: (_isSubmitting || _isLoadingLeads)
               ? null
-              : (value) {
+              : () {
                   setState(() {
-                    _selectedLeadId = value;
+                    _isLeadOpen = !_isLeadOpen;
                   });
                 },
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Please select a lead.';
-            }
-            return null;
-          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  selectedLeadLabel ?? 'Select lead',
+                  style: TextStyle(
+                    color: selectedLeadLabel == null ? Colors.grey : Colors.black,
+                  ),
+                ),
+                Icon(
+                  _isLeadOpen
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                ),
+              ],
+            ),
+          ),
         ),
+        if (_isLeadOpen)
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+            ),
+            child: Column(
+              children: _leadOptions.map((lead) {
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedLeadId = lead.id;
+                      _isLeadOpen = false;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(lead.name),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         if (_isLoadingLeads) ...[
           const SizedBox(height: 8),
           const Text(
@@ -431,6 +480,8 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
 
   Widget _buildPriorityDropdown() {
     const priorities = <String>['high', 'medium', 'low'];
+    final selectedPriorityLabel =
+        _selectedPriority[0].toUpperCase() + _selectedPriority.substring(1);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -443,28 +494,70 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
           ),
         ),
         const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          value: _selectedPriority,
-          decoration: _fieldDecoration(hintText: 'Select priority'),
-          items: priorities
-              .map(
-                (priority) => DropdownMenuItem<String>(
-                  value: priority,
-                  child: Text(priority[0].toUpperCase() + priority.substring(1)),
-                ),
-              )
-              .toList(),
-          onChanged: _isSubmitting
+        GestureDetector(
+          onTap: _isSubmitting
               ? null
-              : (value) {
-                  if (value == null) {
-                    return;
-                  }
+              : () {
                   setState(() {
-                    _selectedPriority = value;
+                    _isPriorityOpen = !_isPriorityOpen;
                   });
                 },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  selectedPriorityLabel,
+                  style: const TextStyle(color: Colors.black),
+                ),
+                Icon(
+                  _isPriorityOpen
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                ),
+              ],
+            ),
+          ),
         ),
+        if (_isPriorityOpen)
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+            ),
+            child: Column(
+              children: priorities.map((priority) {
+                final priorityLabel = priority[0].toUpperCase() + priority.substring(1);
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedPriority = priority;
+                      _isPriorityOpen = false;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(priorityLabel),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
       ],
     );
   }

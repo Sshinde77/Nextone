@@ -28,12 +28,18 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final navReservedHeight = 76.0 + 12.0; // CRMAppBottomNav height + bottom margin
+    final bodyBottomPadding = widget.showBottomNav
+        ? bottomInset + navReservedHeight + 16.0
+        : 32.0;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const CrmAppBar(title: 'Home'),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.fromLTRB(16, 16, 16, bodyBottomPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -143,7 +149,7 @@ class _HomePageState extends State<HomePage> {
 
                 child: _UpcomingVisitsList(),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 102),
             ],
           ),
         ),
@@ -1097,3 +1103,4 @@ class _VisitTile extends StatelessWidget {
     );
   }
 }
+
