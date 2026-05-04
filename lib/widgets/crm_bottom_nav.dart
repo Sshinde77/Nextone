@@ -270,8 +270,8 @@ class _ExpandedNavBar extends StatelessWidget {
           const SizedBox(width: 4),
           Expanded(
             child: _NavItem(
-              icon: Icons.bar_chart_outlined,
-              label: 'Reports',
+              icon: Icons.fact_check,
+              label: 'Attendance',
               isActive: currentIndex == 6,
               onTap: onReports,
             ),

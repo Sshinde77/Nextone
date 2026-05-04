@@ -3,6 +3,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
+import 'package:nextone/utils/csv_export_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class SiteVisitsPage extends StatefulWidget {
@@ -186,6 +187,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                         ),
                       ),
                       _buildViewToggle(),
+                      SizedBox(width: _s(6)),
+                      _buildExportButton(),
                     ],
                   ),
                   SizedBox(height: _s(10)),
@@ -284,6 +287,27 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildExportButton() {
+    return InkWell(
+      onTap: _exportSiteVisits,
+      borderRadius: BorderRadius.circular(_s(10)),
+      child: Container(
+        width: _s(36),
+        height: _s(36),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_s(10)),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Icon(
+          Icons.download_rounded,
+          size: _s(18),
+          color: AppColors.primary,
+        ),
+      ),
     );
   }
 
@@ -1401,6 +1425,40 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
   int _countByStatus(_VisitStatus status) {
     return _visits.where((visit) => visit.status == status).length;
+  }
+
+  Future<void> _exportSiteVisits() async {
+    final visits = _visibleVisits;
+    await CsvExportHelper.exportRowsToClipboard(
+      context: context,
+      fileLabel: 'Site Visits',
+      headers: const <String>[
+        'ID',
+        'Property',
+        'Lead',
+        'Date',
+        'Time',
+        'Assignee',
+        'Status',
+        'Location',
+        'Transport',
+      ],
+      rows: visits
+          .map(
+            (visit) => <String>[
+              visit.id,
+              visit.property,
+              visit.lead,
+              '${visit.dateTime.year}-${visit.dateTime.month.toString().padLeft(2, '0')}-${visit.dateTime.day.toString().padLeft(2, '0')}',
+              _formatTime(visit.dateTime),
+              visit.assignee,
+              _statusLabel(visit.status),
+              visit.location,
+              visit.transport,
+            ],
+          )
+          .toList(),
+    );
   }
 
   List<_SiteVisit> _visitsForDay(DateTime day) {

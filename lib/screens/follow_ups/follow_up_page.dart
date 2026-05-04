@@ -6,6 +6,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_detail_page.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
+import 'package:nextone/utils/csv_export_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -416,6 +417,41 @@ class _FollowUpPageState extends State<FollowUpPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _exportFollowUps() async {
+    await CsvExportHelper.exportRowsToClipboard(
+      context: context,
+      fileLabel: 'Follow Ups',
+      headers: const <String>[
+        'ID',
+        'Lead ID',
+        'Customer',
+        'Status',
+        'Priority',
+        'Due Date',
+        'Due Time',
+        'Channel',
+        'Assignee',
+        'Phone',
+      ],
+      rows: _currentPageFollowUps
+          .map(
+            (item) => <String>[
+              item.id,
+              item.leadId,
+              item.customerName,
+              item.status,
+              item.priority,
+              item.dueDate,
+              item.dueTime,
+              item.channel,
+              item.assignee.name,
+              item.assignee.phone,
+            ],
+          )
+          .toList(),
+    );
+  }
+
   List<_FollowUpModel> get _filteredFollowUps {
     final query = _searchQuery.trim().toLowerCase();
     if (query.isEmpty) {
@@ -691,6 +727,19 @@ class _FollowUpPageState extends State<FollowUpPage> {
           ),
         );
 
+        final exportButton = OutlinedButton.icon(
+          onPressed: _exportFollowUps,
+          icon: const Icon(Icons.download_rounded, size: 18),
+          label: const Text('Export'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+
         final addButton = FilledButton.icon(
           onPressed: _openCreateFollowUp,
           icon: const Icon(Icons.add, size: 18),
@@ -710,7 +759,13 @@ class _FollowUpPageState extends State<FollowUpPage> {
             children: [
               searchField,
               const SizedBox(height: 12),
-              Row(children: [Expanded(child: addButton)]),
+              Row(
+                children: [
+                  Expanded(child: exportButton),
+                  const SizedBox(width: 8),
+                  Expanded(child: addButton),
+                ],
+              ),
             ],
           );
         }
@@ -719,6 +774,8 @@ class _FollowUpPageState extends State<FollowUpPage> {
           children: [
             Expanded(child: searchField),
             const SizedBox(width: 12),
+            exportButton,
+            const SizedBox(width: 8),
             addButton,
           ],
         );

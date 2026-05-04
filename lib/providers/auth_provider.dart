@@ -114,6 +114,18 @@ class AuthProvider {
     );
   }
 
+  Future<ExportFileResult> exportLeads({
+    required String from,
+    required String to,
+    String? token,
+  }) {
+    return _authService.exportLeads(
+      from: from,
+      to: to,
+      token: token,
+    );
+  }
+
   Future<LeadsListResult> followUps({
     String? token,
     String? dueFrom,

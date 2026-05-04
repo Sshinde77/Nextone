@@ -1,3 +1,4 @@
+import 'package:nextone/screens/attendance/attendance_page.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/screens/follow_ups/follow_up_page.dart';
 import 'package:nextone/screens/home/home_page.dart';
@@ -25,7 +26,7 @@ class _MainScreenState extends State<MainScreen> {
     const SiteVisitsPage(),
     const ProjectsPage(),
     const TeamPage(),
-    const Center(child: Text('Reports Screen')),
+    const AttendancePage(),
     const SettingsPage(),
   ];
 

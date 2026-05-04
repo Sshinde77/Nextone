@@ -450,6 +450,56 @@ class AuthService {
     }
   }
 
+  Future<ExportFileResult> exportLeads({
+    required String from,
+    required String to,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{
+      'from': from.trim(),
+      'to': to.trim(),
+    };
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportLeads}')
+        .replace(queryParameters: query);
+    final headers = _headers(
+      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      token: resolvedToken,
+    );
+    _logRequest(
+      endpoint: 'exportLeads',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('exportLeads', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to export leads.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    final contentType = contentTypeHeader.trim().isEmpty
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : contentTypeHeader;
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'leads_${from}_to_$to.xlsx';
+
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
   Future<LeadsListResult> followUps({
     String? token,
     String? dueFrom,
@@ -2249,6 +2299,26 @@ class AuthService {
       return 1;
     }
     return (total / perPage).ceil();
+  }
+
+  String? _readFileNameFromDisposition(String disposition) {
+    if (disposition.trim().isEmpty) {
+      return null;
+    }
+    final fileNameStar =
+        RegExp("filename\\*=UTF-8''([^;]+)", caseSensitive: false)
+            .firstMatch(disposition)
+            ?.group(1);
+    if (fileNameStar != null && fileNameStar.trim().isNotEmpty) {
+      return Uri.decodeFull(fileNameStar.trim().replaceAll('"', ''));
+    }
+    final fileName = RegExp(r'filename="?([^\";]+)"?', caseSensitive: false)
+        .firstMatch(disposition)
+        ?.group(1);
+    if (fileName == null || fileName.trim().isEmpty) {
+      return null;
+    }
+    return fileName.trim();
   }
 
   void _clearTokens() {

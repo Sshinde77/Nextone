@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/routes/app_routes.dart';
+import 'package:nextone/utils/csv_export_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/crm_bottom_nav.dart';
 
@@ -39,10 +40,12 @@ class _HomePageState extends State<HomePage> {
             child: Transform.scale(
               scale: 0.92,
               alignment: Alignment.topCenter,
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _OverviewCards(),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _HomeExportButton(),
+                    SizedBox(height: 10),
+                    _OverviewCards(),
                   SizedBox(height: 12),
                   _RevenueDualSection(),
                   SizedBox(height: 12),
@@ -139,6 +142,39 @@ class _OverviewCards extends StatelessWidget {
           trend: '0%',
         ),
       ],
+    );
+  }
+}
+
+class _HomeExportButton extends StatelessWidget {
+  const _HomeExportButton();
+
+  Future<void> _exportDashboard(BuildContext context) async {
+    await CsvExportHelper.exportRowsToClipboard(
+      context: context,
+      fileLabel: 'Home Dashboard',
+      headers: const <String>['Metric', 'Value'],
+      rows: const <List<String>>[
+        <String>['Total Leads', '0'],
+        <String>['Total Site Visits', '0'],
+        <String>['Total Follow Ups', '0'],
+        <String>['Total Projects', '0'],
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: OutlinedButton.icon(
+          onPressed: () => _exportDashboard(context),
+          icon: const Icon(Icons.download_rounded, size: 18),
+          label: const Text('Export'),
+        ),
+      ),
     );
   }
 }

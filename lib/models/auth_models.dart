@@ -41,3 +41,15 @@ class LeadsListResult {
   final int totalItems;
   final int totalPages;
 }
+
+class ExportFileResult {
+  const ExportFileResult({
+    required this.fileName,
+    required this.bytes,
+    required this.contentType,
+  });
+
+  final String fileName;
+  final List<int> bytes;
+  final String contentType;
+}

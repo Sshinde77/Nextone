@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
@@ -22,6 +24,7 @@ class _LeadsPageState extends State<LeadsPage> {
   final Set<String> _selectedLeadIds = <String>{};
   final AuthProvider _authProvider = AuthProvider();
   bool _isBulkSelectionMode = false;
+  bool _isExporting = false;
 
   Timer? _searchDebounce;
   bool _isLoadingLeads = true;
@@ -164,6 +167,209 @@ class _LeadsPageState extends State<LeadsPage> {
     );
   }
 
+  Future<void> _exportLeads() async {
+    final range = await _showExportDateRangeDialog();
+    if (!mounted || range == null) {
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    final from = _formatDateForApi(range.start);
+    final to = _formatDateForApi(range.end);
+    try {
+      final exported = await _authProvider.exportLeads(
+        from: from,
+        to: to,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      final safeFileName = exported.fileName.trim().isEmpty
+          ? 'leads_${from}_to_$to.xlsx'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                'Export generated ($safeFileName), but direct file save is not supported on Web in this build.',
+              ),
+            ),
+          );
+        return;
+      }
+      final outFile = File('${Directory.systemTemp.path}/$safeFileName');
+      await outFile.writeAsBytes(exported.bytes, flush: true);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Leads export downloaded: ${outFile.path}',
+            ),
+          ),
+        );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final message = error is UnsupportedError
+          ? 'This platform does not support local file save for export yet.'
+          : error.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(message),
+          ),
+        );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  Future<DateTimeRange?> _showExportDateRangeDialog() async {
+    final now = DateTime.now();
+    DateTime? fromDate;
+    DateTime? toDate;
+
+    return showDialog<DateTimeRange>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            String formatDate(DateTime? date) =>
+                date == null ? '' : _formatDateForApi(date);
+
+            Future<void> pickFromDate() async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: fromDate ?? now,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                fromDate = DateTime(picked.year, picked.month, picked.day);
+                if (toDate != null && toDate!.isBefore(fromDate!)) {
+                  toDate = fromDate;
+                }
+              });
+            }
+
+            Future<void> pickToDate() async {
+              final baseDate = toDate ?? fromDate ?? now;
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: baseDate,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                toDate = DateTime(picked.year, picked.month, picked.day);
+              });
+            }
+
+            final isValidRange =
+                fromDate != null && toDate != null && !toDate!.isBefore(fromDate!);
+
+            return AlertDialog(
+              title: const Text('Export Leads'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: pickFromDate,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Start date',
+                        hintText: 'YYYY-MM-DD',
+                        suffixIcon: Icon(Icons.calendar_today_outlined),
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      child: Text(
+                        formatDate(fromDate).isEmpty
+                            ? 'Select start date'
+                            : formatDate(fromDate),
+                        style: TextStyle(
+                          color: formatDate(fromDate).isEmpty
+                              ? AppColors.textSecondary
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: pickToDate,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'End date',
+                        hintText: 'YYYY-MM-DD',
+                        suffixIcon: Icon(Icons.calendar_today_outlined),
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      child: Text(
+                        formatDate(toDate).isEmpty
+                            ? 'Select end date'
+                            : formatDate(toDate),
+                        style: TextStyle(
+                          color: formatDate(toDate).isEmpty
+                              ? AppColors.textSecondary
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isValidRange
+                      ? () => Navigator.of(context).pop(
+                            DateTimeRange(start: fromDate!, end: toDate!),
+                          )
+                      : null,
+                  child: const Text('Export'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatDateForApi(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedCount = _selectedLeadIds.length;
@@ -227,6 +433,25 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
         );
 
+        final exportButton = OutlinedButton.icon(
+          onPressed: _isExporting ? null : _exportLeads,
+          icon: _isExporting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.download_rounded, size: 18),
+          label: Text(_isExporting ? 'Exporting...' : 'Export'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+
         final addButton = FilledButton.icon(
           onPressed: _openCreateLead,
           icon: const Icon(Icons.add, size: 18),
@@ -246,7 +471,13 @@ class _LeadsPageState extends State<LeadsPage> {
             children: [
               searchField,
               const SizedBox(height: 12),
-              Row(children: [Expanded(child: addButton)]),
+              Row(
+                children: [
+                  Expanded(child: exportButton),
+                  const SizedBox(width: 8),
+                  Expanded(child: addButton),
+                ],
+              ),
             ],
           );
         }
@@ -255,6 +486,8 @@ class _LeadsPageState extends State<LeadsPage> {
           children: [
             Expanded(child: searchField),
             const SizedBox(width: 12),
+            exportButton,
+            const SizedBox(width: 8),
             addButton,
           ],
         );

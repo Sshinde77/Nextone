@@ -3,6 +3,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/projects/project_detail_page.dart';
 import 'package:nextone/screens/projects/project_form_page.dart';
+import 'package:nextone/utils/csv_export_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 
@@ -246,6 +247,18 @@ class _ProjectsPageState extends State<ProjectsPage> {
           ),
         ),
         const SizedBox(width: 8),
+        OutlinedButton.icon(
+          onPressed: _exportProjects,
+          icon: const Icon(Icons.download_rounded, size: 18),
+          label: const Text('Export'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(110, 50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
         FilledButton(
           onPressed: _openCreateProject,
           style: FilledButton.styleFrom(
@@ -472,6 +485,35 @@ class _ProjectsPageState extends State<ProjectsPage> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _exportProjects() async {
+    await CsvExportHelper.exportRowsToClipboard(
+      context: context,
+      fileLabel: 'Projects',
+      headers: const <String>[
+        'ID',
+        'Name',
+        'Developer',
+        'Location',
+        'Status',
+        'Price Range',
+        'Mapped Leads',
+      ],
+      rows: _filteredProjects
+          .map(
+            (project) => <String>[
+              project.id,
+              project.name,
+              project.developer,
+              project.location,
+              project.status,
+              project.priceRange,
+              project.mappedLeads.toString(),
+            ],
+          )
+          .toList(),
+    );
   }
 }
 

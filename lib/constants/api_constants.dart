@@ -5,7 +5,7 @@ class ApiConstants {
   static const String login = '/auth/login';
   static const String register = '/auth/register';
   static const String forgotPassword = '/auth/forgot-password';
-  static const String profile = '/auth/profile';
+  static const String profile = '/auth/me';
   static const String refreshToken = '/auth/refresh-token';
   static const String logout = '/auth/logout';
 
@@ -47,4 +47,13 @@ class ApiConstants {
   static const String editsitevisits = '/site-visits/{id}';
   static const String updatestatussitevisits = '/site-visits/{id}/status';
   static const String submitfeedbacksitevisits = '/site-visits/{id}/feedback';
+
+  // Export Endpoints
+  static const String exportLeads = '/export/leads';
+  static const String exportSiteVisits = '/export/site-visits';
+  static const String exportFollowUps = '/export/follow-ups';
+  static const String exportProjects = '/export/projects';
+  static const String exportUsers = '/export/users';
+  static const String exportAttendance = '/export/attendance';
+  static const String exportAll = '/export/all';
 }

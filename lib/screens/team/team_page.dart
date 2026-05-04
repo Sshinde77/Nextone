@@ -4,6 +4,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/team/add_team_member_page.dart';
 import 'package:nextone/screens/team/team_member_details_page.dart';
+import 'package:nextone/utils/csv_export_helper.dart';
 import 'package:nextone/widgets/data_card.dart';
 
 class TeamPage extends StatefulWidget {
@@ -77,21 +78,21 @@ class _TeamPageState extends State<TeamPage> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
           children: [
             const SizedBox(height: 18),
-            if (_isLoadingMembers)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_membersLoadError != null)
-              _buildInfoCard(
-                message: _membersLoadError!,
-                actionLabel: 'Retry',
-                onActionTap: _loadMembers,
-              )
-            else ...[
-              if (bestPerformer != null) _buildBestPerformerCard(bestPerformer),
-              if (bestPerformer != null) const SizedBox(height: 16),
-            ],
+            // if (_isLoadingMembers)
+            //   const Padding(
+            //     padding: EdgeInsets.symmetric(vertical: 40),
+            //     child: Center(child: CircularProgressIndicator()),
+            //   )
+            // else if (_membersLoadError != null)
+            //   _buildInfoCard(
+            //     message: _membersLoadError!,
+            //     actionLabel: 'Retry',
+            //     onActionTap: _loadMembers,
+            //   )
+            // else ...[
+            //   if (bestPerformer != null) _buildBestPerformerCard(bestPerformer),
+            //   if (bestPerformer != null) const SizedBox(height: 16),
+            // ],
             _buildSearchAndCreateRow(),
             const SizedBox(height: 16),
             Text(
@@ -391,6 +392,35 @@ class _TeamPageState extends State<TeamPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _exportMembers() async {
+    await CsvExportHelper.exportRowsToClipboard(
+      context: context,
+      fileLabel: 'Team',
+      headers: const <String>[
+        'ID',
+        'Name',
+        'Email',
+        'Role',
+        'Active Leads',
+        'Closed Leads',
+        'Conversion Rate',
+      ],
+      rows: _filteredMembers
+          .map(
+            (member) => <String>[
+              member.id,
+              member.name,
+              (member.originalData['email'] ?? '').toString(),
+              member.role,
+              member.activeLeads.toString(),
+              member.closedLeads.toString(),
+              member.conversionRate.toStringAsFixed(1),
+            ],
+          )
+          .toList(),
+    );
+  }
+
   Widget _buildBestPerformerCard(_TeamMember member) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -632,6 +662,18 @@ class _TeamPageState extends State<TeamPage> {
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(vertical: 14),
               ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton.icon(
+          onPressed: _exportMembers,
+          icon: const Icon(Icons.download_rounded, size: 18),
+          label: const Text('Export'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(104, 50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
             ),
           ),
         ),
