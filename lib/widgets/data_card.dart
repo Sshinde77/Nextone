@@ -31,6 +31,7 @@ class DataCard extends StatelessWidget {
     this.bulkSelectionMode = false,
     this.isSelected = false,
     this.onLongPress,
+    this.onTap,
     this.onSelectionChanged,
   });
 
@@ -50,6 +51,7 @@ class DataCard extends StatelessWidget {
   final bool bulkSelectionMode;
   final bool isSelected;
   final VoidCallback? onLongPress;
+  final VoidCallback? onTap;
   final ValueChanged<bool>? onSelectionChanged;
 
   @override
@@ -61,7 +63,7 @@ class DataCard extends StatelessWidget {
         onLongPress: onLongPress,
         onTap: bulkSelectionMode && onSelectionChanged != null
             ? () => onSelectionChanged!(!isSelected)
-            : null,
+            : onTap,
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(

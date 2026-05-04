@@ -1,9 +1,12 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
-import 'package:nextone/utils/csv_export_helper.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class SiteVisitsPage extends StatefulWidget {
@@ -70,6 +73,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
   bool _isCalendarView = false;
   bool _isLoadingVisits = false;
+  bool _isExporting = false;
   String? _loadError;
   late DateTime _focusedMonth;
   late DateTime _selectedDate;
@@ -292,7 +296,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
   Widget _buildExportButton() {
     return InkWell(
-      onTap: _exportSiteVisits,
+      onTap: _isExporting ? null : _exportSiteVisits,
       borderRadius: BorderRadius.circular(_s(10)),
       child: Container(
         width: _s(36),
@@ -302,11 +306,16 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           borderRadius: BorderRadius.circular(_s(10)),
           border: Border.all(color: AppColors.border),
         ),
-        child: Icon(
-          Icons.download_rounded,
-          size: _s(18),
-          color: AppColors.primary,
-        ),
+        child: _isExporting
+            ? Padding(
+                padding: EdgeInsets.all(_s(8)),
+                child: const CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(
+                Icons.download_rounded,
+                size: _s(18),
+                color: AppColors.primary,
+              ),
       ),
     );
   }
@@ -1428,37 +1437,38 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Future<void> _exportSiteVisits() async {
-    final visits = _visibleVisits;
-    await CsvExportHelper.exportRowsToClipboard(
-      context: context,
-      fileLabel: 'Site Visits',
-      headers: const <String>[
-        'ID',
-        'Property',
-        'Lead',
-        'Date',
-        'Time',
-        'Assignee',
-        'Status',
-        'Location',
-        'Transport',
-      ],
-      rows: visits
-          .map(
-            (visit) => <String>[
-              visit.id,
-              visit.property,
-              visit.lead,
-              '${visit.dateTime.year}-${visit.dateTime.month.toString().padLeft(2, '0')}-${visit.dateTime.day.toString().padLeft(2, '0')}',
-              _formatTime(visit.dateTime),
-              visit.assignee,
-              _statusLabel(visit.status),
-              visit.location,
-              visit.transport,
-            ],
-          )
-          .toList(),
-    );
+    setState(() {
+      _isExporting = true;
+    });
+    try {
+      final exported = await _authProvider.exportSiteVisits(
+        token: _authProvider.currentAuthToken,
+      );
+      final fileName = exported.fileName.trim().isEmpty
+          ? 'site_visits_export.xlsx'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        _showSnackBar(
+          'Export generated ($fileName), but direct file save is not supported on Web in this build.',
+        );
+        return;
+      }
+      final file = await ExportFileHelper.saveToDownloadNextone(
+        fileName: fileName,
+        bytes: exported.bytes,
+      );
+      if (!mounted) return;
+      _showSnackBar('Site visits export downloaded: ${file.path}');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
   }
 
   List<_SiteVisit> _visitsForDay(DateTime day) {

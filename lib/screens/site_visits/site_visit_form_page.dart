@@ -6,11 +6,13 @@ import 'package:nextone/widgets/crm_app_bar.dart';
 class SiteVisitFormPage extends StatefulWidget {
   final String? visitId;
   final Map<String, dynamic>? visitData;
+  final String? initialLeadId;
 
   const SiteVisitFormPage({
     super.key,
     this.visitId,
     this.visitData,
+    this.initialLeadId,
   });
 
   bool get isEditMode => visitId != null && visitId!.trim().isNotEmpty;
@@ -70,6 +72,16 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
 
       if (widget.isEditMode && widget.visitData != null) {
         _prefillData();
+      } else {
+        final initialLeadId = widget.initialLeadId?.trim() ?? '';
+        if (initialLeadId.isNotEmpty) {
+          final matchedLead = _resolveLeadValue(initialLeadId);
+          if (matchedLead != null && mounted) {
+            setState(() {
+              _selectedLeadId = matchedLead;
+            });
+          }
+        }
       }
     } catch (e) {
       if (mounted) {

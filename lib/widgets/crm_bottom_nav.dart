@@ -278,8 +278,8 @@ class _ExpandedNavBar extends StatelessWidget {
           ),
           Expanded(
             child: _NavItem(
-              icon: Icons.settings_outlined,
-              label: 'Settings',
+              icon: Icons.manage_accounts_outlined,
+              label: 'Users',
               isActive: currentIndex == 7,
               onTap: onSettings,
             ),

@@ -9,10 +9,12 @@ class FollowUpFormPage extends StatefulWidget {
     super.key,
     this.followUpId,
     this.followUpData,
+    this.initialLeadId,
   });
 
   final String? followUpId;
   final Map<String, dynamic>? followUpData;
+  final String? initialLeadId;
 
   bool get isEditMode => followUpId != null && followUpId!.trim().isNotEmpty;
 
@@ -53,12 +55,22 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
   void _prefillData() {
     final data = widget.followUpData;
     if (data == null) {
+      final initialLead = _readString(widget.initialLeadId);
+      if (initialLead.isNotEmpty) {
+        _selectedLeadId = initialLead;
+      }
       return;
     }
 
     _titleController.text = _readString(data['title']);
     _notesController.text = _readString(data['notes']);
     _selectedLeadId = _readString(data['lead_id'] ?? data['leadId']);
+    if (_selectedLeadId == null || _selectedLeadId!.isEmpty) {
+      final initialLead = _readString(widget.initialLeadId);
+      if (initialLead.isNotEmpty) {
+        _selectedLeadId = initialLead;
+      }
+    }
 
     final priority = _readString(data['priority']).toLowerCase();
     if (priority == 'high' || priority == 'medium' || priority == 'low') {
@@ -104,7 +116,7 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
       }
       setState(() {
         _leadOptions = leads;
-        _selectedLeadId = validSelection;
+        _selectedLeadId = validSelection ?? _selectedLeadId;
         _isLoadingLeads = false;
       });
     } catch (e) {

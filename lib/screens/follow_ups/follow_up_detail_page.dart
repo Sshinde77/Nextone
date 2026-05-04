@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class FollowUpDetailPage extends StatefulWidget {
@@ -101,6 +102,24 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
     }
   }
 
+  Future<void> _openScheduleVisit() async {
+    final leadId = _readString(_detail?['lead_id'], fallback: '');
+    if (leadId.isEmpty) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Lead is not available for this follow-up.')),
+        );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SiteVisitFormPage(initialLeadId: leadId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -185,6 +204,15 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
             _kv('Lead Name', leadName),
             _kv('Assigned To', assignedName),
             _kv('Created By', _readString(data['created_by'])),
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _openScheduleVisit,
+                icon: const Icon(Icons.calendar_month_outlined),
+                label: const Text('Schedule Visit'),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),

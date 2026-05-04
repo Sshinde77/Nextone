@@ -1,6 +1,14 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:nextone/constants/app_colors.dart';
-import 'package:nextone/utils/csv_export_helper.dart';
+import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/export_file_helper.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
@@ -11,6 +19,10 @@ class AttendancePage extends StatefulWidget {
 
 class _AttendancePageState extends State<AttendancePage> {
   int _selectedTabIndex = 0;
+  final AuthProvider _authProvider = AuthProvider();
+  bool _isExporting = false;
+  bool _isAttendanceSubmitting = false;
+  bool _isCheckedIn = false;
 
   static const List<_TabData> _tabs = [
     _TabData('Overview', Icons.bar_chart_rounded),
@@ -45,73 +57,421 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Widget _buildHeader() {
-    return Row(
-      children: [
-        const Expanded(
-          child: Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 560;
+
+        final titleBlock = const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Attendance',
+              style: TextStyle(
+                color: Color(0xFF071A3A),
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.4,
+                height: 1.1,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Sunday, 3 May 2026',
+              style: TextStyle(
+                color: Color(0xFF5D6B82),
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        );
+
+        final actions = [
+          _RoundActionButton(
+            icon: Icons.refresh_rounded,
+            onTap: () {},
+          ),
+          OutlinedButton.icon(
+            onPressed: _isExporting ? null : _exportAttendance,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF1C3159),
+              backgroundColor: Colors.white,
+              side: const BorderSide(color: Color(0xFFD4DBEA)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+            icon: _isExporting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.download_rounded, size: 18),
+            label: Text(
+              _isExporting ? 'Exporting...' : 'Export Excel',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ];
+
+        if (isCompact) {
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Attendance',
-                style: TextStyle(
-                  color: Color(0xFF071A3A),
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.4,
-                  height: 1.1,
-                ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                'Sunday, 3 May 2026',
-                style: TextStyle(
-                  color: Color(0xFF5D6B82),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
+              titleBlock,
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: actions,
               ),
             ],
-          ),
-        ),
-        _RoundActionButton(
-          icon: Icons.refresh_rounded,
-          onTap: () {},
-        ),
-        const SizedBox(width: 8),
-        OutlinedButton.icon(
-          onPressed: _exportAttendance,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF1C3159),
-            backgroundColor: Colors.white,
-            side: const BorderSide(color: Color(0xFFD4DBEA)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          ),
-          icon: const Icon(Icons.download_rounded, size: 18),
-          label: const Text(
-            'Export Excel',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
-          ),
-        ),
-      ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: titleBlock),
+            const SizedBox(width: 8),
+            actions[0],
+            const SizedBox(width: 8),
+            actions[1],
+          ],
+        );
+      },
     );
   }
 
+  Future<void> _handleAttendanceAction() async {
+    if (_isAttendanceSubmitting) return;
+
+    final isCheckingIn = !_isCheckedIn;
+    final attendanceType = isCheckingIn ? 'checkin' : 'checkout';
+
+    try {
+      setState(() => _isAttendanceSubmitting = true);
+
+      final granted = await _ensureAttendancePermissions();
+      if (!granted) return;
+
+      final picker = ImagePicker();
+      final photo = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (photo == null) {
+        _showSnackBar('Photo is required to continue.');
+        return;
+      }
+
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        _showSnackBar('Location services are disabled. Please enable location.');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      final address = await _resolveAddress(position.latitude, position.longitude);
+      final device = _deviceDescription();
+
+      final uploadRes = await _authProvider.uploadAttendancePhoto(
+        type: attendanceType,
+        photoPath: photo.path,
+        token: _authProvider.currentAuthToken,
+      );
+      final photoUrl = _extractPhotoUrl(uploadRes);
+      if (photoUrl.isEmpty) {
+        throw Exception('Photo uploaded but photo URL is missing in response.');
+      }
+
+      if (isCheckingIn) {
+        await _authProvider.attendanceCheckIn(
+          photoUrl: photoUrl,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          address: address,
+          device: device,
+          notes: '',
+          token: _authProvider.currentAuthToken,
+        );
+      } else {
+        await _authProvider.attendanceCheckOut(
+          photoUrl: photoUrl,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          address: address,
+          device: device,
+          notes: '',
+          token: _authProvider.currentAuthToken,
+        );
+      }
+
+      if (!mounted) return;
+      setState(() => _isCheckedIn = isCheckingIn);
+      _showSnackBar(isCheckingIn
+          ? 'Checked in successfully.'
+          : 'Checked out successfully.');
+    } catch (e) {
+      if (!mounted) return;
+      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _isAttendanceSubmitting = false);
+      }
+    }
+  }
+
+  Future<bool> _ensureAttendancePermissions() async {
+    final cameraStatus = await Permission.camera.request();
+    if (!cameraStatus.isGranted) {
+      _showSnackBar('Camera permission is required for attendance.');
+      if (cameraStatus.isPermanentlyDenied) {
+        await openAppSettings();
+      }
+      return false;
+    }
+
+    final locationStatus = await Permission.locationWhenInUse.request();
+    if (!locationStatus.isGranted) {
+      _showSnackBar('Location permission is required for attendance.');
+      if (locationStatus.isPermanentlyDenied) {
+        await openAppSettings();
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<String> _resolveAddress(double latitude, double longitude) async {
+    try {
+      final places = await placemarkFromCoordinates(latitude, longitude);
+      if (places.isEmpty) return 'Unknown location';
+      final place = places.first;
+      final parts = <String>[
+        place.subLocality ?? '',
+        place.locality ?? '',
+        place.administrativeArea ?? '',
+      ].where((part) => part.trim().isNotEmpty).toList();
+      return parts.isEmpty ? 'Unknown location' : parts.join(', ');
+    } catch (_) {
+      return 'Unknown location';
+    }
+  }
+
+  String _extractPhotoUrl(Map<String, dynamic> response) {
+    String read(dynamic value) =>
+        value is String ? value.trim() : '';
+
+    final direct = read(response['photo_url']);
+    if (direct.isNotEmpty) return direct;
+
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      final nested = read(data['photo_url']);
+      if (nested.isNotEmpty) return nested;
+      final url = read(data['url']);
+      if (url.isNotEmpty) return url;
+      final path = read(data['path']);
+      if (path.isNotEmpty) return path;
+    }
+    return '';
+  }
+
+  String _deviceDescription() {
+    if (kIsWeb) return 'Web';
+    return '${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _exportAttendance() async {
-    await CsvExportHelper.exportRowsToClipboard(
+    final range = await _showExportDateRangeDialog();
+    if (!mounted || range == null) {
+      return;
+    }
+    setState(() {
+      _isExporting = true;
+    });
+    final from = _formatDateForApi(range.start);
+    final to = _formatDateForApi(range.end);
+    try {
+      final exported = await _authProvider.exportAttendance(
+        from: from,
+        to: to,
+        token: _authProvider.currentAuthToken,
+      );
+      final fileName = exported.fileName.trim().isEmpty
+          ? 'attendance_${from}_to_$to.xlsx'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                'Export generated ($fileName), but direct file save is not supported on Web in this build.',
+              ),
+            ),
+          );
+        return;
+      }
+      final file = await ExportFileHelper.saveToDownloadNextone(
+        fileName: fileName,
+        bytes: exported.bytes,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Attendance export downloaded: ${file.path}')),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  Future<DateTimeRange?> _showExportDateRangeDialog() async {
+    final now = DateTime.now();
+    DateTime? fromDate;
+    DateTime? toDate;
+
+    return showDialog<DateTimeRange>(
       context: context,
-      fileLabel: 'Attendance',
-      headers: const <String>['Section', 'Value'],
-      rows: const <List<String>>[
-        <String>['View', 'Overview'],
-        <String>['Status', 'Attendance summary snapshot'],
-      ],
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            String formatDate(DateTime? date) =>
+                date == null ? '' : _formatDateForApi(date);
+
+            Future<void> pickFromDate() async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: fromDate ?? now,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                fromDate = DateTime(picked.year, picked.month, picked.day);
+                if (toDate != null && toDate!.isBefore(fromDate!)) {
+                  toDate = fromDate;
+                }
+              });
+            }
+
+            Future<void> pickToDate() async {
+              final baseDate = toDate ?? fromDate ?? now;
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: baseDate,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                toDate = DateTime(picked.year, picked.month, picked.day);
+              });
+            }
+
+            final isValidRange =
+                fromDate != null && toDate != null && !toDate!.isBefore(fromDate!);
+
+            return AlertDialog(
+              title: const Text('Export Attendance'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: pickFromDate,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Start date',
+                        hintText: 'YYYY-MM-DD',
+                        suffixIcon: Icon(Icons.calendar_today_outlined),
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      child: Text(
+                        formatDate(fromDate).isEmpty
+                            ? 'Select start date'
+                            : formatDate(fromDate),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: pickToDate,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'End date',
+                        hintText: 'YYYY-MM-DD',
+                        suffixIcon: Icon(Icons.calendar_today_outlined),
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      child: Text(
+                        formatDate(toDate).isEmpty
+                            ? 'Select end date'
+                            : formatDate(toDate),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isValidRange
+                      ? () => Navigator.of(context).pop(
+                            DateTimeRange(start: fromDate!, end: toDate!),
+                          )
+                      : null,
+                  child: const Text('Export'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
+  }
+
+  String _formatDateForApi(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
   }
 
   Widget _buildTopTabs() {
@@ -631,9 +991,17 @@ class _AttendancePageState extends State<AttendancePage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.login_rounded, size: 20),
-                    label: const Text('Check In'),
+                    onPressed:
+                        _isAttendanceSubmitting ? null : _handleAttendanceAction,
+                    icon: Icon(
+                      _isCheckedIn ? Icons.logout_rounded : Icons.login_rounded,
+                      size: 20,
+                    ),
+                    label: Text(
+                      _isAttendanceSubmitting
+                          ? (_isCheckedIn ? 'Checking Out...' : 'Checking In...')
+                          : (_isCheckedIn ? 'Check Out' : 'Check In'),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -661,7 +1029,13 @@ class _AttendancePageState extends State<AttendancePage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = (constraints.maxWidth - 12) / 2;
-        final childAspectRatio = cardWidth > 260 ? 1.85 : 1.35;
+        final childAspectRatio = cardWidth > 260
+            ? 1.85
+            : cardWidth > 220
+                ? 1.35
+                : cardWidth > 180
+                    ? 1.15
+                    : 0.95;
 
         return GridView.count(
           crossAxisCount: 2,

@@ -405,7 +405,10 @@ class _LeadFormPageState extends State<LeadFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: CrmAppBar(title: widget.isEditMode ? 'Edit Lead' : 'Create Lead'),
+      appBar: CrmAppBar(
+        title: widget.isEditMode ? 'Edit Lead' : 'Create Lead',
+        showBackButton: true,
+      ),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -558,13 +561,17 @@ class _LeadFormPageState extends State<LeadFormPage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      selectedLabel ?? 'Select assignee',
-                      style: TextStyle(
-                        color:
-                            selectedLabel == null ? Colors.grey : Colors.black,
+                    Expanded(
+                      child: Text(
+                        selectedLabel ?? 'Select assignee',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: selectedLabel == null ? Colors.grey : Colors.black,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     const Icon(Icons.keyboard_arrow_down),
                   ],
                 ),

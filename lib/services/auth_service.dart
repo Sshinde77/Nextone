@@ -500,6 +500,375 @@ class AuthService {
     );
   }
 
+  Future<ExportFileResult> exportSiteVisits({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportSiteVisits}');
+    final headers = _headers(
+      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      token: resolvedToken,
+    );
+    _logRequest(
+      endpoint: 'exportSiteVisits',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('exportSiteVisits', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to export site visits.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName =
+        _readFileNameFromDisposition(disposition) ?? 'site_visits_export.xlsx';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    final contentType = contentTypeHeader.trim().isEmpty
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : contentTypeHeader;
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
+  Future<ExportFileResult> exportFollowUps({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportFollowUps}');
+    final headers = _headers(
+      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      token: resolvedToken,
+    );
+    _logRequest(
+      endpoint: 'exportFollowUps',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('exportFollowUps', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to export follow-ups.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName =
+        _readFileNameFromDisposition(disposition) ?? 'follow_ups_export.xlsx';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    final contentType = contentTypeHeader.trim().isEmpty
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : contentTypeHeader;
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
+  Future<ExportFileResult> exportProjects({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportProjects}');
+    final headers = _headers(
+      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      token: resolvedToken,
+    );
+    _logRequest(
+      endpoint: 'exportProjects',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('exportProjects', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to export projects.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName =
+        _readFileNameFromDisposition(disposition) ?? 'projects_export.xlsx';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    final contentType = contentTypeHeader.trim().isEmpty
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : contentTypeHeader;
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
+  Future<ExportFileResult> exportUsers({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportUsers}');
+    final headers = _headers(
+      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      token: resolvedToken,
+    );
+    _logRequest(
+      endpoint: 'exportUsers',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('exportUsers', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to export users.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName =
+        _readFileNameFromDisposition(disposition) ?? 'users_export.xlsx';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    final contentType = contentTypeHeader.trim().isEmpty
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : contentTypeHeader;
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
+  Future<ExportFileResult> exportAttendance({
+    required String from,
+    required String to,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportAttendance}')
+        .replace(queryParameters: <String, String>{
+      'from': from.trim(),
+      'to': to.trim(),
+    });
+    final headers = _headers(
+      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      token: resolvedToken,
+    );
+    _logRequest(
+      endpoint: 'exportAttendance',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('exportAttendance', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to export attendance.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'attendance_${from}_to_$to.xlsx';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    final contentType = contentTypeHeader.trim().isEmpty
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : contentTypeHeader;
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadAttendancePhoto({
+    required String type,
+    required String photoPath,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final normalizedType = type.trim().toLowerCase();
+    if (normalizedType != 'checkin' && normalizedType != 'checkout') {
+      throw Exception('Invalid attendance photo type.');
+    }
+    if (photoPath.trim().isEmpty) {
+      throw Exception('Photo path is required.');
+    }
+
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.attendanceUploadPhoto}',
+    ).replace(queryParameters: <String, String>{'type': normalizedType});
+
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['accept'] = 'application/json';
+    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    request.files.add(
+      await http.MultipartFile.fromPath('photo', photoPath.trim()),
+    );
+
+    _logRequest(
+      endpoint: 'uploadAttendancePhoto',
+      method: 'POST',
+      uri: uri,
+      headers: request.headers,
+      body: 'multipart/form-data',
+    );
+
+    http.StreamedResponse streamedResponse;
+    try {
+      streamedResponse =
+          await request.send().timeout(_requestTimeout);
+    } on TimeoutException {
+      throw Exception('Server is taking too long to respond. Please try again.');
+    } on SocketException {
+      throw Exception('No internet connection or server is unreachable.');
+    } on HandshakeException {
+      throw Exception(
+          'Secure connection failed. Check phone date/time and try again.');
+    } on http.ClientException {
+      throw Exception('Network error while contacting server. Please try again.');
+    }
+
+    final response = await http.Response.fromStream(streamedResponse);
+    _logResponse('uploadAttendancePhoto', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to upload attendance photo.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+    throw Exception('Attendance photo upload response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> attendanceCheckIn({
+    required String photoUrl,
+    required double latitude,
+    required double longitude,
+    required String address,
+    required String device,
+    required String notes,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceCheckin}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode(<String, dynamic>{
+      'photo_url': photoUrl,
+      'latitude': latitude,
+      'longitude': longitude,
+      'address': address,
+      'device': device,
+      'notes': notes,
+    });
+    _logRequest(
+      endpoint: 'attendanceCheckIn',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response =
+        await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    _logResponse('attendanceCheckIn', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to check in.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+    throw Exception('Attendance check-in response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> attendanceCheckOut({
+    required String photoUrl,
+    required double latitude,
+    required double longitude,
+    required String address,
+    required String device,
+    required String notes,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceCheckout}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode(<String, dynamic>{
+      'photo_url': photoUrl,
+      'latitude': latitude,
+      'longitude': longitude,
+      'address': address,
+      'device': device,
+      'notes': notes,
+    });
+    _logRequest(
+      endpoint: 'attendanceCheckOut',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response =
+        await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    _logResponse('attendanceCheckOut', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to check out.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+    throw Exception('Attendance check-out response is not valid JSON.');
+  }
+
   Future<LeadsListResult> followUps({
     String? token,
     String? dueFrom,
@@ -2299,6 +2668,293 @@ class AuthService {
       return 1;
     }
     return (total / perPage).ceil();
+  }
+
+  Future<Map<String, dynamic>> dashboardStats({
+    required String from,
+    required String to,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{
+      'from': from.trim(),
+      'to': to.trim(),
+    };
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.dashboardStats}')
+            .replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'dashboardStats',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('dashboardStats', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch dashboard stats.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Dashboard stats response format is not valid.');
+      }
+      final dynamic data = decoded['data'];
+      if (data is! Map<String, dynamic>) {
+        throw Exception('Dashboard stats payload is missing.');
+      }
+      final dynamic stats = data['stats'];
+      if (stats is! Map<String, dynamic>) {
+        throw Exception('Dashboard stats data is missing.');
+      }
+      return _stringDynamicMap(stats);
+    } catch (_) {
+      throw Exception('Dashboard stats response format is not valid.');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> dashboardUpcomingSiteVisits({
+    int limit = 5,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{'limit': limit.toString()};
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.dashboardUpcomingSiteVisits}',
+    ).replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'dashboardUpcomingSiteVisits',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('dashboardUpcomingSiteVisits', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch upcoming site visits.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Upcoming site visits response format is not valid.');
+      }
+      final dynamic data = decoded['data'];
+      dynamic siteVisits;
+      if (data is List) {
+        siteVisits = data;
+      } else if (data is Map<String, dynamic>) {
+        siteVisits = data['site_visits'];
+      }
+
+      if (siteVisits is! List) {
+        return const <Map<String, dynamic>>[];
+      }
+
+      return siteVisits
+          .whereType<Map>()
+          .map((entry) => _stringDynamicMap(entry))
+          .toList();
+    } catch (_) {
+      throw Exception('Upcoming site visits response format is not valid.');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> dashboardRecentActivity({
+    int limit = 5,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{'limit': limit.toString()};
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.dashboardRecentActivity}',
+    ).replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'dashboardRecentActivity',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('dashboardRecentActivity', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch recent activity.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Recent activity response format is not valid.');
+      }
+      final dynamic data = decoded['data'];
+      if (data is! List) {
+        return const <Map<String, dynamic>>[];
+      }
+
+      return data
+          .whereType<Map>()
+          .map((entry) => _stringDynamicMap(entry))
+          .toList();
+    } catch (_) {
+      throw Exception('Recent activity response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> dashboardLeadPipeline({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.dashboardLeadPipeline}',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'dashboardLeadPipeline',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('dashboardLeadPipeline', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch lead pipeline.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Lead pipeline response format is not valid.');
+      }
+      final dynamic data = decoded['data'];
+      if (data is! Map<String, dynamic>) {
+        throw Exception('Lead pipeline payload is missing.');
+      }
+      return _stringDynamicMap(data);
+    } catch (_) {
+      throw Exception('Lead pipeline response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> dashboardLeadSources({
+    required String from,
+    required String to,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{
+      'from': from.trim(),
+      'to': to.trim(),
+    };
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.dashboardLeadSources}',
+    ).replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'dashboardLeadSources',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('dashboardLeadSources', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch lead sources.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Lead sources response format is not valid.');
+      }
+      final dynamic data = decoded['data'];
+      if (data is! Map<String, dynamic>) {
+        throw Exception('Lead sources payload is missing.');
+      }
+      return _stringDynamicMap(data);
+    } catch (_) {
+      throw Exception('Lead sources response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> dashboardRevenue({
+    required String range,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{'range': range.trim()};
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.dashboardRevenue}',
+    ).replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'dashboardRevenue',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('dashboardRevenue', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch revenue trend.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Revenue trend response format is not valid.');
+      }
+      final dynamic data = decoded['data'];
+      if (data is! Map<String, dynamic>) {
+        throw Exception('Revenue trend payload is missing.');
+      }
+      return _stringDynamicMap(data);
+    } catch (_) {
+      throw Exception('Revenue trend response format is not valid.');
+    }
   }
 
   String? _readFileNameFromDisposition(String disposition) {

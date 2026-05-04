@@ -4,20 +4,22 @@ import 'package:nextone/screens/follow_ups/follow_up_page.dart';
 import 'package:nextone/screens/home/home_page.dart';
 import 'package:nextone/screens/leads/leads_page.dart';
 import 'package:nextone/screens/projects/projects_page.dart';
-import 'package:nextone/screens/settings/settings_page.dart';
 import 'package:nextone/screens/site_visits/site_visits_page.dart';
 import 'package:nextone/screens/team/team_page.dart';
+import 'package:nextone/screens/users/users_page.dart';
 import 'package:nextone/widgets/crm_bottom_nav.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  const MainScreen({super.key, this.initialIndex = 0});
+
+  final int initialIndex;
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex;
 
   final List<Widget> _screens = [
     const HomePage(showBottomNav: false),
@@ -27,8 +29,17 @@ class _MainScreenState extends State<MainScreen> {
     const ProjectsPage(),
     const TeamPage(),
     const AttendancePage(),
-    const SettingsPage(),
+    const UsersPage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final index = widget.initialIndex;
+    _currentIndex = index < 0
+        ? 0
+        : (index >= _screens.length ? _screens.length - 1 : index);
+  }
 
   void _setIndex(int index) {
     if (_currentIndex == index) return;

@@ -56,4 +56,18 @@ class ApiConstants {
   static const String exportUsers = '/export/users';
   static const String exportAttendance = '/export/attendance';
   static const String exportAll = '/export/all';
+
+  // Attendance Endpoints
+  static const String attendanceCheckin = '/attendance/checkin';
+  static const String attendanceCheckout = '/attendance/checkout';
+  static const String attendanceUploadPhoto = '/attendance/upload-photo';
+
+  // Dashboard Endpoints
+  static const String dashboardStats = '/dashboard/stats';
+  static const String dashboardUpcomingSiteVisits =
+      '/dashboard/upcoming-site-visits';
+  static const String dashboardRecentActivity = '/dashboard/recent-activity';
+  static const String dashboardLeadPipeline = '/dashboard/lead-pipeline';
+  static const String dashboardLeadSources = '/dashboard/lead-sources';
+  static const String dashboardRevenue = '/dashboard/revenue';
 }

@@ -8,6 +8,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/screens/leads/lead_form_page.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -203,8 +204,10 @@ class _LeadsPageState extends State<LeadsPage> {
           );
         return;
       }
-      final outFile = File('${Directory.systemTemp.path}/$safeFileName');
-      await outFile.writeAsBytes(exported.bytes, flush: true);
+      final outFile = await ExportFileHelper.saveToDownloadNextone(
+        fileName: safeFileName,
+        bytes: exported.bytes,
+      );
       if (!mounted) {
         return;
       }
@@ -515,30 +518,65 @@ class _LeadsPageState extends State<LeadsPage> {
             ),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
-                  label: const Text('Assign'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 40),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 360;
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+                        label: const Text('Assign'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 40),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.flag_outlined, size: 16),
+                        label: const Text('Update Status'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 40),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+                      label: const Text('Assign'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 40),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.flag_outlined, size: 16),
-                  label: const Text('Update Status'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 40),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.flag_outlined, size: 16),
+                      label: const Text('Update Status'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 40),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -634,14 +672,11 @@ class _LeadsPageState extends State<LeadsPage> {
                   profileImageUrl: lead.profileImageUrl,
                   assigneeName: lead.assignee.name,
                   assigneeImageUrl: lead.assignee.imageUrl,
+                  onTap: () => _viewLeadDetail(lead.id),
                   actions: [
                     DataCardAction(
                       icon: Icons.call_outlined,
                       onTap: () => _callLead(lead.phone),
-                    ),
-                    DataCardAction(
-                      icon: Icons.visibility_outlined,
-                      onTap: () => _viewLeadDetail(lead.id),
                     ),
                     DataCardAction(
                       icon: Icons.edit_outlined,
@@ -752,8 +787,9 @@ class _LeadsPageState extends State<LeadsPage> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 4,
             children: [
               IconButton(
                 onPressed: !_isLoadingLeads && currentPage > 1

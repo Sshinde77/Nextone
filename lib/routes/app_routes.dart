@@ -29,7 +29,11 @@ class AppRoutes {
       case forgotPassword:
         return MaterialPageRoute(builder: (_) => const ForgotPasswordPage());
       case home:
-        return MaterialPageRoute(builder: (_) => const MainScreen());
+        final dynamic args = settings.arguments;
+        final int initialIndex = args is int ? args : 0;
+        return MaterialPageRoute(
+          builder: (_) => MainScreen(initialIndex: initialIndex),
+        );
       case leads:
         return MaterialPageRoute(builder: (_) => const LeadsPage());
       case followUps:

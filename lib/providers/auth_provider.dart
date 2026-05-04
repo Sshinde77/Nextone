@@ -126,6 +126,86 @@ class AuthProvider {
     );
   }
 
+  Future<ExportFileResult> exportSiteVisits({String? token}) {
+    return _authService.exportSiteVisits(token: token);
+  }
+
+  Future<ExportFileResult> exportFollowUps({String? token}) {
+    return _authService.exportFollowUps(token: token);
+  }
+
+  Future<ExportFileResult> exportProjects({String? token}) {
+    return _authService.exportProjects(token: token);
+  }
+
+  Future<ExportFileResult> exportUsers({String? token}) {
+    return _authService.exportUsers(token: token);
+  }
+
+  Future<ExportFileResult> exportAttendance({
+    required String from,
+    required String to,
+    String? token,
+  }) {
+    return _authService.exportAttendance(
+      from: from,
+      to: to,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadAttendancePhoto({
+    required String type,
+    required String photoPath,
+    String? token,
+  }) {
+    return _authService.uploadAttendancePhoto(
+      type: type,
+      photoPath: photoPath,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> attendanceCheckIn({
+    required String photoUrl,
+    required double latitude,
+    required double longitude,
+    required String address,
+    required String device,
+    required String notes,
+    String? token,
+  }) {
+    return _authService.attendanceCheckIn(
+      photoUrl: photoUrl,
+      latitude: latitude,
+      longitude: longitude,
+      address: address,
+      device: device,
+      notes: notes,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> attendanceCheckOut({
+    required String photoUrl,
+    required double latitude,
+    required double longitude,
+    required String address,
+    required String device,
+    required String notes,
+    String? token,
+  }) {
+    return _authService.attendanceCheckOut(
+      photoUrl: photoUrl,
+      latitude: latitude,
+      longitude: longitude,
+      address: address,
+      device: device,
+      notes: notes,
+      token: token,
+    );
+  }
+
   Future<LeadsListResult> followUps({
     String? token,
     String? dueFrom,
@@ -467,5 +547,63 @@ class AuthProvider {
 
   Future<void> deleteProject({required String id, String? token}) {
     return _authService.deleteProject(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> dashboardStats({
+    required String from,
+    required String to,
+    String? token,
+  }) {
+    return _authService.dashboardStats(
+      from: from,
+      to: to,
+      token: token,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> dashboardUpcomingSiteVisits({
+    int limit = 5,
+    String? token,
+  }) {
+    return _authService.dashboardUpcomingSiteVisits(
+      limit: limit,
+      token: token,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> dashboardRecentActivity({
+    int limit = 5,
+    String? token,
+  }) {
+    return _authService.dashboardRecentActivity(
+      limit: limit,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> dashboardLeadPipeline({String? token}) {
+    return _authService.dashboardLeadPipeline(token: token);
+  }
+
+  Future<Map<String, dynamic>> dashboardLeadSources({
+    required String from,
+    required String to,
+    String? token,
+  }) {
+    return _authService.dashboardLeadSources(
+      from: from,
+      to: to,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> dashboardRevenue({
+    required String range,
+    String? token,
+  }) {
+    return _authService.dashboardRevenue(
+      range: range,
+      token: token,
+    );
   }
 }

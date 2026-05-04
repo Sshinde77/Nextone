@@ -1,12 +1,14 @@
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_detail_page.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
-import 'package:nextone/utils/csv_export_helper.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -28,6 +30,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
   final int _pageSize = 5;
   String _searchQuery = '';
   bool _isLoadingFollowUps = false;
+  bool _isExporting = false;
   String? _loadError;
 
   final List<_FollowUpModel> _allFollowUps = <_FollowUpModel>[
@@ -418,38 +421,38 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   Future<void> _exportFollowUps() async {
-    await CsvExportHelper.exportRowsToClipboard(
-      context: context,
-      fileLabel: 'Follow Ups',
-      headers: const <String>[
-        'ID',
-        'Lead ID',
-        'Customer',
-        'Status',
-        'Priority',
-        'Due Date',
-        'Due Time',
-        'Channel',
-        'Assignee',
-        'Phone',
-      ],
-      rows: _currentPageFollowUps
-          .map(
-            (item) => <String>[
-              item.id,
-              item.leadId,
-              item.customerName,
-              item.status,
-              item.priority,
-              item.dueDate,
-              item.dueTime,
-              item.channel,
-              item.assignee.name,
-              item.assignee.phone,
-            ],
-          )
-          .toList(),
-    );
+    setState(() {
+      _isExporting = true;
+    });
+    try {
+      final exported = await _authProvider.exportFollowUps(
+        token: _authProvider.currentAuthToken,
+      );
+      final fileName = exported.fileName.trim().isEmpty
+          ? 'follow_ups_export.xlsx'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        _showSnackBar(
+          'Export generated ($fileName), but direct file save is not supported on Web in this build.',
+        );
+        return;
+      }
+      final file = await ExportFileHelper.saveToDownloadNextone(
+        fileName: fileName,
+        bytes: exported.bytes,
+      );
+      if (!mounted) return;
+      _showSnackBar('Follow-ups export downloaded: ${file.path}');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
   }
 
   List<_FollowUpModel> get _filteredFollowUps {
@@ -728,9 +731,15 @@ class _FollowUpPageState extends State<FollowUpPage> {
         );
 
         final exportButton = OutlinedButton.icon(
-          onPressed: _exportFollowUps,
-          icon: const Icon(Icons.download_rounded, size: 18),
-          label: const Text('Export'),
+          onPressed: _isExporting ? null : _exportFollowUps,
+          icon: _isExporting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.download_rounded, size: 18),
+          label: Text(_isExporting ? 'Exporting...' : 'Export'),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(0, 48),
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -903,15 +912,12 @@ class _FollowUpPageState extends State<FollowUpPage> {
                       onTap: () => _openEditFollowUp(followUp),
                     ),
                     DataCardAction(
-                      icon: Icons.visibility_outlined,
-                      onTap: () => _viewFollowUp(followUp),
-                    ),
-                    DataCardAction(
                       icon: Icons.delete_outline,
                       color: AppColors.error,
                       onTap: () => _deleteFollowUp(followUp),
                     ),
                   ],
+                  onTap: () => _viewFollowUp(followUp),
                   bulkSelectionMode: _isBulkSelectionMode,
                   isSelected: _selectedFollowUpIds.contains(followUp.id),
                   onLongPress: () {

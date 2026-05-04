@@ -1,9 +1,12 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/projects/project_detail_page.dart';
 import 'package:nextone/screens/projects/project_form_page.dart';
-import 'package:nextone/utils/csv_export_helper.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 
@@ -21,6 +24,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   List<_Project> _projects = const <_Project>[];
   bool _isLoading = true;
   bool _isDeleting = false;
+  bool _isExporting = false;
   String? _loadError;
 
   List<_Project> get _filteredProjects {
@@ -248,9 +252,15 @@ class _ProjectsPageState extends State<ProjectsPage> {
         ),
         const SizedBox(width: 8),
         OutlinedButton.icon(
-          onPressed: _exportProjects,
-          icon: const Icon(Icons.download_rounded, size: 18),
-          label: const Text('Export'),
+          onPressed: _isExporting ? null : _exportProjects,
+          icon: _isExporting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.download_rounded, size: 18),
+          label: Text(_isExporting ? 'Exporting...' : 'Export'),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(110, 50),
             shape: RoundedRectangleBorder(
@@ -488,32 +498,38 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Future<void> _exportProjects() async {
-    await CsvExportHelper.exportRowsToClipboard(
-      context: context,
-      fileLabel: 'Projects',
-      headers: const <String>[
-        'ID',
-        'Name',
-        'Developer',
-        'Location',
-        'Status',
-        'Price Range',
-        'Mapped Leads',
-      ],
-      rows: _filteredProjects
-          .map(
-            (project) => <String>[
-              project.id,
-              project.name,
-              project.developer,
-              project.location,
-              project.status,
-              project.priceRange,
-              project.mappedLeads.toString(),
-            ],
-          )
-          .toList(),
-    );
+    setState(() {
+      _isExporting = true;
+    });
+    try {
+      final exported = await _authProvider.exportProjects(
+        token: _authProvider.currentAuthToken,
+      );
+      final fileName = exported.fileName.trim().isEmpty
+          ? 'projects_export.xlsx'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        _showSnackBar(
+          'Export generated ($fileName), but direct file save is not supported on Web in this build.',
+        );
+        return;
+      }
+      final file = await ExportFileHelper.saveToDownloadNextone(
+        fileName: fileName,
+        bytes: exported.bytes,
+      );
+      if (!mounted) return;
+      _showSnackBar('Projects export downloaded: ${file.path}');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
   }
 }
 
