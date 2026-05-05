@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:nextone/constants/api_constants.dart';
 import 'package:nextone/models/auth_models.dart';
 
@@ -719,7 +720,11 @@ class AuthService {
       request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
     }
     request.files.add(
-      await http.MultipartFile.fromPath('photo', photoPath.trim()),
+      await http.MultipartFile.fromPath(
+        'photo',
+        photoPath.trim(),
+        contentType: _imageMediaType(photoPath.trim()),
+      ),
     );
 
     _logRequest(
@@ -867,6 +872,241 @@ class AuthService {
       // handled below
     }
     throw Exception('Attendance check-out response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> attendanceToday({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceToday}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'attendanceToday',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('attendanceToday', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch today attendance.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Today attendance response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> attendanceCalendar({
+    required int month,
+    required int year,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.attendanceCalendar}',
+    ).replace(queryParameters: <String, String>{
+      'month': month.toString(),
+      'year': year.toString(),
+    });
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'attendanceCalendar',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('attendanceCalendar', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch attendance calendar.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Attendance calendar response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> attendanceByMonth({
+    required int month,
+    required int year,
+    int page = 1,
+    int perPage = 50,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.attendanceByMonth}',
+    ).replace(queryParameters: <String, String>{
+      'month': month.toString(),
+      'year': year.toString(),
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    });
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'attendanceByMonth',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('attendanceByMonth', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch monthly attendance grid.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Monthly attendance grid response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> attendanceByDate({
+    required String date,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.attendanceByDate}',
+    ).replace(queryParameters: <String, String>{
+      'date': date,
+    });
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'attendanceByDate',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('attendanceByDate', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch daily attendance.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Daily attendance response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> attendanceSummary({
+    String? from,
+    String? to,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{};
+    if (from != null && from.trim().isNotEmpty) {
+      query['from'] = from.trim();
+    }
+    if (to != null && to.trim().isNotEmpty) {
+      query['to'] = to.trim();
+    }
+
+    final uri = query.isEmpty
+        ? Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceSummary}')
+        : Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceSummary}')
+            .replace(queryParameters: query);
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'attendanceSummary',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('attendanceSummary', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch attendance summary.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Attendance summary response is not valid JSON.');
   }
 
   Future<LeadsListResult> followUps({
@@ -2668,6 +2908,17 @@ class AuthService {
       return 1;
     }
     return (total / perPage).ceil();
+  }
+
+  MediaType _imageMediaType(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.png')) {
+      return MediaType('image', 'png');
+    }
+    if (lower.endsWith('.webp')) {
+      return MediaType('image', 'webp');
+    }
+    return MediaType('image', 'jpeg');
   }
 
   Future<Map<String, dynamic>> dashboardStats({

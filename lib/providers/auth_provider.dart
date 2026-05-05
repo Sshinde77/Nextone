@@ -206,6 +206,60 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> attendanceToday({String? token}) {
+    return _authService.attendanceToday(token: token);
+  }
+
+  Future<Map<String, dynamic>> attendanceCalendar({
+    required int month,
+    required int year,
+    String? token,
+  }) {
+    return _authService.attendanceCalendar(
+      month: month,
+      year: year,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> attendanceByMonth({
+    required int month,
+    required int year,
+    int page = 1,
+    int perPage = 50,
+    String? token,
+  }) {
+    return _authService.attendanceByMonth(
+      month: month,
+      year: year,
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> attendanceByDate({
+    required String date,
+    String? token,
+  }) {
+    return _authService.attendanceByDate(
+      date: date,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> attendanceSummary({
+    String? from,
+    String? to,
+    String? token,
+  }) {
+    return _authService.attendanceSummary(
+      from: from,
+      to: to,
+      token: token,
+    );
+  }
+
   Future<LeadsListResult> followUps({
     String? token,
     String? dueFrom,

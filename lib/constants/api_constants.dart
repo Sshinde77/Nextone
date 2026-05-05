@@ -61,6 +61,11 @@ class ApiConstants {
   static const String attendanceCheckin = '/attendance/checkin';
   static const String attendanceCheckout = '/attendance/checkout';
   static const String attendanceUploadPhoto = '/attendance/upload-photo';
+  static const String attendanceToday = '/attendance/today';
+  static const String attendanceCalendar = '/attendance/calendar';
+  static const String attendanceByMonth = '/attendance/by-month';
+  static const String attendanceByDate = '/attendance/by-date';
+  static const String attendanceSummary = '/attendance/summary';
 
   // Dashboard Endpoints
   static const String dashboardStats = '/dashboard/stats';
