@@ -168,32 +168,35 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     await launchUrl(launchUri, mode: LaunchMode.externalApplication);
   }
 
-  Future<void> _submitStatusChange() async {
+  Future<String?> _submitStatusChange() async {
     if (_selectedNextStatus == null || _selectedNextStatus!.isEmpty) {
       _showSnackBar('Please select the next status.');
-      return;
+      return null;
     }
     setState(() {
       _isSubmittingStatus = true;
     });
 
     try {
+      final updatedStatus = _selectedNextStatus!;
       await _authProvider.updateLeadStatus(
         id: widget.leadId,
-        status: _selectedNextStatus!,
+        status: updatedStatus,
         note: _statusNoteController.text.trim(),
         token: _authProvider.currentAuthToken,
       );
       await _fetchLeadDetails();
       if (!mounted) {
-        return;
+        return null;
       }
       _showSnackBar('Lead status updated successfully.');
+      return updatedStatus;
     } catch (e) {
       if (!mounted) {
-        return;
+        return null;
       }
       _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      return null;
     } finally {
       if (mounted) {
         setState(() {
@@ -258,7 +261,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         return _buildSheetContainer(
-          title: 'Change Status',
+          title: 'Update Status',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -291,8 +294,16 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                   onPressed: _isSubmittingStatus
                       ? null
                       : () async {
-                          await _submitStatusChange();
-                          if (mounted) Navigator.of(context).pop();
+                          final updatedStatus = await _submitStatusChange();
+                          if (mounted && updatedStatus != null) {
+                            Navigator.of(context).pop();
+                            if (updatedStatus == 'follow_up') {
+                              await _openCreateFollowUp();
+                            } else if (updatedStatus ==
+                                'site_visit_scheduled') {
+                              await _openCreateSiteVisit();
+                            }
+                          }
                         },
                   child: Text(
                       _isSubmittingStatus ? 'Updating...' : 'Update Status'),
@@ -367,290 +378,26 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     );
   }
 
-  Future<void> _onConvertLead() async {
-    if (_lead == null) {
-      return;
+  Future<void> _openCreateFollowUp() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FollowUpFormPage(initialLeadId: widget.leadId),
+      ),
+    );
+    if (mounted) {
+      await _fetchLeadDetails();
     }
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) {
-        return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.82,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Convert Lead',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close_rounded),
-                          color: AppColors.textSecondary,
-                          splashRadius: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1, color: AppColors.border),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildConvertLeadInfoCard(),
-                        const SizedBox(height: 14),
-                        const Text(
-                          'Choose what you want to convert this lead into:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final isNarrow = constraints.maxWidth < 420;
-                            if (isNarrow) {
-                              return Column(
-                                children: [
-                                  _buildConvertOptionCard(
-                                    icon: Icons.call_outlined,
-                                    iconBackground: const Color(0xFF2ECF8D),
-                                    title: 'Follow-Up',
-                                    subtitle: 'Create a task with due date & priority',
-                                    onTap: () {
-                                      Navigator.of(context).pop();
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => FollowUpFormPage(
-                                            initialLeadId: widget.leadId,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _buildConvertOptionCard(
-                                    icon: Icons.calendar_month_outlined,
-                                    iconBackground: const Color(0xFF8C4BFF),
-                                    title: 'Site Visit',
-                                    subtitle: 'Schedule a project visit',
-                                    onTap: () {
-                                      Navigator.of(context).pop();
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => SiteVisitFormPage(
-                                            initialLeadId: widget.leadId,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              );
-                            }
-
-                            return Row(
-                              children: [
-                                Expanded(
-                                  child: _buildConvertOptionCard(
-                                    icon: Icons.call_outlined,
-                                    iconBackground: const Color(0xFF2ECF8D),
-                                    title: 'Follow-Up',
-                                    subtitle: 'Create a task with due date & priority',
-                                    onTap: () {
-                                      Navigator.of(context).pop();
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => FollowUpFormPage(
-                                            initialLeadId: widget.leadId,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildConvertOptionCard(
-                                    icon: Icons.calendar_month_outlined,
-                                    iconBackground: const Color(0xFF8C4BFF),
-                                    title: 'Site Visit',
-                                    subtitle: 'Schedule a project visit',
-                                    onTap: () {
-                                      Navigator.of(context).pop();
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => SiteVisitFormPage(
-                                            initialLeadId: widget.leadId,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
   }
 
-  Widget _buildConvertLeadInfoCard() {
-    final lead = _lead!;
-    final leadStatus = _prettyStatus(_normalizeStatus(lead.status));
-    final initials =
-        lead.name.trim().isNotEmpty ? lead.name.trim()[0].toLowerCase() : '?';
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFD),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE7ECF4)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              initials,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  lead.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${lead.phone} - $leadStatus',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+  Future<void> _openCreateSiteVisit() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SiteVisitFormPage(initialLeadId: widget.leadId),
       ),
     );
-  }
-
-  Widget _buildConvertOptionCard({
-    required IconData icon,
-    required Color iconBackground,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: iconBackground,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: Colors.white, size: 22),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    if (mounted) {
+      await _fetchLeadDetails();
+    }
   }
 
   @override
@@ -696,7 +443,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                             const SizedBox(height: 14),
                             _buildActionButtonsRow(),
                             const SizedBox(height: 24),
-                            _buildInfoSection('Lead Information', [
+                            _buildInfoSection(
+                              'Lead Information',
+                              [
                               _buildInfoTile(
                                 Icons.phone_outlined,
                                 'Phone',
@@ -721,10 +470,18 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                                 'Budget',
                                 _lead!.budget,
                               ),
-                            ]),
+                              ],
+                              trailingAction: _buildSectionActionButton(
+                                label: 'Update Status',
+                                icon: Icons.timeline_rounded,
+                                onTap: _openStatusSheet,
+                              ),
+                            ),
                             const SizedBox(height: 24),
                             if (_lead!.assignedTo != null)
-                              _buildInfoSection('Assigned To', [
+                              _buildInfoSection(
+                                'Assigned To',
+                                [
                                 _buildInfoTile(
                                   Icons.person_outline,
                                   'Name',
@@ -737,7 +494,13 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                                   onTap: () =>
                                       _makeCall(_lead!.assignedTo!.phone),
                                 ),
-                              ]),
+                                ],
+                                trailingAction: _buildSectionActionButton(
+                                  label: 'Reassign Lead',
+                                  icon: Icons.swap_horiz_rounded,
+                                  onTap: _openReassignSheet,
+                                ),
+                              ),
                             const SizedBox(height: 100),
                           ],
                         ),
@@ -749,145 +512,76 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   Widget _buildActionButtonsRow() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 560;
-          final itemWidth = wide ? (constraints.maxWidth - 16) / 3 : null;
-
-          return Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildPremiumActionButton(
-                width: itemWidth,
-                label: 'Change Status',
-                subtitle: 'Update lead stage',
-                icon: Icons.timeline_rounded,
-                onTap: _openStatusSheet,
-                highlighted: true,
-              ),
-              _buildPremiumActionButton(
-                width: itemWidth,
-                label: 'Reassign Lead',
-                subtitle: 'Transfer ownership',
-                icon: Icons.swap_horiz_rounded,
-                onTap: _openReassignSheet,
-              ),
-              _buildPremiumActionButton(
-                width: itemWidth,
-                label: 'Convert Lead',
-                subtitle: 'Move to customer',
-                icon: Icons.sync_alt_rounded,
-                onTap: _onConvertLead,
-              ),
-            ],
-          );
-        },
+      child: Column(
+        children: [
+          _buildPremiumActionButton(
+            label: 'Schedule Follow Up',
+            icon: Icons.call_outlined,
+            onTap: _openCreateFollowUp,
+          ),
+          const SizedBox(height: 10),
+          _buildPremiumActionButton(
+            label: 'Schedule Visit',
+            icon: Icons.calendar_month_outlined,
+            onTap: _openCreateSiteVisit,
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildPremiumActionButton({
     required String label,
-    required String subtitle,
     required IconData icon,
     required VoidCallback onTap,
-    bool highlighted = false,
-    double? width,
   }) {
-    return SizedBox(
-      width: width,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Ink(
-            decoration: BoxDecoration(
-              gradient: highlighted
-                  ? const LinearGradient(
-                      colors: [Color(0xFF2F6BFF), Color(0xFF5A8BFF)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: highlighted ? null : const Color(0xFFF7F9FD),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: highlighted ? Colors.transparent : AppColors.border,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFD),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
               ),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: highlighted
-                        ? Colors.white.withOpacity(0.2)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 18,
-                    color: highlighted ? Colors.white : AppColors.primary,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: highlighted ? Colors.white : AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: highlighted
-                              ? Colors.white.withOpacity(0.88)
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 12,
-                  color:
-                      highlighted ? Colors.white.withOpacity(0.92) : AppColors.textSecondary,
-                ),
-              ],
-            ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.textSecondary,
+              ),
+            ],
           ),
         ),
       ),
@@ -1009,19 +703,30 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     );
   }
 
-  Widget _buildInfoSection(String title, List<Widget> children) {
+  Widget _buildInfoSection(
+    String title,
+    List<Widget> children, {
+    Widget? trailingAction,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (trailingAction != null) trailingAction,
+            ],
           ),
         ),
         Container(
@@ -1041,6 +746,31 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSectionActionButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16, color: AppColors.primary),
+      label: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AppColors.primary,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: AppColors.border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        visualDensity: VisualDensity.compact,
+      ),
     );
   }
 

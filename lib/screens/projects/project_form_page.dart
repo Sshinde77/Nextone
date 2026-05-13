@@ -140,10 +140,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     if (form == null || !form.validate()) {
       return;
     }
-    if (_selectedPossessionDate == null) {
-      _showSnackBar('Please select possession date.');
-      return;
-    }
 
     setState(() {
       _isSubmitting = true;
@@ -157,9 +153,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       final address = _addressController.text.trim();
       final configurations = _csvToList(_configurationsController.text);
       final priceRange = _priceRangeController.text.trim();
-      final totalUnits = int.parse(_totalUnitsController.text.trim());
-      final possessionDate =
-          DateFormat('yyyy-MM-dd').format(_selectedPossessionDate!);
+      final totalUnits = int.tryParse(_totalUnitsController.text.trim()) ?? 0;
+      final possessionDate = _selectedPossessionDate == null
+          ? ''
+          : DateFormat('yyyy-MM-dd').format(_selectedPossessionDate!);
       final reraNumber = _reraNumberController.text.trim();
       final amenities = _csvToList(_amenitiesController.text);
       final description = _descriptionController.text.trim();
@@ -313,6 +310,12 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                     controller: _nameController,
                     label: 'Project Name',
                     hintText: 'Skyline Heights',
+                    validator: (value) {
+                      if ((value?.trim().isEmpty ?? true)) {
+                        return 'Project Name is required.';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 12),
                   _buildTextField(
@@ -358,17 +361,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                     label: 'Total Units',
                     hintText: '240',
                     keyboardType: TextInputType.number,
-                    validator: (value) {
-                      final text = value?.trim() ?? '';
-                      if (text.isEmpty) {
-                        return 'Total Units is required.';
-                      }
-                      final parsed = int.tryParse(text);
-                      if (parsed == null || parsed <= 0) {
-                        return 'Enter a valid positive number.';
-                      }
-                      return null;
-                    },
                   ),
                   const SizedBox(height: 12),
                   _buildPossessionDateField(possessionDateLabel),
@@ -530,13 +522,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           minLines: minLines,
           maxLines: maxLines,
           enabled: !_isSubmitting,
-          validator: validator ??
-              (value) {
-                if ((value?.trim().isEmpty ?? true)) {
-                  return '$label is required.';
-                }
-                return null;
-              },
+          validator: validator,
           decoration: _fieldDecoration(hintText: hintText),
         ),
       ],

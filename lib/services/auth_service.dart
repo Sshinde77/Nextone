@@ -7,10 +7,13 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:nextone/constants/api_constants.dart';
 import 'package:nextone/models/auth_models.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   static String? _authToken;
   static String? _refreshToken;
+  static const String _authTokenStorageKey = 'auth_token';
+  static const String _refreshTokenStorageKey = 'refresh_token';
   static const Duration _requestTimeout = Duration(seconds: 45);
   static const int _maxRequestAttempts = 3;
   static const Duration _retryDelay = Duration(seconds: 2);
@@ -21,6 +24,15 @@ class AuthService {
   }
 
   static String? get currentAuthToken => _authToken;
+
+  static Future<bool> hasPersistedSession() async {
+    if (_authToken != null && _authToken!.trim().isNotEmpty) {
+      return true;
+    }
+
+    await _restoreTokensFromStorage();
+    return _authToken != null && _authToken!.trim().isNotEmpty;
+  }
 
   Future<String?> login({
     required String email,
@@ -79,7 +91,7 @@ class AuthService {
 
     final error = _handleResponse(response, fallbackMessage: 'Login failed.');
     if (error == null) {
-      _storeTokensFromResponse(response.body);
+      await _storeTokensFromResponse(response.body);
     }
 
     return error;
@@ -283,6 +295,7 @@ class AuthService {
         final result = _tokenResultFromBody(body);
         _authToken = result.accessToken ?? _authToken;
         _refreshToken = result.refreshToken ?? _refreshToken;
+        await _persistTokens();
         return result;
       }
     } catch (_) {
@@ -322,13 +335,13 @@ class AuthService {
     _logResponse('logout', response);
 
     if (response.statusCode == 401 || response.statusCode == 403) {
-      _clearTokens();
+      await _clearTokens();
       return null;
     }
 
     final error = _handleResponse(response, fallbackMessage: 'Logout failed.');
     if (error == null) {
-      _clearTokens();
+      await _clearTokens();
     }
 
     return error;
@@ -685,6 +698,43 @@ class AuthService {
     final disposition = response.headers['content-disposition'] ?? '';
     final fileName = _readFileNameFromDisposition(disposition) ??
         'attendance_${from}_to_$to.xlsx';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    final contentType = contentTypeHeader.trim().isEmpty
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : contentTypeHeader;
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
+  Future<ExportFileResult> exportAll({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportAll}');
+    final headers = _headers(
+      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      token: resolvedToken,
+    );
+    _logRequest(
+      endpoint: 'exportAll',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('exportAll', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to export all modules.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName =
+        _readFileNameFromDisposition(disposition) ?? 'all_modules_export.xlsx';
     final contentTypeHeader = response.headers['content-type'] ?? '';
     final contentType = contentTypeHeader.trim().isEmpty
         ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -1107,6 +1157,111 @@ class AuthService {
     }
 
     throw Exception('Attendance summary response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> attendancePending({
+    String? date,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{};
+    if (date != null && date.trim().isNotEmpty) {
+      query['date'] = date.trim();
+    }
+
+    final uri = query.isEmpty
+        ? Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendancePending}')
+        : Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendancePending}')
+            .replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'attendancePending',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('attendancePending', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch pending attendance approvals.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Pending approvals response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> attendanceApprove({
+    required String id,
+    required String status,
+    String? reason,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Attendance approval id is required.');
+    }
+    final endpoint = ApiConstants.attendanceapprove.replaceAll('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final payload = <String, dynamic>{
+      'status': status.trim(),
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+    };
+    _logRequest(
+      endpoint: 'attendanceApprove',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: jsonEncode(payload),
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: jsonEncode(payload))
+        .timeout(_requestTimeout);
+    _logResponse('attendanceApprove', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update attendance status.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    return <String, dynamic>{'id': normalizedId, 'status': status};
   }
 
   Future<LeadsListResult> followUps({
@@ -2635,6 +2790,283 @@ class AuthService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> notifications({
+    String? token,
+    String? type,
+    bool? unreadOnly,
+    int page = 1,
+    int perPage = 30,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    if (type != null && type.trim().isNotEmpty) {
+      query['type'] = type.trim();
+    }
+    if (unreadOnly != null) {
+      query['unread'] = unreadOnly.toString();
+    }
+
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.notifications}')
+        .replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'notifications',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('notifications', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch notifications.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      return _extractLeadsItems(decoded);
+    } catch (_) {
+      throw Exception('Notifications response format is not valid.');
+    }
+  }
+
+  Future<void> deleteAllNotifications({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.deletenotifications}',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteAllNotifications',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteAllNotifications', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete all notifications.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
+  Future<int> unreadNotificationsCount({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.unreadcountnotifications}',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'unreadNotificationsCount',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('unreadNotificationsCount', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch unread notifications count.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final rootCount = _readIntFromMap(decoded, ['count', 'unread_count']);
+        if (rootCount != null) {
+          return rootCount;
+        }
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          final nestedCount =
+              _readIntFromMap(data, ['count', 'unread_count', 'unreadCount']);
+          if (nestedCount != null) {
+            return nestedCount;
+          }
+        }
+      }
+    } catch (_) {
+      // Fall back to default.
+    }
+    return 0;
+  }
+
+  Future<List<String>> notificationTypes({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.typesnotifications}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'notificationTypes',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('notificationTypes', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch notification types.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      List<String> parseList(dynamic raw) {
+        if (raw is! List) {
+          return const <String>[];
+        }
+        return raw
+            .map((item) => item?.toString().trim() ?? '')
+            .where((item) => item.isNotEmpty)
+            .toList();
+      }
+
+      final fromRoot = parseList(decoded);
+      if (fromRoot.isNotEmpty) {
+        return fromRoot;
+      }
+      if (decoded is Map<String, dynamic>) {
+        final fromData = parseList(decoded['data']);
+        if (fromData.isNotEmpty) {
+          return fromData;
+        }
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          final fromNested = parseList(data['types']);
+          if (fromNested.isNotEmpty) {
+            return fromNested;
+          }
+        }
+      }
+    } catch (_) {
+      // Fall through to default empty list.
+    }
+
+    return const <String>[];
+  }
+
+  Future<void> markAllNotificationsRead({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.readallnotifications}',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'markAllNotificationsRead',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: '{}',
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: jsonEncode(<String, dynamic>{}))
+        .timeout(_requestTimeout);
+    _logResponse('markAllNotificationsRead', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to mark all notifications as read.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> markSingleNotificationRead({
+    required String id,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.readsinglenotification.replaceAll('{id}', id);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'markSingleNotificationRead',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: '{}',
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: jsonEncode(<String, dynamic>{}))
+        .timeout(_requestTimeout);
+    _logResponse('markSingleNotificationRead', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to mark notification as read.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return _stringDynamicMap(data);
+        }
+        return _stringDynamicMap(decoded);
+      }
+    } catch (_) {
+      // Fall through to default map.
+    }
+
+    return <String, dynamic>{'id': id, 'is_read': true};
+  }
+
+  Future<void> deleteSingleNotification({
+    required String id,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.deletesinglenotification.replaceAll('{id}', id);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteSingleNotification',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteSingleNotification', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete notification.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
   Map<String, String> _headers({required String accept, String? token}) {
     final headers = {'accept': accept, 'Content-Type': 'application/json'};
 
@@ -2688,7 +3120,7 @@ class AuthService {
     return fallbackMessage;
   }
 
-  void _storeTokensFromResponse(String responseBody) {
+  Future<void> _storeTokensFromResponse(String responseBody) async {
     try {
       final dynamic body = jsonDecode(responseBody);
       if (body is! Map<String, dynamic>) {
@@ -2698,6 +3130,7 @@ class AuthService {
       final result = _tokenResultFromBody(body);
       _authToken = result.accessToken ?? _authToken;
       _refreshToken = result.refreshToken ?? _refreshToken;
+      await _persistTokens();
     } catch (_) {
       return;
     }
@@ -3228,9 +3661,46 @@ class AuthService {
     return fileName.trim();
   }
 
-  void _clearTokens() {
+  Future<void> _clearTokens() async {
     _authToken = null;
     _refreshToken = null;
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(_authTokenStorageKey);
+    await preferences.remove(_refreshTokenStorageKey);
+  }
+
+  static Future<void> _restoreTokensFromStorage() async {
+    final preferences = await SharedPreferences.getInstance();
+    final storedAuthToken = preferences.getString(_authTokenStorageKey);
+    final storedRefreshToken = preferences.getString(_refreshTokenStorageKey);
+
+    _authToken =
+        (storedAuthToken != null && storedAuthToken.trim().isNotEmpty)
+            ? storedAuthToken
+            : null;
+    _refreshToken =
+        (storedRefreshToken != null && storedRefreshToken.trim().isNotEmpty)
+            ? storedRefreshToken
+            : null;
+  }
+
+  static Future<void> _persistTokens() async {
+    final preferences = await SharedPreferences.getInstance();
+
+    if (_authToken != null && _authToken!.trim().isNotEmpty) {
+      await preferences.setString(_authTokenStorageKey, _authToken!.trim());
+    } else {
+      await preferences.remove(_authTokenStorageKey);
+    }
+
+    if (_refreshToken != null && _refreshToken!.trim().isNotEmpty) {
+      await preferences.setString(
+        _refreshTokenStorageKey,
+        _refreshToken!.trim(),
+      );
+    } else {
+      await preferences.remove(_refreshTokenStorageKey);
+    }
   }
 
   static Future<void> _pingBackend() async {

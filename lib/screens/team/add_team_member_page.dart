@@ -40,7 +40,7 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
 
   bool _isSubmitting = false;
   bool _obscurePassword = true;
-  String _selectedRoleValue = 'admin';
+  String? _selectedRoleValue;
 
   final List<_RoleOption> _roles = const [
     _RoleOption(label: 'Admin', value: 'admin'),
@@ -92,13 +92,26 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
     }
   }
 
-  _RoleOption get _selectedRole {
-    return _roles.firstWhere((role) => role.value == _selectedRoleValue);
+  _RoleOption? get _selectedRole {
+    final selected = _selectedRoleValue;
+    if (selected == null || selected.isEmpty) {
+      return null;
+    }
+    for (final role in _roles) {
+      if (role.value == selected) {
+        return role;
+      }
+    }
+    return null;
   }
 
   Future<void> _submitMember() async {
     final form = _formKey.currentState;
     if (form == null || !form.validate()) {
+      return;
+    }
+    if ((_selectedRoleValue ?? '').trim().isEmpty) {
+      _showSnackBar('Role is required.');
       return;
     }
 
@@ -133,7 +146,7 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
           TeamMemberCreationResult(
             fullName:
                 '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-            roleLabel: _selectedRole.label,
+            roleLabel: _selectedRole?.label ?? '',
           ),
         );
         return;
@@ -145,7 +158,7 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
         lastName: _lastNameController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
         password: _passwordController.text,
-        role: _selectedRoleValue,
+        role: _selectedRoleValue ?? '',
         token: _authProvider.currentAuthToken,
       );
 
@@ -164,7 +177,7 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
         TeamMemberCreationResult(
           fullName:
               '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-          roleLabel: _selectedRole.label,
+          roleLabel: _selectedRole?.label ?? '',
         ),
       );
     } catch (error) {
@@ -307,9 +320,6 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                       prefixIcon: Icon(Icons.person_outline),
                     ),
                     validator: (value) {
-                      if ((value?.trim() ?? '').isEmpty) {
-                        return 'Last name is required.';
-                      }
                       return null;
                     },
                   ),
@@ -327,9 +337,6 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                       prefixIcon: Icon(Icons.alternate_email),
                     ),
                     validator: (value) {
-                      if (_isEditMode) {
-                        return null;
-                      }
                       final email = value?.trim() ?? '';
                       if (email.isEmpty) {
                         return 'Email is required.';
@@ -379,8 +386,12 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                _selectedRole.label,
-                                style: const TextStyle(color: Colors.black),
+                                _selectedRole?.label ?? 'Select role',
+                                style: TextStyle(
+                                  color: _selectedRole == null
+                                      ? AppColors.textSecondary
+                                      : Colors.black,
+                                ),
                               ),
                               const Icon(Icons.keyboard_arrow_down),
                             ],

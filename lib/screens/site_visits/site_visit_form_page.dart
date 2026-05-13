@@ -221,31 +221,23 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
 
   void _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedDate == null || _selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select both date and time')),
-      );
-      return;
-    }
 
     setState(() => _isSubmitting = true);
 
     try {
-      final formattedDate =
-          '${_selectedDate!.year.toString().padLeft(4, '0')}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}';
-      final formattedTime =
-          '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}';
-
-      if ((_selectedAssigneeId ?? '').trim().isEmpty) {
-        throw Exception('Please select a team member.');
-      }
+      final formattedDate = _selectedDate == null
+          ? ''
+          : '${_selectedDate!.year.toString().padLeft(4, '0')}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}';
+      final formattedTime = _selectedTime == null
+          ? ''
+          : '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}';
 
       Map<String, dynamic> responseData;
       if (widget.isEditMode) {
         responseData = await _authProvider.editSiteVisit(
           id: widget.visitId!.trim(),
-          visitDate: formattedDate,
-          visitTime: formattedTime,
+          visitDate: formattedDate.isEmpty ? null : formattedDate,
+          visitTime: formattedTime.isEmpty ? null : formattedTime,
           rescheduleReason: _notesController.text.trim(),
           token: _authProvider.currentAuthToken,
         );
@@ -358,7 +350,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildLabel('VISIT DATE *'),
+                                  _buildLabel('VISIT DATE'),
                                   const SizedBox(height: 8),
                                   _buildPickerField(
                                     text: _selectedDate == null
@@ -375,7 +367,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildLabel('VISIT TIME *'),
+                                  _buildLabel('VISIT TIME'),
                                   const SizedBox(height: 8),
                                   _buildPickerField(
                                     text: _selectedTime == null

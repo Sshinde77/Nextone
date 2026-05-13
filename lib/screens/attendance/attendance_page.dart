@@ -41,6 +41,10 @@ class _AttendancePageState extends State<AttendancePage> {
   bool _isLoadingSummary = false;
   String? _summaryError;
   Map<String, dynamic> _summaryData = <String, dynamic>{};
+  bool _isLoadingApprovals = false;
+  bool _isApprovingStatus = false;
+  String? _approvalsError;
+  List<Map<String, dynamic>> _approvalRows = <Map<String, dynamic>>[];
   late DateTime _calendarMonth;
   late DateTime _dailyViewDate;
   late DateTime _summaryFromDate;
@@ -71,6 +75,7 @@ class _AttendancePageState extends State<AttendancePage> {
     _loadMonthGridAttendance();
     _loadDailyViewAttendance();
     _loadSummaryAttendance();
+    _loadApprovalPending();
   }
 
   @override
@@ -988,6 +993,37 @@ class _AttendancePageState extends State<AttendancePage> {
     };
   }
 
+  Map<String, int> _approvalSummaryCounts(List<Map<String, dynamic>> rows) {
+    var present = 0;
+    var late = 0;
+    var absent = 0;
+    var leave = 0;
+
+    for (final row in rows) {
+      final status = _readStringFromMap(
+        row,
+        const ['status', 'attendance_status'],
+        fallback: 'absent',
+      ).toLowerCase();
+      if (status == 'present') {
+        present++;
+      } else if (status == 'late') {
+        late++;
+      } else if (status == 'on_leave' || status == 'leave') {
+        leave++;
+      } else if (status != 'weekend') {
+        absent++;
+      }
+    }
+
+    return <String, int>{
+      'present': present,
+      'late': late,
+      'absent': absent,
+      'leave': leave,
+    };
+  }
+
   String _summaryHours() {
     final summary = _calendarData['summary'];
     if (summary is Map<String, dynamic>) {
@@ -998,6 +1034,100 @@ class _AttendancePageState extends State<AttendancePage> {
       );
     }
     return '0';
+  }
+
+  int _approvalNotCheckedOutCount(List<Map<String, dynamic>> rows) {
+    var count = 0;
+    for (final row in rows) {
+      final checkOut = _readStringFromMap(
+        row,
+        const ['check_out_time', 'checkOutTime', 'check_out'],
+        fallback: '',
+      );
+      if (checkOut.trim().isEmpty || checkOut.trim() == '--:--') {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  Map<String, dynamic> _approvalEmployeeMap(Map<String, dynamic> row) {
+    final employee = row['employee'];
+    if (employee is Map<String, dynamic>) {
+      return employee;
+    }
+    if (employee is Map) {
+      return Map<String, dynamic>.from(
+        employee.map((key, value) => MapEntry(key.toString(), value)),
+      );
+    }
+    return const <String, dynamic>{};
+  }
+
+  String _approvalName(Map<String, dynamic> row) {
+    final employee = _approvalEmployeeMap(row);
+    final nested = _readStringFromMap(
+      employee,
+      const ['name', 'full_name', 'fullName', 'first_name'],
+      fallback: '',
+    );
+    if (nested.isNotEmpty) return nested;
+    return _readStringFromMap(
+      row,
+      const ['name', 'full_name', 'employee_name', 'employeeName'],
+      fallback: 'Employee',
+    );
+  }
+
+  String _approvalRole(Map<String, dynamic> row) {
+    final employee = _approvalEmployeeMap(row);
+    final nested = _readStringFromMap(
+      employee,
+      const ['role', 'designation', 'title'],
+      fallback: '',
+    );
+    if (nested.isNotEmpty) return nested;
+    return _readStringFromMap(
+      row,
+      const ['role', 'designation', 'title'],
+      fallback: 'Sales Executive',
+    );
+  }
+
+  String _approvalId(Map<String, dynamic> row) {
+    return _readStringFromMap(
+      row,
+      const ['id', '_id', 'attendance_id', 'attendanceId', 'pending_id', 'pendingId'],
+      fallback: '',
+    );
+  }
+
+  String _approvalStatus(Map<String, dynamic> row) {
+    return _readStringFromMap(
+      row,
+      const ['status', 'attendance_status', 'attendanceStatus'],
+      fallback: 'present',
+    );
+  }
+
+  String _approvalCheckIn(Map<String, dynamic> row) {
+    return _formatTimeValue(
+      _readStringFromMap(
+        row,
+        const ['check_in_time', 'checkInTime', 'check_in', 'checkIn'],
+        fallback: '--:--',
+      ),
+    );
+  }
+
+  String _approvalCheckOut(Map<String, dynamic> row) {
+    return _formatTimeValue(
+      _readStringFromMap(
+        row,
+        const ['check_out_time', 'checkOutTime', 'check_out', 'checkOut'],
+        fallback: '--:--',
+      ),
+    );
   }
 
   String _readStringFromMap(Map<String, dynamic> map, List<String> keys,
@@ -1332,6 +1462,8 @@ class _AttendancePageState extends State<AttendancePage> {
                         _loadDailyViewAttendance();
                       } else if (index == 5) {
                         _loadSummaryAttendance();
+                      } else if (index == 6) {
+                        _loadApprovalPending();
                       }
                     },
                   child: AnimatedContainer(
@@ -2000,21 +2132,25 @@ class _AttendancePageState extends State<AttendancePage> {
         value: summary['present'] ?? 0,
         label: 'Present',
         color: const Color(0xFF0F9D71),
+        compact: compact,
       ),
       _DailySummaryTile(
         value: summary['late'] ?? 0,
         label: 'Late',
         color: const Color(0xFFE07900),
+        compact: compact,
       ),
       _DailySummaryTile(
         value: summary['absent'] ?? 0,
         label: 'Absent',
         color: const Color(0xFFF04452),
+        compact: compact,
       ),
       _DailySummaryTile(
         value: summary['leave'] ?? 0,
         label: 'On Leave',
         color: const Color(0xFF5655F6),
+        compact: compact,
       ),
     ];
 
@@ -2023,7 +2159,7 @@ class _AttendancePageState extends State<AttendancePage> {
         crossAxisCount: 2,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: 2.9,
+        childAspectRatio: 2.0,
         children: tiles,
       );
     }
@@ -2296,38 +2432,77 @@ class _AttendancePageState extends State<AttendancePage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Team Summary',
-                    style: TextStyle(
-                      color: Color(0xFF172B4D),
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                    ),
+            child: compact
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Team Summary',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Color(0xFF172B4D),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _SummaryDateButton(
+                            value: _displayDate(_summaryFromDate),
+                            onTap: _pickSummaryFromDate,
+                          ),
+                          const Text(
+                            'to',
+                            style: TextStyle(
+                              color: Color(0xFF8B98AA),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          _SummaryDateButton(
+                            value: _displayDate(_summaryToDate),
+                            onTap: _pickSummaryToDate,
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Team Summary',
+                          style: TextStyle(
+                            color: Color(0xFF172B4D),
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      _SummaryDateButton(
+                        value: _displayDate(_summaryFromDate),
+                        onTap: _pickSummaryFromDate,
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          'to',
+                          style: TextStyle(
+                            color: Color(0xFF8B98AA),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      _SummaryDateButton(
+                        value: _displayDate(_summaryToDate),
+                        onTap: _pickSummaryToDate,
+                      ),
+                    ],
                   ),
-                ),
-                _SummaryDateButton(
-                  value: _displayDate(_summaryFromDate),
-                  onTap: _pickSummaryFromDate,
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    'to',
-                    style: TextStyle(
-                      color: Color(0xFF8B98AA),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                _SummaryDateButton(
-                  value: _displayDate(_summaryToDate),
-                  onTap: _pickSummaryToDate,
-                ),
-              ],
-            ),
           ),
           const Divider(height: 1, color: Color(0xFFE8EDF5)),
           if (_isLoadingSummary)
@@ -3028,12 +3203,71 @@ class _AttendancePageState extends State<AttendancePage> {
     if (picked == null) return;
     setState(() {
       _approvalDate = DateTime(picked.year, picked.month, picked.day);
+      _dailyViewDate = DateTime(picked.year, picked.month, picked.day);
     });
+    _loadDailyViewAttendance();
+    _loadApprovalPending();
+  }
+
+  Future<void> _loadApprovalPending() async {
+    setState(() {
+      _isLoadingApprovals = true;
+      _approvalsError = null;
+    });
+    try {
+      final data = await _authProvider.attendancePending(
+        date: _formatDateForApi(_approvalDate),
+        token: _authProvider.currentAuthToken,
+      );
+      final parsedRows = _extractApprovalRows(data);
+      if (!mounted) return;
+      setState(() {
+        _approvalRows = parsedRows;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _approvalsError = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingApprovals = false;
+        });
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> _extractApprovalRows(Map<String, dynamic> source) {
+    dynamic list = source['records'] ??
+        source['items'] ??
+        source['rows'] ??
+        source['pending'] ??
+        source['data'];
+
+    if (list is Map<String, dynamic>) {
+      list = list['records'] ?? list['items'] ?? list['rows'] ?? list['data'];
+    }
+
+    if (list is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    return list
+        .whereType<Map>()
+        .map(
+          (entry) => Map<String, dynamic>.from(
+            entry.map((key, value) => MapEntry(key.toString(), value)),
+          ),
+        )
+        .toList();
   }
 
   Widget _buildApprovalsTabContent(double maxWidth) {
     final compact = maxWidth < 700;
     final displayDate = _displayDate(_approvalDate);
+    final rows = _approvalRows;
+    final summary = _approvalSummaryCounts(rows);
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -3123,25 +3357,25 @@ class _AttendancePageState extends State<AttendancePage> {
                         onTap: _pickApprovalDate,
                       ),
                       const SizedBox(height: 10),
-                      const Wrap(
+                      Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
                           _ApprovalCountChip(
                             icon: Icons.logout_rounded,
-                            label: '0 not checked out',
+                            label: '${_approvalNotCheckedOutCount(rows)} not checked out',
                             textColor: Color(0xFFF97316),
                             bgColor: Color(0xFFFFF1E8),
                           ),
                           _ApprovalCountChip(
                             icon: Icons.cancel_outlined,
-                            label: '0 absent',
+                            label: '${summary['absent'] ?? 0} absent',
                             textColor: Color(0xFFEF4444),
                             bgColor: Color(0xFFFFECEC),
                           ),
                           _ApprovalCountChip(
                             icon: Icons.schedule_rounded,
-                            label: '0 late',
+                            label: '${summary['late'] ?? 0} late',
                             textColor: Color(0xFFD97706),
                             bgColor: Color(0xFFFFF6E5),
                           ),
@@ -3156,25 +3390,25 @@ class _AttendancePageState extends State<AttendancePage> {
                         onTap: _pickApprovalDate,
                       ),
                       const Spacer(),
-                      const Wrap(
+                      Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
                           _ApprovalCountChip(
                             icon: Icons.logout_rounded,
-                            label: '0 not checked out',
+                            label: '${_approvalNotCheckedOutCount(rows)} not checked out',
                             textColor: Color(0xFFF97316),
                             bgColor: Color(0xFFFFF1E8),
                           ),
                           _ApprovalCountChip(
                             icon: Icons.cancel_outlined,
-                            label: '0 absent',
+                            label: '${summary['absent'] ?? 0} absent',
                             textColor: Color(0xFFEF4444),
                             bgColor: Color(0xFFFFECEC),
                           ),
                           _ApprovalCountChip(
                             icon: Icons.schedule_rounded,
-                            label: '0 late',
+                            label: '${summary['late'] ?? 0} late',
                             textColor: Color(0xFFD97706),
                             bgColor: Color(0xFFFFF6E5),
                           ),
@@ -3186,49 +3420,450 @@ class _AttendancePageState extends State<AttendancePage> {
           Container(
             width: double.infinity,
             constraints: const BoxConstraints(minHeight: 280),
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Icon(
-                    Icons.check_circle_rounded,
-                    color: Color(0xFF10B981),
-                    size: 34,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'All caught up!',
-                  style: TextStyle(
-                    color: Color(0xFF1E3A5F),
-                    fontSize: compact ? 22 : 28,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'No pending approvals for $displayDate',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF98A4B8),
-                    fontSize: compact ? 14 : 20,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+            child: _isLoadingApprovals
+                ? const Center(child: CircularProgressIndicator())
+                : _approvalsError != null
+                    ? Center(
+                        child: Text(
+                          _approvalsError!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.error,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    : rows.isEmpty
+                        ? Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 64,
+                                height: 64,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDCFCE7),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: Color(0xFF10B981),
+                                  size: 34,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                'All caught up!',
+                                style: TextStyle(
+                                  color: const Color(0xFF1E3A5F),
+                                  fontSize: compact ? 22 : 28,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'No pending approvals for $displayDate',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: const Color(0xFF98A4B8),
+                                  fontSize: compact ? 14 : 20,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            children: [
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  '${rows.length} employees | ${summary['present'] ?? 0} present',
+                                  style: const TextStyle(
+                                    color: Color(0xFF64748B),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              ...rows.map((row) {
+                                final name = _approvalName(row);
+                                final role = _approvalRole(row);
+                                final status = _approvalStatus(row);
+                                final checkIn = _approvalCheckIn(row);
+                                final checkOut = _approvalCheckOut(row);
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _ApprovalEmployeeCard(
+                                    name: name,
+                                    role: role,
+                                    status: status,
+                                    checkIn: checkIn,
+                                    checkOut: checkOut,
+                                    onChange: () {
+                                      _openApprovalStatusDialog(row);
+                                    },
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openApprovalStatusDialog(Map<String, dynamic> row) async {
+    final name = _approvalName(row);
+
+    final role = _approvalRole(row);
+    final approvalId = _approvalId(row);
+    if (approvalId.trim().isEmpty) {
+      _showSnackBar('Cannot update status: approval id missing.');
+      return;
+    }
+    final checkIn = _approvalCheckIn(row);
+    final checkOut = _approvalCheckOut(row);
+    final currentStatus = _approvalStatus(row);
+
+    final reasonController = TextEditingController();
+    final options = <String>['present', 'late', 'absent', 'on_leave', 'half_day'];
+    var selectedStatus = options.contains(currentStatus.toLowerCase())
+        ? currentStatus.toLowerCase()
+        : 'present';
+
+    final changed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compactDialog = constraints.maxWidth < 430;
+                  return Container(
+                    padding: EdgeInsets.all(compactDialog ? 12 : 14),
+                    constraints: const BoxConstraints(maxWidth: 760, maxHeight: 640),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Change Status for ${name.toUpperCase()}',
+                            style: const TextStyle(
+                              color: Color(0xFF475569),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.25,
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => Navigator.of(dialogContext).pop(false),
+                          icon: const Icon(Icons.link_off_rounded, size: 14),
+                          label: const Text('Cancel'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF4F46E5),
+                            backgroundColor: const Color(0xFFEEF2FF),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              role,
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          _statusPreviewChip(selectedStatus),
+                          _ApprovalMetaText(
+                            icon: Icons.login_rounded,
+                            color: const Color(0xFF10B981),
+                            text: checkIn,
+                          ),
+                          _ApprovalMetaText(
+                            icon: Icons.logout_rounded,
+                            color: const Color(0xFFEF4444),
+                            text: checkOut == '--:--' ? 'Not checked out' : checkOut,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'New Status',
+                      style: TextStyle(
+                        color: Color(0xFF475569),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: options.map((status) {
+                        final selected = selectedStatus == status;
+                        return ChoiceChip(
+                          selected: selected,
+                          onSelected: (_) => setStateDialog(() => selectedStatus = status),
+                          label: Text(_approvalStatusLabel(status)),
+                          selectedColor: const Color(0xFFDDF7E9),
+                          side: BorderSide(
+                            color: selected
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFD1D5DB),
+                          ),
+                          labelStyle: TextStyle(
+                            color: selected
+                                ? const Color(0xFF0E9A6E)
+                                : const Color(0xFF475569),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Reason (optional)',
+                      style: TextStyle(
+                        color: Color(0xFF475569),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: reasonController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Employee was on field visit...',
+                        hintStyle: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF94A3B8),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    compactDialog
+                        ? Column(
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                                  style: OutlinedButton.styleFrom(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    side: const BorderSide(color: Color(0xFFD1D5DB)),
+                                    padding: const EdgeInsets.symmetric(vertical: 13),
+                                    textStyle: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  child: const Text('Cancel'),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _isApprovingStatus
+                                      ? null
+                                      : () => Navigator.of(dialogContext).pop(true),
+                                  child: Text(
+                                    _isApprovingStatus ? 'Updating...' : 'Confirm Change',
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 13),
+                                    backgroundColor: const Color(0xFF6D28D9),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                                  style: OutlinedButton.styleFrom(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    side: const BorderSide(color: Color(0xFFD1D5DB)),
+                                    padding: const EdgeInsets.symmetric(vertical: 13),
+                                    textStyle: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  child: const Text('Cancel'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _isApprovingStatus
+                                      ? null
+                                      : () => Navigator.of(dialogContext).pop(true),
+                                  child: Text(
+                                    _isApprovingStatus ? 'Updating...' : 'Confirm Change',
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 13),
+                                    backgroundColor: const Color(0xFF6D28D9),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (changed == true) {
+      try {
+        setState(() {
+          _isApprovingStatus = true;
+        });
+        await _authProvider.attendanceApprove(
+          id: approvalId,
+          status: selectedStatus,
+          reason: reasonController.text.trim().isEmpty
+              ? null
+              : reasonController.text.trim(),
+          token: _authProvider.currentAuthToken,
+        );
+        if (!mounted) return;
+        await _loadApprovalPending();
+        _showSnackBar('Status updated for $name.');
+      } catch (e) {
+        if (!mounted) return;
+        _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isApprovingStatus = false;
+          });
+        }
+      }
+    }
+
+    reasonController.dispose();
+  }
+
+  Widget _statusPreviewChip(String status) {
+    final isPresent = status == 'present';
+    final bg = isPresent ? const Color(0xFFDDF7E9) : const Color(0xFFFFE7E7);
+    final fg = isPresent ? const Color(0xFF0E9A6E) : const Color(0xFFDC2626);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.circle, size: 7, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            _approvalStatusLabel(status),
+            style: TextStyle(
+              color: fg,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _approvalStatusLabel(String status) {
+    return status
+        .replaceAll('_', ' ')
+        .split(' ')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
   }
 
 }
@@ -3417,41 +4052,49 @@ class _DailySummaryTile extends StatelessWidget {
     required this.value,
     required this.label,
     required this.color,
+    this.compact = false,
   });
 
   final int value;
   final String label;
   final Color color;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: const BoxDecoration(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 12,
+        vertical: compact ? 10 : 14,
+      ),
+      decoration: BoxDecoration(
         border: Border(
-          right: BorderSide(color: Color(0xFFE8EDF5)),
+          right: compact
+              ? BorderSide.none
+              : const BorderSide(color: Color(0xFFE8EDF5)),
         ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             '$value',
             style: TextStyle(
               color: color,
-              fontSize: 20,
+              fontSize: compact ? 16 : 20,
               fontWeight: FontWeight.w900,
               height: 1,
             ),
           ),
-          const SizedBox(height: 7),
+          SizedBox(height: compact ? 4 : 7),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               color: Color(0xFF8E9AAF),
-              fontSize: 11,
+              fontSize: compact ? 10 : 11,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -3725,6 +4368,342 @@ class _ApprovalCountChip extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ApprovalEmployeeCard extends StatelessWidget {
+  const _ApprovalEmployeeCard({
+    required this.name,
+    required this.role,
+    required this.status,
+    required this.checkIn,
+    required this.checkOut,
+    required this.onChange,
+  });
+
+  final String name;
+  final String role;
+  final String status;
+  final String checkIn;
+  final String checkOut;
+  final VoidCallback onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusLower = status.trim().toLowerCase();
+    final isPresent = statusLower == 'present' || statusLower == 'checked in';
+    final statusBg = isPresent ? const Color(0xFFDDF7E9) : const Color(0xFFFFE7E7);
+    final statusFg = isPresent ? const Color(0xFF0E9A6E) : const Color(0xFFDC2626);
+    final statusLabel = status
+        .replaceAll('_', ' ')
+        .split(' ')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 540;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFDDE4F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0F0F172A),
+                blurRadius: 14,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF5EF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.person_outline_rounded,
+                            color: Color(0xFF0E9A6E),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      role,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: statusBg,
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.circle, size: 7, color: statusFg),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          statusLabel.isEmpty ? 'Absent' : statusLabel,
+                                          style: TextStyle(
+                                            color: statusFg,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 6,
+                      children: [
+                        _ApprovalMetaText(
+                          icon: Icons.login_rounded,
+                          color: const Color(0xFF10B981),
+                          text: checkIn == '--:--' ? 'Not checked in' : checkIn,
+                        ),
+                        _ApprovalMetaText(
+                          icon: Icons.logout_rounded,
+                          color: const Color(0xFFEF4444),
+                          text: checkOut == '--:--' ? 'Not checked out' : checkOut,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: onChange,
+                        icon: const Icon(Icons.edit_outlined, size: 16),
+                        label: const Text('Change'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF4F46E5),
+                          backgroundColor: const Color(0xFFEEF2FF),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF5EF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.person_outline_rounded,
+              color: Color(0xFF0E9A6E),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        role,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: statusBg,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.circle, size: 7, color: statusFg),
+                          const SizedBox(width: 6),
+                          Text(
+                            statusLabel.isEmpty ? 'Absent' : statusLabel,
+                            style: TextStyle(
+                              color: statusFg,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 6,
+                  children: [
+                    _ApprovalMetaText(
+                      icon: Icons.login_rounded,
+                      color: const Color(0xFF10B981),
+                      text: checkIn == '--:--' ? 'Not checked in' : checkIn,
+                    ),
+                    _ApprovalMetaText(
+                      icon: Icons.logout_rounded,
+                      color: const Color(0xFFEF4444),
+                      text: checkOut == '--:--' ? 'Not checked out' : checkOut,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          TextButton.icon(
+            onPressed: onChange,
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            label: const Text('Change'),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF4F46E5),
+              backgroundColor: const Color(0xFFEEF2FF),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+                  ],
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _ApprovalMetaText extends StatelessWidget {
+  const _ApprovalMetaText({
+    required this.icon,
+    required this.color,
+    required this.text,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 5),
+        Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF7C8DA6),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

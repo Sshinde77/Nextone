@@ -270,15 +270,6 @@ class _LeadFormPageState extends State<LeadFormPage> {
     if (form == null || !form.validate()) {
       return;
     }
-    if (_selectedAssigneeId == null || _selectedAssigneeId!.isEmpty) {
-      _showSnackBar('Please select an assignee.');
-      return;
-    }
-
-    if (_isLoadingAssignees) {
-      _showSnackBar('Please wait while assignees are loading.');
-      return;
-    }
     if (_isLoadingLeadDetails) {
       _showSnackBar('Please wait while lead details are loading.');
       return;
@@ -302,7 +293,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           phone: _phoneController.text.trim(),
           email: _emailController.text.trim(),
           source: _sourceController.text.trim(),
-          assignedTo: _selectedAssigneeId!,
+          assignedTo: _selectedAssigneeId?.trim() ?? '',
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           notes: _notesController.text.trim(),
@@ -314,7 +305,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           phone: _phoneController.text.trim(),
           email: _emailController.text.trim(),
           source: _sourceController.text.trim(),
-          assignedTo: _selectedAssigneeId!,
+          assignedTo: _selectedAssigneeId?.trim() ?? '',
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           notes: _notesController.text.trim(),
@@ -424,6 +415,12 @@ class _LeadFormPageState extends State<LeadFormPage> {
                         controller: _nameController,
                         label: 'Name',
                         hintText: 'Suresh Patel',
+                        validator: (value) {
+                          if ((value?.trim().isEmpty ?? true)) {
+                            return 'Name is required.';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 12),
                       _buildTextField(
@@ -431,6 +428,12 @@ class _LeadFormPageState extends State<LeadFormPage> {
                         label: 'Phone',
                         hintText: '+919876543210',
                         keyboardType: TextInputType.phone,
+                        validator: (value) {
+                          if ((value?.trim().isEmpty ?? true)) {
+                            return 'Phone is required.';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 12),
                       _buildTextField(
@@ -629,13 +632,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           minLines: minLines,
           maxLines: maxLines,
           enabled: !_isSubmitting,
-          validator: validator ??
-              (value) {
-                if ((value?.trim().isEmpty ?? true)) {
-                  return '$label is required.';
-                }
-                return null;
-              },
+          validator: validator,
           decoration: _fieldDecoration(hintText: hintText),
         ),
       ],

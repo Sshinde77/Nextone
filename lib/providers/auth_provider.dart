@@ -154,6 +154,10 @@ class AuthProvider {
     );
   }
 
+  Future<ExportFileResult> exportAll({String? token}) {
+    return _authService.exportAll(token: token);
+  }
+
   Future<Map<String, dynamic>> uploadAttendancePhoto({
     required String type,
     required String photoPath,
@@ -256,6 +260,30 @@ class AuthProvider {
     return _authService.attendanceSummary(
       from: from,
       to: to,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> attendancePending({
+    String? date,
+    String? token,
+  }) {
+    return _authService.attendancePending(
+      date: date,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> attendanceApprove({
+    required String id,
+    required String status,
+    String? reason,
+    String? token,
+  }) {
+    return _authService.attendanceApprove(
+      id: id,
+      status: status,
+      reason: reason,
       token: token,
     );
   }
@@ -601,6 +629,52 @@ class AuthProvider {
 
   Future<void> deleteProject({required String id, String? token}) {
     return _authService.deleteProject(id: id, token: token);
+  }
+
+  Future<List<Map<String, dynamic>>> notifications({
+    String? token,
+    String? type,
+    bool? unreadOnly,
+    int page = 1,
+    int perPage = 30,
+  }) {
+    return _authService.notifications(
+      token: token,
+      type: type,
+      unreadOnly: unreadOnly,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
+  Future<void> deleteAllNotifications({String? token}) {
+    return _authService.deleteAllNotifications(token: token);
+  }
+
+  Future<int> unreadNotificationsCount({String? token}) {
+    return _authService.unreadNotificationsCount(token: token);
+  }
+
+  Future<List<String>> notificationTypes({String? token}) {
+    return _authService.notificationTypes(token: token);
+  }
+
+  Future<void> markAllNotificationsRead({String? token}) {
+    return _authService.markAllNotificationsRead(token: token);
+  }
+
+  Future<Map<String, dynamic>> markSingleNotificationRead({
+    required String id,
+    String? token,
+  }) {
+    return _authService.markSingleNotificationRead(id: id, token: token);
+  }
+
+  Future<void> deleteSingleNotification({
+    required String id,
+    String? token,
+  }) {
+    return _authService.deleteSingleNotification(id: id, token: token);
   }
 
   Future<Map<String, dynamic>> dashboardStats({

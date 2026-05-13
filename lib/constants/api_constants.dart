@@ -65,14 +65,25 @@ class ApiConstants {
   static const String attendanceCalendar = '/attendance/calendar';
   static const String attendanceByMonth = '/attendance/by-month';
   static const String attendanceByDate = '/attendance/by-date';
-  static const String attendanceSummary = '/attendance/summary';
+  static const String attendanceSummary = '/attendance/summary';  
+  static const String attendancePending = '/attendance/pending';
+  static const String attendanceapprove = '/attendance/{id}/approve';
 
   // Dashboard Endpoints
   static const String dashboardStats = '/dashboard/stats';
-  static const String dashboardUpcomingSiteVisits =
+  static const String dashboardUpcomingSiteVisits =   
       '/dashboard/upcoming-site-visits';
   static const String dashboardRecentActivity = '/dashboard/recent-activity';
   static const String dashboardLeadPipeline = '/dashboard/lead-pipeline';
   static const String dashboardLeadSources = '/dashboard/lead-sources';
   static const String dashboardRevenue = '/dashboard/revenue';
+
+  // Notifications Endpoints
+  static const String notifications = '/notifications';
+  static const String deletenotifications = '/notifications';
+  static const String unreadcountnotifications = '/notifications/unread-count';
+  static const String typesnotifications = '/notifications/types';
+  static const String readallnotifications = '/notifications/read-all';
+  static const String readsinglenotification = '/notifications/{id}/read';
+  static const String deletesinglenotification = '/notifications/{id}';
 }

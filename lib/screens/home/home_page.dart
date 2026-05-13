@@ -1,10 +1,11 @@
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/routes/app_routes.dart';
 import 'package:nextone/screens/attendance/attendance_page.dart';
-import 'package:nextone/utils/csv_export_helper.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/crm_bottom_nav.dart';
 
@@ -236,6 +237,10 @@ class _HomePageState extends State<HomePage> {
                   isLoading: _statsLoading,
                   hasError: _statsError != null,
                   onRetry: _loadDashboardStats,
+                  onLeadsTap: () => _openMainTab(1),
+                  onSiteVisitsTap: () => _openMainTab(3),
+                  onFollowUpsTap: () => _openMainTab(2),
+                  onProjectsTap: () => _openMainTab(4),
                 ),
                 const SizedBox(height: 10),
                 _RowWrap(
@@ -256,6 +261,7 @@ class _HomePageState extends State<HomePage> {
                     isLoading: _upcomingVisitsLoading,
                     hasError: _upcomingVisitsError != null,
                     onRetry: _loadUpcomingSiteVisits,
+                    onViewAllTap: () => _openMainTab(3),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -339,10 +345,20 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _HeaderBlock extends StatelessWidget {
+class _HeaderBlock extends StatefulWidget {
   const _HeaderBlock();
 
+  @override
+  State<_HeaderBlock> createState() => _HeaderBlockState();
+}
+
+class _HeaderBlockState extends State<_HeaderBlock> {
+  final AuthProvider _authProvider = AuthProvider();
+  bool _isExporting = false;
+  _ExportModuleType? _activeExportType;
+
   String _greetingForHour(int hour) {
+    if (hour < 5) return 'Good night';
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     if (hour < 21) return 'Good evening';
@@ -379,18 +395,177 @@ class _HeaderBlock extends StatelessWidget {
     return '$weekday, ${now.day} $month ${now.year}';
   }
 
-  Future<void> _exportDashboard(BuildContext context) async {
-    await CsvExportHelper.exportRowsToClipboard(
+  ({String from, String to}) _currentMonthRange() {
+    final now = DateTime.now();
+    final from =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
+    final toDate = DateTime(now.year, now.month + 1, 0);
+    final to =
+        '${toDate.year}-${toDate.month.toString().padLeft(2, '0')}-${toDate.day.toString().padLeft(2, '0')}';
+    return (from: from, to: to);
+  }
+
+  Future<void> _exportModule(_ExportModuleType moduleType) async {
+    if (_isExporting) {
+      return;
+    }
+    setState(() {
+      _isExporting = true;
+      _activeExportType = moduleType;
+    });
+
+    try {
+      final token = _authProvider.currentAuthToken;
+      final range = _currentMonthRange();
+      final exported = switch (moduleType) {
+        _ExportModuleType.leads => await _authProvider.exportLeads(
+            from: range.from,
+            to: range.to,
+            token: token,
+          ),
+        _ExportModuleType.siteVisits =>
+          await _authProvider.exportSiteVisits(token: token),
+        _ExportModuleType.followUps =>
+          await _authProvider.exportFollowUps(token: token),
+        _ExportModuleType.attendance => await _authProvider.exportAttendance(
+            from: range.from,
+            to: range.to,
+            token: token,
+          ),
+        _ExportModuleType.projects =>
+          await _authProvider.exportProjects(token: token),
+        _ExportModuleType.teamMembers =>
+          await _authProvider.exportUsers(token: token),
+        _ExportModuleType.allModules =>
+          await _authProvider.exportAll(token: token),
+      };
+
+      if (!mounted) return;
+
+      final fileName = exported.fileName.trim().isEmpty
+          ? '${moduleType.fallbackFileName}.xlsx'
+          : exported.fileName.trim();
+
+      if (kIsWeb) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                'Export generated ($fileName), but direct file save is not supported on Web in this build.',
+              ),
+            ),
+          );
+        return;
+      }
+
+      final file = await ExportFileHelper.saveToDownloadNextone(
+        fileName: fileName,
+        bytes: exported.bytes,
+      );
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('${moduleType.label} export downloaded: ${file.path}')),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+          _activeExportType = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _openExportMenu() async {
+    final renderBox = context.findRenderObject() as RenderBox?;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (renderBox == null || overlay == null) {
+      return;
+    }
+    final offset = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
+
+    final selected = await showMenu<_ExportModuleType>(
       context: context,
-      fileLabel: 'Home Dashboard',
-      headers: const <String>['Metric', 'Value'],
-      rows: const <List<String>>[
-        <String>['Total Leads', '3'],
-        <String>['Site Visits', '3'],
-        <String>['Follow Ups', '3'],
-        <String>['Projects', '2'],
+      position: RelativeRect.fromLTRB(
+        offset.dx + 120,
+        offset.dy + 88,
+        overlay.size.width - offset.dx - 8,
+        overlay.size.height - offset.dy,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      color: Colors.white,
+      items: [
+        const PopupMenuItem<_ExportModuleType>(
+          enabled: false,
+          height: 34,
+          child: Text(
+            'DOWNLOAD EXCEL (.XLSX)',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        ..._ExportModuleType.values.map(
+          (item) => PopupMenuItem<_ExportModuleType>(
+            value: item,
+            height: 44,
+            child: Row(
+              children: [
+                Icon(item.icon, size: 16, color: item.color),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    item.label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF344054),
+                    ),
+                  ),
+                ),
+                if (item == _ExportModuleType.allModules)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F2FF),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Text(
+                      'All',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
+
+    if (selected != null && mounted) {
+      await _exportModule(selected);
+    }
   }
 
   @override
@@ -427,7 +602,7 @@ class _HeaderBlock extends StatelessWidget {
           ),
         ),
         OutlinedButton.icon(
-          onPressed: () => _exportDashboard(context),
+          onPressed: _isExporting ? null : _openExportMenu,
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF344054),
             side: const BorderSide(color: Color(0xFFD8DFEA)),
@@ -437,10 +612,18 @@ class _HeaderBlock extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             visualDensity: VisualDensity.compact,
           ),
-          icon: const Icon(Icons.download_rounded, size: 16),
-          label: const Text(
-            'Export Data',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          icon: _isExporting
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.download_rounded, size: 16),
+          label: Text(
+            _isExporting && _activeExportType != null
+                ? 'Exporting ${_activeExportType!.label}'
+                : 'Export Data',
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
       ],
@@ -510,18 +693,83 @@ class _HeaderBlock extends StatelessWidget {
   }
 }
 
+enum _ExportModuleType {
+  leads(
+    label: 'Leads',
+    icon: Icons.download_rounded,
+    color: Color(0xFF2563EB),
+    fallbackFileName: 'leads_export',
+  ),
+  siteVisits(
+    label: 'Site Visits',
+    icon: Icons.download_rounded,
+    color: Color(0xFF7C3AED),
+    fallbackFileName: 'site_visits_export',
+  ),
+  followUps(
+    label: 'Follow-Ups',
+    icon: Icons.download_rounded,
+    color: Color(0xFF16A34A),
+    fallbackFileName: 'follow_ups_export',
+  ),
+  attendance(
+    label: 'Attendance',
+    icon: Icons.download_rounded,
+    color: Color(0xFF4F46E5),
+    fallbackFileName: 'attendance_export',
+  ),
+  projects(
+    label: 'Projects',
+    icon: Icons.download_rounded,
+    color: Color(0xFFEA580C),
+    fallbackFileName: 'projects_export',
+  ),
+  teamMembers(
+    label: 'Team Members',
+    icon: Icons.download_rounded,
+    color: Color(0xFFE11D48),
+    fallbackFileName: 'users_export',
+  ),
+  allModules(
+    label: 'All Modules',
+    icon: Icons.download_rounded,
+    color: Color(0xFF0EA5E9),
+    fallbackFileName: 'all_modules_export',
+  );
+
+  const _ExportModuleType({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.fallbackFileName,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final String fallbackFileName;
+}
+
 class _StatsGrid extends StatelessWidget {
   const _StatsGrid({
     required this.stats,
     required this.isLoading,
     required this.hasError,
     required this.onRetry,
+    required this.onLeadsTap,
+    required this.onSiteVisitsTap,
+    required this.onFollowUpsTap,
+    required this.onProjectsTap,
   });
 
   final Map<String, dynamic>? stats;
   final bool isLoading;
   final bool hasError;
   final Future<void> Function() onRetry;
+  final VoidCallback onLeadsTap;
+  final VoidCallback onSiteVisitsTap;
+  final VoidCallback onFollowUpsTap;
+  final VoidCallback onProjectsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -596,14 +844,15 @@ class _StatsGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth > 900;
+        final compact = constraints.maxWidth < 420;
         return GridView.count(
           crossAxisCount: wide ? 4 : 2,
           padding: EdgeInsets.zero,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 6,
+          mainAxisSpacing: 8,
           crossAxisSpacing: 8,
-          childAspectRatio: wide ? 1.85 : 1.5,
+          childAspectRatio: wide ? 1.85 : (compact ? 1.25 : 1.38),
           children: [
             _StatCard(
               icon: Icons.group_outlined,
@@ -612,6 +861,8 @@ class _StatsGrid extends StatelessWidget {
               title: 'Total Leads',
               value: '$totalLeads',
               subtitle: '$bookedLeads booked',
+              compact: compact,
+              onTap: onLeadsTap,
             ),
             _StatCard(
               icon: Icons.calendar_month_outlined,
@@ -621,6 +872,8 @@ class _StatsGrid extends StatelessWidget {
               value: '$totalSiteVisits',
               subtitle: '$upcomingSiteVisits upcoming',
               tag: '$doneSiteVisits done',
+              compact: compact,
+              onTap: onSiteVisitsTap,
             ),
             _StatCard(
               icon: Icons.call_outlined,
@@ -629,6 +882,8 @@ class _StatsGrid extends StatelessWidget {
               title: 'Follow-Ups',
               value: '$totalFollowUps',
               subtitle: '$pendingFollowUps pending',
+              compact: compact,
+              onTap: onFollowUpsTap,
             ),
             _StatCard(
               icon: Icons.apartment_outlined,
@@ -638,6 +893,8 @@ class _StatsGrid extends StatelessWidget {
               value: '$totalProjects',
               subtitle: '$activeProjects active',
               tag: '$upcomingProjects upcoming',
+              compact: compact,
+              onTap: onProjectsTap,
             ),
           ],
         );
@@ -656,6 +913,7 @@ class _StatCard extends StatelessWidget {
     required this.subtitle,
     this.tag,
     this.compact = false,
+    this.onTap,
   });
 
   final IconData icon;
@@ -666,13 +924,17 @@ class _StatCard extends StatelessWidget {
   final String subtitle;
   final String? tag;
   final bool compact;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return _DashCard(
-      padding: const EdgeInsets.all(11),
-      child: Stack(
-        children: [
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: _DashCard(
+        padding: EdgeInsets.all(compact ? 10 : 11),
+        child: Stack(
+          children: [
           Positioned(
             right: -30,
             top: -30,
@@ -691,20 +953,20 @@ class _StatCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    width: 30,
-                    height: 30,
+                    width: compact ? 28 : 30,
+                    height: compact ? 28 : 30,
                     decoration: BoxDecoration(
                       color: iconBg,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(icon, color: Colors.white, size: 16),
+                    child: Icon(icon, color: Colors.white, size: compact ? 15 : 16),
                   ),
                   const Spacer(),
                   if (tag != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compact ? 6 : 8,
+                        vertical: compact ? 2 : 3,
                       ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFF7E8),
@@ -712,20 +974,22 @@ class _StatCard extends StatelessWidget {
                       ),
                       child: Text(
                         tag!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Color(0xFFD97706),
-                          fontSize: 11,
+                          fontSize: compact ? 10 : 11,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                 ],
               ),
-              const Spacer(),
+              SizedBox(height: compact ? 8 : 10),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 11,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: compact ? 10 : 11,
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
@@ -734,7 +998,7 @@ class _StatCard extends StatelessWidget {
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: compact ? 19 : 28,
+                  fontSize: compact ? 24 : 28,
                   height: 1.0,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFF0F1F3A),
@@ -743,15 +1007,18 @@ class _StatCard extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  fontSize: 11,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: compact ? 10 : 11,
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -849,18 +1116,18 @@ class _QuickAccessCard extends StatelessWidget {
         color: const Color(0xFFEF4444),
         onTap: onAttendanceTap,
       ),
-      _QuickAccessItem(
-        title: 'Notifications',
-        icon: Icons.notifications_none_rounded,
-        color: const Color(0xFF06B6D4),
-        onTap: onNotificationsTap,
-      ),
-      _QuickAccessItem(
-        title: 'Reports',
-        icon: Icons.bar_chart_rounded,
-        color: const Color(0xFF2563EB),
-        onTap: onReportsTap,
-      ),
+      // _QuickAccessItem(
+      //   title: 'Notifications',
+      //   icon: Icons.notifications_none_rounded,
+      //   color: const Color(0xFF06B6D4),
+      //   onTap: onNotificationsTap,
+      // ),
+      // _QuickAccessItem(
+      //   title: 'Reports',
+      //   icon: Icons.bar_chart_rounded,
+      //   color: const Color(0xFF2563EB),
+      //   onTap: onReportsTap,
+      // ),
     ];
 
     return _DashCard(
@@ -946,12 +1213,14 @@ class _UpcomingVisitsCard extends StatelessWidget {
     required this.isLoading,
     required this.hasError,
     required this.onRetry,
+    required this.onViewAllTap,
   });
 
   final List<Map<String, dynamic>> visits;
   final bool isLoading;
   final bool hasError;
   final Future<void> Function() onRetry;
+  final VoidCallback onViewAllTap;
 
   String _formatTime(dynamic rawTime) {
     if (rawTime is! String || rawTime.trim().isEmpty) return '--';
@@ -993,7 +1262,11 @@ class _UpcomingVisitsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(title: 'Upcoming Visits', actionLabel: 'View all'),
+          _SectionTitle(
+            title: 'Upcoming Visits',
+            actionLabel: 'View all',
+            onActionTap: onViewAllTap,
+          ),
           const SizedBox(height: 14),
           if (isLoading)
             const SizedBox(
@@ -1160,7 +1433,7 @@ class _RecentActivityCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(title: 'Recent Activity', actionLabel: 'View all'),
+          const _SectionTitle(title: 'Recent Activity'),
           const SizedBox(height: 10),
           if (isLoading)
             const SizedBox(
@@ -1913,10 +2186,15 @@ class _PerformanceCard extends StatelessWidget {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, this.actionLabel});
+  const _SectionTitle({
+    required this.title,
+    this.actionLabel,
+    this.onActionTap,
+  });
 
   final String title;
   final String? actionLabel;
+  final VoidCallback? onActionTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1932,9 +2210,9 @@ class _SectionTitle extends StatelessWidget {
             ),
           ),
         ),
-        if (actionLabel != null)
+        if (actionLabel != null && onActionTap != null)
           TextButton(
-            onPressed: () {},
+            onPressed: onActionTap,
             child: Text(
               actionLabel!,
               style: const TextStyle(

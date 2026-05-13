@@ -85,6 +85,71 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
+  Future<void> _openEditUser(_UserItem user) async {
+    final memberId = user.id.trim();
+    if (memberId.isEmpty) {
+      _showSnackBar('Unable to edit member: missing user id.');
+      return;
+    }
+    final updated = await Navigator.of(context).push<TeamMemberCreationResult>(
+      MaterialPageRoute(
+        builder: (_) => AddTeamMemberPage(
+          memberId: memberId,
+          memberData: user.rawData,
+        ),
+      ),
+    );
+    if (updated != null && mounted) {
+      _loadUsers();
+    }
+  }
+
+  Future<void> _deleteUser(_UserItem user) async {
+    final userId = user.id.trim();
+    if (userId.isEmpty) {
+      _showSnackBar('Unable to delete member: missing user id.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete User'),
+          content: Text('Are you sure you want to delete ${user.name}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    try {
+      await _authProvider.deleteUser(
+        id: userId,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      _showSnackBar('User deleted successfully.');
+      await _loadUsers();
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
   Future<void> _exportUsers() async {
     setState(() {
       _isExporting = true;
@@ -168,35 +233,34 @@ class _UsersPageState extends State<UsersPage> {
               ],
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(
-                  'Showing ${users.length} users',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const Spacer(),
-                OutlinedButton.icon(
-                  onPressed: _isExporting ? null : _exportUsers,
-                  icon: _isExporting
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.download_rounded, size: 16),
-                  label: const Text('Export'),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: _openCreateUser,
-                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
-                  label: const Text('New User'),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 430;
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment:
+                      isCompact ? WrapAlignment.start : WrapAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _isExporting ? null : _exportUsers,
+                      icon: _isExporting
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.download_rounded, size: 16),
+                      label: const Text('Export'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: _openCreateUser,
+                      icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                      label: const Text('New User'),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 12),
             if (_isLoading)
@@ -284,12 +348,16 @@ class _UsersPageState extends State<UsersPage> {
         assigneeName: user.status,
         assigneeImageUrl: '',
         actions: [
-          DataCardAction(icon: Icons.edit_outlined, onTap: () {}),
           DataCardAction(
-            icon: Icons.delete_outline,
-            color: AppColors.error,
-            onTap: () {},
+            icon: Icons.edit_outlined,
+            onTap: () => _openEditUser(user),
           ),
+          if (user.status != 'Inactive')
+            DataCardAction(
+              icon: Icons.delete_outline,
+              color: AppColors.error,
+              onTap: () => _deleteUser(user),
+            ),
         ],
       ),
     );
@@ -298,20 +366,24 @@ class _UsersPageState extends State<UsersPage> {
 
 class _UserItem {
   const _UserItem({
+    required this.id,
     required this.name,
     required this.email,
     required this.phone,
     required this.role,
     required this.status,
     required this.lastSeen,
+    required this.rawData,
   });
 
+  final String id;
   final String name;
   final String email;
   final String phone;
   final String role;
   final String status;
   final String lastSeen;
+  final Map<String, dynamic> rawData;
 
   factory _UserItem.fromApi(Map<String, dynamic> json) {
     String read(dynamic value) {
@@ -342,12 +414,14 @@ class _UserItem {
         read(json['status']).toLowerCase() == 'active';
     final lastLogin = read(json['last_login'] ?? json['lastLogin']);
     return _UserItem(
+      id: read(json['id'] ?? json['user_id'] ?? json['userId'] ?? json['uuid']),
       name: fullName.isNotEmpty ? fullName : (fallbackName.isNotEmpty ? fallbackName : 'Unknown'),
       email: read(json['email']),
       phone: read(json['phone_number'] ?? json['phone'] ?? json['mobile']),
       role: roleLabel(read(json['role'])),
       status: active ? 'Active' : 'Inactive',
       lastSeen: lastLogin.isEmpty ? 'Never logged in' : 'Last: $lastLogin',
+      rawData: Map<String, dynamic>.from(json),
     );
   }
 }

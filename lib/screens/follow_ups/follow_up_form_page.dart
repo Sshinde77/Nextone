@@ -201,10 +201,6 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
       _showSnackBar('Please select a lead.');
       return;
     }
-    if (_selectedDueDate == null) {
-      _showSnackBar('Please select due date and time.');
-      return;
-    }
     if (_isLoadingLeads) {
       _showSnackBar('Please wait while leads are loading.');
       return;
@@ -215,7 +211,7 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
     });
 
     try {
-      final dueDateUtc = _selectedDueDate!.toUtc().toIso8601String();
+      final dueDateUtc = _selectedDueDate?.toUtc().toIso8601String() ?? '';
       Map<String, dynamic> responseData;
 
       if (widget.isEditMode) {
@@ -409,6 +405,12 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
                     controller: _titleController,
                     label: 'Title',
                     hintText: 'Follow up call with Suresh Patel',
+                    validator: (value) {
+                      if ((value?.trim().isEmpty ?? true)) {
+                        return 'Title is required.';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 12),
                   _buildLeadDropdown(),
@@ -623,6 +625,7 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
     required String hintText,
     int minLines = 1,
     int maxLines = 1,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -641,12 +644,7 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
           minLines: minLines,
           maxLines: maxLines,
           enabled: !_isSubmitting,
-          validator: (value) {
-            if ((value?.trim().isEmpty ?? true)) {
-              return '$label is required.';
-            }
-            return null;
-          },
+          validator: validator,
           decoration: _fieldDecoration(hintText: hintText),
         ),
       ],
