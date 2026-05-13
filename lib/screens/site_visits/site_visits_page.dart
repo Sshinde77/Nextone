@@ -7,6 +7,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/utils/export_file_helper.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class SiteVisitsPage extends StatefulWidget {
@@ -75,6 +76,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   bool _isLoadingVisits = false;
   bool _isExporting = false;
   String? _loadError;
+  String _currentRole = '';
   late DateTime _focusedMonth;
   late DateTime _selectedDate;
   late List<_SiteVisit> _visits;
@@ -86,7 +88,22 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     _focusedMonth = DateTime(now.year, now.month, 1);
     _selectedDate = DateTime(now.year, now.month, now.day);
     _visits = <_SiteVisit>[];
+    _loadAccess();
     _loadSiteVisits();
+  }
+
+  bool get _canExportData => RoleAccess.canExportData(_currentRole);
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+      });
+    } catch (_) {
+      // Export actions stay hidden if access cannot be resolved.
+    }
   }
 
   List<_SiteVisit> get _selectedDayVisits {
@@ -295,6 +312,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Widget _buildExportButton() {
+    if (!_canExportData) {
+      return const SizedBox.shrink();
+    }
     return InkWell(
       onTap: _isExporting ? null : _exportSiteVisits,
       borderRadius: BorderRadius.circular(_s(10)),
@@ -1437,6 +1457,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Future<void> _exportSiteVisits() async {
+    if (!_canExportData) {
+      _showSnackBar('You do not have permission to export site visits.');
+      return;
+    }
     setState(() {
       _isExporting = true;
     });

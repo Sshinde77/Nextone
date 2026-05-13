@@ -5,6 +5,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/team/add_team_member_page.dart';
 import 'package:nextone/screens/team/team_member_details_page.dart';
 import 'package:nextone/utils/csv_export_helper.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/data_card.dart';
 
 class TeamPage extends StatefulWidget {
@@ -21,6 +22,7 @@ class _TeamPageState extends State<TeamPage> {
   String? _membersLoadError;
   final Set<String> _deletingMemberIds = <String>{};
   final Set<String> _changingRoleMemberIds = <String>{};
+  String _currentRole = '';
   final List<_RoleOption> _roleOptions = const [
     _RoleOption(label: 'Admin', value: 'admin'),
     _RoleOption(label: 'Sales Manager', value: 'sales_manager'),
@@ -29,6 +31,14 @@ class _TeamPageState extends State<TeamPage> {
   ];
 
   final List<_TeamMember> _members = [];
+
+  bool get _canManageUsers => RoleAccess.canManageUsers(_currentRole);
+  bool get _canExportData => RoleAccess.canExportData(_currentRole);
+  List<_RoleOption> get _assignableRoleOptions {
+    return _roleOptions
+        .where((role) => RoleAccess.canChangeRole(_currentRole, role.value))
+        .toList();
+  }
 
   List<_TeamMember> get _filteredMembers {
     final query = _searchController.text.toLowerCase();
@@ -55,6 +65,7 @@ class _TeamPageState extends State<TeamPage> {
   @override
   void initState() {
     super.initState();
+    _loadAccess();
     _loadMembers();
   }
 
@@ -62,6 +73,18 @@ class _TeamPageState extends State<TeamPage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+      });
+    } catch (_) {
+      // Keep management actions hidden if access cannot be resolved.
+    }
   }
 
   @override
@@ -156,6 +179,10 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Future<void> _openCreateMember() async {
+    if (!_canManageUsers) {
+      _showSnackBar('You do not have permission to create users.');
+      return;
+    }
     final created = await Navigator.push<TeamMemberCreationResult>(
       context,
       MaterialPageRoute(builder: (_) => const AddTeamMemberPage()),
@@ -185,6 +212,10 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Future<void> _openEditMember(_TeamMember member) async {
+    if (!_canManageUsers) {
+      _showSnackBar('You do not have permission to edit users.');
+      return;
+    }
     if (member.id.isEmpty) {
       _showSnackBar('Unable to edit member: missing user id.');
       return;
@@ -208,6 +239,10 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Future<void> _deleteMember(_TeamMember member) async {
+    if (!RoleAccess.canDeactivate(_currentRole, member.rawRole)) {
+      _showSnackBar('You do not have permission to deactivate this user.');
+      return;
+    }
     if (member.id.isEmpty) {
       _showSnackBar('Unable to delete member: missing user id.');
       return;
@@ -271,6 +306,10 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Future<void> _openChangeRoleSheet(_TeamMember member) async {
+    if (_assignableRoleOptions.isEmpty) {
+      _showSnackBar('You do not have permission to change roles.');
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -302,7 +341,7 @@ class _TeamPageState extends State<TeamPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                ..._roleOptions.map((option) {
+                ..._assignableRoleOptions.map((option) {
                   final roleLabel = _TeamMember.readableRole(option.value);
                   final isSelected =
                       member.role.toLowerCase() == roleLabel.toLowerCase();
@@ -366,6 +405,7 @@ class _TeamPageState extends State<TeamPage> {
         )..['role'] = selectedRole;
         _members[index] = _members[index].copyWith(
           role: _TeamMember.readableRole(selectedRole),
+          rawRole: selectedRole,
           originalData: updatedData,
         );
       });
@@ -393,6 +433,10 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Future<void> _exportMembers() async {
+    if (!_canExportData) {
+      _showSnackBar('You do not have permission to export team data.');
+      return;
+    }
     await CsvExportHelper.exportRowsToClipboard(
       context: context,
       fileLabel: 'Team',
@@ -552,26 +596,32 @@ class _TeamPageState extends State<TeamPage> {
           AppColors.info,
           isBusy ? null : () => _viewMemberDetails(member),
         ),
-        const SizedBox(width: 12),
-        _buildCircleActionButton(
-          Icons.edit_outlined,
-          AppColors.warning,
-          isBusy ? null : () => _openEditMember(member),
-        ),
-        const SizedBox(width: 12),
-        _buildCircleActionButton(
-          Icons.manage_accounts_outlined,
-          AppColors.primary,
-          isBusy ? null : () => _openChangeRoleSheet(member),
-          isLoading: isChangingRole,
-        ),
-        const SizedBox(width: 12),
-        _buildCircleActionButton(
-          Icons.delete_outline,
-          AppColors.error,
-          isBusy ? null : () => _deleteMember(member),
-          isLoading: isDeleting,
-        ),
+        if (_canManageUsers) ...[
+          const SizedBox(width: 12),
+          _buildCircleActionButton(
+            Icons.edit_outlined,
+            AppColors.warning,
+            isBusy ? null : () => _openEditMember(member),
+          ),
+        ],
+        if (_assignableRoleOptions.isNotEmpty) ...[
+          const SizedBox(width: 12),
+          _buildCircleActionButton(
+            Icons.manage_accounts_outlined,
+            AppColors.primary,
+            isBusy ? null : () => _openChangeRoleSheet(member),
+            isLoading: isChangingRole,
+          ),
+        ],
+        if (RoleAccess.canDeactivate(_currentRole, member.rawRole)) ...[
+          const SizedBox(width: 12),
+          _buildCircleActionButton(
+            Icons.delete_outline,
+            AppColors.error,
+            isBusy ? null : () => _deleteMember(member),
+            isLoading: isDeleting,
+          ),
+        ],
       ],
     );
   }
@@ -666,30 +716,33 @@ class _TeamPageState extends State<TeamPage> {
           ),
         ),
         const SizedBox(width: 8),
-        OutlinedButton.icon(
-          onPressed: _exportMembers,
-          icon: const Icon(Icons.download_rounded, size: 18),
-          label: const Text('Export'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(104, 50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(999),
+        if (_canExportData) ...[
+          OutlinedButton.icon(
+            onPressed: _exportMembers,
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: const Text('Export'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(104, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        FilledButton(
-          onPressed: _openCreateMember,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(132, 50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(999),
+          const SizedBox(width: 8),
+        ],
+        if (_canManageUsers)
+          FilledButton(
+            onPressed: _openCreateMember,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(132, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
             ),
+            child: const Text('Create Member'),
           ),
-          child: const Text('Create Member'),
-        ),
       ],
     );
   }
@@ -722,19 +775,22 @@ class _TeamPageState extends State<TeamPage> {
             icon: Icons.visibility_outlined,
             onTap: isBusy ? () {} : () => _viewMemberDetails(member),
           ),
-          DataCardAction(
-            icon: Icons.edit_outlined,
-            onTap: isBusy ? () {} : () => _openEditMember(member),
-          ),
-          DataCardAction(
-            icon: Icons.manage_accounts_outlined,
-            onTap: isBusy ? () {} : () => _openChangeRoleSheet(member),
-          ),
-          DataCardAction(
-            icon: Icons.delete_outline,
-            color: AppColors.error,
-            onTap: isBusy ? () {} : () => _deleteMember(member),
-          ),
+          if (_canManageUsers)
+            DataCardAction(
+              icon: Icons.edit_outlined,
+              onTap: isBusy ? () {} : () => _openEditMember(member),
+            ),
+          if (_assignableRoleOptions.isNotEmpty)
+            DataCardAction(
+              icon: Icons.manage_accounts_outlined,
+              onTap: isBusy ? () {} : () => _openChangeRoleSheet(member),
+            ),
+          if (RoleAccess.canDeactivate(_currentRole, member.rawRole))
+            DataCardAction(
+              icon: Icons.delete_outline,
+              color: AppColors.error,
+              onTap: isBusy ? () {} : () => _deleteMember(member),
+            ),
         ],
       ),
     );
@@ -847,6 +903,7 @@ class _TeamMember {
   final String id;
   final String name;
   final String role;
+  final String rawRole;
   final int activeLeads;
   final int closedLeads;
   final double conversionRate;
@@ -856,6 +913,7 @@ class _TeamMember {
     required this.id,
     required this.name,
     required this.role,
+    required this.rawRole,
     required this.activeLeads,
     required this.closedLeads,
     required this.conversionRate,
@@ -901,6 +959,7 @@ class _TeamMember {
       id: id,
       name: safeName,
       role: role.isNotEmpty ? readableRole(role) : 'Team Member',
+      rawRole: role,
       activeLeads: activeLeads,
       closedLeads: closedLeads,
       conversionRate: conversionRate,
@@ -912,6 +971,7 @@ class _TeamMember {
     String? id,
     String? name,
     String? role,
+    String? rawRole,
     int? activeLeads,
     int? closedLeads,
     double? conversionRate,
@@ -921,6 +981,7 @@ class _TeamMember {
       id: id ?? this.id,
       name: name ?? this.name,
       role: role ?? this.role,
+      rawRole: rawRole ?? this.rawRole,
       activeLeads: activeLeads ?? this.activeLeads,
       closedLeads: closedLeads ?? this.closedLeads,
       conversionRate: conversionRate ?? this.conversionRate,

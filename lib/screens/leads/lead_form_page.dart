@@ -204,7 +204,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
     );
     final normalizedRole = _normalizeRole(roleRaw);
     if (normalizedRole != 'sale_executive' &&
-        normalizedRole != 'sales_manager') {
+        normalizedRole != 'sales_manager' &&
+        normalizedRole != 'external_caller') {
       return null;
     }
 

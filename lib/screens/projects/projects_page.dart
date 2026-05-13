@@ -7,6 +7,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/projects/project_detail_page.dart';
 import 'package:nextone/screens/projects/project_form_page.dart';
 import 'package:nextone/utils/export_file_helper.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 
@@ -26,6 +27,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
   bool _isDeleting = false;
   bool _isExporting = false;
   String? _loadError;
+  String _currentRole = '';
+
+  bool get _canManageProjects => RoleAccess.canManageProjects(_currentRole);
+  bool get _canExportData => RoleAccess.canExportData(_currentRole);
 
   List<_Project> get _filteredProjects {
     final query = _searchController.text.toLowerCase();
@@ -39,7 +44,20 @@ class _ProjectsPageState extends State<ProjectsPage> {
   @override
   void initState() {
     super.initState();
+    _loadAccess();
     _loadProjects();
+  }
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+      });
+    } catch (_) {
+      // Keep project management actions hidden if access cannot be resolved.
+    }
   }
 
   @override
@@ -251,35 +269,38 @@ class _ProjectsPageState extends State<ProjectsPage> {
           ),
         ),
         const SizedBox(width: 8),
-        OutlinedButton.icon(
-          onPressed: _isExporting ? null : _exportProjects,
-          icon: _isExporting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.download_rounded, size: 18),
-          label: Text(_isExporting ? 'Exporting...' : 'Export'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(110, 50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(999),
+        if (_canExportData) ...[
+          OutlinedButton.icon(
+            onPressed: _isExporting ? null : _exportProjects,
+            icon: _isExporting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.download_rounded, size: 18),
+            label: Text(_isExporting ? 'Exporting...' : 'Export'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(110, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        FilledButton(
-          onPressed: _openCreateProject,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(120, 50),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999)),
+          const SizedBox(width: 8),
+        ],
+        if (_canManageProjects)
+          FilledButton(
+            onPressed: _openCreateProject,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(120, 50),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999)),
+            ),
+            child: const Text('Add Project'),
           ),
-          child: const Text('Add Project'),
-        ),
       ],
     );
   }
@@ -311,15 +332,17 @@ class _ProjectsPageState extends State<ProjectsPage> {
             icon: Icons.visibility_outlined,
             onTap: () => _openProjectDetails(project),
           ),
-          DataCardAction(
-            icon: Icons.edit_outlined,
-            onTap: () => _openEditProject(project),
-          ),
-          DataCardAction(
-            icon: Icons.delete_outline,
-            color: AppColors.error,
-            onTap: _isDeleting ? () {} : () => _deleteProject(project),
-          ),
+          if (_canManageProjects)
+            DataCardAction(
+              icon: Icons.edit_outlined,
+              onTap: () => _openEditProject(project),
+            ),
+          if (_canManageProjects)
+            DataCardAction(
+              icon: Icons.delete_outline,
+              color: AppColors.error,
+              onTap: _isDeleting ? () {} : () => _deleteProject(project),
+            ),
         ],
       ),
     );
@@ -422,6 +445,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Future<void> _openCreateProject() async {
+    if (!_canManageProjects) {
+      _showSnackBar('You do not have permission to create projects.');
+      return;
+    }
     final created = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const ProjectFormPage()),
     );
@@ -431,6 +458,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Future<void> _openEditProject(_Project project) async {
+    if (!_canManageProjects) {
+      _showSnackBar('You do not have permission to edit projects.');
+      return;
+    }
     final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => ProjectFormPage(projectData: project.toPayload()),
@@ -451,6 +482,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Future<void> _deleteProject(_Project project) async {
+    if (!_canManageProjects) {
+      _showSnackBar('You do not have permission to delete projects.');
+      return;
+    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -498,6 +533,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Future<void> _exportProjects() async {
+    if (!_canExportData) {
+      _showSnackBar('You do not have permission to export projects.');
+      return;
+    }
     setState(() {
       _isExporting = true;
     });

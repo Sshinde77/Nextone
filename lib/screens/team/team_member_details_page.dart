@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/team/add_team_member_page.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class TeamMemberDetailsPage extends StatefulWidget {
@@ -22,13 +23,31 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
   bool _isLoading = true;
   String? _loadError;
   bool _isDeleting = false;
+  String _currentRole = '';
 
   @override
   void initState() {
     super.initState();
     _memberData = Map<String, dynamic>.from(widget.memberData);
     _memberId = _extractMemberId(_memberData);
+    _loadAccess();
     _fetchMemberDetails();
+  }
+
+  String get _memberRole => RoleAccess.normalize(_asString(_memberData['role']));
+  bool get _canManageUsers => RoleAccess.canManageUsers(_currentRole);
+  bool get _canDeleteMember => RoleAccess.canDeactivate(_currentRole, _memberRole);
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+      });
+    } catch (_) {
+      // Keep member management actions hidden if access cannot be resolved.
+    }
   }
 
   Future<void> _fetchMemberDetails() async {
@@ -73,6 +92,10 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
   }
 
   Future<void> _deleteMember() async {
+    if (!_canDeleteMember) {
+      _showSnackBar('You do not have permission to deactivate this user.');
+      return;
+    }
     final memberId = _memberId;
     if (memberId == null || memberId.isEmpty) {
       _showSnackBar('Unable to delete member: missing user id.');
@@ -139,6 +162,10 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
   }
 
   Future<void> _openEditMember() async {
+    if (!_canManageUsers) {
+      _showSnackBar('You do not have permission to edit users.');
+      return;
+    }
     final memberId = _memberId;
     if (memberId == null || memberId.isEmpty) {
       _showSnackBar('Unable to edit member: missing user id.');
@@ -533,6 +560,9 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
   }
 
   Widget _buildActionButtons() {
+    if (!_canManageUsers && !_canDeleteMember) {
+      return const SizedBox.shrink();
+    }
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -543,23 +573,25 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: _buildRoundedButton(
-              icon: Icons.edit_outlined,
-              label: 'Edit Member',
-              color: AppColors.primary,
-              onTap: _isDeleting ? null : _openEditMember,
+          if (_canManageUsers)
+            Expanded(
+              child: _buildRoundedButton(
+                icon: Icons.edit_outlined,
+                label: 'Edit Member',
+                color: AppColors.primary,
+                onTap: _isDeleting ? null : _openEditMember,
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildRoundedButton(
-              icon: Icons.delete_outline,
-              label: _isDeleting ? 'Deleting...' : 'Delete Member',
-              color: AppColors.error,
-              onTap: _isDeleting ? null : _deleteMember,
+          if (_canManageUsers && _canDeleteMember) const SizedBox(width: 12),
+          if (_canDeleteMember)
+            Expanded(
+              child: _buildRoundedButton(
+                icon: Icons.delete_outline,
+                label: _isDeleting ? 'Deleting...' : 'Delete Member',
+                color: AppColors.error,
+                onTap: _isDeleting ? null : _deleteMember,
+              ),
             ),
-          ),
         ],
       ),
     );

@@ -5,6 +5,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/routes/app_routes.dart';
 import 'package:nextone/screens/attendance/attendance_page.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/crm_bottom_nav.dart';
@@ -40,6 +41,7 @@ class _HomePageState extends State<HomePage> {
   bool _leadTrendLoading = true;
   String? _leadTrendError;
   Map<String, dynamic>? _leadTrendData;
+  String _currentRole = '';
 
   @override
   void initState() {
@@ -50,6 +52,19 @@ class _HomePageState extends State<HomePage> {
     _loadLeadPipeline();
     _loadLeadSources();
     _loadLeadTrend();
+    _loadAccess();
+  }
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+      });
+    } catch (_) {
+      // Keep the lowest-privilege UI fallback if profile cannot be read.
+    }
   }
 
   String _twoDigits(int value) => value.toString().padLeft(2, '0');
@@ -203,6 +218,7 @@ class _HomePageState extends State<HomePage> {
 
   void _openMainTab(int index) {
     if (!mounted) return;
+    if (!RoleAccess.canAccessMainTab(_currentRole, index)) return;
     Navigator.pushReplacementNamed(context, AppRoutes.home, arguments: index);
   }
 
@@ -241,6 +257,7 @@ class _HomePageState extends State<HomePage> {
                   onSiteVisitsTap: () => _openMainTab(3),
                   onFollowUpsTap: () => _openMainTab(2),
                   onProjectsTap: () => _openMainTab(4),
+                  showProjects: RoleAccess.canViewProjects(_currentRole),
                 ),
                 const SizedBox(height: 10),
                 _RowWrap(
@@ -255,6 +272,8 @@ class _HomePageState extends State<HomePage> {
                       Navigator.pushNamed(context, AppRoutes.notifications);
                     },
                     onReportsTap: () => _openMainTab(7),
+                    showProjects: RoleAccess.canViewProjects(_currentRole),
+                    showTeam: RoleAccess.canViewTeam(_currentRole),
                   ),
                   rightChild: _UpcomingVisitsCard(
                     visits: _upcomingVisits,
@@ -313,6 +332,9 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: widget.showBottomNav
           ? CRMAppBottomNav(
               currentIndex: _currentIndex,
+              showProjects: RoleAccess.canViewProjects(_currentRole),
+              showTeam: RoleAccess.canViewTeam(_currentRole),
+              showUsers: RoleAccess.canViewUsers(_currentRole),
               onDashboard: () {
                 setState(() => _currentIndex = 0);
               },
@@ -356,6 +378,25 @@ class _HeaderBlockState extends State<_HeaderBlock> {
   final AuthProvider _authProvider = AuthProvider();
   bool _isExporting = false;
   _ExportModuleType? _activeExportType;
+  String _currentRole = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAccess();
+  }
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+      });
+    } catch (_) {
+      // Export actions stay hidden if the role cannot be resolved.
+    }
+  }
 
   String _greetingForHour(int hour) {
     if (hour < 5) return 'Good night';
@@ -573,6 +614,7 @@ class _HeaderBlockState extends State<_HeaderBlock> {
     final now = DateTime.now();
     final greeting = _greetingForHour(now.hour);
     final formattedDate = _formatDate(now);
+    final canExport = RoleAccess.canExportData(_currentRole);
     final actionButtons = Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -601,31 +643,32 @@ class _HeaderBlockState extends State<_HeaderBlock> {
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
-        OutlinedButton.icon(
-          onPressed: _isExporting ? null : _openExportMenu,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF344054),
-            side: const BorderSide(color: Color(0xFFD8DFEA)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        if (canExport)
+          OutlinedButton.icon(
+            onPressed: _isExporting ? null : _openExportMenu,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF344054),
+              side: const BorderSide(color: Color(0xFFD8DFEA)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              visualDensity: VisualDensity.compact,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            visualDensity: VisualDensity.compact,
+            icon: _isExporting
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.download_rounded, size: 16),
+            label: Text(
+              _isExporting && _activeExportType != null
+                  ? 'Exporting ${_activeExportType!.label}'
+                  : 'Export Data',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
-          icon: _isExporting
-              ? const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.download_rounded, size: 16),
-          label: Text(
-            _isExporting && _activeExportType != null
-                ? 'Exporting ${_activeExportType!.label}'
-                : 'Export Data',
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
       ],
     );
 
@@ -760,6 +803,7 @@ class _StatsGrid extends StatelessWidget {
     required this.onSiteVisitsTap,
     required this.onFollowUpsTap,
     required this.onProjectsTap,
+    required this.showProjects,
   });
 
   final Map<String, dynamic>? stats;
@@ -770,6 +814,7 @@ class _StatsGrid extends StatelessWidget {
   final VoidCallback onSiteVisitsTap;
   final VoidCallback onFollowUpsTap;
   final VoidCallback onProjectsTap;
+  final bool showProjects;
 
   @override
   Widget build(BuildContext context) {
@@ -885,17 +930,18 @@ class _StatsGrid extends StatelessWidget {
               compact: compact,
               onTap: onFollowUpsTap,
             ),
-            _StatCard(
-              icon: Icons.apartment_outlined,
-              iconBg: const Color(0xFFF59E0B),
-              bubbleColor: const Color(0xFFFEF3C7),
-              title: 'Projects',
-              value: '$totalProjects',
-              subtitle: '$activeProjects active',
-              tag: '$upcomingProjects upcoming',
-              compact: compact,
-              onTap: onProjectsTap,
-            ),
+            if (showProjects)
+              _StatCard(
+                icon: Icons.apartment_outlined,
+                iconBg: const Color(0xFFF59E0B),
+                bubbleColor: const Color(0xFFFEF3C7),
+                title: 'Projects',
+                value: '$totalProjects',
+                subtitle: '$activeProjects active',
+                tag: '$upcomingProjects upcoming',
+                compact: compact,
+                onTap: onProjectsTap,
+              ),
           ],
         );
       },
@@ -1066,6 +1112,8 @@ class _QuickAccessCard extends StatelessWidget {
     required this.onAttendanceTap,
     required this.onNotificationsTap,
     required this.onReportsTap,
+    required this.showProjects,
+    required this.showTeam,
   });
 
   final VoidCallback onLeadsTap;
@@ -1076,6 +1124,8 @@ class _QuickAccessCard extends StatelessWidget {
   final VoidCallback onAttendanceTap;
   final VoidCallback onNotificationsTap;
   final VoidCallback onReportsTap;
+  final bool showProjects;
+  final bool showTeam;
 
   @override
   Widget build(BuildContext context) {
@@ -1098,18 +1148,20 @@ class _QuickAccessCard extends StatelessWidget {
         color: const Color(0xFF10B981),
         onTap: onFollowUpsTap,
       ),
-      _QuickAccessItem(
-        title: 'Projects',
-        icon: Icons.apartment_outlined,
-        color: const Color(0xFFF59E0B),
-        onTap: onProjectsTap,
-      ),
-      _QuickAccessItem(
-        title: 'Team',
-        icon: Icons.groups_outlined,
-        color: const Color(0xFFEC4899),
-        onTap: onTeamTap,
-      ),
+      if (showProjects)
+        _QuickAccessItem(
+          title: 'Projects',
+          icon: Icons.apartment_outlined,
+          color: const Color(0xFFF59E0B),
+          onTap: onProjectsTap,
+        ),
+      if (showTeam)
+        _QuickAccessItem(
+          title: 'Team',
+          icon: Icons.groups_outlined,
+          color: const Color(0xFFEC4899),
+          onTap: onTeamTap,
+        ),
       _QuickAccessItem(
         title: 'Attendance',
         icon: Icons.badge_outlined,

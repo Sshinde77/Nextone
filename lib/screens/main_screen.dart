@@ -7,6 +7,8 @@ import 'package:nextone/screens/projects/projects_page.dart';
 import 'package:nextone/screens/site_visits/site_visits_page.dart';
 import 'package:nextone/screens/team/team_page.dart';
 import 'package:nextone/screens/users/users_page.dart';
+import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_bottom_nav.dart';
 
 class MainScreen extends StatefulWidget {
@@ -20,6 +22,9 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   late int _currentIndex;
+  final AuthProvider _authProvider = AuthProvider();
+  String _currentRole = '';
+  bool _isLoadingAccess = true;
 
   final List<Widget> _screens = [
     const HomePage(showBottomNav: false),
@@ -39,9 +44,33 @@ class _MainScreenState extends State<MainScreen> {
     _currentIndex = index < 0
         ? 0
         : (index >= _screens.length ? _screens.length - 1 : index);
+    _loadAccess();
+  }
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+        _isLoadingAccess = false;
+        if (!RoleAccess.canAccessMainTab(role, _currentIndex)) {
+          _currentIndex = 0;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingAccess = false;
+        if (!RoleAccess.canAccessMainTab(_currentRole, _currentIndex)) {
+          _currentIndex = 0;
+        }
+      });
+    }
   }
 
   void _setIndex(int index) {
+    if (!RoleAccess.canAccessMainTab(_currentRole, index)) return;
     if (_currentIndex == index) return;
     setState(() {
       _currentIndex = index;
@@ -52,9 +81,14 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: _screens[_currentIndex],
+      body: _isLoadingAccess
+          ? const Center(child: CircularProgressIndicator())
+          : _screens[_currentIndex],
       bottomNavigationBar: CRMAppBottomNav(
         currentIndex: _currentIndex,
+        showProjects: RoleAccess.canViewProjects(_currentRole),
+        showTeam: RoleAccess.canViewTeam(_currentRole),
+        showUsers: RoleAccess.canViewUsers(_currentRole),
         onDashboard: () => _setIndex(0),
         onLeads: () => _setIndex(1),
         onFollowUps: () => _setIndex(2),

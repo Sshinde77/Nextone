@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class TeamMemberCreationResult {
@@ -41,6 +42,7 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
   bool _isSubmitting = false;
   bool _obscurePassword = true;
   String? _selectedRoleValue;
+  String _currentRole = '';
 
   final List<_RoleOption> _roles = const [
     _RoleOption(label: 'Admin', value: 'admin'),
@@ -51,11 +53,15 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
 
   bool get _isEditMode => widget.isEditMode;
   String? get _memberId => widget.memberId?.trim();
+  List<_RoleOption> get _availableRoles => _roles
+      .where((role) => RoleAccess.canChangeRole(_currentRole, role.value))
+      .toList();
 
   @override
   void initState() {
     super.initState();
     _prefillDataForEdit();
+    _loadAccess();
   }
 
   @override
@@ -89,6 +95,18 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
     if (incomingRole.isNotEmpty &&
         _roles.any((role) => role.value == incomingRole)) {
       _selectedRoleValue = incomingRole;
+    }
+  }
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+      });
+    } catch (_) {
+      // Role menu remains empty if access cannot be resolved.
     }
   }
 
@@ -237,7 +255,7 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
         overlay.size.width - topLeft.dx - renderBox.size.width,
         overlay.size.height - bottomLeft.dy,
       ),
-      items: _roles
+      items: _availableRoles
           .map(
             (role) => PopupMenuItem<String>(
               value: role.value,

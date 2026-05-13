@@ -124,7 +124,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     );
     final normalizedRole = _normalizeRole(roleRaw);
     if (normalizedRole != 'sale_executive' &&
-        normalizedRole != 'sales_manager') {
+        normalizedRole != 'sales_manager' &&
+        normalizedRole != 'external_caller') {
       return null;
     }
 

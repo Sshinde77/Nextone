@@ -9,6 +9,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/screens/leads/lead_form_page.dart';
 import 'package:nextone/utils/export_file_helper.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -30,6 +31,7 @@ class _LeadsPageState extends State<LeadsPage> {
   Timer? _searchDebounce;
   bool _isLoadingLeads = true;
   String? _loadError;
+  String _currentRole = '';
 
   int _currentPage = 1;
   final int _pageSize = 20;
@@ -57,7 +59,22 @@ class _LeadsPageState extends State<LeadsPage> {
   @override
   void initState() {
     super.initState();
+    _loadAccess();
     _loadLeads();
+  }
+
+  bool get _canExportData => RoleAccess.canExportData(_currentRole);
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+      });
+    } catch (_) {
+      // Export actions stay hidden if access cannot be resolved.
+    }
   }
 
   @override
@@ -169,6 +186,16 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Future<void> _exportLeads() async {
+    if (!_canExportData) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('You do not have permission to export leads.'),
+          ),
+        );
+      return;
+    }
     final range = await _showExportDateRangeDialog();
     if (!mounted || range == null) {
       return;
@@ -436,24 +463,26 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
         );
 
-        final exportButton = OutlinedButton.icon(
-          onPressed: _isExporting ? null : _exportLeads,
-          icon: _isExporting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.download_rounded, size: 18),
-          label: Text(_isExporting ? 'Exporting...' : 'Export'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(0, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        final exportButton = _canExportData
+            ? OutlinedButton.icon(
+                onPressed: _isExporting ? null : _exportLeads,
+                icon: _isExporting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download_rounded, size: 18),
+                label: Text(_isExporting ? 'Exporting...' : 'Export'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              )
+            : null;
 
         final addButton = FilledButton.icon(
           onPressed: _openCreateLead,
@@ -476,8 +505,10 @@ class _LeadsPageState extends State<LeadsPage> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: exportButton),
-                  const SizedBox(width: 8),
+                  if (exportButton != null) ...[
+                    Expanded(child: exportButton),
+                    const SizedBox(width: 8),
+                  ],
                   Expanded(child: addButton),
                 ],
               ),
@@ -489,8 +520,10 @@ class _LeadsPageState extends State<LeadsPage> {
           children: [
             Expanded(child: searchField),
             const SizedBox(width: 12),
-            exportButton,
-            const SizedBox(width: 8),
+            if (exportButton != null) ...[
+              exportButton,
+              const SizedBox(width: 8),
+            ],
             addButton,
           ],
         );

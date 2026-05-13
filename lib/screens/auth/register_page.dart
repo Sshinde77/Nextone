@@ -24,12 +24,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
   final List<Map<String, String>> _roles = [
     {
-      'value': 'super_admin',
-      'label': 'Super Admin',
-      'icon': 'admin_panel_settings',
-    },
-    {'value': 'admin', 'label': 'Admin', 'icon': 'security'},
-    {
       'value': 'sales_manager',
       'label': 'Sales Manager',
       'icon': 'manage_accounts',

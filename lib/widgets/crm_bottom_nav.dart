@@ -18,6 +18,9 @@ class CRMAppBottomNav extends StatefulWidget {
   final int? leadsBadgeCount;
   final int? followUpsBadgeCount;
   final double height;
+  final bool showProjects;
+  final bool showTeam;
+  final bool showUsers;
 
   const CRMAppBottomNav({
     super.key,
@@ -35,6 +38,9 @@ class CRMAppBottomNav extends StatefulWidget {
     this.leadsBadgeCount,
     this.followUpsBadgeCount,
     this.height = 76,
+    this.showProjects = true,
+    this.showTeam = true,
+    this.showUsers = true,
   });
 
   @override
@@ -106,6 +112,9 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
                     ? _ExpandedNavBar(
                         key: const ValueKey<String>('expanded-nav'),
                         currentIndex: widget.currentIndex,
+                        showProjects: widget.showProjects,
+                        showTeam: widget.showTeam,
+                        showUsers: widget.showUsers,
                         onProjects: widget.onProjects,
                         onTeam: widget.onTeam,
                         onReports: widget.onReports,
@@ -222,6 +231,9 @@ class _MainNavBar extends StatelessWidget {
 
 class _ExpandedNavBar extends StatelessWidget {
   final int currentIndex;
+  final bool showProjects;
+  final bool showTeam;
+  final bool showUsers;
   final VoidCallback onProjects;
   final VoidCallback onTeam;
   final VoidCallback onReports;
@@ -231,6 +243,9 @@ class _ExpandedNavBar extends StatelessWidget {
   const _ExpandedNavBar({
     super.key,
     required this.currentIndex,
+    required this.showProjects,
+    required this.showTeam,
+    required this.showUsers,
     required this.onProjects,
     required this.onTeam,
     required this.onReports,
@@ -244,22 +259,24 @@ class _ExpandedNavBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Row(
         children: [
-          Expanded(
-            child: _NavItem(
-              icon: Icons.apartment_outlined,
-              label: 'Projects',
-              isActive: currentIndex == 4,
-              onTap: onProjects,
+          if (showProjects)
+            Expanded(
+              child: _NavItem(
+                icon: Icons.apartment_outlined,
+                label: 'Projects',
+                isActive: currentIndex == 4,
+                onTap: onProjects,
+              ),
             ),
-          ),
-          Expanded(
-            child: _NavItem(
-              icon: Icons.groups_outlined,
-              label: 'Team',
-              isActive: currentIndex == 5,
-              onTap: onTeam,
+          if (showTeam)
+            Expanded(
+              child: _NavItem(
+                icon: Icons.groups_outlined,
+                label: 'Team',
+                isActive: currentIndex == 5,
+                onTap: onTeam,
+              ),
             ),
-          ),
           const SizedBox(width: 4),
           _CenterNavButton(
             icon: Icons.keyboard_arrow_down_rounded,
@@ -276,14 +293,15 @@ class _ExpandedNavBar extends StatelessWidget {
               onTap: onReports,
             ),
           ),
-          Expanded(
-            child: _NavItem(
-              icon: Icons.manage_accounts_outlined,
-              label: 'Users',
-              isActive: currentIndex == 7,
-              onTap: onSettings,
+          if (showUsers)
+            Expanded(
+              child: _NavItem(
+                icon: Icons.manage_accounts_outlined,
+                label: 'Users',
+                isActive: currentIndex == 7,
+                onTap: onSettings,
+              ),
             ),
-          ),
         ],
       ),
     );

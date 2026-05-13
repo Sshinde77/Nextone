@@ -6,6 +6,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/team/add_team_member_page.dart';
 import 'package:nextone/utils/export_file_helper.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 
@@ -24,6 +25,7 @@ class _UsersPageState extends State<UsersPage> {
   bool _isExporting = false;
   String? _error;
   List<_UserItem> _users = <_UserItem>[];
+  String _currentRole = '';
 
   static const List<String> _roleFilters = <String>[
     'All Roles',
@@ -43,7 +45,23 @@ class _UsersPageState extends State<UsersPage> {
   @override
   void initState() {
     super.initState();
+    _loadAccess();
     _loadUsers();
+  }
+
+  bool get _canManageUsers => RoleAccess.canManageUsers(_currentRole);
+  bool get _canExportData => RoleAccess.canExportData(_currentRole);
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+      });
+    } catch (_) {
+      // Keep management actions hidden if access cannot be resolved.
+    }
   }
 
   List<_UserItem> get _filteredUsers {
@@ -77,6 +95,10 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _openCreateUser() async {
+    if (!_canManageUsers) {
+      _showSnackBar('You do not have permission to create users.');
+      return;
+    }
     final created = await Navigator.of(context).push<TeamMemberCreationResult>(
       MaterialPageRoute(builder: (_) => const AddTeamMemberPage()),
     );
@@ -86,6 +108,10 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _openEditUser(_UserItem user) async {
+    if (!_canManageUsers) {
+      _showSnackBar('You do not have permission to edit users.');
+      return;
+    }
     final memberId = user.id.trim();
     if (memberId.isEmpty) {
       _showSnackBar('Unable to edit member: missing user id.');
@@ -105,6 +131,10 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _deleteUser(_UserItem user) async {
+    if (!RoleAccess.canDeactivate(_currentRole, user.rawRole)) {
+      _showSnackBar('You do not have permission to deactivate this user.');
+      return;
+    }
     final userId = user.id.trim();
     if (userId.isEmpty) {
       _showSnackBar('Unable to delete member: missing user id.');
@@ -151,6 +181,10 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _exportUsers() async {
+    if (!_canExportData) {
+      _showSnackBar('You do not have permission to export users.');
+      return;
+    }
     setState(() {
       _isExporting = true;
     });
@@ -242,22 +276,26 @@ class _UsersPageState extends State<UsersPage> {
                   alignment:
                       isCompact ? WrapAlignment.start : WrapAlignment.end,
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: _isExporting ? null : _exportUsers,
-                      icon: _isExporting
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.download_rounded, size: 16),
-                      label: const Text('Export'),
-                    ),
-                    FilledButton.icon(
-                      onPressed: _openCreateUser,
-                      icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
-                      label: const Text('New User'),
-                    ),
+                    if (_canExportData)
+                      OutlinedButton.icon(
+                        onPressed: _isExporting ? null : _exportUsers,
+                        icon: _isExporting
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.download_rounded, size: 16),
+                        label: const Text('Export'),
+                      ),
+                    if (_canManageUsers)
+                      FilledButton.icon(
+                        onPressed: _openCreateUser,
+                        icon: const Icon(Icons.person_add_alt_1_rounded,
+                            size: 16),
+                        label: const Text('New User'),
+                      ),
                   ],
                 );
               },
@@ -348,11 +386,13 @@ class _UsersPageState extends State<UsersPage> {
         assigneeName: user.status,
         assigneeImageUrl: '',
         actions: [
-          DataCardAction(
-            icon: Icons.edit_outlined,
-            onTap: () => _openEditUser(user),
-          ),
-          if (user.status != 'Inactive')
+          if (_canManageUsers)
+            DataCardAction(
+              icon: Icons.edit_outlined,
+              onTap: () => _openEditUser(user),
+            ),
+          if (RoleAccess.canDeactivate(_currentRole, user.rawRole) &&
+              user.status != 'Inactive')
             DataCardAction(
               icon: Icons.delete_outline,
               color: AppColors.error,
@@ -371,6 +411,7 @@ class _UserItem {
     required this.email,
     required this.phone,
     required this.role,
+    required this.rawRole,
     required this.status,
     required this.lastSeen,
     required this.rawData,
@@ -381,6 +422,7 @@ class _UserItem {
   final String email;
   final String phone;
   final String role;
+  final String rawRole;
   final String status;
   final String lastSeen;
   final Map<String, dynamic> rawData;
@@ -419,6 +461,7 @@ class _UserItem {
       email: read(json['email']),
       phone: read(json['phone_number'] ?? json['phone'] ?? json['mobile']),
       role: roleLabel(read(json['role'])),
+      rawRole: RoleAccess.normalize(read(json['role'])),
       status: active ? 'Active' : 'Inactive',
       lastSeen: lastLogin.isEmpty ? 'Never logged in' : 'Last: $lastLogin',
       rawData: Map<String, dynamic>.from(json),
