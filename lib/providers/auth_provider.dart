@@ -214,10 +214,12 @@ class AuthProvider {
 
   Future<Map<String, dynamic>> uploadLeadBulkFile({
     required String filePath,
+    String? assignedTo,
     String? token,
   }) {
     return _authService.uploadLeadBulkFile(
       filePath: filePath,
+      assignedTo: assignedTo,
       token: token,
     );
   }

@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/leads/lead_bulk_upload_page.dart';
 import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/screens/leads/lead_form_page.dart';
 import 'package:nextone/utils/export_file_helper.dart';
@@ -30,9 +29,7 @@ class _LeadsPageState extends State<LeadsPage> {
   final AuthProvider _authProvider = AuthProvider();
   bool _isBulkSelectionMode = false;
   bool _isExporting = false;
-  bool _isBulkOperating = false;
   bool _isSubmittingReassign = false;
-  String? _lastBulkResultFilename;
   String? _selectedAssigneeId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
 
@@ -486,304 +483,24 @@ class _LeadsPageState extends State<LeadsPage> {
       return;
     }
 
-    final choice = await showDialog<_BulkLeadDialogChoice>(
-      context: context,
-      builder: (context) {
-        final resultController = TextEditingController(
-          text: _lastBulkResultFilename ?? '',
-        );
-
-        return AlertDialog(
-          title: const Text('Bulk Lead Operations'),
-          content: SizedBox(
-            width: 420,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Download the Excel template, fill lead details, then upload the completed file.',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _BulkOperationTile(
-                  icon: Icons.file_download_outlined,
-                  title: 'Download template',
-                  subtitle: 'Get the latest Excel format for lead import.',
-                  onTap: () => Navigator.of(context).pop(
-                    const _BulkLeadDialogChoice.template(),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                _BulkOperationTile(
-                  icon: Icons.upload_file_outlined,
-                  title: 'Upload leads file',
-                  subtitle: 'Import filled Excel rows into leads.',
-                  onTap: () => Navigator.of(context).pop(
-                    const _BulkLeadDialogChoice.upload(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: resultController,
-                  decoration: const InputDecoration(
-                    labelText: 'Result filename',
-                    hintText: 'Example: bulk-result-123.xlsx',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      final filename = resultController.text.trim();
-                      if (filename.isEmpty) {
-                        return;
-                      }
-                      Navigator.of(context).pop(
-                        _BulkLeadDialogChoice.result(filename),
-                      );
-                    },
-                    icon: const Icon(Icons.fact_check_outlined, size: 18),
-                    label: const Text('Download result file'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
+    final result = await Navigator.of(context).push<LeadBulkUploadResult>(
+      MaterialPageRoute(builder: (_) => const LeadBulkUploadPage()),
     );
 
-    if (!mounted || choice == null) {
+    if (!mounted || result == null) {
       return;
     }
 
-    switch (choice.action) {
-      case _BulkLeadDialogAction.template:
-        await _downloadLeadBulkTemplate();
-        break;
-      case _BulkLeadDialogAction.upload:
-        await _pickAndUploadLeadBulkFile();
-        break;
-      case _BulkLeadDialogAction.result:
-        await _downloadLeadBulkResult(choice.filename ?? '');
-        break;
-    }
-  }
-
-  Future<void> _downloadLeadBulkTemplate() async {
-    setState(() {
-      _isBulkOperating = true;
-    });
-    try {
-      final exported = await _authProvider.downloadLeadBulkTemplate(
-        token: _authProvider.currentAuthToken,
-      );
-      final fileName = exported.fileName.trim().isEmpty
-          ? 'lead_bulk_template.xlsx'
-          : exported.fileName.trim();
-      if (kIsWeb) {
-        _showSnackBar(
-          'Template generated ($fileName), but direct file save is not supported on Web in this build.',
-        );
-        return;
-      }
-      final file = await ExportFileHelper.saveToDownloadNextone(
-        fileName: fileName,
-        bytes: exported.bytes,
-      );
-      if (!mounted) return;
-      _showSnackBar('Lead template downloaded: ${file.path}');
-    } catch (error) {
-      if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isBulkOperating = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _pickAndUploadLeadBulkFile() async {
-    if (kIsWeb) {
-      _showSnackBar('Bulk upload is not supported on Web in this build.');
+    await _loadLeads();
+    if (!mounted) {
       return;
     }
-
-    final hasPermission = await _requestFilePickerPermission();
-    if (!hasPermission || !mounted) {
-      return;
-    }
-
-    final picked = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const <String>['xlsx', 'xls', 'csv'],
-      allowMultiple: false,
+    final resultFilename = result.resultFilename;
+    _showSnackBar(
+      resultFilename == null || resultFilename.trim().isEmpty
+          ? result.message
+          : '${result.message} Result file: $resultFilename',
     );
-    if (!mounted || picked == null || picked.files.isEmpty) {
-      return;
-    }
-
-    final filePath = picked.files.single.path;
-    if (filePath == null || filePath.trim().isEmpty) {
-      _showSnackBar('Could not read the selected file path.');
-      return;
-    }
-
-    setState(() {
-      _isBulkOperating = true;
-    });
-    try {
-      final response = await _authProvider.uploadLeadBulkFile(
-        filePath: filePath,
-        token: _authProvider.currentAuthToken,
-      );
-      final resultFilename = _readBulkResultFilename(response);
-      if (resultFilename != null && resultFilename.trim().isNotEmpty) {
-        _lastBulkResultFilename = resultFilename.trim();
-      }
-      if (!mounted) return;
-      await _loadLeads();
-      if (!mounted) return;
-      final message =
-          _readBulkMessage(response) ?? 'Leads uploaded successfully.';
-      _showSnackBar(
-        _lastBulkResultFilename == null
-            ? message
-            : '$message Result file: $_lastBulkResultFilename',
-      );
-    } catch (error) {
-      if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isBulkOperating = false;
-        });
-      }
-    }
-  }
-
-  Future<bool> _requestFilePickerPermission() async {
-    final allowed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Allow file selection?'),
-          content: const Text(
-            'NextOne needs to open your device file picker so you can select an Excel or CSV file for bulk lead upload.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Allow'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (allowed != true && mounted) {
-      _showSnackBar('File selection cancelled.');
-    }
-    return allowed == true;
-  }
-
-  Future<void> _downloadLeadBulkResult(String filename) async {
-    final normalizedFilename = filename.trim();
-    if (normalizedFilename.isEmpty) {
-      _showSnackBar('Enter a result filename first.');
-      return;
-    }
-
-    setState(() {
-      _isBulkOperating = true;
-    });
-    try {
-      final exported = await _authProvider.downloadLeadBulkResult(
-        filename: normalizedFilename,
-        token: _authProvider.currentAuthToken,
-      );
-      final fileName = exported.fileName.trim().isEmpty
-          ? normalizedFilename
-          : exported.fileName.trim();
-      if (kIsWeb) {
-        _showSnackBar(
-          'Result generated ($fileName), but direct file save is not supported on Web in this build.',
-        );
-        return;
-      }
-      final file = await ExportFileHelper.saveToDownloadNextone(
-        fileName: fileName,
-        bytes: exported.bytes,
-      );
-      if (!mounted) return;
-      _lastBulkResultFilename = normalizedFilename;
-      _showSnackBar('Lead upload result downloaded: ${file.path}');
-    } catch (error) {
-      if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isBulkOperating = false;
-        });
-      }
-    }
-  }
-
-  String? _readBulkMessage(Map<String, dynamic> response) {
-    final value = response['message'] ?? response['detail'];
-    return value is String && value.trim().isNotEmpty ? value.trim() : null;
-  }
-
-  String? _readBulkResultFilename(dynamic source) {
-    if (source is! Map<String, dynamic>) {
-      return null;
-    }
-
-    for (final key in const <String>[
-      'filename',
-      'file_name',
-      'fileName',
-      'result_filename',
-      'resultFilename',
-      'result_file',
-      'resultFile',
-      'report_filename',
-      'reportFilename',
-      'output_file',
-      'outputFile',
-    ]) {
-      final value = source[key];
-      if (value is String && value.trim().isNotEmpty) {
-        return value.trim();
-      }
-    }
-
-    final data = source['data'];
-    if (data is Map<String, dynamic>) {
-      return _readBulkResultFilename(data);
-    }
-    return null;
   }
 
   void _showSnackBar(String message) {
@@ -1104,16 +821,9 @@ class _LeadsPageState extends State<LeadsPage> {
 
         final bulkButton = _canUseBulkLeadTools
             ? OutlinedButton.icon(
-                onPressed:
-                    (_isBulkOperating || _isExporting) ? null : _openLeadBulkDialog,
-                icon: _isBulkOperating
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.cloud_upload_outlined, size: 18),
-                label: Text(_isBulkOperating ? 'Working...' : 'Bulk'),
+                onPressed: _isExporting ? null : _openLeadBulkDialog,
+                icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                label: const Text('Bulk'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(0, 48),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1510,91 +1220,6 @@ class _LeadsPageState extends State<LeadsPage> {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-enum _BulkLeadDialogAction { template, upload, result }
-
-class _BulkLeadDialogChoice {
-  const _BulkLeadDialogChoice.template()
-      : action = _BulkLeadDialogAction.template,
-        filename = null;
-
-  const _BulkLeadDialogChoice.upload()
-      : action = _BulkLeadDialogAction.upload,
-        filename = null;
-
-  const _BulkLeadDialogChoice.result(this.filename)
-      : action = _BulkLeadDialogAction.result;
-
-  final _BulkLeadDialogAction action;
-  final String? filename;
-}
-
-class _BulkOperationTile extends StatelessWidget {
-  const _BulkOperationTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF4FF),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: AppColors.primary, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-          ],
-        ),
       ),
     );
   }

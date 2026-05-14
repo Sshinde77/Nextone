@@ -559,6 +559,7 @@ class AuthService {
 
   Future<Map<String, dynamic>> uploadLeadBulkFile({
     required String filePath,
+    String? assignedTo,
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
@@ -573,6 +574,10 @@ class AuthService {
     request.headers['accept'] = 'application/json';
     if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
       request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    final normalizedAssignee = assignedTo?.trim();
+    if (normalizedAssignee != null && normalizedAssignee.isNotEmpty) {
+      request.fields['assigned_to'] = normalizedAssignee;
     }
     request.files.add(
       await http.MultipartFile.fromPath(
