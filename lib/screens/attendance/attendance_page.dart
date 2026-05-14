@@ -34,6 +34,9 @@ class _AttendancePageState extends State<AttendancePage> {
   bool _isLoadingCalendar = false;
   String? _calendarError;
   Map<String, dynamic> _calendarData = <String, dynamic>{};
+  bool _isLoadingMyHistory = false;
+  String? _myHistoryError;
+  Map<String, dynamic> _myHistoryData = <String, dynamic>{};
   bool _isLoadingMonthGrid = false;
   String? _monthGridError;
   Map<String, dynamic> _monthGridData = <String, dynamic>{};
@@ -75,6 +78,7 @@ class _AttendancePageState extends State<AttendancePage> {
     _loadAccess();
     _loadTodayAttendance();
     _loadCalendarAttendance();
+    _loadMyHistoryAttendance();
     _loadMonthGridAttendance();
     _loadDailyViewAttendance();
     _loadSummaryAttendance();
@@ -495,6 +499,35 @@ class _AttendancePageState extends State<AttendancePage> {
     }
   }
 
+  Future<void> _loadMyHistoryAttendance() async {
+    setState(() {
+      _isLoadingMyHistory = true;
+      _myHistoryError = null;
+    });
+    try {
+      final data = await _authProvider.attendanceMe(
+        page: 1,
+        perPage: 30,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      setState(() {
+        _myHistoryData = data;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _myHistoryError = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMyHistory = false;
+        });
+      }
+    }
+  }
+
   Future<void> _loadMonthGridAttendance() async {
     setState(() {
       _isLoadingMonthGrid = true;
@@ -674,6 +707,246 @@ class _AttendancePageState extends State<AttendancePage> {
       };
     }
     return const <String, int>{'present': 0, 'late': 0, 'absent': 0};
+  }
+
+  Map<String, int> _myHistorySummary() {
+    final summaryRaw = _myHistorySummaryMap();
+    if (summaryRaw.isNotEmpty) {
+      return <String, int>{
+        'present': _historySummaryValue(
+          summaryRaw,
+          const ['present', 'present_count', 'presentCount'],
+        ),
+        'absent': _historySummaryValue(
+          summaryRaw,
+          const ['absent', 'absent_count', 'absentCount'],
+        ),
+        'late': _historySummaryValue(
+          summaryRaw,
+          const ['late', 'late_count', 'lateCount'],
+        ),
+        'leave': _historySummaryValue(
+          summaryRaw,
+          const ['leave', 'on_leave', 'onLeave', 'leave_count', 'leaveCount'],
+        ),
+      };
+    }
+
+    final entries = _myHistoryEntries();
+    return <String, int>{
+      'present': entries.where((entry) => entry.status == 'present').length,
+      'absent': entries.where((entry) => entry.status == 'absent').length,
+      'late': entries.where((entry) => entry.status == 'late').length,
+      'leave': entries.where((entry) => entry.status == 'leave').length,
+    };
+  }
+
+  int _historySummaryValue(Map<String, dynamic> summary, List<String> keys) {
+    for (final key in keys) {
+      if (summary.containsKey(key)) {
+        return _readIntValue(summary[key], 0);
+      }
+    }
+    return 0;
+  }
+
+  List<_HistoryEntry> _myHistoryEntries() {
+    final daysRaw = _myHistoryRows();
+    if (daysRaw.isEmpty) return const <_HistoryEntry>[];
+
+    final todayRaw = DateTime.now();
+    final today = DateTime(todayRaw.year, todayRaw.month, todayRaw.day);
+    final entries = <_HistoryEntry>[];
+
+    for (final raw in daysRaw) {
+      final day = Map<String, dynamic>.from(
+        raw.map((key, value) => MapEntry(key.toString(), value)),
+      );
+      final parsedDate = _historyDate(day);
+      if (parsedDate == null) continue;
+      final date = DateTime(parsedDate.year, parsedDate.month, parsedDate.day);
+      if (date.isAfter(today)) continue;
+
+      final status = _historyStatus(day);
+      if (status.isEmpty || status == 'weekend' || status == 'off') continue;
+
+      entries.add(
+        _HistoryEntry(
+          date: date,
+          dateLabel: _historyDateLabel(date),
+          status: status,
+          statusLabel: _statusLabel(status),
+          checkIn: _historyCheckIn(day),
+          checkOut: _historyCheckOut(day),
+          hours: _historyHours(day),
+        ),
+      );
+    }
+
+    entries.sort((a, b) => b.date.compareTo(a.date));
+    return entries;
+  }
+
+  DateTime? _historyDate(Map<String, dynamic> day) {
+    return _parseApiDate(
+      _readStringFromMap(
+        day,
+        const [
+          'date',
+          'attendance_date',
+          'attendanceDate',
+          'created_at',
+          'createdAt',
+        ],
+        fallback: '',
+      ),
+    );
+  }
+
+  Map<String, dynamic> _myHistorySummaryMap() {
+    final summary = _myHistoryData['summary'];
+    if (summary is Map<String, dynamic>) return summary;
+    if (summary is Map) {
+      return Map<String, dynamic>.from(
+        summary.map((key, value) => MapEntry(key.toString(), value)),
+      );
+    }
+
+    final data = _myHistoryData['data'];
+    if (data is Map) {
+      final nestedSummary = data['summary'];
+      if (nestedSummary is Map<String, dynamic>) return nestedSummary;
+      if (nestedSummary is Map) {
+        return Map<String, dynamic>.from(
+          nestedSummary.map((key, value) => MapEntry(key.toString(), value)),
+        );
+      }
+    }
+    return const <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _myHistoryRows() {
+    dynamic rowsRaw = _myHistoryData['data'];
+    if (rowsRaw is Map) {
+      rowsRaw = rowsRaw['data'] ??
+          rowsRaw['items'] ??
+          rowsRaw['records'] ??
+          rowsRaw['attendance'] ??
+          rowsRaw['attendances'];
+    }
+    rowsRaw ??= _myHistoryData['items'] ??
+        _myHistoryData['records'] ??
+        _myHistoryData['attendance'] ??
+        _myHistoryData['attendances'];
+
+    if (rowsRaw is! List) return const <Map<String, dynamic>>[];
+    return rowsRaw
+        .whereType<Map>()
+        .map(
+          (entry) => Map<String, dynamic>.from(
+            entry.map((key, value) => MapEntry(key.toString(), value)),
+          ),
+        )
+        .toList();
+  }
+
+  String _historyStatus(Map<String, dynamic> day) {
+    final rawStatus = _readStringFromMap(
+      day,
+      const ['status', 'attendance_status', 'attendanceStatus'],
+      fallback: '',
+    ).trim().toLowerCase();
+    if (rawStatus == 'on_leave' || rawStatus == 'on leave') return 'leave';
+    if (rawStatus == 'checked_in' || rawStatus == 'checked in') return 'present';
+    if (rawStatus.isNotEmpty) return rawStatus;
+    final hasCheckIn = _readStringFromMap(
+      day,
+      const [
+        'check_in_time',
+        'checkInTime',
+        'check_in',
+        'checkIn',
+        'check_in_at',
+      ],
+      fallback: '',
+    ).isNotEmpty;
+    return hasCheckIn ? 'present' : 'absent';
+  }
+
+  String _historyDateLabel(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final day = date.day.toString().padLeft(2, '0');
+    return '$day ${months[date.month - 1]} ${date.year}';
+  }
+
+  String _historyCheckIn(Map<String, dynamic> day) {
+    return _formatTimeValue(
+      _readStringFromMap(
+        day,
+        const [
+          'check_in_time',
+          'checkInTime',
+          'check_in',
+          'checkIn',
+          'check_in_at',
+        ],
+        fallback: '--:--',
+      ),
+    );
+  }
+
+  String _historyCheckOut(Map<String, dynamic> day) {
+    return _formatTimeValue(
+      _readStringFromMap(
+        day,
+        const [
+          'check_out_time',
+          'checkOutTime',
+          'check_out',
+          'checkOut',
+          'check_out_at',
+        ],
+        fallback: '--:--',
+      ),
+    );
+  }
+
+  String _historyHours(Map<String, dynamic> day) {
+    final raw = _readStringFromMap(
+      day,
+      const [
+        'working_hours',
+        'workingHours',
+        'hours_worked',
+        'hoursWorked',
+        'total_working_hours',
+      ],
+      fallback: '',
+    );
+    if (raw.isEmpty || raw == '--') return '';
+    return raw.toLowerCase().endsWith('h') ? raw : '${raw}h';
+  }
+
+  String _statusLabel(String status) {
+    return status
+        .replaceAll('_', ' ')
+        .split(' ')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
   }
 
   List<Map<String, dynamic>> _monthGridDays() {
@@ -1479,6 +1752,8 @@ class _AttendancePageState extends State<AttendancePage> {
                       setState(() => _selectedTabIndex = index);
                       if (index == 1) {
                         _loadCalendarAttendance();
+                      } else if (index == 2) {
+                        _loadMyHistoryAttendance();
                       } else if (index == 3) {
                         _loadMonthGridAttendance();
                       } else if (index == 4) {
@@ -1552,6 +1827,9 @@ class _AttendancePageState extends State<AttendancePage> {
       builder: (context, constraints) {
         if (_selectedTabIndex == 1) {
           return _buildCalendarTabContent(constraints.maxWidth);
+        }
+        if (_selectedTabIndex == 2) {
+          return _buildMyHistoryTabContent(constraints.maxWidth);
         }
         if (_selectedTabIndex == 3) {
           return _buildMonthGridTabContent(constraints.maxWidth);
@@ -3217,6 +3495,136 @@ class _AttendancePageState extends State<AttendancePage> {
     );
   }
 
+  Widget _buildMyHistoryTabContent(double maxWidth) {
+    final summary = _myHistorySummary();
+    final entries = _myHistoryEntries();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD8E0EE)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x120A2548),
+            blurRadius: 14,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'My Attendance History',
+                    style: TextStyle(
+                      color: Color(0xFF172B4D),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                _RoundActionButton(
+                  icon: Icons.refresh_rounded,
+                  onTap: _loadMyHistoryAttendance,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE8EDF5)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: GridView.count(
+              crossAxisCount: maxWidth < 430 ? 2 : 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: maxWidth < 430 ? 1.95 : 1.45,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              children: [
+                _HistoryStatTile(
+                  value: summary['present'] ?? 0,
+                  label: 'Present',
+                  color: const Color(0xFF009966),
+                ),
+                _HistoryStatTile(
+                  value: summary['absent'] ?? 0,
+                  label: 'Absent',
+                  color: const Color(0xFFF04452),
+                ),
+                _HistoryStatTile(
+                  value: summary['late'] ?? 0,
+                  label: 'Late',
+                  color: const Color(0xFFE88700),
+                ),
+                _HistoryStatTile(
+                  value: summary['leave'] ?? 0,
+                  label: 'Leave',
+                  color: const Color(0xFF4F46E5),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE8EDF5)),
+          if (_isLoadingMyHistory)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_myHistoryError != null)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _myHistoryError!,
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _loadMyHistoryAttendance,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+          else if (entries.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(18),
+              child: Text(
+                'No attendance history available.',
+                style: TextStyle(
+                  color: Color(0xFF7C8DA6),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              itemCount: entries.length,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, color: Color(0xFFF0F3F8)),
+              itemBuilder: (context, index) {
+                return _HistoryAttendanceRow(entry: entries[index]);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pickApprovalDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -4221,6 +4629,267 @@ class _DailyDetailPill extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HistoryEntry {
+  const _HistoryEntry({
+    required this.date,
+    required this.dateLabel,
+    required this.status,
+    required this.statusLabel,
+    required this.checkIn,
+    required this.checkOut,
+    required this.hours,
+  });
+
+  final DateTime date;
+  final String dateLabel;
+  final String status;
+  final String statusLabel;
+  final String checkIn;
+  final String checkOut;
+  final String hours;
+}
+
+class _HistoryStatTile extends StatelessWidget {
+  const _HistoryStatTile({
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  final int value;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8EDF5)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            value.toString(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF7C8DA6),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryAttendanceRow extends StatelessWidget {
+  const _HistoryAttendanceRow({required this.entry});
+
+  final _HistoryEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _historyColors(entry.status);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 10,
+            height: 42,
+            decoration: BoxDecoration(
+              color: colors.accent,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      entry.dateLabel,
+                      style: const TextStyle(
+                        color: Color(0xFF0F1F3D),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    _HistoryStatusPill(
+                      label: entry.statusLabel.isEmpty
+                          ? 'Absent'
+                          : entry.statusLabel,
+                      colors: colors,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 9),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  children: [
+                    _HistoryMetaText(
+                      icon: Icons.login_rounded,
+                      color: const Color(0xFF10B981),
+                      text: entry.checkIn,
+                    ),
+                    _HistoryMetaText(
+                      icon: Icons.logout_rounded,
+                      color: const Color(0xFFF55462),
+                      text: entry.checkOut,
+                    ),
+                    if (entry.hours.isNotEmpty)
+                      _HistoryMetaText(
+                        icon: Icons.timer_outlined,
+                        color: const Color(0xFF0A84FF),
+                        text: entry.hours,
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static _HistoryStatusColors _historyColors(String status) {
+    switch (status) {
+      case 'present':
+      case 'checked in':
+        return const _HistoryStatusColors(
+          accent: Color(0xFF10B981),
+          foreground: Color(0xFF008A63),
+          background: Color(0xFFDDF7E9),
+        );
+      case 'late':
+        return const _HistoryStatusColors(
+          accent: Color(0xFFF59E0B),
+          foreground: Color(0xFFC56B00),
+          background: Color(0xFFFFF0C6),
+        );
+      case 'leave':
+      case 'on_leave':
+        return const _HistoryStatusColors(
+          accent: Color(0xFF4F46E5),
+          foreground: Color(0xFF4F46E5),
+          background: Color(0xFFE8EAFE),
+        );
+      default:
+        return const _HistoryStatusColors(
+          accent: Color(0xFFF04452),
+          foreground: Color(0xFFDC2626),
+          background: Color(0xFFFFE7E7),
+        );
+    }
+  }
+}
+
+class _HistoryStatusPill extends StatelessWidget {
+  const _HistoryStatusPill({
+    required this.label,
+    required this.colors,
+  });
+
+  final String label;
+  final _HistoryStatusColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.circle, size: 7, color: colors.accent),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: colors.foreground,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryMetaText extends StatelessWidget {
+  const _HistoryMetaText({
+    required this.icon,
+    required this.color,
+    required this.text,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 5),
+        Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF7C8DA6),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HistoryStatusColors {
+  const _HistoryStatusColors({
+    required this.accent,
+    required this.foreground,
+    required this.background,
+  });
+
+  final Color accent;
+  final Color foreground;
+  final Color background;
 }
 
 class _SummaryDateButton extends StatelessWidget {

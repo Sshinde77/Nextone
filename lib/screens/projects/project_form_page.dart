@@ -1,3 +1,5 @@
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
@@ -17,6 +19,18 @@ class ProjectFormPage extends StatefulWidget {
 }
 
 class _ProjectFormPageState extends State<ProjectFormPage> {
+  static const int _maxDocumentBytes = 20 * 1024 * 1024;
+  static const int _maxDocumentCount = 10;
+  static const List<String> _documentExtensions = <String>[
+    'pdf',
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+    'doc',
+    'docx',
+  ];
+
   final _formKey = GlobalKey<FormState>();
   final _authProvider = AuthProvider();
 
@@ -33,6 +47,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
 
   String _projectType = 'residential';
   String _status = 'active';
+  List<PlatformFile> _unitPlanFiles = const <PlatformFile>[];
+  List<PlatformFile> _creativeFiles = const <PlatformFile>[];
   bool _isSubmitting = false;
 
   static const _projectTypes = <_SelectOption>[
@@ -200,6 +216,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           amenities: _csvToList(_listToCsv(widget.projectData?['amenities'])),
           status: _status,
           description: description,
+          unitPlanFilePaths: _filePaths(_unitPlanFiles),
+          creativeFilePaths: _filePaths(_creativeFiles),
           token: _authProvider.currentAuthToken,
         );
       } else {
@@ -217,6 +235,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           amenities: const <String>[],
           status: _status,
           description: description,
+          unitPlanFilePaths: _filePaths(_unitPlanFiles),
+          creativeFilePaths: _filePaths(_creativeFiles),
           token: _authProvider.currentAuthToken,
         );
       }
@@ -237,6 +257,89 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
         });
       }
     }
+  }
+
+  List<String> _filePaths(List<PlatformFile> files) {
+    return files
+        .map((file) => file.path?.trim() ?? '')
+        .where((path) => path.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> _pickDocuments({required bool unitPlans}) async {
+    if (_isSubmitting) {
+      return;
+    }
+    if (kIsWeb) {
+      _showSnackBar('Document upload is not supported on Web in this build.');
+      return;
+    }
+
+    final currentFiles = unitPlans ? _unitPlanFiles : _creativeFiles;
+    final remainingSlots = _maxDocumentCount - currentFiles.length;
+    if (remainingSlots <= 0) {
+      _showSnackBar('You can attach up to 10 files.');
+      return;
+    }
+
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: _documentExtensions,
+      allowMultiple: true,
+    );
+    if (!mounted || picked == null || picked.files.isEmpty) {
+      return;
+    }
+
+    final accepted = <PlatformFile>[];
+    for (final file in picked.files) {
+      if (accepted.length >= remainingSlots) {
+        break;
+      }
+      final extension = (file.extension ?? '').toLowerCase();
+      if (!_documentExtensions.contains(extension)) {
+        _showSnackBar('Unsupported file skipped: ${file.name}');
+        continue;
+      }
+      if (file.path == null || file.path!.trim().isEmpty) {
+        _showSnackBar('Could not read file path: ${file.name}');
+        continue;
+      }
+      if (file.size > _maxDocumentBytes) {
+        _showSnackBar('File is larger than 20MB: ${file.name}');
+        continue;
+      }
+      accepted.add(file);
+    }
+
+    if (accepted.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      if (unitPlans) {
+        _unitPlanFiles = <PlatformFile>[..._unitPlanFiles, ...accepted];
+      } else {
+        _creativeFiles = <PlatformFile>[..._creativeFiles, ...accepted];
+      }
+    });
+
+    final skipped = picked.files.length - accepted.length;
+    if (skipped > 0) {
+      _showSnackBar('$skipped file(s) skipped. Max 10 files, 20MB each.');
+    }
+  }
+
+  void _removeDocument({required bool unitPlans, required PlatformFile file}) {
+    setState(() {
+      if (unitPlans) {
+        _unitPlanFiles =
+            _unitPlanFiles.where((item) => !identical(item, file)).toList();
+      } else {
+        _creativeFiles =
+            _creativeFiles.where((item) => !identical(item, file)).toList();
+      }
+    });
   }
 
   void _showSnackBar(String message) {
@@ -437,6 +540,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                             minLines: 3,
                             maxLines: 3,
                           ),
+                          const SizedBox(height: 20),
+                          _buildDocumentSection(),
                           const SizedBox(height: 26),
                           _buildFooter(isNarrow),
                         ],
@@ -454,7 +559,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   Widget _buildHeader(String title) {
     return Container(
       height: 54,
-      padding: const EdgeInsets.only(left: 20, right: 12),
+      padding: const EdgeInsets.only(left: 8, right: 12),
       decoration: const BoxDecoration(
         border: Border(
           bottom: BorderSide(color: Color(0xFFE3EAF3)),
@@ -462,6 +567,13 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       ),
       child: Row(
         children: [
+          IconButton(
+            onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back_rounded, size: 20),
+            color: const Color(0xFF667085),
+            tooltip: 'Back',
+          ),
+          const SizedBox(width: 4),
           Expanded(
             child: Text(
               title,
@@ -480,6 +592,155 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDocumentSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 1, color: Color(0xFFE3EAF3)),
+        const SizedBox(height: 16),
+        const Row(
+          children: [
+            Icon(Icons.attach_file, size: 17, color: Color(0xFF667085)),
+            SizedBox(width: 6),
+            Text(
+              'Attach Documents',
+              style: TextStyle(
+                color: Color(0xFF667085),
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                '(optional - unit plans & creatives)',
+                style: TextStyle(
+                  color: Color(0xFF98A4B4),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        _buildDocumentPicker(
+          label: 'Unit Plans',
+          title: 'Click to upload unit plans',
+          files: _unitPlanFiles,
+          highlighted: _unitPlanFiles.isNotEmpty,
+          onTap: () => _pickDocuments(unitPlans: true),
+          onRemove: (file) => _removeDocument(unitPlans: true, file: file),
+        ),
+        const SizedBox(height: 16),
+        _buildDocumentPicker(
+          label: 'Creatives',
+          title: 'Click to upload creatives',
+          files: _creativeFiles,
+          highlighted: _creativeFiles.isNotEmpty,
+          onTap: () => _pickDocuments(unitPlans: false),
+          onRemove: (file) => _removeDocument(unitPlans: false, file: file),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDocumentPicker({
+    required String label,
+    required String title,
+    required List<PlatformFile> files,
+    required bool highlighted,
+    required VoidCallback onTap,
+    required ValueChanged<PlatformFile> onRemove,
+  }) {
+    final borderColor =
+        highlighted ? AppColors.primary : const Color(0xFFDCE3ED);
+    final background =
+        highlighted ? const Color(0xFFEFF8FF) : const Color(0xFFFCFCFD);
+    final iconColor =
+        highlighted ? AppColors.primary : const Color(0xFF98A4B4);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FieldLabel(label),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _isSubmitting ? null : onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: CustomPaint(
+            painter: _DashedBorderPainter(
+              color: borderColor,
+              radius: 18,
+            ),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 28),
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: highlighted
+                          ? const Color(0xFFDDF0FF)
+                          : const Color(0xFFF4F6F9),
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: Icon(
+                      Icons.upload_outlined,
+                      size: 24,
+                      color: iconColor,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF344054),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'PDF, JPEG, PNG, WEBP, Word - max 20MB',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF98A4B4),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (files.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: files
+                .map(
+                  (file) => _DocumentChip(
+                    file: file,
+                    onRemove: _isSubmitting ? null : () => onRemove(file),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ],
     );
   }
 
@@ -709,6 +970,129 @@ class _FieldLabel extends StatelessWidget {
         fontWeight: FontWeight.w700,
       ),
     );
+  }
+}
+
+class _DocumentChip extends StatelessWidget {
+  const _DocumentChip({
+    required this.file,
+    required this.onRemove,
+  });
+
+  final PlatformFile file;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 280),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE3EAF3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.insert_drive_file_outlined,
+            size: 16,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  file.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF344054),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  _formatFileSize(file.size),
+                  style: const TextStyle(
+                    color: Color(0xFF98A4B4),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: onRemove,
+            borderRadius: BorderRadius.circular(12),
+            child: const Padding(
+              padding: EdgeInsets.all(3),
+              child: Icon(
+                Icons.close,
+                size: 14,
+                color: Color(0xFF667085),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatFileSize(int bytes) {
+    if (bytes <= 0) {
+      return '0 KB';
+    }
+    final mb = bytes / (1024 * 1024);
+    if (mb >= 1) {
+      return '${mb.toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / 1024).toStringAsFixed(0)} KB';
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter({
+    required this.color,
+    required this.radius,
+  });
+
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.4
+      ..style = PaintingStyle.stroke;
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Offset.zero & size,
+          Radius.circular(radius),
+        ),
+      );
+
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final next = distance + 7;
+        canvas.drawPath(metric.extractPath(distance, next), paint);
+        distance = next + 6;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.radius != radius;
   }
 }
 

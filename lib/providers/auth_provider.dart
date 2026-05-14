@@ -334,6 +334,18 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> attendanceMe({
+    int page = 1,
+    int perPage = 30,
+    String? token,
+  }) {
+    return _authService.attendanceMe(
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> attendanceByMonth({
     required int month,
     required int year,
@@ -674,6 +686,8 @@ class AuthProvider {
     required List<String> amenities,
     required String status,
     required String description,
+    List<String> unitPlanFilePaths = const <String>[],
+    List<String> creativeFilePaths = const <String>[],
     String? token,
   }) {
     return _authService.createProject(
@@ -690,6 +704,8 @@ class AuthProvider {
       amenities: amenities,
       status: status,
       description: description,
+      unitPlanFilePaths: unitPlanFilePaths,
+      creativeFilePaths: creativeFilePaths,
       token: token,
     );
   }
@@ -697,6 +713,58 @@ class AuthProvider {
   Future<Map<String, dynamic>> projectDetail(
       {required String id, String? token}) {
     return _authService.projectDetail(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> projectDocuments({
+    required String id,
+    String? token,
+  }) {
+    return _authService.projectDocuments(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> uploadProjectDocuments({
+    required String id,
+    List<String> unitPlanFilePaths = const <String>[],
+    List<String> creativeFilePaths = const <String>[],
+    String? token,
+  }) {
+    return _authService.uploadProjectDocuments(
+      id: id,
+      unitPlanFilePaths: unitPlanFilePaths,
+      creativeFilePaths: creativeFilePaths,
+      token: token,
+    );
+  }
+
+  Future<ExportFileResult> downloadAllProjectDocuments({
+    required String id,
+    String? token,
+  }) {
+    return _authService.downloadAllProjectDocuments(id: id, token: token);
+  }
+
+  Future<ExportFileResult> downloadProjectDocument({
+    required String projectId,
+    required String documentId,
+    String? token,
+  }) {
+    return _authService.downloadProjectDocument(
+      projectId: projectId,
+      documentId: documentId,
+      token: token,
+    );
+  }
+
+  Future<void> deleteProjectDocument({
+    required String projectId,
+    required String documentId,
+    String? token,
+  }) {
+    return _authService.deleteProjectDocument(
+      projectId: projectId,
+      documentId: documentId,
+      token: token,
+    );
   }
 
   Future<Map<String, dynamic>> editProject({
@@ -714,6 +782,8 @@ class AuthProvider {
     required List<String> amenities,
     required String status,
     required String description,
+    List<String> unitPlanFilePaths = const <String>[],
+    List<String> creativeFilePaths = const <String>[],
     String? token,
   }) {
     return _authService.editProject(
@@ -731,6 +801,8 @@ class AuthProvider {
       amenities: amenities,
       status: status,
       description: description,
+      unitPlanFilePaths: unitPlanFilePaths,
+      creativeFilePaths: creativeFilePaths,
       token: token,
     );
   }

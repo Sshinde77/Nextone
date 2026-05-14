@@ -49,6 +49,12 @@ class ApiConstants {
   static const String projectsdetail = '/projects/{id}';
   static const String deleteprojects = '/projects/{id}';
   static const String editprojects = '/projects/{id}';
+  static const String projectDocuments = '/projects/{id}/documents';
+  static const String projectDocumentsDownloadAll =
+      '/projects/{id}/documents/download-all';
+  static const String projectDocumentDownload =
+      '/projects/{id}/documents/{docId}/download';
+  static const String projectDocumentDelete = '/projects/{id}/documents/{docId}';
 
   //site visit Endpoints
   static const String sitevisits = '/site-visits';
@@ -72,6 +78,7 @@ class ApiConstants {
   static const String attendanceCheckout = '/attendance/checkout';
   static const String attendanceUploadPhoto = '/attendance/upload-photo';
   static const String attendanceToday = '/attendance/today';
+  static const String attendanceMe = '/attendance/me';
   static const String attendanceCalendar = '/attendance/calendar';
   static const String attendanceByMonth = '/attendance/by-month';
   static const String attendanceByDate = '/attendance/by-date';

@@ -1,7 +1,11 @@
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/models/auth_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class ProjectDetailPage extends StatefulWidget {
@@ -19,11 +23,28 @@ class ProjectDetailPage extends StatefulWidget {
 }
 
 class _ProjectDetailPageState extends State<ProjectDetailPage> {
+  static const int _maxDocumentBytes = 20 * 1024 * 1024;
+  static const int _maxDocumentCount = 10;
+  static const List<String> _documentExtensions = <String>[
+    'pdf',
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+    'doc',
+    'docx',
+  ];
+
   final _authProvider = AuthProvider();
 
   Map<String, dynamic>? _data;
+  List<_ProjectDocument> _unitPlans = const <_ProjectDocument>[];
+  List<_ProjectDocument> _creatives = const <_ProjectDocument>[];
   bool _isLoading = true;
+  bool _isLoadingDocuments = true;
+  bool _isDocumentAction = false;
   String? _error;
+  String? _documentsError;
 
   @override
   void initState() {
@@ -46,6 +67,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       setState(() {
         _data = detail;
       });
+      await _loadDocuments(showLoading: false);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -58,6 +80,301 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         });
       }
     }
+  }
+
+  Future<void> _loadDocuments({bool showLoading = true}) async {
+    if (showLoading) {
+      setState(() {
+        _isLoadingDocuments = true;
+        _documentsError = null;
+      });
+    } else {
+      setState(() {
+        _documentsError = null;
+      });
+    }
+
+    try {
+      final payload = await _authProvider.projectDocuments(
+        id: widget.projectId,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      setState(() {
+        _unitPlans = _readDocuments(payload, 'unit_plans');
+        _creatives = _readDocuments(payload, 'creatives');
+        _isLoadingDocuments = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _documentsError = error.toString().replaceFirst('Exception: ', '');
+        _isLoadingDocuments = false;
+      });
+    }
+  }
+
+  Future<void> _uploadDocuments() async {
+    if (_isDocumentAction) {
+      return;
+    }
+    final uploadAsUnitPlans = await _chooseDocumentUploadType();
+    if (uploadAsUnitPlans == null) {
+      return;
+    }
+    if (kIsWeb) {
+      _showSnackBar('Document upload is not supported on Web in this build.');
+      return;
+    }
+
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: _documentExtensions,
+      allowMultiple: true,
+    );
+    if (!mounted || picked == null || picked.files.isEmpty) {
+      return;
+    }
+
+    final acceptedPaths = <String>[];
+    for (final file in picked.files.take(_maxDocumentCount)) {
+      final extension = (file.extension ?? '').toLowerCase();
+      if (!_documentExtensions.contains(extension)) {
+        _showSnackBar('Unsupported file skipped: ${file.name}');
+        continue;
+      }
+      if (file.path == null || file.path!.trim().isEmpty) {
+        _showSnackBar('Could not read file path: ${file.name}');
+        continue;
+      }
+      if (file.size > _maxDocumentBytes) {
+        _showSnackBar('File is larger than 20MB: ${file.name}');
+        continue;
+      }
+      acceptedPaths.add(file.path!.trim());
+    }
+    if (acceptedPaths.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isDocumentAction = true;
+    });
+    try {
+      await _authProvider.uploadProjectDocuments(
+        id: widget.projectId,
+        unitPlanFilePaths:
+            uploadAsUnitPlans ? acceptedPaths : const <String>[],
+        creativeFilePaths:
+            uploadAsUnitPlans ? const <String>[] : acceptedPaths,
+        token: _authProvider.currentAuthToken,
+      );
+      await _loadDocuments(showLoading: false);
+      if (!mounted) return;
+      _showSnackBar('Documents uploaded successfully.');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDocumentAction = false;
+        });
+      }
+    }
+  }
+
+  Future<bool?> _chooseDocumentUploadType() {
+    return showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Upload Documents',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: const Icon(Icons.home_work_outlined,
+                      color: AppColors.primary),
+                  title: const Text('Unit Plans'),
+                  onTap: () => Navigator.of(context).pop(true),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.collections_outlined,
+                      color: AppColors.primary),
+                  title: const Text('Creatives'),
+                  onTap: () => Navigator.of(context).pop(false),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _downloadAllDocuments() async {
+    if (_isDocumentAction) {
+      return;
+    }
+    setState(() {
+      _isDocumentAction = true;
+    });
+    try {
+      final exported = await _authProvider.downloadAllProjectDocuments(
+        id: widget.projectId,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      await _saveExportedFile(exported, 'Documents ZIP');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDocumentAction = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _downloadDocument(_ProjectDocument document) async {
+    if (_isDocumentAction) {
+      return;
+    }
+    setState(() {
+      _isDocumentAction = true;
+    });
+    try {
+      final exported = await _authProvider.downloadProjectDocument(
+        projectId: widget.projectId,
+        documentId: document.id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      final fileName = exported.fileName.trim().isEmpty
+          ? document.name
+          : exported.fileName.trim();
+      await _saveExportedFile(
+        ExportFileResult(
+          fileName: fileName,
+          bytes: exported.bytes,
+          contentType: exported.contentType,
+        ),
+        'Document',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDocumentAction = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteDocument(_ProjectDocument document) async {
+    if (_isDocumentAction) {
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Document'),
+          content: Text('Delete "${document.name}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _isDocumentAction = true;
+    });
+    try {
+      await _authProvider.deleteProjectDocument(
+        projectId: widget.projectId,
+        documentId: document.id,
+        token: _authProvider.currentAuthToken,
+      );
+      await _loadDocuments(showLoading: false);
+      if (!mounted) return;
+      _showSnackBar('Document deleted successfully.');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDocumentAction = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveExportedFile(
+    ExportFileResult exported,
+    String label,
+  ) async {
+    final fileName = exported.fileName.trim().isEmpty
+        ? "${label.toLowerCase().replaceAll(' ', '_')}.bin"
+        : exported.fileName.trim();
+    if (kIsWeb) {
+      _showSnackBar(
+        '$label generated ($fileName), but direct file save is not supported on Web in this build.',
+      );
+      return;
+    }
+    final file = await ExportFileHelper.saveToDownloadNextone(
+      fileName: fileName,
+      bytes: exported.bytes,
+    );
+    if (!mounted) return;
+    _showSnackBar('$label downloaded: ${file.path}');
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -120,6 +437,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         ],
                       ),
                       const SizedBox(height: 14),
+                      _buildDocumentsSection(),
+                      const SizedBox(height: 14),
                       _buildSectionCard(
                         title: 'Configurations',
                         children: [
@@ -167,6 +486,320 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _buildDocumentsSection() {
+    final totalDocuments = _unitPlans.length + _creatives.length;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFFDF9),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.folder_open_outlined,
+                  color: Color(0xFF00A88F),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Project Documents',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$totalDocuments documents - Unit Plans & Creatives',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 360;
+              final downloadButton = OutlinedButton.icon(
+                onPressed: totalDocuments == 0 || _isDocumentAction
+                    ? null
+                    : _downloadAllDocuments,
+                icon: const Icon(Icons.folder_zip_outlined, size: 16),
+                label: const Text('Download All ZIP'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  foregroundColor: AppColors.textPrimary,
+                  side: const BorderSide(color: AppColors.border),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              );
+              final uploadButton = FilledButton.icon(
+                onPressed: _isDocumentAction ? null : _uploadDocuments,
+                icon: _isDocumentAction
+                    ? const SizedBox(
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.upload_outlined, size: 16),
+                label: const Text('Upload'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              );
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    SizedBox(width: double.infinity, child: downloadButton),
+                    const SizedBox(height: 8),
+                    SizedBox(width: double.infinity, child: uploadButton),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: downloadButton),
+                  const SizedBox(width: 10),
+                  Expanded(child: uploadButton),
+                ],
+              );
+            },
+          ),
+          if (_isLoadingDocuments) ...[
+            const SizedBox(height: 16),
+            const Center(child: CircularProgressIndicator()),
+          ] else if (_documentsError != null) ...[
+            const SizedBox(height: 16),
+            Text(
+              _documentsError!,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _loadDocuments,
+              child: const Text('Retry'),
+            ),
+          ] else ...[
+            const SizedBox(height: 18),
+            _buildDocumentGroup(
+              title: 'UNIT PLANS',
+              documents: _unitPlans,
+              accentColor: AppColors.primary,
+            ),
+            const SizedBox(height: 18),
+            _buildDocumentGroup(
+              title: 'CREATIVES',
+              documents: _creatives,
+              accentColor: const Color(0xFF7C3AED),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocumentGroup({
+    required String title,
+    required List<_ProjectDocument> documents,
+    required Color accentColor,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.6,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                documents.length.toString(),
+                style: TextStyle(
+                  color: accentColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: documents.isEmpty || _isDocumentAction
+                  ? null
+                  : _downloadAllDocuments,
+              icon: Icon(Icons.download_outlined, size: 15, color: accentColor),
+              label: Text(
+                'Download all',
+                style: TextStyle(
+                  color: accentColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (documents.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Text(
+              'No documents uploaded.',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          )
+        else
+          ...documents.map(
+            (document) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildDocumentTile(document),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDocumentTile(_ProjectDocument document) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE8EEF6)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE8EEF6)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.description_outlined,
+              color: Color(0xFFE53935),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  document.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  document.meta,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Download',
+            onPressed:
+                _isDocumentAction ? null : () => _downloadDocument(document),
+            icon: const Icon(Icons.download_outlined, color: AppColors.primary),
+          ),
+          IconButton(
+            tooltip: 'Delete',
+            onPressed: _isDocumentAction ? null : () => _deleteDocument(document),
+            icon: const Icon(Icons.delete_outline, color: Color(0xFF98A4B4)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -370,6 +1003,55 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     return const <String>[];
   }
 
+  List<_ProjectDocument> _readDocuments(
+    Map<String, dynamic> payload,
+    String category,
+  ) {
+    final source = _documentSource(payload, category);
+    if (source is! List) {
+      return const <_ProjectDocument>[];
+    }
+    return source
+        .whereType<Map>()
+        .map((item) => _ProjectDocument.fromMap(
+              Map<String, dynamic>.from(item),
+              fallbackCategory: category,
+            ))
+        .where((document) => document.id.isNotEmpty)
+        .toList();
+  }
+
+  dynamic _documentSource(Map<String, dynamic> payload, String category) {
+    final data = payload['data'];
+    if (payload[category] is List) {
+      return payload[category];
+    }
+    if (data is Map<String, dynamic> && data[category] is List) {
+      return data[category];
+    }
+    final documents = payload['documents'] ??
+        (data is Map ? data['documents'] : null) ??
+        (data is List ? data : null);
+    if (documents is Map<String, dynamic> && documents[category] is List) {
+      return documents[category];
+    }
+    if (documents is List) {
+      return documents.where((item) {
+        if (item is! Map) {
+          return false;
+        }
+        final type = _readString(
+          item['category'] ?? item['type'] ?? item['document_type'],
+        ).toLowerCase();
+        if (category == 'unit_plans') {
+          return type.contains('unit') || type.contains('plan');
+        }
+        return type.contains('creative');
+      }).toList();
+    }
+    return const <dynamic>[];
+  }
+
   String _readString(dynamic value) {
     if (value is String) return value.trim();
     if (value is num || value is bool) return value.toString();
@@ -377,6 +1059,110 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   String _formatDate(String raw) {
+    if (raw.isEmpty) return '';
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    return DateFormat('dd MMM yyyy').format(parsed.toLocal());
+  }
+}
+
+class _ProjectDocument {
+  const _ProjectDocument({
+    required this.id,
+    required this.name,
+    required this.sizeLabel,
+    required this.uploadedBy,
+    required this.uploadedAt,
+    required this.category,
+  });
+
+  final String id;
+  final String name;
+  final String sizeLabel;
+  final String uploadedBy;
+  final String uploadedAt;
+  final String category;
+
+  String get meta {
+    final parts = <String>[
+      if (sizeLabel.isNotEmpty) sizeLabel,
+      if (uploadedBy.isNotEmpty) uploadedBy,
+      if (uploadedAt.isNotEmpty) uploadedAt,
+    ];
+    return parts.isEmpty ? 'Document' : parts.join(' - ');
+  }
+
+  factory _ProjectDocument.fromMap(
+    Map<String, dynamic> json, {
+    required String fallbackCategory,
+  }) {
+    final id = _readValue(
+      json['id'] ?? json['_id'] ?? json['doc_id'] ?? json['document_id'],
+    );
+    final name = _readValue(
+      json['name'] ??
+          json['file_name'] ??
+          json['filename'] ??
+          json['original_name'] ??
+          json['originalName'] ??
+          json['title'],
+    );
+    final uploadedByRaw =
+        json['uploaded_by'] ?? json['uploadedBy'] ?? json['created_by'];
+    final uploadedBy = uploadedByRaw is Map<String, dynamic>
+        ? _readValue(
+            uploadedByRaw['name'] ??
+                uploadedByRaw['full_name'] ??
+                uploadedByRaw['fullName'] ??
+                uploadedByRaw['email'],
+          )
+        : _readValue(uploadedByRaw);
+    final uploadedAt = _formatDocDate(
+      _readValue(
+        json['created_at'] ??
+            json['createdAt'] ??
+            json['uploaded_at'] ??
+            json['uploadedAt'],
+      ),
+    );
+    final sizeLabel = _readSizeLabel(
+      json['size'] ?? json['file_size'] ?? json['fileSize'] ?? json['bytes'],
+    );
+
+    return _ProjectDocument(
+      id: id,
+      name: name.isEmpty ? 'Project document' : name,
+      sizeLabel: sizeLabel,
+      uploadedBy: uploadedBy,
+      uploadedAt: uploadedAt,
+      category: fallbackCategory,
+    );
+  }
+
+  static String _readValue(dynamic value) {
+    if (value is String) return value.trim();
+    if (value is num || value is bool) return value.toString().trim();
+    return '';
+  }
+
+  static String _readSizeLabel(dynamic value) {
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+    if (value is num) {
+      final bytes = value.toDouble();
+      if (bytes >= 1024 * 1024) {
+        return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+      }
+      if (bytes >= 1024) {
+        return '${(bytes / 1024).toStringAsFixed(1)} KB';
+      }
+      return '${bytes.toStringAsFixed(0)} B';
+    }
+    return '';
+  }
+
+  static String _formatDocDate(String raw) {
     if (raw.isEmpty) return '';
     final parsed = DateTime.tryParse(raw);
     if (parsed == null) return raw;

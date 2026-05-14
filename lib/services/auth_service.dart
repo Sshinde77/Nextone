@@ -1183,6 +1183,50 @@ class AuthService {
     throw Exception('Attendance calendar response is not valid JSON.');
   }
 
+  Future<Map<String, dynamic>> attendanceMe({
+    int page = 1,
+    int perPage = 30,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.attendanceMe}',
+    ).replace(queryParameters: <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    });
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'attendanceMe',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('attendanceMe', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch attendance history.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Attendance history response is not valid JSON.');
+  }
+
   Future<Map<String, dynamic>> attendanceByMonth({
     required int month,
     required int year,
@@ -2900,39 +2944,55 @@ class AuthService {
     required List<String> amenities,
     required String status,
     required String description,
+    List<String> unitPlanFilePaths = const <String>[],
+    List<String> creativeFilePaths = const <String>[],
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
     final uri =
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createprojects}');
-    final headers = _headers(accept: 'application/json', token: resolvedToken);
-    final body = jsonEncode({
-      'name': name.trim(),
-      'developer': developer.trim(),
-      'city': city.trim(),
-      'locality': locality.trim(),
-      'address': address.trim(),
-      'configurations': configurations,
-      'price_range': priceRange.trim(),
-      'total_units': totalUnits,
-      'possession_date': possessionDate.trim(),
-      'rera_number': reraNumber.trim(),
-      'amenities': amenities,
-      'status': status.trim(),
-      'description': description.trim(),
-    });
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['accept'] = 'application/json';
+    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    _addProjectFields(
+      request,
+      name: name,
+      developer: developer,
+      city: city,
+      locality: locality,
+      address: address,
+      configurations: configurations,
+      priceRange: priceRange,
+      totalUnits: totalUnits,
+      possessionDate: possessionDate,
+      reraNumber: reraNumber,
+      amenities: amenities,
+      status: status,
+      description: description,
+    );
+    await _addProjectFiles(
+      request,
+      fieldName: 'unit_plans',
+      filePaths: unitPlanFilePaths,
+    );
+    await _addProjectFiles(
+      request,
+      fieldName: 'creatives',
+      filePaths: creativeFilePaths,
+    );
 
     _logRequest(
       endpoint: 'createProject',
       method: 'POST',
       uri: uri,
-      headers: headers,
-      body: body,
+      headers: request.headers,
+      body: 'multipart/form-data',
     );
 
-    final response = await http
-        .post(uri, headers: headers, body: body)
-        .timeout(_requestTimeout);
+    final streamedResponse = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamedResponse);
     _logResponse('createProject', response);
 
     final error = _handleResponse(
@@ -2966,6 +3026,76 @@ class AuthService {
       'status': status.trim(),
       'description': description.trim(),
     };
+  }
+
+  void _addProjectFields(
+    http.MultipartRequest request, {
+    required String name,
+    required String developer,
+    required String city,
+    required String locality,
+    required String address,
+    required List<String> configurations,
+    required String priceRange,
+    required int totalUnits,
+    required String possessionDate,
+    required String reraNumber,
+    required List<String> amenities,
+    required String status,
+    required String description,
+  }) {
+    request.fields.addAll({
+      'name': name.trim(),
+      'developer': developer.trim(),
+      'city': city.trim(),
+      'locality': locality.trim(),
+      'address': address.trim(),
+      'price_range': priceRange.trim(),
+      'total_units': totalUnits.toString(),
+      'possession_date': possessionDate.trim(),
+      'rera_number': reraNumber.trim(),
+      'status': status.trim(),
+      'description': description.trim(),
+    });
+
+    for (final configuration in configurations) {
+      final value = configuration.trim();
+      if (value.isNotEmpty) {
+        request.fields['configurations'] = [
+          request.fields['configurations'],
+          value,
+        ].whereType<String>().join(',');
+      }
+    }
+    for (final amenity in amenities) {
+      final value = amenity.trim();
+      if (value.isNotEmpty) {
+        request.fields['amenities'] = [
+          request.fields['amenities'],
+          value,
+        ].whereType<String>().join(',');
+      }
+    }
+  }
+
+  Future<void> _addProjectFiles(
+    http.MultipartRequest request, {
+    required String fieldName,
+    required List<String> filePaths,
+  }) async {
+    for (final path in filePaths) {
+      final normalizedPath = path.trim();
+      if (normalizedPath.isEmpty) {
+        continue;
+      }
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          fieldName,
+          normalizedPath,
+          contentType: _documentMediaType(normalizedPath),
+        ),
+      );
+    }
   }
 
   Future<Map<String, dynamic>> projectDetail({
@@ -3012,6 +3142,250 @@ class AuthService {
     throw Exception('Project details response format is not valid.');
   }
 
+  Future<Map<String, dynamic>> projectDocuments({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.projectDocuments.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'projectDocuments',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('projectDocuments', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch project documents.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+
+    throw Exception('Project documents response format is not valid.');
+  }
+
+  Future<Map<String, dynamic>> uploadProjectDocuments({
+    required String id,
+    List<String> unitPlanFilePaths = const <String>[],
+    List<String> creativeFilePaths = const <String>[],
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+    if (unitPlanFilePaths.isEmpty && creativeFilePaths.isEmpty) {
+      throw Exception('Select at least one document to upload.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.projectDocuments.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['accept'] = 'application/json';
+    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    await _addProjectFiles(
+      request,
+      fieldName: 'unit_plans',
+      filePaths: unitPlanFilePaths,
+    );
+    await _addProjectFiles(
+      request,
+      fieldName: 'creatives',
+      filePaths: creativeFilePaths,
+    );
+
+    _logRequest(
+      endpoint: 'uploadProjectDocuments',
+      method: 'POST',
+      uri: uri,
+      headers: request.headers,
+      body: 'multipart/form-data',
+    );
+
+    final streamedResponse = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    _logResponse('uploadProjectDocuments', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to upload project documents.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{'id': normalizedId};
+  }
+
+  Future<ExportFileResult> downloadAllProjectDocuments({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.projectDocumentsDownloadAll
+        .replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/zip', token: resolvedToken);
+    _logRequest(
+      endpoint: 'downloadAllProjectDocuments',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('downloadAllProjectDocuments', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to download project documents.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'project_${normalizedId}_documents.zip';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType:
+          contentTypeHeader.trim().isEmpty ? 'application/zip' : contentTypeHeader,
+    );
+  }
+
+  Future<ExportFileResult> downloadProjectDocument({
+    required String projectId,
+    required String documentId,
+    String? token,
+  }) async {
+    final normalizedProjectId = projectId.trim();
+    final normalizedDocumentId = documentId.trim();
+    if (normalizedProjectId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+    if (normalizedDocumentId.isEmpty) {
+      throw Exception('Document id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.projectDocumentDownload
+        .replaceFirst('{id}', normalizedProjectId)
+        .replaceFirst('{docId}', normalizedDocumentId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'downloadProjectDocument',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('downloadProjectDocument', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to download project document.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'project_document_$normalizedDocumentId';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentTypeHeader.trim().isEmpty
+          ? 'application/octet-stream'
+          : contentTypeHeader,
+    );
+  }
+
+  Future<void> deleteProjectDocument({
+    required String projectId,
+    required String documentId,
+    String? token,
+  }) async {
+    final normalizedProjectId = projectId.trim();
+    final normalizedDocumentId = documentId.trim();
+    if (normalizedProjectId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+    if (normalizedDocumentId.isEmpty) {
+      throw Exception('Document id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.projectDocumentDelete
+        .replaceFirst('{id}', normalizedProjectId)
+        .replaceFirst('{docId}', normalizedDocumentId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteProjectDocument',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteProjectDocument', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete project document.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
   Future<Map<String, dynamic>> editProject({
     required String id,
     required String name,
@@ -3027,6 +3401,8 @@ class AuthService {
     required List<String> amenities,
     required String status,
     required String description,
+    List<String> unitPlanFilePaths = const <String>[],
+    List<String> creativeFilePaths = const <String>[],
     String? token,
   }) async {
     final normalizedId = id.trim();
@@ -3038,34 +3414,48 @@ class AuthService {
     final endpoint =
         ApiConstants.editprojects.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
-    final headers = _headers(accept: 'application/json', token: resolvedToken);
-    final body = jsonEncode({
-      'name': name.trim(),
-      'developer': developer.trim(),
-      'city': city.trim(),
-      'locality': locality.trim(),
-      'address': address.trim(),
-      'configurations': configurations,
-      'price_range': priceRange.trim(),
-      'total_units': totalUnits,
-      'possession_date': possessionDate.trim(),
-      'rera_number': reraNumber.trim(),
-      'amenities': amenities,
-      'status': status.trim(),
-      'description': description.trim(),
-    });
+    final request = http.MultipartRequest('PUT', uri);
+    request.headers['accept'] = 'application/json';
+    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    _addProjectFields(
+      request,
+      name: name,
+      developer: developer,
+      city: city,
+      locality: locality,
+      address: address,
+      configurations: configurations,
+      priceRange: priceRange,
+      totalUnits: totalUnits,
+      possessionDate: possessionDate,
+      reraNumber: reraNumber,
+      amenities: amenities,
+      status: status,
+      description: description,
+    );
+    await _addProjectFiles(
+      request,
+      fieldName: 'unit_plans',
+      filePaths: unitPlanFilePaths,
+    );
+    await _addProjectFiles(
+      request,
+      fieldName: 'creatives',
+      filePaths: creativeFilePaths,
+    );
 
     _logRequest(
       endpoint: 'editProject',
       method: 'PUT',
       uri: uri,
-      headers: headers,
-      body: body,
+      headers: request.headers,
+      body: 'multipart/form-data',
     );
 
-    final response = await http
-        .put(uri, headers: headers, body: body)
-        .timeout(_requestTimeout);
+    final streamedResponse = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamedResponse);
     _logResponse('editProject', response);
 
     final error = _handleResponse(
@@ -3809,6 +4199,29 @@ class AuthService {
     }
     if (lower.endsWith('.webp')) {
       return MediaType('image', 'webp');
+    }
+    return MediaType('image', 'jpeg');
+  }
+
+  MediaType _documentMediaType(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.pdf')) {
+      return MediaType('application', 'pdf');
+    }
+    if (lower.endsWith('.png')) {
+      return MediaType('image', 'png');
+    }
+    if (lower.endsWith('.webp')) {
+      return MediaType('image', 'webp');
+    }
+    if (lower.endsWith('.doc')) {
+      return MediaType('application', 'msword');
+    }
+    if (lower.endsWith('.docx')) {
+      return MediaType(
+        'application',
+        'vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
     }
     return MediaType('image', 'jpeg');
   }

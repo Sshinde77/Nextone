@@ -384,6 +384,144 @@ class _LeadsPageState extends State<LeadsPage> {
     }
   }
 
+  Future<void> _openBulkAssignSheet() async {
+    if (_selectedLeadIds.isEmpty) {
+      _showSnackBar('Select at least one lead to assign.');
+      return;
+    }
+    if (_assigneeOptions.isEmpty) {
+      _showSnackBar('No active assignee available.');
+      return;
+    }
+
+    final selectedIds = _selectedLeadIds.toList(growable: false);
+    _reassignNoteController.clear();
+    _selectedAssigneeId ??= _assigneeOptions.first.id;
+    if (!_assigneeOptions.any((option) => option.id == _selectedAssigneeId)) {
+      _selectedAssigneeId = _assigneeOptions.first.id;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return _buildSheetContainer(
+              title: 'Assign Selected Leads',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${selectedIds.length} leads selected',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: _selectedAssigneeId,
+                    isExpanded: true,
+                    decoration: _sheetFieldDecoration('Select assignee'),
+                    items: _assigneeOptions
+                        .map(
+                          (user) => DropdownMenuItem<String>(
+                            value: user.id,
+                            child: Text(user.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _isSubmittingReassign
+                        ? null
+                        : (value) {
+                            setSheetState(() {
+                              _selectedAssigneeId = value;
+                            });
+                          },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _reassignNoteController,
+                    minLines: 2,
+                    maxLines: 3,
+                    decoration: _sheetFieldDecoration('Add note (optional)'),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _isSubmittingReassign
+                          ? null
+                          : () async {
+                              setSheetState(() {
+                                _isSubmittingReassign = true;
+                              });
+                              final reassigned = await _submitBulkReassignment(
+                                selectedIds,
+                              );
+                              if (!mounted) {
+                                return;
+                              }
+                              setSheetState(() {
+                                _isSubmittingReassign = false;
+                              });
+                              if (reassigned) {
+                                Navigator.of(context).pop();
+                              }
+                            },
+                      child: Text(
+                        _isSubmittingReassign
+                            ? 'Assigning...'
+                            : 'Assign ${selectedIds.length} Leads',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<bool> _submitBulkReassignment(List<String> leadIds) async {
+    if (_selectedAssigneeId == null || _selectedAssigneeId!.isEmpty) {
+      _showSnackBar('Please select an assignee.');
+      return false;
+    }
+
+    try {
+      for (final leadId in leadIds) {
+        await _authProvider.reassignLead(
+          id: leadId,
+          assignedTo: _selectedAssigneeId!,
+          note: _reassignNoteController.text.trim(),
+          token: _authProvider.currentAuthToken,
+        );
+      }
+      await _loadLeads();
+      if (!mounted) {
+        return false;
+      }
+      setState(() {
+        _selectedLeadIds.clear();
+        _isBulkSelectionMode = false;
+      });
+      _showSnackBar('${leadIds.length} leads assigned successfully.');
+      return true;
+    } catch (e) {
+      if (!mounted) {
+        return false;
+      }
+      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      return false;
+    }
+  }
+
   Future<void> _viewLeadDetail(String leadId) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -918,8 +1056,12 @@ class _LeadsPageState extends State<LeadsPage> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+                        onPressed:
+                            _isSubmittingReassign ? null : _openBulkAssignSheet,
+                        icon: const Icon(
+                          Icons.person_add_alt_1_outlined,
+                          size: 16,
+                        ),
                         label: const Text('Assign'),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 40),
@@ -946,8 +1088,12 @@ class _LeadsPageState extends State<LeadsPage> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+                      onPressed:
+                          _isSubmittingReassign ? null : _openBulkAssignSheet,
+                      icon: const Icon(
+                        Icons.person_add_alt_1_outlined,
+                        size: 16,
+                      ),
                       label: const Text('Assign'),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 40),
