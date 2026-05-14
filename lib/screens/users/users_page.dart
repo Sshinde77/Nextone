@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/team/add_team_member_page.dart';
+import 'package:nextone/screens/team/team_member_details_page.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/assign_manager_dialog.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 
@@ -23,6 +25,7 @@ class _UsersPageState extends State<UsersPage> {
   String _selectedStatus = 'All Status';
   bool _isLoading = true;
   bool _isExporting = false;
+  final Set<String> _assigningManagerUserIds = <String>{};
   String? _error;
   List<_UserItem> _users = <_UserItem>[];
   String _currentRole = '';
@@ -51,6 +54,9 @@ class _UsersPageState extends State<UsersPage> {
 
   bool get _canManageUsers => RoleAccess.canManageUsers(_currentRole);
   bool get _canExportData => RoleAccess.canExportData(_currentRole);
+  bool get _canAssignManager =>
+      RoleAccess.canManageUsers(_currentRole) ||
+      RoleAccess.isSalesManager(_currentRole);
 
   Future<void> _loadAccess() async {
     try {
@@ -177,6 +183,144 @@ class _UsersPageState extends State<UsersPage> {
     } catch (error) {
       if (!mounted) return;
       _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _viewUser(_UserItem user) async {
+    final action = await Navigator.of(context).push<Object?>(
+      MaterialPageRoute(
+        builder: (_) => TeamMemberDetailsPage(memberData: user.rawData),
+      ),
+    );
+    if (!mounted) return;
+    if (action == true || action == 'updated' || action == 'deleted') {
+      await _loadUsers();
+    }
+  }
+
+  List<_UserItem> get _managerOptions {
+    return _users.where((u) {
+      return u.rawRole == RoleAccess.salesManager && u.status == 'Active';
+    }).toList();
+  }
+
+  String _userManagerId(_UserItem user) {
+    final raw = user.rawData;
+    final direct = raw['manager_id'] ?? raw['managerId'];
+    final directId = direct?.toString().trim() ?? '';
+    if (directId.isNotEmpty) return directId;
+    final nested = raw['manager'];
+    if (nested is Map<String, dynamic>) {
+      final nestedId = nested['id'] ?? nested['user_id'] ?? nested['userId'];
+      final nestedValue = nestedId?.toString().trim() ?? '';
+      if (nestedValue.isNotEmpty) {
+        return nestedValue;
+      }
+    }
+    return '';
+  }
+
+  String _userManagerName(_UserItem user) {
+    final raw = user.rawData;
+    final byName = raw['manager_name'] ?? raw['managerName'];
+    if (byName is String && byName.trim().isNotEmpty) return byName.trim();
+    final nested = raw['manager'];
+    if (nested is Map<String, dynamic>) {
+      final nestedName =
+          nested['name'] ?? nested['full_name'] ?? nested['fullName'];
+      if (nestedName is String && nestedName.trim().isNotEmpty) {
+        return nestedName.trim();
+      }
+    }
+    final managerId = _userManagerId(user);
+    final manager = _managerOptions.where((m) => m.id == managerId);
+    return manager.isNotEmpty ? manager.first.name : 'Not assigned';
+  }
+
+  Future<void> _openAssignManagerDialog(_UserItem user) async {
+    if (!_canAssignManager) {
+      _showSnackBar('You do not have permission to assign manager.');
+      return;
+    }
+    if (user.id.trim().isEmpty) {
+      _showSnackBar('Unable to assign manager: missing user id.');
+      return;
+    }
+    if (user.rawRole != RoleAccess.salesExecutive &&
+        user.rawRole != RoleAccess.externalCaller) {
+      _showSnackBar(
+          'Manager can only be assigned to sales executives or external callers.');
+      return;
+    }
+
+    final managers = _managerOptions;
+    if (managers.isEmpty) {
+      _showSnackBar('No sales manager available to assign.');
+      return;
+    }
+
+    String selectedManagerId = _userManagerId(user);
+    if (selectedManagerId.isEmpty ||
+        managers.every((m) => m.id != selectedManagerId)) {
+      selectedManagerId = managers.first.id;
+    }
+
+    final assignedId = await showDialog<String>(
+      context: context,
+      builder: (context) => AssignManagerDialog(
+        memberName: user.name,
+        memberRole: user.role,
+        memberEmail: user.email,
+        currentManagerName: _userManagerName(user),
+        managers: managers
+            .map(
+              (manager) => AssignManagerOption(
+                id: manager.id,
+                name: manager.name,
+              ),
+            )
+            .toList(),
+        initialManagerId: selectedManagerId,
+      ),
+    );
+
+    if (!mounted || assignedId == null || assignedId.trim().isEmpty) {
+      return;
+    }
+    final manager = managers.firstWhere(
+      (m) => m.id == assignedId,
+      orElse: () => managers.first,
+    );
+
+    setState(() {
+      _assigningManagerUserIds.add(user.id);
+    });
+    try {
+      await _authProvider.assignUserManager(
+        id: user.id,
+        managerId: manager.id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      final index = _users.indexWhere((u) => u.id == user.id);
+      if (index >= 0) {
+        final updatedRaw = Map<String, dynamic>.from(_users[index].rawData)
+          ..['manager_id'] = manager.id
+          ..['manager_name'] = manager.name;
+        setState(() {
+          _users[index] = _users[index].copyWith(rawData: updatedRaw);
+        });
+      }
+      _showSnackBar('Manager assigned to ${user.name}.');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _assigningManagerUserIds.remove(user.id);
+        });
+      }
     }
   }
 
@@ -371,6 +515,7 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Widget _buildUserCard(_UserItem user) {
+    final isAssigning = _assigningManagerUserIds.contains(user.id);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: DataCard(
@@ -386,17 +531,28 @@ class _UsersPageState extends State<UsersPage> {
         assigneeName: user.status,
         assigneeImageUrl: '',
         actions: [
+          DataCardAction(
+            icon: Icons.visibility_outlined,
+            onTap: isAssigning ? () {} : () => _viewUser(user),
+          ),
+          if (_canAssignManager &&
+              (user.rawRole == RoleAccess.salesExecutive ||
+                  user.rawRole == RoleAccess.externalCaller))
+            DataCardAction(
+              icon: Icons.person_add_alt_1_outlined,
+              onTap: isAssigning ? () {} : () => _openAssignManagerDialog(user),
+            ),
           if (_canManageUsers)
             DataCardAction(
               icon: Icons.edit_outlined,
-              onTap: () => _openEditUser(user),
+              onTap: isAssigning ? () {} : () => _openEditUser(user),
             ),
           if (RoleAccess.canDeactivate(_currentRole, user.rawRole) &&
               user.status != 'Inactive')
             DataCardAction(
               icon: Icons.delete_outline,
               color: AppColors.error,
-              onTap: () => _deleteUser(user),
+              onTap: isAssigning ? () {} : () => _deleteUser(user),
             ),
         ],
       ),
@@ -465,6 +621,30 @@ class _UserItem {
       status: active ? 'Active' : 'Inactive',
       lastSeen: lastLogin.isEmpty ? 'Never logged in' : 'Last: $lastLogin',
       rawData: Map<String, dynamic>.from(json),
+    );
+  }
+
+  _UserItem copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? phone,
+    String? role,
+    String? rawRole,
+    String? status,
+    String? lastSeen,
+    Map<String, dynamic>? rawData,
+  }) {
+    return _UserItem(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      role: role ?? this.role,
+      rawRole: rawRole ?? this.rawRole,
+      status: status ?? this.status,
+      lastSeen: lastSeen ?? this.lastSeen,
+      rawData: rawData ?? this.rawData,
     );
   }
 }

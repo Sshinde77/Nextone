@@ -514,6 +514,173 @@ class AuthService {
     );
   }
 
+  Future<ExportFileResult> downloadLeadBulkTemplate({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.leadsBulkTemplate}');
+    final headers = _headers(
+      accept:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      token: resolvedToken,
+    );
+    _logRequest(
+      endpoint: 'downloadLeadBulkTemplate',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('downloadLeadBulkTemplate', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to download lead upload template.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName =
+        _readFileNameFromDisposition(disposition) ?? 'lead_bulk_template.xlsx';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    final contentType = contentTypeHeader.trim().isEmpty
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : contentTypeHeader;
+
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadLeadBulkFile({
+    required String filePath,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final normalizedPath = filePath.trim();
+    if (normalizedPath.isEmpty) {
+      throw Exception('Select an Excel file to upload.');
+    }
+
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.leadsBulkUpload}');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['accept'] = 'application/json';
+    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'file',
+        normalizedPath,
+        contentType: _spreadsheetMediaType(normalizedPath),
+      ),
+    );
+
+    _logRequest(
+      endpoint: 'uploadLeadBulkFile',
+      method: 'POST',
+      uri: uri,
+      headers: request.headers,
+      body: 'multipart/form-data',
+    );
+
+    http.StreamedResponse streamedResponse;
+    try {
+      streamedResponse = await request.send().timeout(_requestTimeout);
+    } on TimeoutException {
+      throw Exception('Server is taking too long to respond. Please try again.');
+    } on SocketException {
+      throw Exception('No internet connection or server is unreachable.');
+    } on HandshakeException {
+      throw Exception(
+          'Secure connection failed. Check phone date/time and try again.');
+    } on http.ClientException {
+      throw Exception('Network error while contacting server. Please try again.');
+    }
+
+    final response = await http.Response.fromStream(streamedResponse);
+    _logResponse('uploadLeadBulkFile', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to upload leads file.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Lead bulk upload response is not valid JSON.');
+  }
+
+  Future<ExportFileResult> downloadLeadBulkResult({
+    required String filename,
+    String? token,
+  }) async {
+    final normalizedFilename = filename.trim();
+    if (normalizedFilename.isEmpty) {
+      throw Exception('Result filename is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.leadsBulkResult.replaceFirst(
+      '{filename}',
+      Uri.encodeComponent(normalizedFilename),
+    );
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(
+      accept:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      token: resolvedToken,
+    );
+    _logRequest(
+      endpoint: 'downloadLeadBulkResult',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('downloadLeadBulkResult', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to download lead upload result.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName =
+        _readFileNameFromDisposition(disposition) ?? normalizedFilename;
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    final contentType = contentTypeHeader.trim().isEmpty
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : contentTypeHeader;
+
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
   Future<ExportFileResult> exportSiteVisits({String? token}) async {
     final resolvedToken = token ?? _authToken;
     final uri =
@@ -2366,6 +2533,165 @@ class AuthService {
     throw Exception('User details response format is not valid.');
   }
 
+  Future<Map<String, dynamic>> userPerformance({
+    required String id,
+    required String from,
+    required String to,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+
+    final normalizedFrom = from.trim();
+    final normalizedTo = to.trim();
+    if (normalizedFrom.isEmpty || normalizedTo.isEmpty) {
+      throw Exception('From and to date are required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.userPerformance.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint').replace(
+      queryParameters: <String, String>{
+        'from': normalizedFrom,
+        'to': normalizedTo,
+      },
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'userPerformance',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('userPerformance', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch user performance.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      if (body is Map<String, dynamic>) {
+        final data = body['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return body;
+      }
+    } catch (_) {
+      // Fall through to generic parsing error below.
+    }
+
+    throw Exception('User performance response format is not valid.');
+  }
+
+  Future<LeadsListResult> teamHistoryLeads({
+    required String userId,
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+    final endpoint = ApiConstants.teamHistoryLeads
+        .replaceFirst('{userId}', normalizedUserId);
+    return _teamHistoryList(
+      endpointName: 'teamHistoryLeads',
+      endpointPath: endpoint,
+      fallbackMessage: 'Unable to fetch team history leads.',
+      token: token,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
+  Future<LeadsListResult> teamHistoryFollowUps({
+    required String userId,
+    bool? isCompleted,
+    String? priority,
+    String? from,
+    String? to,
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+    final endpoint = ApiConstants.teamHistoryFollowUps
+        .replaceFirst('{userId}', normalizedUserId);
+    final query = <String, String>{};
+    if (isCompleted != null) {
+      query['is_completed'] = isCompleted.toString();
+    }
+    if (priority != null && priority.trim().isNotEmpty) {
+      query['priority'] = priority.trim();
+    }
+    if (from != null && from.trim().isNotEmpty) {
+      query['from'] = from.trim();
+    }
+    if (to != null && to.trim().isNotEmpty) {
+      query['to'] = to.trim();
+    }
+    return _teamHistoryList(
+      endpointName: 'teamHistoryFollowUps',
+      endpointPath: endpoint,
+      fallbackMessage: 'Unable to fetch team history follow-ups.',
+      token: token,
+      page: page,
+      perPage: perPage,
+      query: query,
+    );
+  }
+
+  Future<LeadsListResult> teamHistorySiteVisits({
+    required String userId,
+    String? status,
+    String? from,
+    String? to,
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+    final endpoint = ApiConstants.teamHistorySiteVisits
+        .replaceFirst('{userId}', normalizedUserId);
+    final query = <String, String>{};
+    if (status != null && status.trim().isNotEmpty) {
+      query['status'] = status.trim();
+    }
+    if (from != null && from.trim().isNotEmpty) {
+      query['from'] = from.trim();
+    }
+    if (to != null && to.trim().isNotEmpty) {
+      query['to'] = to.trim();
+    }
+    return _teamHistoryList(
+      endpointName: 'teamHistorySiteVisits',
+      endpointPath: endpoint,
+      fallbackMessage: 'Unable to fetch team history site visits.',
+      token: token,
+      page: page,
+      perPage: perPage,
+      query: query,
+    );
+  }
+
   Future<void> deleteUser({
     required String id,
     String? token,
@@ -2790,6 +3116,50 @@ class AuthService {
     }
   }
 
+  Future<void> assignUserManager({
+    required String id,
+    required String managerId,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    final normalizedManagerId = managerId.trim();
+
+    if (normalizedId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+    if (normalizedManagerId.isEmpty) {
+      throw Exception('Manager id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.assignUserManager.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({'manager_id': normalizedManagerId});
+
+    _logRequest(
+      endpoint: 'assignUserManager',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('assignUserManager', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to assign manager.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
   Future<List<Map<String, dynamic>>> notifications({
     String? token,
     String? type,
@@ -3183,6 +3553,90 @@ class AuthService {
     return message is String ? message : null;
   }
 
+  Future<LeadsListResult> _teamHistoryList({
+    required String endpointName,
+    required String endpointPath,
+    required String fallbackMessage,
+    required int page,
+    required int perPage,
+    String? token,
+    Map<String, String>? query,
+  }) async {
+    final normalizedPath = endpointPath.trim();
+    if (normalizedPath.isEmpty) {
+      throw Exception('Invalid team history endpoint.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+      ...?query,
+    };
+
+    final uri = Uri.parse('${ApiConstants.baseUrl}$normalizedPath')
+        .replace(queryParameters: queryParams);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: endpointName,
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse(endpointName, response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: fallbackMessage,
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+
+      final resolvedCurrentPage = _readIntFromMap(
+            pagination,
+            ['page', 'current_page', 'currentPage'],
+          ) ??
+          page;
+      final resolvedPerPage = _readIntFromMap(
+            pagination,
+            ['per_page', 'perPage', 'page_size', 'limit'],
+          ) ??
+          perPage;
+      final resolvedTotalItems = _readIntFromMap(
+            pagination,
+            ['total', 'total_items', 'totalItems', 'count'],
+          ) ??
+          items.length;
+      final resolvedTotalPages = _readIntFromMap(
+            pagination,
+            ['total_pages', 'totalPages', 'last_page', 'lastPage'],
+          ) ??
+          _deriveTotalPages(
+            total: resolvedTotalItems,
+            perPage: resolvedPerPage,
+          );
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('$fallbackMessage Invalid response format.');
+    }
+  }
+
   List<Map<String, dynamic>>? _extractUserList(dynamic source) {
     if (source is List) {
       final users = source.whereType<Map>().map(_stringDynamicMap).toList();
@@ -3352,6 +3806,20 @@ class AuthService {
       return MediaType('image', 'webp');
     }
     return MediaType('image', 'jpeg');
+  }
+
+  MediaType _spreadsheetMediaType(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.csv')) {
+      return MediaType('text', 'csv');
+    }
+    if (lower.endsWith('.xls')) {
+      return MediaType('application', 'vnd.ms-excel');
+    }
+    return MediaType(
+      'application',
+      'vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
   }
 
   Future<Map<String, dynamic>> dashboardStats({

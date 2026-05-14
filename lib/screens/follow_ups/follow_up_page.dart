@@ -775,6 +775,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
         final addButton = FilledButton.icon(
           onPressed: _openCreateFollowUp,
           icon: const Icon(Icons.add, size: 18),
+          
           label: const Text('Add Follow Up'),
           style: FilledButton.styleFrom(
             minimumSize: const Size(0, 48),

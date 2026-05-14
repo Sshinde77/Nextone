@@ -15,6 +15,13 @@ class ApiConstants {
   static const String deleteuser = '/users/{id}';
   static const String edituser = '/users/{id}';
   static const String edituserrole = '/users/{id}/role';
+  static const String assignUserManager = '/users/{id}/assign-manager';
+  static const String userPerformance = '/users/{id}/performance';
+  static const String teamHistoryLeads = '/team-history/{userId}/leads';
+  static const String teamHistoryFollowUps =
+      '/team-history/{userId}/follow-ups';
+  static const String teamHistorySiteVisits =
+      '/team-history/{userId}/site-visits';
 
   //leads Endpoints
   static const String leads = '/leads';
@@ -24,6 +31,9 @@ class ApiConstants {
   static const String editleads = '/leads/{id}';
   static const String updatestatusleads = '/leads/{id}/status';
   static const String reassignmemberleads = '/leads/{id}/assign';
+  static const String leadsBulkTemplate = '/leads/bulk/template';
+  static const String leadsBulkUpload = '/leads/bulk/upload';
+  static const String leadsBulkResult = '/leads/bulk/result/{filename}';
 
   //followup Endpoints
   static const String followups = '/tasks';

@@ -59,7 +59,10 @@ class RoleAccess {
   static bool canManageProjects(String role) => hasFullAccess(role);
   static bool canExportData(String role) => hasFullAccess(role);
   static bool canViewProjects(String role) => hasFullAccess(role);
-  static bool canViewUsers(String role) => hasFullAccess(role);
+  static bool canViewUsers(String role) {
+    final normalized = normalize(role);
+    return hasFullAccess(normalized) || normalized == salesManager;
+  }
 
   static bool canViewTeam(String role) {
     final normalized = normalize(role);

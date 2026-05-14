@@ -6,6 +6,7 @@ import 'package:nextone/screens/team/add_team_member_page.dart';
 import 'package:nextone/screens/team/team_member_details_page.dart';
 import 'package:nextone/utils/csv_export_helper.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/assign_manager_dialog.dart';
 import 'package:nextone/widgets/data_card.dart';
 
 class TeamPage extends StatefulWidget {
@@ -22,6 +23,7 @@ class _TeamPageState extends State<TeamPage> {
   String? _membersLoadError;
   final Set<String> _deletingMemberIds = <String>{};
   final Set<String> _changingRoleMemberIds = <String>{};
+  final Set<String> _assigningManagerMemberIds = <String>{};
   String _currentRole = '';
   final List<_RoleOption> _roleOptions = const [
     _RoleOption(label: 'Admin', value: 'admin'),
@@ -33,6 +35,9 @@ class _TeamPageState extends State<TeamPage> {
   final List<_TeamMember> _members = [];
 
   bool get _canManageUsers => RoleAccess.canManageUsers(_currentRole);
+  bool get _canAssignManager =>
+      RoleAccess.canManageUsers(_currentRole) ||
+      RoleAccess.isSalesManager(_currentRole);
   bool get _canExportData => RoleAccess.canExportData(_currentRole);
   List<_RoleOption> get _assignableRoleOptions {
     return _roleOptions
@@ -426,6 +431,142 @@ class _TeamPageState extends State<TeamPage> {
     }
   }
 
+  List<_TeamMember> get _managerOptions {
+    return _members.where((member) {
+      return member.rawRole == RoleAccess.salesManager;
+    }).toList();
+  }
+
+  String _memberManagerId(_TeamMember member) {
+    final raw = member.originalData;
+    final direct = raw['manager_id'] ?? raw['managerId'];
+    final directId = direct?.toString().trim() ?? '';
+    if (directId.isNotEmpty) {
+      return directId;
+    }
+    final nested = raw['manager'];
+    if (nested is Map<String, dynamic>) {
+      final nestedId = nested['id'] ?? nested['user_id'] ?? nested['userId'];
+      final nestedValue = nestedId?.toString().trim() ?? '';
+      if (nestedValue.isNotEmpty) {
+        return nestedValue;
+      }
+    }
+    return '';
+  }
+
+  String _memberManagerName(_TeamMember member) {
+    final raw = member.originalData;
+    final byName = raw['manager_name'] ?? raw['managerName'];
+    if (byName is String && byName.trim().isNotEmpty) {
+      return byName.trim();
+    }
+    final nested = raw['manager'];
+    if (nested is Map<String, dynamic>) {
+      final name = nested['name'] ?? nested['full_name'] ?? nested['fullName'];
+      if (name is String && name.trim().isNotEmpty) {
+        return name.trim();
+      }
+    }
+    final selected = _managerOptions.where(
+      (m) => m.id == _memberManagerId(member),
+    );
+    if (selected.isNotEmpty) {
+      return selected.first.name;
+    }
+    return 'Not assigned';
+  }
+
+  Future<void> _openAssignManagerDialog(_TeamMember member) async {
+    if (!_canAssignManager) {
+      _showSnackBar('You do not have permission to assign manager.');
+      return;
+    }
+    if (member.id.isEmpty) {
+      _showSnackBar('Unable to assign manager: missing user id.');
+      return;
+    }
+    if (member.rawRole != RoleAccess.salesExecutive &&
+        member.rawRole != RoleAccess.externalCaller) {
+      _showSnackBar(
+        'Manager can only be assigned to sales executives or external callers.',
+      );
+      return;
+    }
+
+    final managers = _managerOptions;
+    if (managers.isEmpty) {
+      _showSnackBar('No sales manager available to assign.');
+      return;
+    }
+
+    String selectedManagerId = _memberManagerId(member);
+    if (selectedManagerId.isEmpty ||
+        managers.every((m) => m.id != selectedManagerId)) {
+      selectedManagerId = managers.first.id;
+    }
+
+    final assignedId = await showDialog<String>(
+      context: context,
+      builder: (context) => AssignManagerDialog(
+        memberName: member.name,
+        memberRole: member.role,
+        memberEmail: (member.originalData['email'] ?? '').toString(),
+        currentManagerName: _memberManagerName(member),
+        managers: managers
+            .map(
+              (manager) => AssignManagerOption(
+                id: manager.id,
+                name: manager.name,
+              ),
+            )
+            .toList(),
+        initialManagerId: selectedManagerId,
+      ),
+    );
+
+    if (!mounted || assignedId == null || assignedId.trim().isEmpty) {
+      return;
+    }
+
+    final manager = managers.firstWhere(
+      (m) => m.id == assignedId,
+      orElse: () => managers.first,
+    );
+
+    setState(() {
+      _assigningManagerMemberIds.add(member.id);
+    });
+    try {
+      await _authProvider.assignUserManager(
+        id: member.id,
+        managerId: manager.id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      final index = _members.indexWhere((m) => m.id == member.id);
+      if (index >= 0) {
+        final updatedData =
+            Map<String, dynamic>.from(_members[index].originalData)
+          ..['manager_id'] = manager.id
+          ..['manager_name'] = manager.name;
+        setState(() {
+          _members[index] = _members[index].copyWith(originalData: updatedData);
+        });
+      }
+      _showSnackBar('Manager assigned to ${member.name}.');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _assigningManagerMemberIds.remove(member.id);
+        });
+      }
+    }
+  }
+
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -586,7 +727,9 @@ class _TeamPageState extends State<TeamPage> {
         member.id.isNotEmpty && _deletingMemberIds.contains(member.id);
     final isChangingRole =
         member.id.isNotEmpty && _changingRoleMemberIds.contains(member.id);
-    final isBusy = isDeleting || isChangingRole;
+    final isAssigningManager =
+        member.id.isNotEmpty && _assigningManagerMemberIds.contains(member.id);
+    final isBusy = isDeleting || isChangingRole || isAssigningManager;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -596,6 +739,17 @@ class _TeamPageState extends State<TeamPage> {
           AppColors.info,
           isBusy ? null : () => _viewMemberDetails(member),
         ),
+        if (_canAssignManager &&
+            (member.rawRole == RoleAccess.salesExecutive ||
+                member.rawRole == RoleAccess.externalCaller)) ...[
+          const SizedBox(width: 12),
+          _buildCircleActionButton(
+            Icons.person_add_alt_1_outlined,
+            AppColors.primary,
+            isBusy ? null : () => _openAssignManagerDialog(member),
+            isLoading: isAssigningManager,
+          ),
+        ],
         if (_canManageUsers) ...[
           const SizedBox(width: 12),
           _buildCircleActionButton(
@@ -752,7 +906,9 @@ class _TeamPageState extends State<TeamPage> {
         member.id.isNotEmpty && _deletingMemberIds.contains(member.id);
     final isChangingRole =
         member.id.isNotEmpty && _changingRoleMemberIds.contains(member.id);
-    final isBusy = isDeleting || isChangingRole;
+    final isAssigningManager =
+        member.id.isNotEmpty && _assigningManagerMemberIds.contains(member.id);
+    final isBusy = isDeleting || isChangingRole || isAssigningManager;
     final conversionColor =
         member.conversionRate >= 30 ? AppColors.success : AppColors.warning;
 
@@ -775,6 +931,13 @@ class _TeamPageState extends State<TeamPage> {
             icon: Icons.visibility_outlined,
             onTap: isBusy ? () {} : () => _viewMemberDetails(member),
           ),
+          if (_canAssignManager &&
+              (member.rawRole == RoleAccess.salesExecutive ||
+                  member.rawRole == RoleAccess.externalCaller))
+            DataCardAction(
+              icon: Icons.person_add_alt_1_outlined,
+              onTap: isBusy ? () {} : () => _openAssignManagerDialog(member),
+            ),
           if (_canManageUsers)
             DataCardAction(
               icon: Icons.edit_outlined,
@@ -959,7 +1122,7 @@ class _TeamMember {
       id: id,
       name: safeName,
       role: role.isNotEmpty ? readableRole(role) : 'Team Member',
-      rawRole: role,
+      rawRole: RoleAccess.normalize(role),
       activeLeads: activeLeads,
       closedLeads: closedLeads,
       conversionRate: conversionRate,

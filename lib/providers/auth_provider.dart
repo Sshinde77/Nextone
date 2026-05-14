@@ -66,6 +66,76 @@ class AuthProvider {
     return _authService.usersDetail(id: id, token: token);
   }
 
+  Future<Map<String, dynamic>> userPerformance({
+    required String id,
+    required String from,
+    required String to,
+    String? token,
+  }) {
+    return _authService.userPerformance(
+      id: id,
+      from: from,
+      to: to,
+      token: token,
+    );
+  }
+
+  Future<LeadsListResult> teamHistoryLeads({
+    required String userId,
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) {
+    return _authService.teamHistoryLeads(
+      userId: userId,
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
+  Future<LeadsListResult> teamHistoryFollowUps({
+    required String userId,
+    bool? isCompleted,
+    String? priority,
+    String? from,
+    String? to,
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) {
+    return _authService.teamHistoryFollowUps(
+      userId: userId,
+      isCompleted: isCompleted,
+      priority: priority,
+      from: from,
+      to: to,
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
+  Future<LeadsListResult> teamHistorySiteVisits({
+    required String userId,
+    String? status,
+    String? from,
+    String? to,
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) {
+    return _authService.teamHistorySiteVisits(
+      userId: userId,
+      status: status,
+      from: from,
+      to: to,
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
   Future<void> deleteUser({required String id, String? token}) {
     return _authService.deleteUser(id: id, token: token);
   }
@@ -92,6 +162,18 @@ class AuthProvider {
     String? token,
   }) {
     return _authService.editUserRole(id: id, role: role, token: token);
+  }
+
+  Future<void> assignUserManager({
+    required String id,
+    required String managerId,
+    String? token,
+  }) {
+    return _authService.assignUserManager(
+      id: id,
+      managerId: managerId,
+      token: token,
+    );
   }
 
   Future<LeadsListResult> leads({
@@ -122,6 +204,30 @@ class AuthProvider {
     return _authService.exportLeads(
       from: from,
       to: to,
+      token: token,
+    );
+  }
+
+  Future<ExportFileResult> downloadLeadBulkTemplate({String? token}) {
+    return _authService.downloadLeadBulkTemplate(token: token);
+  }
+
+  Future<Map<String, dynamic>> uploadLeadBulkFile({
+    required String filePath,
+    String? token,
+  }) {
+    return _authService.uploadLeadBulkFile(
+      filePath: filePath,
+      token: token,
+    );
+  }
+
+  Future<ExportFileResult> downloadLeadBulkResult({
+    required String filename,
+    String? token,
+  }) {
+    return _authService.downloadLeadBulkResult(
+      filename: filename,
       token: token,
     );
   }

@@ -51,19 +51,85 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
   bool _isExpanded = false;
 
   bool get _isExpandedIndex => widget.currentIndex >= 4;
+  bool get _hasOverflow => _allVisibleItems.length > 5;
+  bool get _isSevenItemOverflow => _allVisibleItems.length == 7;
+
+  List<_NavEntry> get _allVisibleItems {
+    return <_NavEntry>[
+      _NavEntry(
+        index: 0,
+        label: 'Dashboard',
+        icon: Icons.dashboard_outlined,
+        onTap: widget.onDashboard,
+      ),
+      _NavEntry(
+        index: 1,
+        label: 'Leads',
+        icon: Icons.people_alt_outlined,
+        onTap: widget.onLeads,
+        badgeCount: widget.leadsBadgeCount,
+      ),
+      _NavEntry(
+        index: 2,
+        label: 'Follow-ups',
+        icon: Icons.check_circle_outline,
+        onTap: widget.onFollowUps,
+        badgeCount: widget.followUpsBadgeCount,
+      ),
+      _NavEntry(
+        index: 3,
+        label: 'Visits',
+        icon: Icons.location_on_outlined,
+        onTap: widget.onSiteVisits,
+      ),
+      if (widget.showProjects)
+        _NavEntry(
+          index: 4,
+          label: 'Projects',
+          icon: Icons.apartment_outlined,
+          onTap: widget.onProjects,
+        ),
+      if (widget.showTeam)
+        _NavEntry(
+          index: 5,
+          label: 'Team',
+          icon: Icons.groups_outlined,
+          onTap: widget.onTeam,
+        ),
+      _NavEntry(
+        index: 6,
+        label: 'Attendance',
+        icon: Icons.fact_check,
+        onTap: widget.onReports,
+      ),
+      if (widget.showUsers)
+        _NavEntry(
+          index: 7,
+          label: 'Users',
+          icon: Icons.manage_accounts_outlined,
+          onTap: widget.onSettings,
+        ),
+    ];
+  }
 
   @override
   void initState() {
     super.initState();
-    _isExpanded = _isExpandedIndex;
+    _isExpanded = _hasOverflow && _isExpandedIndex;
   }
 
   @override
   void didUpdateWidget(covariant CRMAppBottomNav oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!_hasOverflow && _isExpanded) {
+      setState(() {
+        _isExpanded = false;
+      });
+      return;
+    }
     if (_isExpanded != _isExpandedIndex) {
       setState(() {
-        _isExpanded = _isExpandedIndex;
+        _isExpanded = _hasOverflow && _isExpandedIndex;
       });
     }
   }
@@ -108,13 +174,20 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
                 duration: const Duration(milliseconds: 280),
                 switchInCurve: Curves.easeOutCubic,
                 switchOutCurve: Curves.easeInCubic,
-                child: _isExpanded
+                child: !_hasOverflow
+                    ? _SingleRowNavBar(
+                        key: const ValueKey<String>('single-row-nav'),
+                        currentIndex: widget.currentIndex,
+                        items: _allVisibleItems,
+                      )
+                    : _isExpanded
                     ? _ExpandedNavBar(
                         key: const ValueKey<String>('expanded-nav'),
                         currentIndex: widget.currentIndex,
                         showProjects: widget.showProjects,
                         showTeam: widget.showTeam,
                         showUsers: widget.showUsers,
+                        showTrailingEmptySlot: _isSevenItemOverflow,
                         onProjects: widget.onProjects,
                         onTeam: widget.onTeam,
                         onReports: widget.onReports,
@@ -229,11 +302,45 @@ class _MainNavBar extends StatelessWidget {
   }
 }
 
+class _SingleRowNavBar extends StatelessWidget {
+  const _SingleRowNavBar({
+    super.key,
+    required this.currentIndex,
+    required this.items,
+  });
+
+  final int currentIndex;
+  final List<_NavEntry> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        children: items
+            .map(
+              (item) => Expanded(
+                child: _NavItem(
+                  icon: item.icon,
+                  label: item.label,
+                  isActive: currentIndex == item.index,
+                  onTap: item.onTap,
+                  badgeCount: item.badgeCount,
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
 class _ExpandedNavBar extends StatelessWidget {
   final int currentIndex;
   final bool showProjects;
   final bool showTeam;
   final bool showUsers;
+  final bool showTrailingEmptySlot;
   final VoidCallback onProjects;
   final VoidCallback onTeam;
   final VoidCallback onReports;
@@ -246,6 +353,7 @@ class _ExpandedNavBar extends StatelessWidget {
     required this.showProjects,
     required this.showTeam,
     required this.showUsers,
+    required this.showTrailingEmptySlot,
     required this.onProjects,
     required this.onTeam,
     required this.onReports,
@@ -255,28 +363,82 @@ class _ExpandedNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final overflowItems = <_NavEntry>[
+      if (showProjects)
+        _NavEntry(
+          index: 4,
+          label: 'Projects',
+          icon: Icons.apartment_outlined,
+          onTap: onProjects,
+        ),
+      if (showTeam)
+        _NavEntry(
+          index: 5,
+          label: 'Team',
+          icon: Icons.groups_outlined,
+          onTap: onTeam,
+        ),
+      _NavEntry(
+        index: 6,
+        label: 'Attendance',
+        icon: Icons.fact_check,
+        onTap: onReports,
+      ),
+      if (showUsers)
+        _NavEntry(
+          index: 7,
+          label: 'Users',
+          icon: Icons.manage_accounts_outlined,
+          onTap: onSettings,
+        ),
+    ];
+
+    _NavEntry? itemAt(int i) => i < overflowItems.length ? overflowItems[i] : null;
+
+    Widget navCell(_NavEntry? entry) {
+      return Expanded(
+        child: entry == null
+            ? const SizedBox.expand()
+            : _NavItem(
+                icon: entry.icon,
+                label: entry.label,
+                isActive: currentIndex == entry.index,
+                onTap: entry.onTap,
+                badgeCount: entry.badgeCount,
+              ),
+      );
+    }
+
+    if (showTrailingEmptySlot) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Row(
+          children: [
+            navCell(itemAt(0)),
+            navCell(itemAt(1)),
+            const SizedBox(width: 4),
+            _CenterNavButton(
+              icon: Icons.keyboard_arrow_down_rounded,
+              color: AppColors.primaryDark,
+              shadowColor: AppColors.primaryDark.withValues(alpha: 0.25),
+              onTap: onLess,
+            ),
+            const SizedBox(width: 4),
+            navCell(itemAt(2)),
+            const Expanded(
+              child: SizedBox.expand(),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Row(
         children: [
-          if (showProjects)
-            Expanded(
-              child: _NavItem(
-                icon: Icons.apartment_outlined,
-                label: 'Projects',
-                isActive: currentIndex == 4,
-                onTap: onProjects,
-              ),
-            ),
-          if (showTeam)
-            Expanded(
-              child: _NavItem(
-                icon: Icons.groups_outlined,
-                label: 'Team',
-                isActive: currentIndex == 5,
-                onTap: onTeam,
-              ),
-            ),
+          navCell(itemAt(0)),
+          navCell(itemAt(1)),
           const SizedBox(width: 4),
           _CenterNavButton(
             icon: Icons.keyboard_arrow_down_rounded,
@@ -285,23 +447,8 @@ class _ExpandedNavBar extends StatelessWidget {
             onTap: onLess,
           ),
           const SizedBox(width: 4),
-          Expanded(
-            child: _NavItem(
-              icon: Icons.fact_check,
-              label: 'Attendance',
-              isActive: currentIndex == 6,
-              onTap: onReports,
-            ),
-          ),
-          if (showUsers)
-            Expanded(
-              child: _NavItem(
-                icon: Icons.manage_accounts_outlined,
-                label: 'Users',
-                isActive: currentIndex == 7,
-                onTap: onSettings,
-              ),
-            ),
+          navCell(itemAt(2)),
+          navCell(itemAt(3)),
         ],
       ),
     );
@@ -442,4 +589,20 @@ class _Badge extends StatelessWidget {
       ),
     );
   }
+}
+
+class _NavEntry {
+  const _NavEntry({
+    required this.index,
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.badgeCount,
+  });
+
+  final int index;
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final int? badgeCount;
 }

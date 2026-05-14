@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
@@ -23,10 +24,17 @@ class LeadsPage extends StatefulWidget {
 
 class _LeadsPageState extends State<LeadsPage> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _reassignNoteController =
+      TextEditingController();
   final Set<String> _selectedLeadIds = <String>{};
   final AuthProvider _authProvider = AuthProvider();
   bool _isBulkSelectionMode = false;
   bool _isExporting = false;
+  bool _isBulkOperating = false;
+  bool _isSubmittingReassign = false;
+  String? _lastBulkResultFilename;
+  String? _selectedAssigneeId;
+  List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
 
   Timer? _searchDebounce;
   bool _isLoadingLeads = true;
@@ -60,10 +68,12 @@ class _LeadsPageState extends State<LeadsPage> {
   void initState() {
     super.initState();
     _loadAccess();
+    _loadAssigneeOptions();
     _loadLeads();
   }
 
   bool get _canExportData => RoleAccess.canExportData(_currentRole);
+  bool get _canUseBulkLeadTools => RoleAccess.canExportData(_currentRole);
 
   Future<void> _loadAccess() async {
     try {
@@ -81,7 +91,86 @@ class _LeadsPageState extends State<LeadsPage> {
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _reassignNoteController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAssigneeOptions() async {
+    try {
+      final users =
+          await _authProvider.users(token: _authProvider.currentAuthToken);
+      final options = users
+          .map(_assigneeFromApi)
+          .where((user) => user != null)
+          .cast<_AssigneeOption>()
+          .toList();
+
+      final uniqueById = <String, _AssigneeOption>{};
+      for (final option in options) {
+        uniqueById[option.id] = option;
+      }
+      final uniqueOptions = uniqueById.values.toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _assigneeOptions = uniqueOptions;
+      });
+    } catch (_) {
+      // Keep the leads list usable even if users cannot be loaded.
+    }
+  }
+
+  _AssigneeOption? _assigneeFromApi(Map<String, dynamic> user) {
+    final isActive = _readBool(
+      user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'],
+    );
+    if (!isActive) {
+      return null;
+    }
+
+    final roleRaw = _readString(
+      user['role'] ??
+          user['user_role'] ??
+          user['userRole'] ??
+          user['designation'],
+    );
+    final normalizedRole = _normalizeRole(roleRaw);
+    if (normalizedRole != 'sale_executive' &&
+        normalizedRole != 'sales_manager' &&
+        normalizedRole != 'external_caller') {
+      return null;
+    }
+
+    final id = _readString(
+      user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid'],
+    );
+    if (id.isEmpty) {
+      return null;
+    }
+
+    final firstName = _readString(user['first_name'] ?? user['firstName']);
+    final lastName = _readString(user['last_name'] ?? user['lastName']);
+    final combinedName = [
+      if (firstName.isNotEmpty) firstName,
+      if (lastName.isNotEmpty) lastName,
+    ].join(' ').trim();
+
+    final displayName = combinedName.isNotEmpty
+        ? combinedName
+        : _readString(
+            user['name'] ??
+                user['full_name'] ??
+                user['fullName'] ??
+                user['email'],
+          );
+
+    return _AssigneeOption(
+      id: id,
+      name: displayName.isEmpty ? 'User $id' : displayName,
+    );
   }
 
   Future<void> _loadLeads() async {
@@ -177,6 +266,127 @@ class _LeadsPageState extends State<LeadsPage> {
     await launchUrl(launchUri, mode: LaunchMode.externalApplication);
   }
 
+  Future<void> _openReassignSheet(_LeadModel lead) async {
+    if (_assigneeOptions.isEmpty) {
+      _showSnackBar('No active assignee available.');
+      return;
+    }
+
+    _reassignNoteController.clear();
+    _selectedAssigneeId = lead.assignedToId.isNotEmpty
+        ? lead.assignedToId
+        : _assigneeOptions.first.id;
+    if (!_assigneeOptions.any((option) => option.id == _selectedAssigneeId)) {
+      _selectedAssigneeId = _assigneeOptions.first.id;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return _buildSheetContainer(
+              title: lead.assignedToId.isEmpty ? 'Assign Lead' : 'Reassign Lead',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: _selectedAssigneeId,
+                    isExpanded: true,
+                    decoration: _sheetFieldDecoration('Select assignee'),
+                    items: _assigneeOptions
+                        .map(
+                          (user) => DropdownMenuItem<String>(
+                            value: user.id,
+                            child: Text(user.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _isSubmittingReassign
+                        ? null
+                        : (value) {
+                            setSheetState(() {
+                              _selectedAssigneeId = value;
+                            });
+                          },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _reassignNoteController,
+                    minLines: 2,
+                    maxLines: 3,
+                    decoration: _sheetFieldDecoration('Add note (optional)'),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _isSubmittingReassign
+                          ? null
+                          : () async {
+                              setSheetState(() {
+                                _isSubmittingReassign = true;
+                              });
+                              final reassigned = await _submitReassignment(lead);
+                              if (!mounted) {
+                                return;
+                              }
+                              setSheetState(() {
+                                _isSubmittingReassign = false;
+                              });
+                              if (reassigned) {
+                                Navigator.of(context).pop();
+                              }
+                            },
+                      child: Text(
+                        _isSubmittingReassign
+                            ? 'Reassigning...'
+                            : (lead.assignedToId.isEmpty
+                                ? 'Assign Lead'
+                                : 'Reassign Lead'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<bool> _submitReassignment(_LeadModel lead) async {
+    if (_selectedAssigneeId == null || _selectedAssigneeId!.isEmpty) {
+      _showSnackBar('Please select an assignee.');
+      return false;
+    }
+
+    try {
+      await _authProvider.reassignLead(
+        id: lead.id,
+        assignedTo: _selectedAssigneeId!,
+        note: _reassignNoteController.text.trim(),
+        token: _authProvider.currentAuthToken,
+      );
+      await _loadLeads();
+      if (!mounted) {
+        return false;
+      }
+      _showSnackBar('Lead reassigned successfully.');
+      return true;
+    } catch (e) {
+      if (!mounted) {
+        return false;
+      }
+      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      return false;
+    }
+  }
+
   Future<void> _viewLeadDetail(String leadId) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -268,6 +478,318 @@ class _LeadsPageState extends State<LeadsPage> {
         });
       }
     }
+  }
+
+  Future<void> _openLeadBulkDialog() async {
+    if (!_canUseBulkLeadTools) {
+      _showSnackBar('You do not have permission to use bulk lead tools.');
+      return;
+    }
+
+    final choice = await showDialog<_BulkLeadDialogChoice>(
+      context: context,
+      builder: (context) {
+        final resultController = TextEditingController(
+          text: _lastBulkResultFilename ?? '',
+        );
+
+        return AlertDialog(
+          title: const Text('Bulk Lead Operations'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Download the Excel template, fill lead details, then upload the completed file.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _BulkOperationTile(
+                  icon: Icons.file_download_outlined,
+                  title: 'Download template',
+                  subtitle: 'Get the latest Excel format for lead import.',
+                  onTap: () => Navigator.of(context).pop(
+                    const _BulkLeadDialogChoice.template(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _BulkOperationTile(
+                  icon: Icons.upload_file_outlined,
+                  title: 'Upload leads file',
+                  subtitle: 'Import filled Excel rows into leads.',
+                  onTap: () => Navigator.of(context).pop(
+                    const _BulkLeadDialogChoice.upload(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: resultController,
+                  decoration: const InputDecoration(
+                    labelText: 'Result filename',
+                    hintText: 'Example: bulk-result-123.xlsx',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      final filename = resultController.text.trim();
+                      if (filename.isEmpty) {
+                        return;
+                      }
+                      Navigator.of(context).pop(
+                        _BulkLeadDialogChoice.result(filename),
+                      );
+                    },
+                    icon: const Icon(Icons.fact_check_outlined, size: 18),
+                    label: const Text('Download result file'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || choice == null) {
+      return;
+    }
+
+    switch (choice.action) {
+      case _BulkLeadDialogAction.template:
+        await _downloadLeadBulkTemplate();
+        break;
+      case _BulkLeadDialogAction.upload:
+        await _pickAndUploadLeadBulkFile();
+        break;
+      case _BulkLeadDialogAction.result:
+        await _downloadLeadBulkResult(choice.filename ?? '');
+        break;
+    }
+  }
+
+  Future<void> _downloadLeadBulkTemplate() async {
+    setState(() {
+      _isBulkOperating = true;
+    });
+    try {
+      final exported = await _authProvider.downloadLeadBulkTemplate(
+        token: _authProvider.currentAuthToken,
+      );
+      final fileName = exported.fileName.trim().isEmpty
+          ? 'lead_bulk_template.xlsx'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        _showSnackBar(
+          'Template generated ($fileName), but direct file save is not supported on Web in this build.',
+        );
+        return;
+      }
+      final file = await ExportFileHelper.saveToDownloadNextone(
+        fileName: fileName,
+        bytes: exported.bytes,
+      );
+      if (!mounted) return;
+      _showSnackBar('Lead template downloaded: ${file.path}');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBulkOperating = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadLeadBulkFile() async {
+    if (kIsWeb) {
+      _showSnackBar('Bulk upload is not supported on Web in this build.');
+      return;
+    }
+
+    final hasPermission = await _requestFilePickerPermission();
+    if (!hasPermission || !mounted) {
+      return;
+    }
+
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const <String>['xlsx', 'xls', 'csv'],
+      allowMultiple: false,
+    );
+    if (!mounted || picked == null || picked.files.isEmpty) {
+      return;
+    }
+
+    final filePath = picked.files.single.path;
+    if (filePath == null || filePath.trim().isEmpty) {
+      _showSnackBar('Could not read the selected file path.');
+      return;
+    }
+
+    setState(() {
+      _isBulkOperating = true;
+    });
+    try {
+      final response = await _authProvider.uploadLeadBulkFile(
+        filePath: filePath,
+        token: _authProvider.currentAuthToken,
+      );
+      final resultFilename = _readBulkResultFilename(response);
+      if (resultFilename != null && resultFilename.trim().isNotEmpty) {
+        _lastBulkResultFilename = resultFilename.trim();
+      }
+      if (!mounted) return;
+      await _loadLeads();
+      if (!mounted) return;
+      final message =
+          _readBulkMessage(response) ?? 'Leads uploaded successfully.';
+      _showSnackBar(
+        _lastBulkResultFilename == null
+            ? message
+            : '$message Result file: $_lastBulkResultFilename',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBulkOperating = false;
+        });
+      }
+    }
+  }
+
+  Future<bool> _requestFilePickerPermission() async {
+    final allowed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Allow file selection?'),
+          content: const Text(
+            'NextOne needs to open your device file picker so you can select an Excel or CSV file for bulk lead upload.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Allow'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (allowed != true && mounted) {
+      _showSnackBar('File selection cancelled.');
+    }
+    return allowed == true;
+  }
+
+  Future<void> _downloadLeadBulkResult(String filename) async {
+    final normalizedFilename = filename.trim();
+    if (normalizedFilename.isEmpty) {
+      _showSnackBar('Enter a result filename first.');
+      return;
+    }
+
+    setState(() {
+      _isBulkOperating = true;
+    });
+    try {
+      final exported = await _authProvider.downloadLeadBulkResult(
+        filename: normalizedFilename,
+        token: _authProvider.currentAuthToken,
+      );
+      final fileName = exported.fileName.trim().isEmpty
+          ? normalizedFilename
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        _showSnackBar(
+          'Result generated ($fileName), but direct file save is not supported on Web in this build.',
+        );
+        return;
+      }
+      final file = await ExportFileHelper.saveToDownloadNextone(
+        fileName: fileName,
+        bytes: exported.bytes,
+      );
+      if (!mounted) return;
+      _lastBulkResultFilename = normalizedFilename;
+      _showSnackBar('Lead upload result downloaded: ${file.path}');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBulkOperating = false;
+        });
+      }
+    }
+  }
+
+  String? _readBulkMessage(Map<String, dynamic> response) {
+    final value = response['message'] ?? response['detail'];
+    return value is String && value.trim().isNotEmpty ? value.trim() : null;
+  }
+
+  String? _readBulkResultFilename(dynamic source) {
+    if (source is! Map<String, dynamic>) {
+      return null;
+    }
+
+    for (final key in const <String>[
+      'filename',
+      'file_name',
+      'fileName',
+      'result_filename',
+      'resultFilename',
+      'result_file',
+      'resultFile',
+      'report_filename',
+      'reportFilename',
+      'output_file',
+      'outputFile',
+    ]) {
+      final value = source[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+
+    final data = source['data'];
+    if (data is Map<String, dynamic>) {
+      return _readBulkResultFilename(data);
+    }
+    return null;
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<DateTimeRange?> _showExportDateRangeDialog() async {
@@ -393,6 +915,102 @@ class _LeadsPageState extends State<LeadsPage> {
     );
   }
 
+  Widget _buildSheetContainer({
+    required String title,
+    required Widget child,
+  }) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        14,
+        16,
+        16 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _sheetFieldDecoration(String hintText) {
+    return InputDecoration(
+      hintText: hintText,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.primary),
+      ),
+    );
+  }
+
+  String _normalizeRole(String value) {
+    final normalized =
+        value.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+    if (normalized == 'sales_executive') {
+      return 'sale_executive';
+    }
+    return normalized;
+  }
+
+  String _readString(dynamic value) {
+    if (value is String) {
+      return value.trim();
+    }
+    if (value is num || value is bool) {
+      return value.toString().trim();
+    }
+    return '';
+  }
+
+  bool _readBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1' || normalized == 'yes';
+    }
+    return false;
+  }
+
   String _formatDateForApi(DateTime date) {
     final year = date.year.toString().padLeft(4, '0');
     final month = date.month.toString().padLeft(2, '0');
@@ -484,6 +1102,28 @@ class _LeadsPageState extends State<LeadsPage> {
               )
             : null;
 
+        final bulkButton = _canUseBulkLeadTools
+            ? OutlinedButton.icon(
+                onPressed:
+                    (_isBulkOperating || _isExporting) ? null : _openLeadBulkDialog,
+                icon: _isBulkOperating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.cloud_upload_outlined, size: 18),
+                label: Text(_isBulkOperating ? 'Working...' : 'Bulk'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              )
+            : null;
+
         final addButton = FilledButton.icon(
           onPressed: _openCreateLead,
           icon: const Icon(Icons.add, size: 18),
@@ -509,6 +1149,10 @@ class _LeadsPageState extends State<LeadsPage> {
                     Expanded(child: exportButton),
                     const SizedBox(width: 8),
                   ],
+                  if (bulkButton != null) ...[
+                    Expanded(child: bulkButton),
+                    const SizedBox(width: 8),
+                  ],
                   Expanded(child: addButton),
                 ],
               ),
@@ -522,6 +1166,10 @@ class _LeadsPageState extends State<LeadsPage> {
             const SizedBox(width: 12),
             if (exportButton != null) ...[
               exportButton,
+              const SizedBox(width: 8),
+            ],
+            if (bulkButton != null) ...[
+              bulkButton,
               const SizedBox(width: 8),
             ],
             addButton,
@@ -712,6 +1360,11 @@ class _LeadsPageState extends State<LeadsPage> {
                       onTap: () => _callLead(lead.phone),
                     ),
                     DataCardAction(
+                      icon: Icons.person_add_alt_1_outlined,
+                      color: AppColors.primary,
+                      onTap: () => _openReassignSheet(lead),
+                    ),
+                    DataCardAction(
                       icon: Icons.edit_outlined,
                       onTap: () => _openEditLead(lead),
                     ),
@@ -860,6 +1513,101 @@ class _LeadsPageState extends State<LeadsPage> {
       ),
     );
   }
+}
+
+enum _BulkLeadDialogAction { template, upload, result }
+
+class _BulkLeadDialogChoice {
+  const _BulkLeadDialogChoice.template()
+      : action = _BulkLeadDialogAction.template,
+        filename = null;
+
+  const _BulkLeadDialogChoice.upload()
+      : action = _BulkLeadDialogAction.upload,
+        filename = null;
+
+  const _BulkLeadDialogChoice.result(this.filename)
+      : action = _BulkLeadDialogAction.result;
+
+  final _BulkLeadDialogAction action;
+  final String? filename;
+}
+
+class _BulkOperationTile extends StatelessWidget {
+  const _BulkOperationTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF4FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AssigneeOption {
+  const _AssigneeOption({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
 }
 
 class _LeadModel {
