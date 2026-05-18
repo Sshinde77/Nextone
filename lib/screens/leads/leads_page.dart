@@ -44,6 +44,8 @@ class _LeadsPageState extends State<LeadsPage> {
   int _totalItems = 0;
   String _searchQuery = '';
   List<_LeadModel> _currentPageLeads = <_LeadModel>[];
+  final Map<String, _LeadPhoneAccess> _leadPhoneAccessById =
+      <String, _LeadPhoneAccess>{};
 
   bool get _isAllCurrentPageSelected {
     final leads = _currentPageLeads;
@@ -199,6 +201,7 @@ class _LeadsPageState extends State<LeadsPage> {
         _selectedLeadIds.removeWhere((id) => !pageLeadIds.contains(id));
         _isLoadingLeads = false;
       });
+      await _loadPhoneAccessForCurrentPage(pageLeads);
     } catch (error) {
       if (!mounted) {
         return;
@@ -209,9 +212,68 @@ class _LeadsPageState extends State<LeadsPage> {
         _totalPages = 1;
         _isLoadingLeads = false;
         _selectedLeadIds.clear();
+        _leadPhoneAccessById.clear();
         _loadError = error.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  Future<void> _loadPhoneAccessForCurrentPage(List<_LeadModel> leads) async {
+    if (RoleAccess.hasFullAccess(_currentRole)) {
+      if (!mounted) return;
+      setState(() {
+        _leadPhoneAccessById.clear();
+        for (final lead in leads) {
+          _leadPhoneAccessById[lead.id] = _LeadPhoneAccess(
+            hasAccess: true,
+            phone: lead.phone,
+            hasPendingRequest: false,
+          );
+        }
+      });
+      return;
+    }
+
+    final results = <String, _LeadPhoneAccess>{};
+    for (final lead in leads) {
+      try {
+        final access = await _authProvider.phoneRevealCheck(
+          leadId: lead.id,
+          token: _authProvider.currentAuthToken,
+        );
+        final hasAccessRaw = access['has_access'];
+        final hasAccess = hasAccessRaw is bool
+            ? hasAccessRaw
+            : (hasAccessRaw is num
+                ? hasAccessRaw != 0
+                : (hasAccessRaw is String &&
+                    hasAccessRaw.trim().toLowerCase() == 'true'));
+        final apiPhone = _readString(
+          access['phone'] ??
+              access['lead_phone'] ??
+              access['phone_number'] ??
+              access['mobile'],
+        );
+        results[lead.id] = _LeadPhoneAccess(
+          hasAccess: hasAccess,
+          phone: apiPhone.isNotEmpty ? apiPhone : lead.phone,
+          hasPendingRequest: _isPendingRequest(access['request']),
+        );
+      } catch (_) {
+        results[lead.id] = _LeadPhoneAccess(
+          hasAccess: false,
+          phone: lead.phone,
+          hasPendingRequest: false,
+        );
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _leadPhoneAccessById
+        ..clear()
+        ..addAll(results);
+    });
   }
 
   void _onSearchChanged(String value) {
@@ -256,11 +318,233 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Future<void> _callLead(String phoneNumber) async {
+    if (phoneNumber.trim().isEmpty || phoneNumber.trim().toUpperCase() == 'N/A') {
+      _showSnackBar('Phone number is not available.');
+      return;
+    }
     final launchUri = Uri(
       scheme: 'tel',
       path: phoneNumber.trim(),
     );
     await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _handleCallAction(_LeadModel lead) async {
+    if (RoleAccess.hasFullAccess(_currentRole)) {
+      await _callLead(_callPhoneForLead(lead));
+      return;
+    }
+    final access = _leadPhoneAccessById[lead.id];
+    if (access?.hasAccess == true) {
+      await _callLead(_callPhoneForLead(lead));
+      return;
+    }
+    if (access?.hasPendingRequest == true) {
+      _showSnackBar('Request pending for this lead.');
+      return;
+    }
+    await _openPhoneRequestSheet(lead);
+  }
+
+  Future<void> _openPhoneRequestSheet(_LeadModel lead) async {
+    final reasonController = TextEditingController();
+    bool isSubmitting = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return _buildSheetContainer(
+              title: 'Request Phone Access',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFD),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(
+                      lead.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: reasonController,
+                    minLines: 3,
+                    maxLines: 4,
+                    decoration: _sheetFieldDecoration('Reason for phone access'),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              final reason = reasonController.text.trim();
+                              if (reason.isEmpty) {
+                                _showSnackBar('Please enter reason.');
+                                return;
+                              }
+                              setSheetState(() => isSubmitting = true);
+                              try {
+                                await _authProvider.requestPhoneReveal(
+                                  leadId: lead.id,
+                                  reason: reason,
+                                  token: _authProvider.currentAuthToken,
+                                );
+                                if (!mounted) return;
+                                Navigator.of(context).pop();
+                                _showSnackBar(
+                                  'Phone access request submitted successfully.',
+                                );
+                                await _loadPhoneAccessForCurrentPage(
+                                  _currentPageLeads,
+                                );
+                              } catch (e) {
+                                final message = e
+                                    .toString()
+                                    .replaceFirst('Exception: ', '');
+                                if (message.toLowerCase().contains(
+                                  'already have a pending request',
+                                )) {
+                                  _showSnackBar('Request pending for this lead.');
+                                } else {
+                                  _showSnackBar(message);
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setSheetState(() => isSubmitting = false);
+                                }
+                              }
+                            },
+                      icon: isSubmitting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send_outlined, size: 18),
+                      label: Text(
+                        isSubmitting ? 'Submitting...' : 'Submit Request',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    reasonController.dispose();
+  }
+
+  Future<void> _openBulkPhoneRequestSheet() async {
+    final selectedIds = _selectedLeadIds.toList(growable: false);
+    if (selectedIds.isEmpty) {
+      _showSnackBar('Select at least one lead.');
+      return;
+    }
+    final reasonController = TextEditingController();
+    bool isSubmitting = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return _buildSheetContainer(
+              title: 'Bulk Phone Access Request',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${selectedIds.length} leads selected',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: reasonController,
+                    minLines: 3,
+                    maxLines: 4,
+                    decoration: _sheetFieldDecoration(
+                      'Reason for bulk phone access',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              final reason = reasonController.text.trim();
+                              if (reason.isEmpty) {
+                                _showSnackBar('Please enter reason.');
+                                return;
+                              }
+                              setSheetState(() => isSubmitting = true);
+                              try {
+                                await _authProvider.bulkRequestPhoneReveal(
+                                  leadIds: selectedIds,
+                                  reason: reason,
+                                  token: _authProvider.currentAuthToken,
+                                );
+                                if (!mounted) return;
+                                Navigator.of(context).pop();
+                                _showSnackBar(
+                                  'Bulk phone access request submitted.',
+                                );
+                                await _loadPhoneAccessForCurrentPage(
+                                  _currentPageLeads,
+                                );
+                              } catch (e) {
+                                _showSnackBar(
+                                  e.toString().replaceFirst('Exception: ', ''),
+                                );
+                              } finally {
+                                if (mounted) {
+                                  setSheetState(() => isSubmitting = false);
+                                }
+                              }
+                            },
+                      icon: isSubmitting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.group_add_outlined, size: 18),
+                      label: Text(
+                        isSubmitting ? 'Submitting...' : 'Submit Bulk Request',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    reasonController.dispose();
   }
 
   Future<void> _openReassignSheet(_LeadModel lead) async {
@@ -1072,9 +1356,9 @@ class _LeadsPageState extends State<LeadsPage> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.flag_outlined, size: 16),
-                        label: const Text('Update Status'),
+                        onPressed: _openBulkPhoneRequestSheet,
+                        icon: const Icon(Icons.phone_outlined, size: 16),
+                        label: const Text('Request Phone Access'),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 40),
                         ),
@@ -1103,9 +1387,9 @@ class _LeadsPageState extends State<LeadsPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.flag_outlined, size: 16),
-                      label: const Text('Update Status'),
+                      onPressed: _openBulkPhoneRequestSheet,
+                      icon: const Icon(Icons.phone_outlined, size: 16),
+                      label: const Text('Request Phone Access'),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 40),
                       ),
@@ -1205,7 +1489,7 @@ class _LeadsPageState extends State<LeadsPage> {
                   priorityColor: lead.priorityColor,
                   nextFollowUpDate: lead.nextFollowUpDate,
                   budget: lead.budget,
-                  phone: lead.phone,
+                  phone: _displayPhoneForLead(lead),
                   profileImageUrl: lead.profileImageUrl,
                   assigneeName: lead.assignee.name,
                   assigneeImageUrl: lead.assignee.imageUrl,
@@ -1213,7 +1497,7 @@ class _LeadsPageState extends State<LeadsPage> {
                   actions: [
                     DataCardAction(
                       icon: Icons.call_outlined,
-                      onTap: () => _callLead(lead.phone),
+                      onTap: () => _handleCallAction(lead),
                     ),
                     DataCardAction(
                       icon: Icons.person_add_alt_1_outlined,
@@ -1368,6 +1652,52 @@ class _LeadsPageState extends State<LeadsPage> {
         ],
       ),
     );
+  }
+
+  String _displayPhoneForLead(_LeadModel lead) {
+    final access = _leadPhoneAccessById[lead.id];
+    final rawPhone = lead.phone;
+    if (RoleAccess.hasFullAccess(_currentRole)) {
+      return rawPhone;
+    }
+    if (access?.hasAccess == true) {
+      final grantedPhone = _readString(access?.phone);
+      return grantedPhone.isNotEmpty ? grantedPhone : rawPhone;
+    }
+    return _maskPhone(rawPhone);
+  }
+
+  String _callPhoneForLead(_LeadModel lead) {
+    final access = _leadPhoneAccessById[lead.id];
+    if (RoleAccess.hasFullAccess(_currentRole)) {
+      return lead.phone;
+    }
+    final grantedPhone = _readString(access?.phone);
+    if (grantedPhone.isNotEmpty) {
+      return grantedPhone;
+    }
+    return lead.phone;
+  }
+
+  String _maskPhone(String phone) {
+    final value = phone.trim();
+    if (value.isEmpty || value.toUpperCase() == 'N/A') {
+      return 'N/A';
+    }
+    final keepCount = (value.length / 2).ceil();
+    final hiddenCount = value.length - keepCount;
+    if (hiddenCount <= 0) {
+      return value;
+    }
+    return '${value.substring(0, keepCount)}${'x' * hiddenCount}';
+  }
+
+  bool _isPendingRequest(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      final rawStatus = _readString(value['status']);
+      return rawStatus.toLowerCase() == 'pending';
+    }
+    return false;
   }
 }
 
@@ -1590,4 +1920,16 @@ class _PersonModel {
 
   final String name;
   final String imageUrl;
+}
+
+class _LeadPhoneAccess {
+  const _LeadPhoneAccess({
+    required this.hasAccess,
+    required this.phone,
+    required this.hasPendingRequest,
+  });
+
+  final bool hasAccess;
+  final String phone;
+  final bool hasPendingRequest;
 }

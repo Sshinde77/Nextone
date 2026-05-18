@@ -35,6 +35,16 @@ class ApiConstants {
   static const String leadsBulkUpload = '/leads/bulk/upload';
   static const String leadsBulkResult = '/leads/bulk/result/{filename}';
 
+  // Phone Reveal Endpoints
+  static const String phoneRevealMyRequests = '/phone-reveal/my-requests';
+  static const String phoneRevealPending = '/phone-reveal/pending';
+  static const String phoneRevealAll = '/phone-reveal/all';
+  static const String phoneRevealCheck = '/phone-reveal/check/{leadId}';
+  static const String phoneRevealRequest = '/phone-reveal/request';
+  static const String phoneRevealBulkRequest = '/phone-reveal/bulk-request';
+  static const String phoneRevealApprove = '/phone-reveal/{id}/approve';
+  static const String phoneRevealDecline = '/phone-reveal/{id}/decline';
+
   //followup Endpoints
   static const String followups = '/tasks';
   static const String createfollowups = '/tasks';

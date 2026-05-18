@@ -1480,6 +1480,389 @@ class AuthService {
     return <String, dynamic>{'id': normalizedId, 'status': status};
   }
 
+  Future<LeadsListResult> phoneRevealMyRequests({
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) async {
+    return _phoneRevealList(
+      endpoint: ApiConstants.phoneRevealMyRequests,
+      page: page,
+      perPage: perPage,
+      token: token,
+      fallbackMessage: 'Unable to fetch your phone requests.',
+    );
+  }
+
+  Future<LeadsListResult> phoneRevealPending({
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) async {
+    return _phoneRevealList(
+      endpoint: ApiConstants.phoneRevealPending,
+      page: page,
+      perPage: perPage,
+      token: token,
+      fallbackMessage: 'Unable to fetch pending phone requests.',
+    );
+  }
+
+  Future<LeadsListResult> phoneRevealAll({
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) async {
+    return _phoneRevealList(
+      endpoint: ApiConstants.phoneRevealAll,
+      page: page,
+      perPage: perPage,
+      token: token,
+      fallbackMessage: 'Unable to fetch all phone requests.',
+    );
+  }
+
+  Future<Map<String, dynamic>> phoneRevealCheck({
+    required String leadId,
+    String? token,
+  }) async {
+    final normalizedLeadId = leadId.trim();
+    if (normalizedLeadId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.phoneRevealCheck.replaceFirst('{leadId}', normalizedLeadId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+
+    _logRequest(
+      endpoint: 'phoneRevealCheck',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('phoneRevealCheck', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to verify phone access.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // fall through
+    }
+
+    throw Exception('Phone access check response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> requestPhoneReveal({
+    required String leadId,
+    required String reason,
+    String? token,
+  }) async {
+    final normalizedLeadId = leadId.trim();
+    if (normalizedLeadId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.phoneRevealRequest}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'lead_id': normalizedLeadId,
+      'reason': reason.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'requestPhoneReveal',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response =
+        await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    _logResponse('requestPhoneReveal', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to submit phone access request.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // fall through
+    }
+
+    throw Exception('Phone request response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> bulkRequestPhoneReveal({
+    required List<String> leadIds,
+    required String reason,
+    String? token,
+  }) async {
+    final normalizedLeadIds = leadIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toList();
+    if (normalizedLeadIds.isEmpty) {
+      throw Exception('Select at least one lead.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.phoneRevealBulkRequest}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'lead_ids': normalizedLeadIds,
+      'reason': reason.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'bulkRequestPhoneReveal',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response =
+        await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    _logResponse('bulkRequestPhoneReveal', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to submit bulk phone access request.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // fall through
+    }
+
+    throw Exception('Bulk phone request response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> approvePhoneReveal({
+    required String id,
+    required String note,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Phone request id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.phoneRevealApprove.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({'note': note.trim()});
+
+    _logRequest(
+      endpoint: 'approvePhoneReveal',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('approvePhoneReveal', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to approve phone request.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // Some endpoints may return empty/non-json body.
+    }
+
+    return <String, dynamic>{'id': normalizedId, 'status': 'approved'};
+  }
+
+  Future<Map<String, dynamic>> declinePhoneReveal({
+    required String id,
+    required String note,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Phone request id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.phoneRevealDecline.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({'note': note.trim()});
+
+    _logRequest(
+      endpoint: 'declinePhoneReveal',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('declinePhoneReveal', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to decline phone request.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // Some endpoints may return empty/non-json body.
+    }
+
+    return <String, dynamic>{'id': normalizedId, 'status': 'declined'};
+  }
+
+  Future<LeadsListResult> _phoneRevealList({
+    required String endpoint,
+    required int page,
+    required int perPage,
+    required String fallbackMessage,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint')
+        .replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: endpoint,
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse(endpoint, response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: fallbackMessage,
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+      final resolvedCurrentPage = _readIntFromMap(
+            pagination,
+            ['page', 'current_page', 'currentPage'],
+          ) ??
+          page;
+      final resolvedPerPage = _readIntFromMap(
+            pagination,
+            ['per_page', 'perPage', 'page_size', 'limit'],
+          ) ??
+          perPage;
+      final resolvedTotalItems = _readIntFromMap(
+            pagination,
+            ['total', 'total_items', 'totalItems', 'count'],
+          ) ??
+          items.length;
+      final resolvedTotalPages = _readIntFromMap(
+            pagination,
+            ['total_pages', 'totalPages', 'last_page', 'lastPage'],
+          ) ??
+          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('$fallbackMessage Invalid response format.');
+    }
+  }
+
   Future<LeadsListResult> followUps({
     String? token,
     String? dueFrom,

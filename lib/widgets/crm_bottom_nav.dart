@@ -5,6 +5,7 @@ class CRMAppBottomNav extends StatefulWidget {
   final int currentIndex;
 
   final VoidCallback onDashboard;
+  
   final VoidCallback onLeads;
   final VoidCallback onFollowUps;
   final VoidCallback onSiteVisits;
@@ -12,6 +13,8 @@ class CRMAppBottomNav extends StatefulWidget {
   final VoidCallback onTeam;
   final VoidCallback onReports;
   final VoidCallback onSettings;
+  final VoidCallback? onPhoneRequests;
+  final VoidCallback? onSalary;
   final VoidCallback onMore;
   final VoidCallback onLess;
 
@@ -21,6 +24,8 @@ class CRMAppBottomNav extends StatefulWidget {
   final bool showProjects;
   final bool showTeam;
   final bool showUsers;
+  final bool showPhoneRequests;
+  final bool showSalary;
 
   const CRMAppBottomNav({
     super.key,
@@ -33,6 +38,8 @@ class CRMAppBottomNav extends StatefulWidget {
     required this.onTeam,
     required this.onReports,
     required this.onSettings,
+    this.onPhoneRequests,
+    this.onSalary,
     required this.onMore,
     required this.onLess,
     this.leadsBadgeCount,
@@ -41,6 +48,8 @@ class CRMAppBottomNav extends StatefulWidget {
     this.showProjects = true,
     this.showTeam = true,
     this.showUsers = true,
+    this.showPhoneRequests = false,
+    this.showSalary = false,
   });
 
   @override
@@ -50,9 +59,11 @@ class CRMAppBottomNav extends StatefulWidget {
 class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
   bool _isExpanded = false;
 
-  bool get _isExpandedIndex => widget.currentIndex >= 4;
+  bool get _isExpandedIndex => widget.currentIndex >= 5;
   bool get _hasOverflow => _allVisibleItems.length > 5;
-  bool get _isSevenItemOverflow => _allVisibleItems.length == 7;
+  List<_NavEntry> get _collapsedItems => _allVisibleItems.take(5).toList();
+  List<_NavEntry> get _expandedItems =>
+      _allVisibleItems.skip(5).take(5).toList();
 
   List<_NavEntry> get _allVisibleItems {
     return <_NavEntry>[
@@ -108,6 +119,20 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           label: 'Users',
           icon: Icons.manage_accounts_outlined,
           onTap: widget.onSettings,
+        ),
+      if (widget.showPhoneRequests && widget.onPhoneRequests != null)
+        _NavEntry(
+          index: 8,
+          label: 'Phone',
+          icon: Icons.phone_callback_outlined,
+          onTap: widget.onPhoneRequests!,
+        ),
+      if (widget.showSalary && widget.onSalary != null)
+        _NavEntry(
+          index: 9,
+          label: 'Salary',
+          icon: Icons.payments_outlined,
+          onTap: widget.onSalary!,
         ),
     ];
   }
@@ -170,7 +195,7 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
             color: AppColors.surface,
             child: SizedBox(
               height: widget.height,
-              child: AnimatedSwitcher(
+                child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 280),
                 switchInCurve: Curves.easeOutCubic,
                 switchOutCurve: Curves.easeInCubic,
@@ -180,123 +205,19 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
                         currentIndex: widget.currentIndex,
                         items: _allVisibleItems,
                       )
-                    : _isExpanded
-                    ? _ExpandedNavBar(
-                        key: const ValueKey<String>('expanded-nav'),
+                    : _PagedNavBar(
+                        key: ValueKey<String>(
+                          _isExpanded ? 'expanded-nav' : 'main-nav',
+                        ),
                         currentIndex: widget.currentIndex,
-                        showProjects: widget.showProjects,
-                        showTeam: widget.showTeam,
-                        showUsers: widget.showUsers,
-                        showTrailingEmptySlot: _isSevenItemOverflow,
-                        onProjects: widget.onProjects,
-                        onTeam: widget.onTeam,
-                        onReports: widget.onReports,
-                        onSettings: widget.onSettings,
-                        onLess: _handleLess,
-                      )
-                    : _MainNavBar(
-                        key: const ValueKey<String>('main-nav'),
-                        currentIndex: widget.currentIndex,
-                        onDashboard: widget.onDashboard,
-                        onLeads: widget.onLeads,
-                        onFollowUps: widget.onFollowUps,
-                        onSiteVisits: widget.onSiteVisits,
-                        onMore: _handleMore,
-                        leadsBadgeCount: widget.leadsBadgeCount,
-                        followUpsBadgeCount: widget.followUpsBadgeCount,
+                        items: _isExpanded ? _expandedItems : _collapsedItems,
+                        isExpanded: _isExpanded,
+                        onToggle: _isExpanded ? _handleLess : _handleMore,
                       ),
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _MainNavBar extends StatelessWidget {
-  final int currentIndex;
-  final VoidCallback onDashboard;
-  final VoidCallback onLeads;
-  final VoidCallback onFollowUps;
-  final VoidCallback onSiteVisits;
-  final VoidCallback onMore;
-  final int? leadsBadgeCount;
-  final int? followUpsBadgeCount;
-
-  const _MainNavBar({
-    super.key,
-    required this.currentIndex,
-    required this.onDashboard,
-    required this.onLeads,
-    required this.onFollowUps,
-    required this.onSiteVisits,
-    required this.onMore,
-    this.leadsBadgeCount,
-    this.followUpsBadgeCount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _NavItem(
-                    icon: Icons.dashboard_outlined,
-                    label: 'Dashboard',
-                    isActive: currentIndex == 0,
-                    onTap: onDashboard,
-                  ),
-                ),
-                Expanded(
-                  child: _NavItem(
-                    icon: Icons.people_alt_outlined,
-                    label: 'Leads',
-                    isActive: currentIndex == 1,
-                    onTap: onLeads,
-                    badgeCount: leadsBadgeCount,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
-          _CenterNavButton(
-            icon: Icons.keyboard_arrow_up_rounded,
-            color: AppColors.primary,
-            shadowColor: AppColors.primary.withValues(alpha: 0.35),
-            onTap: onMore,
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _NavItem(
-                    icon: Icons.check_circle_outline,
-                    label: 'Follow-ups',
-                    isActive: currentIndex == 2,
-                    onTap: onFollowUps,
-                    badgeCount: followUpsBadgeCount,
-                  ),
-                ),
-                Expanded(
-                  child: _NavItem(
-                    icon: Icons.location_on_outlined,
-                    label: 'Visits',
-                    isActive: currentIndex == 3,
-                    onTap: onSiteVisits,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -335,120 +256,60 @@ class _SingleRowNavBar extends StatelessWidget {
   }
 }
 
-class _ExpandedNavBar extends StatelessWidget {
+class _PagedNavBar extends StatelessWidget {
   final int currentIndex;
-  final bool showProjects;
-  final bool showTeam;
-  final bool showUsers;
-  final bool showTrailingEmptySlot;
-  final VoidCallback onProjects;
-  final VoidCallback onTeam;
-  final VoidCallback onReports;
-  final VoidCallback onSettings;
-  final VoidCallback onLess;
+  final List<_NavEntry> items;
+  final bool isExpanded;
+  final VoidCallback onToggle;
 
-  const _ExpandedNavBar({
+  const _PagedNavBar({
     super.key,
     required this.currentIndex,
-    required this.showProjects,
-    required this.showTeam,
-    required this.showUsers,
-    required this.showTrailingEmptySlot,
-    required this.onProjects,
-    required this.onTeam,
-    required this.onReports,
-    required this.onSettings,
-    required this.onLess,
+    required this.items,
+    required this.isExpanded,
+    required this.onToggle,
   });
 
   @override
   Widget build(BuildContext context) {
-    final overflowItems = <_NavEntry>[
-      if (showProjects)
-        _NavEntry(
-          index: 4,
-          label: 'Projects',
-          icon: Icons.apartment_outlined,
-          onTap: onProjects,
-        ),
-      if (showTeam)
-        _NavEntry(
-          index: 5,
-          label: 'Team',
-          icon: Icons.groups_outlined,
-          onTap: onTeam,
-        ),
-      _NavEntry(
-        index: 6,
-        label: 'Attendance',
-        icon: Icons.fact_check,
-        onTap: onReports,
-      ),
-      if (showUsers)
-        _NavEntry(
-          index: 7,
-          label: 'Users',
-          icon: Icons.manage_accounts_outlined,
-          onTap: onSettings,
-        ),
-    ];
-
-    _NavEntry? itemAt(int i) => i < overflowItems.length ? overflowItems[i] : null;
-
-    Widget navCell(_NavEntry? entry) {
-      return Expanded(
-        child: entry == null
-            ? const SizedBox.expand()
-            : _NavItem(
-                icon: entry.icon,
-                label: entry.label,
-                isActive: currentIndex == entry.index,
-                onTap: entry.onTap,
-                badgeCount: entry.badgeCount,
-              ),
-      );
-    }
-
-    if (showTrailingEmptySlot) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: Row(
-          children: [
-            navCell(itemAt(0)),
-            navCell(itemAt(1)),
-            const SizedBox(width: 4),
-            _CenterNavButton(
-              icon: Icons.keyboard_arrow_down_rounded,
-              color: AppColors.primaryDark,
-              shadowColor: AppColors.primaryDark.withValues(alpha: 0.25),
-              onTap: onLess,
-            ),
-            const SizedBox(width: 4),
-            navCell(itemAt(2)),
-            const Expanded(
-              child: SizedBox.expand(),
-            ),
-          ],
-        ),
-      );
-    }
-
+    final slots = List<_NavEntry?>.generate(
+      5,
+      (index) => index < items.length ? items[index] : null,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Row(
         children: [
-          navCell(itemAt(0)),
-          navCell(itemAt(1)),
-          const SizedBox(width: 4),
-          _CenterNavButton(
-            icon: Icons.keyboard_arrow_down_rounded,
-            color: AppColors.primaryDark,
-            shadowColor: AppColors.primaryDark.withValues(alpha: 0.25),
-            onTap: onLess,
+          Expanded(
+            child: Row(
+              children: slots
+                  .map(
+                    (entry) => Expanded(
+                      child: entry == null
+                          ? const SizedBox.shrink()
+                          : _NavItem(
+                              icon: entry.icon,
+                              label: entry.label,
+                              isActive: currentIndex == entry.index,
+                              onTap: entry.onTap,
+                              badgeCount: entry.badgeCount,
+                            ),
+                    ),
+                  )
+                  .toList(),
+            ),
           ),
-          const SizedBox(width: 4),
-          navCell(itemAt(2)),
-          navCell(itemAt(3)),
+          const SizedBox(width: 6),
+          _CenterNavButton(
+            icon: isExpanded
+                ? Icons.keyboard_arrow_down_rounded
+                : Icons.keyboard_arrow_up_rounded,
+            color: isExpanded ? AppColors.primaryDark : AppColors.primary,
+            shadowColor: isExpanded
+                ? AppColors.primaryDark.withValues(alpha: 0.25)
+                : AppColors.primary.withValues(alpha: 0.35),
+            onTap: onToggle,
+          ),
         ],
       ),
     );

@@ -408,6 +408,100 @@ class AuthProvider {
     );
   }
 
+  Future<LeadsListResult> phoneRevealMyRequests({
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) {
+    return _authService.phoneRevealMyRequests(
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
+  Future<LeadsListResult> phoneRevealPending({
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) {
+    return _authService.phoneRevealPending(
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
+  Future<LeadsListResult> phoneRevealAll({
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) {
+    return _authService.phoneRevealAll(
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> phoneRevealCheck({
+    required String leadId,
+    String? token,
+  }) {
+    return _authService.phoneRevealCheck(
+      leadId: leadId,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> requestPhoneReveal({
+    required String leadId,
+    required String reason,
+    String? token,
+  }) {
+    return _authService.requestPhoneReveal(
+      leadId: leadId,
+      reason: reason,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> bulkRequestPhoneReveal({
+    required List<String> leadIds,
+    required String reason,
+    String? token,
+  }) {
+    return _authService.bulkRequestPhoneReveal(
+      leadIds: leadIds,
+      reason: reason,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> approvePhoneReveal({
+    required String id,
+    required String note,
+    String? token,
+  }) {
+    return _authService.approvePhoneReveal(
+      id: id,
+      note: note,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> declinePhoneReveal({
+    required String id,
+    required String note,
+    String? token,
+  }) {
+    return _authService.declinePhoneReveal(
+      id: id,
+      note: note,
+      token: token,
+    );
+  }
+
   Future<LeadsListResult> followUps({
     String? token,
     String? dueFrom,

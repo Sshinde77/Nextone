@@ -4,6 +4,7 @@ import 'package:nextone/models/lead_detail_model.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -41,11 +42,17 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   bool _isSubmittingReassign = false;
   String? _selectedNextStatus;
   String? _selectedAssigneeId;
+  String _currentRole = '';
+  bool _hasPhoneAccess = false;
+  bool _hasPendingPhoneRequest = false;
+  String _accessiblePhone = '';
+  bool _isCheckingPhoneAccess = false;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
 
   @override
   void initState() {
     super.initState();
+    _loadAccess();
     _fetchLeadDetails();
     _loadAssigneeOptions();
   }
@@ -72,11 +79,78 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         _selectedNextStatus ??= _firstStatusAfter(normalizedCurrent);
         _isLoading = false;
       });
+      await _loadPhoneAccess();
     } catch (e) {
       setState(() {
         _isLoading = false;
         _errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
+    }
+  }
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() => _currentRole = role);
+      await _loadPhoneAccess();
+    } catch (_) {
+      // Phone visibility stays restricted if access cannot be resolved.
+    }
+  }
+
+  Future<void> _loadPhoneAccess() async {
+    if (_lead == null) {
+      return;
+    }
+    final canViewByRole = RoleAccess.canViewLeadPhones(_currentRole);
+    if (canViewByRole) {
+      if (!mounted) return;
+      setState(() {
+        _hasPhoneAccess = true;
+        _hasPendingPhoneRequest = false;
+        _accessiblePhone = _lead!.phone;
+      });
+      return;
+    }
+
+    setState(() => _isCheckingPhoneAccess = true);
+    try {
+      final access = await _authProvider.phoneRevealCheck(
+        leadId: widget.leadId,
+        token: _authProvider.currentAuthToken,
+      );
+      final hasAccessRaw = access['has_access'];
+      final hasAccess = hasAccessRaw is bool
+          ? hasAccessRaw
+          : (hasAccessRaw is num
+              ? hasAccessRaw != 0
+              : (hasAccessRaw is String &&
+                  hasAccessRaw.trim().toLowerCase() == 'true'));
+      final phone = _readString(
+        access['phone'] ??
+            access['lead_phone'] ??
+            access['phone_number'] ??
+            access['mobile'],
+      );
+      final hasPendingRequest = _isPendingRequest(access['request']);
+      if (!mounted) return;
+      setState(() {
+        _hasPhoneAccess = hasAccess;
+        _hasPendingPhoneRequest = hasPendingRequest;
+        _accessiblePhone = phone.isNotEmpty ? phone : (_lead?.phone ?? '');
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _hasPhoneAccess = false;
+        _hasPendingPhoneRequest = false;
+        _accessiblePhone = _lead?.phone ?? '';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingPhoneAccess = false);
+      }
     }
   }
 
@@ -447,12 +521,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                             _buildInfoSection(
                               'Lead Information',
                               [
-                              _buildInfoTile(
-                                Icons.phone_outlined,
-                                'Phone',
-                                _lead!.phone,
-                                onTap: () => _makeCall(_lead!.phone),
-                              ),
+                              _buildPhoneInfoTile(),
                               _buildInfoTile(
                                 Icons.email_outlined,
                                 'Email',
@@ -773,6 +842,198 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         visualDensity: VisualDensity.compact,
       ),
     );
+  }
+
+  Widget _buildPhoneInfoTile() {
+    final canViewPhone = _hasPhoneAccess || RoleAccess.canViewLeadPhones(_currentRole);
+    if (_isCheckingPhoneAccess && !canViewPhone) {
+      return _buildInfoTile(
+        Icons.phone_outlined,
+        'Phone',
+        'Checking access...',
+      );
+    }
+    if (canViewPhone) {
+      return _buildInfoTile(
+        Icons.phone_outlined,
+        'Phone',
+        _accessiblePhone.isNotEmpty ? _accessiblePhone : _lead!.phone,
+        onTap: () => _makeCall(
+          _accessiblePhone.isNotEmpty ? _accessiblePhone : _lead!.phone,
+        ),
+      );
+    }
+
+    return InkWell(
+      onTap: _openPhoneRequestSheet,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7E8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.lock_outline_rounded,
+                color: Color(0xFFC47A00),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Phone',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _maskedPhone(_lead?.phone ?? ''),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _hasPendingPhoneRequest
+                        ? 'Request pending for this lead'
+                        : 'Request approval to view full number',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFC47A00),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppColors.border, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPhoneRequestSheet() async {
+    if (_hasPendingPhoneRequest) {
+      _showSnackBar('Request pending for this lead.');
+      return;
+    }
+    final reasonController = TextEditingController();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return _buildSheetContainer(
+          title: 'Request Phone Access',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFD),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Text(
+                  _lead?.name ?? 'Selected lead',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: reasonController,
+                minLines: 3,
+                maxLines: 4,
+                decoration: _fieldDecoration('Reason for phone access'),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    final reason = reasonController.text.trim();
+                    if (reason.isEmpty) {
+                      _showSnackBar('Please enter reason.');
+                      return;
+                    }
+                    _submitPhoneRequest(reason);
+                  },
+                  icon: const Icon(Icons.send_outlined, size: 18),
+                  label: const Text('Submit Request'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    reasonController.dispose();
+  }
+
+  Future<void> _submitPhoneRequest(String reason) async {
+    try {
+      await _authProvider.requestPhoneReveal(
+        leadId: widget.leadId,
+        reason: reason,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      _showSnackBar('Phone access request sent for review.');
+      await _loadPhoneAccess();
+    } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
+      if (message.toLowerCase().contains('already have a pending request')) {
+        _showSnackBar('Request pending for this lead.');
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+        await _loadPhoneAccess();
+      } else {
+        _showSnackBar(message);
+      }
+    }
+  }
+
+  bool _isPendingRequest(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      final rawStatus = _readString(value['status']);
+      return rawStatus.toLowerCase() == 'pending';
+    }
+    return false;
+  }
+
+  String _maskedPhone(String phone) {
+    final value = phone.trim();
+    if (value.isEmpty) {
+      return 'Not available';
+    }
+    final keepCount = (value.length / 2).ceil();
+    final hiddenCount = value.length - keepCount;
+    if (hiddenCount <= 0) {
+      return value;
+    }
+    return '${value.substring(0, keepCount)}${'x' * hiddenCount}';
   }
 
   Widget _buildInfoTile(IconData icon, String label, String value,

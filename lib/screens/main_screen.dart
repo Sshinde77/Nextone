@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:nextone/screens/follow_ups/follow_up_page.dart';
 import 'package:nextone/screens/home/home_page.dart';
 import 'package:nextone/screens/leads/leads_page.dart';
+import 'package:nextone/screens/phone_requests/phone_requests_page.dart';
 import 'package:nextone/screens/projects/projects_page.dart';
+import 'package:nextone/screens/salary/salary_management_page.dart';
 import 'package:nextone/screens/site_visits/site_visits_page.dart';
 import 'package:nextone/screens/team/team_page.dart';
 import 'package:nextone/screens/users/users_page.dart';
@@ -35,6 +37,8 @@ class _MainScreenState extends State<MainScreen> {
     const TeamPage(),
     const AttendancePage(),
     const UsersPage(),
+    const PhoneRequestsPage(),
+    const SalaryManagementPage(),
   ];
 
   @override
@@ -89,6 +93,8 @@ class _MainScreenState extends State<MainScreen> {
         showProjects: RoleAccess.canViewProjects(_currentRole),
         showTeam: RoleAccess.canViewTeam(_currentRole),
         showUsers: RoleAccess.canViewUsers(_currentRole),
+        showPhoneRequests: RoleAccess.canViewPhoneRequests(_currentRole),
+        showSalary: RoleAccess.canViewSalaryManagement(_currentRole),
         onDashboard: () => _setIndex(0),
         onLeads: () => _setIndex(1),
         onFollowUps: () => _setIndex(2),
@@ -97,6 +103,8 @@ class _MainScreenState extends State<MainScreen> {
         onTeam: () => _setIndex(5),
         onReports: () => _setIndex(6),
         onSettings: () => _setIndex(7),
+        onPhoneRequests: () => _setIndex(8),
+        onSalary: () => _setIndex(9),
         onMore: () {},
         onLess: () {},
       ),
