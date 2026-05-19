@@ -751,26 +751,27 @@ class _FollowUpPageState extends State<FollowUpPage> {
           ),
         );
 
-        final exportButton = _canExportData
-            ? OutlinedButton.icon(
-                onPressed: _isExporting ? null : _exportFollowUps,
-                icon: _isExporting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.download_rounded, size: 18),
-                label: Text(_isExporting ? 'Exporting...' : 'Export'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 48),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              )
-            : null;
+        final exportButton = null;
+        // final exportButton = _canExportData
+        //     ? OutlinedButton.icon(
+        //         onPressed: _isExporting ? null : _exportFollowUps,
+        //         icon: _isExporting
+        //             ? const SizedBox(
+        //                 width: 16,
+        //                 height: 16,
+        //                 child: CircularProgressIndicator(strokeWidth: 2),
+        //               )
+        //             : const Icon(Icons.download_rounded, size: 18),
+        //         label: Text(_isExporting ? 'Exporting...' : 'Export'),
+        //         style: OutlinedButton.styleFrom(
+        //           minimumSize: const Size(0, 48),
+        //           padding: const EdgeInsets.symmetric(horizontal: 14),
+        //           shape: RoundedRectangleBorder(
+        //             borderRadius: BorderRadius.circular(12),
+        //           ),
+        //         ),
+        //       )
+        //     : null;
 
         final addButton = FilledButton.icon(
           onPressed: _openCreateFollowUp,

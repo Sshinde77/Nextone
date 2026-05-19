@@ -30,6 +30,10 @@
 	<string>Camera access is required to capture attendance check-in and check-out photos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Location access is required to record your check-in and check-out coordinates.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

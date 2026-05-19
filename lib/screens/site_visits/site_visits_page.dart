@@ -315,29 +315,30 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     if (!_canExportData) {
       return const SizedBox.shrink();
     }
-    return InkWell(
-      onTap: _isExporting ? null : _exportSiteVisits,
-      borderRadius: BorderRadius.circular(_s(10)),
-      child: Container(
-        width: _s(36),
-        height: _s(36),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(_s(10)),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: _isExporting
-            ? Padding(
-                padding: EdgeInsets.all(_s(8)),
-                child: const CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Icon(
-                Icons.download_rounded,
-                size: _s(18),
-                color: AppColors.primary,
-              ),
-      ),
-    );
+    return const SizedBox.shrink();
+    // return InkWell(
+    //   onTap: _isExporting ? null : _exportSiteVisits,
+    //   borderRadius: BorderRadius.circular(_s(10)),
+    //   child: Container(
+    //     width: _s(36),
+    //     height: _s(36),
+    //     decoration: BoxDecoration(
+    //       color: Colors.white,
+    //       borderRadius: BorderRadius.circular(_s(10)),
+    //       border: Border.all(color: AppColors.border),
+    //     ),
+    //     child: _isExporting
+    //         ? Padding(
+    //             padding: EdgeInsets.all(_s(8)),
+    //             child: const CircularProgressIndicator(strokeWidth: 2),
+    //           )
+    //         : Icon(
+    //             Icons.download_rounded,
+    //             size: _s(18),
+    //             color: AppColors.primary,
+    //           ),
+    //   ),
+    // );
   }
 
   Widget _buildKpiTile({

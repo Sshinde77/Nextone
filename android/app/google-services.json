@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "599915753556",
+    "project_id": "nextone-70b85",
+    "storage_bucket": "nextone-70b85.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:599915753556:android:0d99872ccdf660a3c47dc1",
+        "android_client_info": {
+          "package_name": "com.example.nextone"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTUHXTvSHOFjUjbWJu1SUOCUSa3llf5yY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

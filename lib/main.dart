@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'dart:developer' as developer;
 import 'package:nextone/routes/app_routes.dart';
 import 'package:nextone/services/auth_service.dart';
+import 'package:nextone/services/push_notification_service.dart';
 import 'package:nextone/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+    await PushNotificationService.initialize();
+  } catch (e, stackTrace) {
+    developer.log(
+      'Firebase setup is incomplete. Add firebase config files and rerun.',
+      name: 'main',
+      error: e,
+      stackTrace: stackTrace,
+    );
+  }
   final isLoggedIn = await AuthService.hasPersistedSession();
   runApp(MyApp(isLoggedIn: isLoggedIn));
 }

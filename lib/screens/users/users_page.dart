@@ -420,19 +420,19 @@ class _UsersPageState extends State<UsersPage> {
                   alignment:
                       isCompact ? WrapAlignment.start : WrapAlignment.end,
                   children: [
-                    if (_canExportData)
-                      OutlinedButton.icon(
-                        onPressed: _isExporting ? null : _exportUsers,
-                        icon: _isExporting
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.download_rounded, size: 16),
-                        label: const Text('Export'),
-                      ),
+                    // if (_canExportData)
+                    //   OutlinedButton.icon(
+                    //     onPressed: _isExporting ? null : _exportUsers,
+                    //     icon: _isExporting
+                    //         ? const SizedBox(
+                    //             width: 14,
+                    //             height: 14,
+                    //             child:
+                    //                 CircularProgressIndicator(strokeWidth: 2),
+                    //           )
+                    //         : const Icon(Icons.download_rounded, size: 16),
+                    //     label: const Text('Export'),
+                    //   ),
                     if (_canManageUsers)
                       FilledButton.icon(
                         onPressed: _openCreateUser,

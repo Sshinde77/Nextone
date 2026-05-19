@@ -870,20 +870,20 @@ class _TeamPageState extends State<TeamPage> {
           ),
         ),
         const SizedBox(width: 8),
-        if (_canExportData) ...[
-          OutlinedButton.icon(
-            onPressed: _exportMembers,
-            icon: const Icon(Icons.download_rounded, size: 18),
-            label: const Text('Export'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(104, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
+        // if (_canExportData) ...[
+        //   OutlinedButton.icon(
+        //     onPressed: _exportMembers,
+        //     icon: const Icon(Icons.download_rounded, size: 18),
+        //     label: const Text('Export'),
+        //     style: OutlinedButton.styleFrom(
+        //       minimumSize: const Size(104, 50),
+        //       shape: RoundedRectangleBorder(
+        //         borderRadius: BorderRadius.circular(999),
+        //       ),
+        //     ),
+        //   ),
+        //   const SizedBox(width: 8),
+        // ],
         if (_canManageUsers)
           FilledButton(
             onPressed: _openCreateMember,

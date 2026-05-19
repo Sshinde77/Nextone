@@ -643,32 +643,32 @@ class _HeaderBlockState extends State<_HeaderBlock> {
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
-        if (canExport)
-          OutlinedButton.icon(
-            onPressed: _isExporting ? null : _openExportMenu,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF344054),
-              side: const BorderSide(color: Color(0xFFD8DFEA)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              visualDensity: VisualDensity.compact,
-            ),
-            icon: _isExporting
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.download_rounded, size: 16),
-            label: Text(
-              _isExporting && _activeExportType != null
-                  ? 'Exporting ${_activeExportType!.label}'
-                  : 'Export Data',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
+        // if (canExport)
+        //   OutlinedButton.icon(
+        //     onPressed: _isExporting ? null : _openExportMenu,
+        //     style: OutlinedButton.styleFrom(
+        //       foregroundColor: const Color(0xFF344054),
+        //       side: const BorderSide(color: Color(0xFFD8DFEA)),
+        //       shape: RoundedRectangleBorder(
+        //         borderRadius: BorderRadius.circular(12),
+        //       ),
+        //       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        //       visualDensity: VisualDensity.compact,
+        //     ),
+        //     icon: _isExporting
+        //         ? const SizedBox(
+        //             width: 14,
+        //             height: 14,
+        //             child: CircularProgressIndicator(strokeWidth: 2),
+        //           )
+        //         : const Icon(Icons.download_rounded, size: 16),
+        //     label: Text(
+        //       _isExporting && _activeExportType != null
+        //           ? 'Exporting ${_activeExportType!.label}'
+        //           : 'Export Data',
+        //       style: const TextStyle(fontWeight: FontWeight.w700),
+        //     ),
+        //   ),
       ],
     );
 

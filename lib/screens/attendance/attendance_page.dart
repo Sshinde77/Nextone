@@ -162,34 +162,34 @@ class _AttendancePageState extends State<AttendancePage> {
             icon: Icons.refresh_rounded,
             onTap: _loadTodayAttendance,
           ),
-          if (_canExportData)
-            OutlinedButton.icon(
-              onPressed: _isExporting ? null : _exportAttendance,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF1C3159),
-                backgroundColor: Colors.white,
-                side: const BorderSide(color: Color(0xFFD4DBEA)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
-              icon: _isExporting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.download_rounded, size: 18),
-              label: Text(
-                _isExporting ? 'Exporting...' : 'Export Excel',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ),
+          // if (_canExportData)
+          //   OutlinedButton.icon(
+          //     onPressed: _isExporting ? null : _exportAttendance,
+          //     style: OutlinedButton.styleFrom(
+          //       foregroundColor: const Color(0xFF1C3159),
+          //       backgroundColor: Colors.white,
+          //       side: const BorderSide(color: Color(0xFFD4DBEA)),
+          //       shape: RoundedRectangleBorder(
+          //         borderRadius: BorderRadius.circular(12),
+          //       ),
+          //       padding:
+          //           const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          //     ),
+          //     icon: _isExporting
+          //         ? const SizedBox(
+          //             width: 16,
+          //             height: 16,
+          //             child: CircularProgressIndicator(strokeWidth: 2),
+          //           )
+          //         : const Icon(Icons.download_rounded, size: 18),
+          //     label: Text(
+          //       _isExporting ? 'Exporting...' : 'Export Excel',
+          //       style: const TextStyle(
+          //         fontWeight: FontWeight.w600,
+          //         fontSize: 12,
+          //       ),
+          //     ),
+          //   ),
         ];
 
         if (isCompact) {
@@ -1949,19 +1949,19 @@ class _AttendancePageState extends State<AttendancePage> {
                       onTap: () => _changeCalendarMonth(1),
                     ),
                     const SizedBox(width: 8),
-                    if (_canExportData)
-                      OutlinedButton.icon(
-                        onPressed: _isExporting ? null : _exportAttendance,
-                        icon: const Icon(Icons.download_rounded, size: 16),
-                        label: const Text('Export'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 34),
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
+                    // if (_canExportData)
+                    //   OutlinedButton.icon(
+                    //     onPressed: _isExporting ? null : _exportAttendance,
+                    //     icon: const Icon(Icons.download_rounded, size: 16),
+                    //     label: const Text('Export'),
+                    //     style: OutlinedButton.styleFrom(
+                    //       minimumSize: const Size(0, 34),
+                    //       padding: const EdgeInsets.symmetric(horizontal: 10),
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(10),
+                    //       ),
+                    //     ),
+                    //   ),
                   ],
                 );
 

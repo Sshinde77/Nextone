@@ -269,26 +269,26 @@ class _ProjectsPageState extends State<ProjectsPage> {
           ),
         ),
         const SizedBox(width: 8),
-        if (_canExportData) ...[
-          OutlinedButton.icon(
-            onPressed: _isExporting ? null : _exportProjects,
-            icon: _isExporting
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.download_rounded, size: 18),
-            label: Text(_isExporting ? 'Exporting...' : 'Export'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(110, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
+        // if (_canExportData) ...[
+        //   OutlinedButton.icon(
+        //     onPressed: _isExporting ? null : _exportProjects,
+        //     icon: _isExporting
+        //         ? const SizedBox(
+        //             width: 16,
+        //             height: 16,
+        //             child: CircularProgressIndicator(strokeWidth: 2),
+        //           )
+        //         : const Icon(Icons.download_rounded, size: 18),
+        //     label: Text(_isExporting ? 'Exporting...' : 'Export'),
+        //     style: OutlinedButton.styleFrom(
+        //       minimumSize: const Size(110, 50),
+        //       shape: RoundedRectangleBorder(
+        //         borderRadius: BorderRadius.circular(999),
+        //       ),
+        //     ),
+        //   ),
+        //   const SizedBox(width: 8),
+        // ],
         if (_canManageProjects)
           FilledButton(
             onPressed: _openCreateProject,

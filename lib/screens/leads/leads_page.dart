@@ -867,15 +867,15 @@ class _LeadsPageState extends State<LeadsPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              'Leads export downloaded: ${outFile.path}',
-            ),
-          ),
-        );
+      // ScaffoldMessenger.of(context)
+      //   ..hideCurrentSnackBar()
+      //   ..showSnackBar(
+      //     SnackBar(
+      //       content: Text(
+      //         'Leads export downloaded: ${outFile.path}',
+      //       ),
+      //     ),
+      //   );
     } catch (error) {
       if (!mounted) {
         return;
@@ -1220,26 +1220,27 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
         );
 
-        final exportButton = _canExportData
-            ? OutlinedButton.icon(
-                onPressed: _isExporting ? null : _exportLeads,
-                icon: _isExporting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.download_rounded, size: 18),
-                label: Text(_isExporting ? 'Exporting...' : 'Export'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 48),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              )
-            : null;
+        final exportButton = null;
+        // final exportButton = _canExportData
+        //     ? OutlinedButton.icon(
+        //         onPressed: _isExporting ? null : _exportLeads,
+        //         icon: _isExporting
+        //             ? const SizedBox(
+        //                 width: 16,
+        //                 height: 16,
+        //                 child: CircularProgressIndicator(strokeWidth: 2),
+        //               )
+        //             : const Icon(Icons.download_rounded, size: 18),
+        //         label: Text(_isExporting ? 'Exporting...' : 'Export'),
+        //         style: OutlinedButton.styleFrom(
+        //           minimumSize: const Size(0, 48),
+        //           padding: const EdgeInsets.symmetric(horizontal: 14),
+        //           shape: RoundedRectangleBorder(
+        //             borderRadius: BorderRadius.circular(12),
+        //           ),
+        //         ),
+        //       )
+        //     : null;
 
         final bulkButton = _canUseBulkLeadTools
             ? OutlinedButton.icon(
