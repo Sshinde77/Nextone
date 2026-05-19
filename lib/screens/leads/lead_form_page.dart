@@ -25,8 +25,11 @@ class _LeadFormPageState extends State<LeadFormPage> {
 
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _alternatePhoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _sourceController = TextEditingController();
+  final _callbackTimeController = TextEditingController();
+  final _nextFollowUpTimeController = TextEditingController();
   final _budgetController = TextEditingController();
   final _locationPreferenceController = TextEditingController();
   final _notesController = TextEditingController();
@@ -50,8 +53,11 @@ class _LeadFormPageState extends State<LeadFormPage> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _alternatePhoneController.dispose();
     _emailController.dispose();
     _sourceController.dispose();
+    _callbackTimeController.dispose();
+    _nextFollowUpTimeController.dispose();
     _budgetController.dispose();
     _locationPreferenceController.dispose();
     _notesController.dispose();
@@ -79,8 +85,21 @@ class _LeadFormPageState extends State<LeadFormPage> {
           data['phoneNumber'] ??
           data['mobile'],
     );
+    _alternatePhoneController.text = _readString(
+      data['alternate_phone_number'] ??
+          data['alternatePhoneNumber'] ??
+          data['alternate_phone'],
+    );
     _emailController.text = _readString(data['email']);
     _sourceController.text = _readString(data['source']);
+    _callbackTimeController.text = _readString(
+      data['callback_time'] ?? data['callbackTime'],
+    );
+    _nextFollowUpTimeController.text = _readString(
+      data['next_followup_time'] ??
+          data['next_follow_up_time'] ??
+          data['nextFollowUpTime'],
+    );
     _budgetController.text = _readString(
       data['budget'] ?? data['budget_value'] ?? data['budget_range'],
     );
@@ -290,22 +309,22 @@ class _LeadFormPageState extends State<LeadFormPage> {
         }
         await _authProvider.editLead(
           id: leadId,
-          name: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
-          email: _emailController.text.trim(),
-          source: _sourceController.text.trim(),
-          assignedTo: _selectedAssigneeId?.trim() ?? '',
+          callbackTime: _callbackTimeController.text.trim(),
+          nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
-          notes: _notesController.text.trim(),
           token: _authProvider.currentAuthToken,
         );
       } else {
         await _authProvider.createLead(
           name: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
+          alternatePhoneNumber: _alternatePhoneController.text.trim(),
           email: _emailController.text.trim(),
           source: _sourceController.text.trim(),
+          callbackTime: _callbackTimeController.text.trim(),
+          nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
           assignedTo: _selectedAssigneeId?.trim() ?? '',
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
@@ -339,6 +358,62 @@ class _LeadFormPageState extends State<LeadFormPage> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _pickDateTimeForController({
+    required TextEditingController controller,
+    DateTime? initialDateTime,
+  }) async {
+    final now = DateTime.now();
+    final seed = initialDateTime ?? _tryParseDateTime(controller.text) ?? now;
+    final normalizedNowDate = DateTime(now.year, now.month, now.day);
+
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: seed.isBefore(now) ? now : seed,
+      firstDate: normalizedNowDate,
+      lastDate: DateTime(2100),
+    );
+    if (pickedDate == null || !mounted) {
+      return;
+    }
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(seed),
+    );
+    if (pickedTime == null || !mounted) {
+      return;
+    }
+
+    final dateTime = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+
+    if (dateTime.isBefore(now)) {
+      _showSnackBar('Please select a future date and time.');
+      return;
+    }
+
+    setState(() {
+      controller.text = _formatDateTime(dateTime);
+    });
+  }
+
+  DateTime? _tryParseDateTime(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return DateTime.tryParse(trimmed);
+  }
+
+  String _formatDateTime(DateTime value) {
+    return value.toUtc().toIso8601String();
   }
 
   Future<void> _openAssigneeMenu(BuildContext context) async {
@@ -438,6 +513,13 @@ class _LeadFormPageState extends State<LeadFormPage> {
                       ),
                       const SizedBox(height: 12),
                       _buildTextField(
+                        controller: _alternatePhoneController,
+                        label: 'Alternate Phone Number',
+                        hintText: '+919876543211',
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildTextField(
                         controller: _emailController,
                         label: 'Email',
                         hintText: 'suresh.patel@gmail.com',
@@ -460,6 +542,18 @@ class _LeadFormPageState extends State<LeadFormPage> {
                         controller: _sourceController,
                         label: 'Source',
                         hintText: 'Facebook',
+                      ),
+                      const SizedBox(height: 12),
+                      _buildDateTimeField(
+                        controller: _callbackTimeController,
+                        label: 'Callback Time',
+                        hintText: 'Select callback date & time',
+                      ),
+                      const SizedBox(height: 12),
+                      _buildDateTimeField(
+                        controller: _nextFollowUpTimeController,
+                        label: 'Next Follow-up Time',
+                        hintText: 'Select next follow-up date & time',
                       ),
                       const SizedBox(height: 12),
                       _buildAssigneeDropdown(),
@@ -635,6 +729,38 @@ class _LeadFormPageState extends State<LeadFormPage> {
           enabled: !_isSubmitting,
           validator: validator,
           decoration: _fieldDecoration(hintText: hintText),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateTimeField({
+    required TextEditingController controller,
+    required String label,
+    required String hintText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          readOnly: true,
+          enabled: !_isSubmitting,
+          onTap: _isSubmitting
+              ? null
+              : () => _pickDateTimeForController(controller: controller),
+          decoration: _fieldDecoration(hintText: hintText).copyWith(
+            suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18),
+          ),
         ),
       ],
     );

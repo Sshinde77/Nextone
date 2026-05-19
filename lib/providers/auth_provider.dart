@@ -677,8 +677,11 @@ class AuthProvider {
   Future<Map<String, dynamic>> createLead({
     required String name,
     required String phone,
+    String alternatePhoneNumber = '',
     required String email,
     required String source,
+    String callbackTime = '',
+    String nextFollowUpTime = '',
     required String assignedTo,
     required String budget,
     required String locationPreference,
@@ -688,8 +691,11 @@ class AuthProvider {
     return _authService.createLead(
       name: name,
       phone: phone,
+      alternatePhoneNumber: alternatePhoneNumber,
       email: email,
       source: source,
+      callbackTime: callbackTime,
+      nextFollowUpTime: nextFollowUpTime,
       assignedTo: assignedTo,
       budget: budget,
       locationPreference: locationPreference,
@@ -700,26 +706,20 @@ class AuthProvider {
 
   Future<Map<String, dynamic>> editLead({
     required String id,
-    required String name,
     required String phone,
-    required String email,
-    required String source,
-    required String assignedTo,
+    String callbackTime = '',
+    String nextFollowUpTime = '',
     required String budget,
     required String locationPreference,
-    required String notes,
     String? token,
   }) {
     return _authService.editLead(
       id: id,
-      name: name,
       phone: phone,
-      email: email,
-      source: source,
-      assignedTo: assignedTo,
+      callbackTime: callbackTime,
+      nextFollowUpTime: nextFollowUpTime,
       budget: budget,
       locationPreference: locationPreference,
-      notes: notes,
       token: token,
     );
   }

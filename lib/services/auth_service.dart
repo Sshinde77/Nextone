@@ -25,6 +25,12 @@ class AuthService {
 
   static String? get currentAuthToken => _authToken;
 
+  get name => null;
+  get email => null;
+  get source => null;
+  get assignedTo => null;
+  get notes => null;
+
   static Future<bool> hasPersistedSession() async {
     if (_authToken != null && _authToken!.trim().isNotEmpty) {
       return true;
@@ -2626,8 +2632,11 @@ class AuthService {
   Future<Map<String, dynamic>> createLead({
     required String name,
     required String phone,
+    String alternatePhoneNumber = '',
     required String email,
     required String source,
+    String callbackTime = '',
+    String nextFollowUpTime = '',
     required String assignedTo,
     required String budget,
     required String locationPreference,
@@ -2641,8 +2650,11 @@ class AuthService {
     final body = jsonEncode({
       'name': name.trim(),
       'phone': phone.trim(),
+      'alternate_phone_number': alternatePhoneNumber.trim(),
       'email': email.trim(),
       'source': source.trim(),
+      'callback_time': callbackTime.trim(),
+      'next_followup_time': nextFollowUpTime.trim(),
       'assigned_to': assignedTo.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
@@ -2683,8 +2695,11 @@ class AuthService {
     return <String, dynamic>{
       'name': name.trim(),
       'phone': phone.trim(),
+      'alternate_phone_number': alternatePhoneNumber.trim(),
       'email': email.trim(),
       'source': source.trim(),
+      'callback_time': callbackTime.trim(),
+      'next_followup_time': nextFollowUpTime.trim(),
       'assigned_to': assignedTo.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
@@ -2694,14 +2709,11 @@ class AuthService {
 
   Future<Map<String, dynamic>> editLead({
     required String id,
-    required String name,
     required String phone,
-    required String email,
-    required String source,
-    required String assignedTo,
+    String callbackTime = '',
+    String nextFollowUpTime = '',
     required String budget,
     required String locationPreference,
-    required String notes,
     String? token,
   }) async {
     final normalizedId = id.trim();
@@ -2714,14 +2726,11 @@ class AuthService {
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({
-      'name': name.trim(),
       'phone': phone.trim(),
-      'email': email.trim(),
-      'source': source.trim(),
-      'assigned_to': assignedTo.trim(),
+      'callback_time': callbackTime.trim(),
+      'next_followup_time': nextFollowUpTime.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
-      'notes': notes.trim(),
     });
 
     _logRequest(
