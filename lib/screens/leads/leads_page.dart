@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/leads/lead_bulk_upload_page.dart';
@@ -30,6 +31,7 @@ class _LeadsPageState extends State<LeadsPage> {
   bool _isBulkSelectionMode = false;
   bool _isExporting = false;
   bool _isSubmittingReassign = false;
+  String? _activeShareLeadId;
   String? _selectedAssigneeId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
 
@@ -327,6 +329,62 @@ class _LeadsPageState extends State<LeadsPage> {
       path: phoneNumber.trim(),
     );
     await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _sendLeadDetailsViaWhatsApp(_LeadModel lead) async {
+    final phoneNumber = _callPhoneForLead(lead).trim();
+    if (phoneNumber.isEmpty || phoneNumber.toUpperCase() == 'N/A') {
+      _showSnackBar('Phone number is not available.');
+      return;
+    }
+    final message = Uri.encodeComponent(
+      'Lead Details\n'
+      'Name: ${lead.name}\n'
+      'Phone: ${_displayPhoneForLead(lead)}\n'
+      'Budget: ${lead.budget}\n'
+      'Location: ${lead.locationPreference}\n'
+      'Callback Time: ${lead.priority}\n'
+      'Next Follow-up: ${lead.nextFollowUpDate}\n',
+    );
+    final sanitizedPhone = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+    final url = Uri.parse('https://wa.me/$sanitizedPhone?text=$message');
+    await launchUrl(url, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _sendLeadDetailsViaEmail(_LeadModel lead) async {
+    final email = lead.email.trim();
+    if (email.isEmpty) {
+      _showSnackBar('Email is not available.');
+      return;
+    }
+    final subject = Uri.encodeComponent('Lead Details - ${lead.name}');
+    final body = Uri.encodeComponent(
+      'Lead Details\n\n'
+      'Name: ${lead.name}\n'
+      'Phone: ${_displayPhoneForLead(lead)}\n'
+      'Budget: ${lead.budget}\n'
+      'Location: ${lead.locationPreference}\n'
+      'Callback Time: ${lead.priority}\n'
+      'Next Follow-up: ${lead.nextFollowUpDate}\n'
+      'Source: ${lead.source}\n'
+      'Status: ${lead.status}\n',
+    );
+    final mailto = Uri.parse('mailto:$email?subject=$subject&body=$body');
+    await launchUrl(mailto, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _shareProjectDetails(_LeadModel lead) async {
+    final details = 'Lead Details\n'
+        'Name: ${lead.name}\n'
+        'Phone: ${_displayPhoneForLead(lead)}\n'
+        'Budget: ${lead.budget}\n'
+        'Location: ${lead.locationPreference}\n'
+        'Callback Time: ${lead.priority}\n'
+        'Next Follow-up: ${lead.nextFollowUpDate}\n'
+        'Source: ${lead.source}\n'
+        'Status: ${lead.status}';
+    await Clipboard.setData(ClipboardData(text: details));
+    _showSnackBar('Project details copied to clipboard.');
   }
 
   Future<void> _handleCallAction(_LeadModel lead) async {
@@ -1257,6 +1315,19 @@ class _LeadsPageState extends State<LeadsPage> {
               )
             : null;
 
+        final addSourceButton = OutlinedButton.icon(
+          onPressed: () {},
+          icon: const Icon(Icons.add_circle_outline, size: 18),
+          label: const Text('Add Source'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+
         final addButton = FilledButton.icon(
           onPressed: _openCreateLead,
           icon: const Icon(Icons.add, size: 18),
@@ -1286,6 +1357,8 @@ class _LeadsPageState extends State<LeadsPage> {
                     Expanded(child: bulkButton),
                     const SizedBox(width: 8),
                   ],
+                  Expanded(child: addSourceButton),
+                  const SizedBox(width: 8),
                   Expanded(child: addButton),
                 ],
               ),
@@ -1305,6 +1378,8 @@ class _LeadsPageState extends State<LeadsPage> {
               bulkButton,
               const SizedBox(width: 8),
             ],
+            addSourceButton,
+            const SizedBox(width: 8),
             addButton,
           ],
         );
@@ -1479,16 +1554,21 @@ class _LeadsPageState extends State<LeadsPage> {
               ),
             )
           else
-            ...leads.map(
-              (lead) => Padding(
+            ...leads.map((lead) {
+              final isShareOpen = _activeShareLeadId == lead.id;
+              return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: DataCard(
+                child: Column(
+                  children: [
+                    DataCard(
                   name: lead.name,
                   leadId: '',
                   status: lead.status,
                   priority: lead.priority,
                   priorityColor: lead.priorityColor,
                   nextFollowUpDate: lead.nextFollowUpDate,
+                  leftMetaLabel: 'Callback Time',
+                  rightMetaLabel: 'Next Follow-up',
                   budget: lead.budget,
                   phone: _displayPhoneForLead(lead),
                   profileImageUrl: lead.profileImageUrl,
@@ -1499,6 +1579,15 @@ class _LeadsPageState extends State<LeadsPage> {
                     DataCardAction(
                       icon: Icons.call_outlined,
                       onTap: () => _handleCallAction(lead),
+                    ),
+                    DataCardAction(
+                      icon: Icons.share_outlined,
+                      color: const Color(0xFF7B1FA2),
+                      onTap: () {
+                        setState(() {
+                          _activeShareLeadId = isShareOpen ? null : lead.id;
+                        });
+                      },
                     ),
                     DataCardAction(
                       icon: Icons.person_add_alt_1_outlined,
@@ -1523,19 +1612,72 @@ class _LeadsPageState extends State<LeadsPage> {
                       _selectedLeadIds.add(lead.id);
                     });
                   },
-                  onSelectionChanged: (selected) {
-                    setState(() {
+                    onSelectionChanged: (selected) {
+                      setState(() {
                       if (selected) {
                         _selectedLeadIds.add(lead.id);
                       } else {
                         _selectedLeadIds.remove(lead.id);
                       }
                       _syncBulkSelectionMode();
-                    });
-                  },
+                      });
+                    },
+                    ),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      child: !isShareOpen
+                          ? const SizedBox.shrink()
+                          : Container(
+                              key: ValueKey<String>('share-${lead.id}'),
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(top: 6),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFF9FAFF),
+                                    Color(0xFFF3F6FF),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFDCE3F7)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildInlineShareOption(
+                                      label: 'WhatsApp',
+                                      icon: Icons.chat_outlined,
+                                      color: const Color(0xFF25D366),
+                                      onTap: () => _sendLeadDetailsViaWhatsApp(lead),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildInlineShareOption(
+                                      label: 'Email',
+                                      icon: Icons.email_outlined,
+                                      color: const Color(0xFF1976D2),
+                                      onTap: () => _sendLeadDetailsViaEmail(lead),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildInlineShareOption(
+                                      label: 'Share',
+                                      icon: Icons.share_outlined,
+                                      color: const Color(0xFF7B1FA2),
+                                      onTap: () => _shareProjectDetails(lead),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
+              );
+            }),
         ],
       ),
     );
@@ -1581,6 +1723,45 @@ class _LeadsPageState extends State<LeadsPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildInlineShareOption({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Ink(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE1E6F5)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1776,12 +1957,13 @@ class _LeadModel {
       json['status'] ?? json['stage'] ?? json['current_status'],
       fallback: 'Unknown',
     );
-    final priorityRaw = _readString(
-      json['priority'] ?? json['temperature'],
-      fallback: 'Warm',
+    final callbackTime = _readDateTime(
+      json['callback_time'] ?? json['callbackTime'],
     );
-    final nextFollowUpDate = _readDate(
-      json['next_follow_up_date'] ??
+    final nextFollowUpDate = _readDateTime(
+      json['next_followup_time'] ??
+          json['next_follow_up_time'] ??
+          json['next_follow_up_date'] ??
           json['nextFollowUpDate'] ??
           json['follow_up_date'],
     );
@@ -1841,15 +2023,14 @@ class _LeadModel {
     );
     final notes = _readString(json['notes']);
 
-    final priorityLabel = _readPriorityLabel(priorityRaw);
     return _LeadModel(
       id: id,
       name: resolvedName.isNotEmpty
           ? resolvedName
           : (fullName.isNotEmpty ? fullName : 'Unknown Lead'),
       status: status,
-      priority: priorityLabel,
-      priorityColor: _priorityColor(priorityLabel),
+      priority: callbackTime,
+      priorityColor: const Color(0xFF1E88E5),
       nextFollowUpDate: nextFollowUpDate,
       budget: budget,
       phone: phone,
@@ -1871,7 +2052,7 @@ class _LeadModel {
     return fallback;
   }
 
-  static String _readDate(dynamic value) {
+  static String _readDateTime(dynamic value) {
     final raw = _readString(value);
     if (raw.isEmpty) {
       return 'N/A';
@@ -1880,9 +2061,12 @@ class _LeadModel {
     if (parsed == null) {
       return raw;
     }
-    final month = parsed.month.toString().padLeft(2, '0');
-    final day = parsed.day.toString().padLeft(2, '0');
-    return '${parsed.year}-$month-$day';
+    final local = parsed.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.year}-$month-$day $hour:$minute';
   }
 
   static String _readBudget(dynamic value) {
@@ -1893,27 +2077,6 @@ class _LeadModel {
     return asString.isEmpty ? 'N/A' : asString;
   }
 
-  static String _readPriorityLabel(String value) {
-    final normalized = value.trim().toLowerCase();
-    if (normalized == 'high' || normalized == 'hot') {
-      return 'Hot';
-    }
-    if (normalized == 'low' || normalized == 'cold') {
-      return 'Cold';
-    }
-    return 'Warm';
-  }
-
-  static Color _priorityColor(String label) {
-    switch (label.toLowerCase()) {
-      case 'hot':
-        return const Color(0xFFE53935);
-      case 'cold':
-        return const Color(0xFF1E88E5);
-      default:
-        return const Color(0xFFFB8C00);
-    }
-  }
 }
 
 class _PersonModel {

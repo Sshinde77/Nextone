@@ -7,6 +7,8 @@ class LeadDetailModel {
   final String status;
   final String budget;
   final String locationPreference;
+  final String callbackTime;
+  final String nextFollowupTime;
   final AssignedTo? assignedTo;
 
   LeadDetailModel({
@@ -18,6 +20,8 @@ class LeadDetailModel {
     required this.status,
     required this.budget,
     required this.locationPreference,
+    required this.callbackTime,
+    required this.nextFollowupTime,
     this.assignedTo,
   });
 
@@ -31,6 +35,11 @@ class LeadDetailModel {
       status: json['status']?.toString() ?? '',
       budget: json['budget']?.toString() ?? '',
       locationPreference: json['location_preference']?.toString() ?? '',
+      callbackTime: json['callback_time']?.toString() ?? '',
+      nextFollowupTime: (json['next_followup_time'] ??
+              json['next_follow_up_time'])
+          ?.toString() ??
+          '',
       assignedTo: json['assigned_to'] != null
           ? AssignedTo.fromJson(json['assigned_to'])
           : null,

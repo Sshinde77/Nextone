@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/models/lead_detail_model.dart';
 import 'package:nextone/providers/auth_provider.dart';
@@ -241,6 +242,73 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       path: email.trim(),
     );
     await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _sendDetailsViaWhatsApp() async {
+    final lead = _lead;
+    if (lead == null) {
+      return;
+    }
+    final phone = (_hasPhoneAccess ? _accessiblePhone : lead.phone).trim();
+    if (phone.isEmpty || phone.toUpperCase() == 'N/A') {
+      _showSnackBar('Phone number is not available.');
+      return;
+    }
+    final message = Uri.encodeComponent(
+      'Lead Details\n'
+      'Name: ${lead.name}\n'
+      'Phone: $phone\n'
+      'Budget: ${lead.budget}\n'
+      'Location: ${lead.locationPreference}\n'
+      'Callback Time: ${_formatDateTimeValue(lead.callbackTime)}\n'
+      'Next Follow-up: ${_formatDateTimeValue(lead.nextFollowupTime)}\n'
+      'Status: ${lead.status}\n',
+    );
+    final sanitizedPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    final url = Uri.parse('https://wa.me/$sanitizedPhone?text=$message');
+    await launchUrl(url, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _sendDetailsViaEmail() async {
+    final lead = _lead;
+    if (lead == null) {
+      return;
+    }
+    final email = lead.email.trim();
+    if (email.isEmpty) {
+      _showSnackBar('Email is not available.');
+      return;
+    }
+    final subject = Uri.encodeComponent('Lead Details - ${lead.name}');
+    final body = Uri.encodeComponent(
+      'Lead Details\n\n'
+      'Name: ${lead.name}\n'
+      'Phone: ${_hasPhoneAccess ? _accessiblePhone : lead.phone}\n'
+      'Budget: ${lead.budget}\n'
+      'Location: ${lead.locationPreference}\n'
+      'Callback Time: ${_formatDateTimeValue(lead.callbackTime)}\n'
+      'Next Follow-up: ${_formatDateTimeValue(lead.nextFollowupTime)}\n'
+      'Status: ${lead.status}\n',
+    );
+    final mailto = Uri.parse('mailto:$email?subject=$subject&body=$body');
+    await launchUrl(mailto, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _shareProjectDetails() async {
+    final lead = _lead;
+    if (lead == null) {
+      return;
+    }
+    final details = 'Lead Details\n'
+        'Name: ${lead.name}\n'
+        'Phone: ${_hasPhoneAccess ? _accessiblePhone : lead.phone}\n'
+        'Budget: ${lead.budget}\n'
+        'Location: ${lead.locationPreference}\n'
+        'Callback Time: ${_formatDateTimeValue(lead.callbackTime)}\n'
+        'Next Follow-up: ${_formatDateTimeValue(lead.nextFollowupTime)}\n'
+        'Status: ${lead.status}';
+    await Clipboard.setData(ClipboardData(text: details));
+    _showSnackBar('Project details copied to clipboard.');
   }
 
   Future<String?> _submitStatusChange() async {
@@ -531,6 +599,16 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                               _buildInfoTile(Icons.source_outlined, 'Source',
                                   _lead!.source),
                               _buildInfoTile(
+                                Icons.access_time_rounded,
+                                'Callback Time',
+                                _formatDateTimeValue(_lead!.callbackTime),
+                              ),
+                              _buildInfoTile(
+                                Icons.event_available_rounded,
+                                'Next Follow-up Time',
+                                _formatDateTimeValue(_lead!.nextFollowupTime),
+                              ),
+                              _buildInfoTile(
                                 Icons.location_on_outlined,
                                 'Location Preference',
                                 _lead!.locationPreference,
@@ -608,7 +686,78 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
             icon: Icons.calendar_month_outlined,
             onTap: _openCreateSiteVisit,
           ),
+          const SizedBox(height: 10),
+          _buildPremiumActionButton(
+            label: 'Add Status',
+            icon: Icons.playlist_add_check_circle_outlined,
+            onTap: () {},
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildIconActionButton(
+                  tooltip: 'Send via WhatsApp',
+                  icon: Icons.chat_outlined,
+                  color: const Color(0xFF25D366),
+                  onTap: () {
+                    _sendDetailsViaWhatsApp();
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildIconActionButton(
+                  tooltip: 'Send via Email',
+                  icon: Icons.email_outlined,
+                  color: const Color(0xFF1976D2),
+                  onTap: () {
+                    _sendDetailsViaEmail();
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildIconActionButton(
+                  tooltip: 'Share Project',
+                  icon: Icons.share_outlined,
+                  color: const Color(0xFF7B1FA2),
+                  onTap: () {
+                    _shareProjectDetails();
+                  },
+                ),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildIconActionButton({
+    required String tooltip,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFD),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Center(child: Icon(icon, size: 20, color: color)),
+          ),
+        ),
       ),
     );
   }
@@ -842,6 +991,23 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         visualDensity: VisualDensity.compact,
       ),
     );
+  }
+
+  String _formatDateTimeValue(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return 'N/A';
+    }
+    final parsed = DateTime.tryParse(trimmed);
+    if (parsed == null) {
+      return trimmed;
+    }
+    final local = parsed.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.year}-$month-$day $hour:$minute';
   }
 
   Widget _buildPhoneInfoTile() {

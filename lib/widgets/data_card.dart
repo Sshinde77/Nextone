@@ -33,6 +33,8 @@ class DataCard extends StatelessWidget {
     this.onLongPress,
     this.onTap,
     this.onSelectionChanged,
+    this.leftMetaLabel = 'Priority',
+    this.rightMetaLabel = 'Next Follow-up',
   });
 
   final String name;
@@ -53,6 +55,8 @@ class DataCard extends StatelessWidget {
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
   final ValueChanged<bool>? onSelectionChanged;
+  final String leftMetaLabel;
+  final String rightMetaLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -139,12 +143,12 @@ class DataCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   _buildInfoPair(
                     left: _metaItem(
-                      'Priority',
+                      leftMetaLabel,
                       priority,
                       dotColor: priorityColor,
                     ),
                     right: _metaItem(
-                      'Next Follow-up',
+                      rightMetaLabel,
                       nextFollowUpDate,
                       icon: Icons.calendar_month_outlined,
                     ),
@@ -294,8 +298,9 @@ class DataCard extends StatelessWidget {
     final iconSize = isVeryCompact ? 16.0 : 18.0;
     final buttonSize = isVeryCompact ? 30.0 : 34.0;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      spacing: 0,
+      runSpacing: 4,
       children: actions
           .map(
             (action) => _actionIcon(
