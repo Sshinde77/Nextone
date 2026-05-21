@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:nextone/constants/api_constants.dart';
 import 'package:nextone/models/auth_models.dart';
+import 'package:nextone/models/salary_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
@@ -387,6 +388,494 @@ class AuthService {
     }
 
     throw Exception('Users response format is not valid.');
+  }
+
+  Future<SalaryEmployeesResult> salaryEmployees({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryEmployees}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'salaryEmployees',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('salaryEmployees', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch employee salaries.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final payload = _extractSalaryEmployeesPayload(body);
+      if (payload == null) {
+        throw Exception('Employee salaries response format is not valid.');
+      }
+
+      final totalRaw = payload['total'];
+      final total = totalRaw is num
+          ? totalRaw.toInt()
+          : int.tryParse(totalRaw?.toString() ?? '') ?? 0;
+      final employeesRaw = payload['data'];
+      if (employeesRaw is! List) {
+        throw Exception('Employee salaries data list is missing.');
+      }
+
+      final employees = employeesRaw
+          .whereType<Map>()
+          .map(_stringDynamicMap)
+          .map(SalaryEmployee.fromMap)
+          .toList();
+
+      return SalaryEmployeesResult(
+        total: total > 0 ? total : employees.length,
+        employees: employees,
+      );
+    } catch (_) {
+      throw Exception('Employee salaries response format is not valid.');
+    }
+  }
+
+  Future<SalarySlipsResult> salarySlips({
+    required int month,
+    required int year,
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salarySlips}')
+        .replace(queryParameters: <String, String>{
+      'month': month.toString(),
+      'year': year.toString(),
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    });
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'salarySlips',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('salarySlips', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch salary slips.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      if (body is! Map<String, dynamic>) {
+        throw Exception('Salary slips response format is not valid.');
+      }
+
+      final data = body['data'];
+      if (data is! List) {
+        throw Exception('Salary slips data list is missing.');
+      }
+
+      final pagination = body['pagination'];
+      final paginationMap = pagination is Map<String, dynamic>
+          ? pagination
+          : <String, dynamic>{};
+
+      final totalRaw = paginationMap['total'];
+      final resolvedTotal = totalRaw is num
+          ? totalRaw.toInt()
+          : int.tryParse(totalRaw?.toString() ?? '') ?? data.length;
+      final pageRaw = paginationMap['page'];
+      final resolvedPage = pageRaw is num
+          ? pageRaw.toInt()
+          : int.tryParse(pageRaw?.toString() ?? '') ?? page;
+      final perPageRaw = paginationMap['per_page'];
+      final resolvedPerPage = perPageRaw is num
+          ? perPageRaw.toInt()
+          : int.tryParse(perPageRaw?.toString() ?? '') ?? perPage;
+      final totalPagesRaw = paginationMap['total_pages'];
+      final resolvedTotalPages = totalPagesRaw is num
+          ? totalPagesRaw.toInt()
+          : int.tryParse(totalPagesRaw?.toString() ?? '') ?? 1;
+
+      final items = data
+          .whereType<Map>()
+          .map(_stringDynamicMap)
+          .map(SalarySlip.fromMap)
+          .toList();
+
+      return SalarySlipsResult(
+        items: items,
+        total: resolvedTotal,
+        page: resolvedPage,
+        perPage: resolvedPerPage,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Salary slips response format is not valid.');
+    }
+  }
+
+  Future<SalaryGenerateAllResult> salaryGenerateAll({
+    required int month,
+    required int year,
+    int? workingDaysOverride,
+    Map<String, num>? deductionsMap,
+    String? notes,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryGenerateAll}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final bodyMap = <String, dynamic>{
+      'month': month,
+      'year': year,
+    };
+    if (workingDaysOverride != null) {
+      bodyMap['working_days_override'] = workingDaysOverride;
+    }
+    if (deductionsMap != null && deductionsMap.isNotEmpty) {
+      bodyMap['deductions_map'] = deductionsMap;
+    }
+    if (notes != null && notes.trim().isNotEmpty) {
+      bodyMap['notes'] = notes.trim();
+    }
+    final body = jsonEncode(bodyMap);
+    _logRequest(
+      endpoint: 'salaryGenerateAll',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('salaryGenerateAll', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to generate salary slips.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Generate salary slips response format is not valid.');
+      }
+
+      final message =
+          decoded['message']?.toString().trim() ?? 'Salary slips generated.';
+      final data = decoded['data'];
+      if (data is! Map<String, dynamic>) {
+        throw Exception('Generate salary slips data is missing.');
+      }
+
+      int readInt(dynamic value) {
+        if (value is int) return value;
+        if (value is num) return value.toInt();
+        return int.tryParse(value?.toString() ?? '') ?? 0;
+      }
+
+      final slipsRaw = data['slips'];
+      final slips = slipsRaw is List
+          ? slipsRaw
+              .whereType<Map>()
+              .map(_stringDynamicMap)
+              .map(GeneratedSalarySlipItem.fromMap)
+              .toList()
+          : <GeneratedSalarySlipItem>[];
+
+      return SalaryGenerateAllResult(
+        message: message,
+        month: data['month']?.toString().trim() ?? '',
+        year: readInt(data['year']),
+        workingDays: readInt(data['working_days']),
+        totalProcessed: readInt(data['total_processed']),
+        totalFailed: readInt(data['total_failed']),
+        slips: slips,
+      );
+    } catch (_) {
+      throw Exception('Generate salary slips response format is not valid.');
+    }
+  }
+
+  Future<SalarySetResult> salarySet({
+    required String userId,
+    required double monthlySalary,
+    required double perDaySalary,
+    required int workingDaysInMonth,
+    required String effectiveFrom,
+    String? notes,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salarySet}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final bodyMap = <String, dynamic>{
+      'user_id': userId,
+      'monthly_salary': monthlySalary,
+      'per_day_salary': perDaySalary,
+      'working_days_in_month': workingDaysInMonth,
+      'effective_from': effectiveFrom,
+    };
+    if (notes != null && notes.trim().isNotEmpty) {
+      bodyMap['notes'] = notes.trim();
+    }
+    final body = jsonEncode(bodyMap);
+    _logRequest(
+      endpoint: 'salarySet',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('salarySet', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to save employee salary.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Set salary response format is not valid.');
+      }
+      final data = decoded['data'];
+      if (data is! Map<String, dynamic>) {
+        throw Exception('Set salary response data is missing.');
+      }
+      final salaryRaw = data['salary'];
+      final employeeRaw = data['employee'];
+      return SalarySetResult(
+        message: decoded['message']?.toString().trim().isNotEmpty == true
+            ? decoded['message'].toString().trim()
+            : 'Employee salary saved successfully',
+        salary: salaryRaw is Map ? _stringDynamicMap(salaryRaw) : const {},
+        employee: employeeRaw is Map ? _stringDynamicMap(employeeRaw) : const {},
+      );
+    } catch (_) {
+      throw Exception('Set salary response format is not valid.');
+    }
+  }
+
+  Future<SalaryGenerateResult> salaryGenerate({
+    required String userId,
+    required int month,
+    required int year,
+    required double deductions,
+    int? workingDaysOverride,
+    String? notes,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryGenerate}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final bodyMap = <String, dynamic>{
+      'user_id': userId,
+      'month': month,
+      'year': year,
+      'deductions': deductions,
+    };
+    if (workingDaysOverride != null) {
+      bodyMap['working_days_override'] = workingDaysOverride;
+    }
+    if (notes != null && notes.trim().isNotEmpty) {
+      bodyMap['notes'] = notes.trim();
+    }
+
+    final body = jsonEncode(bodyMap);
+    _logRequest(
+      endpoint: 'salaryGenerate',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('salaryGenerate', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to generate salary slip.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Generate salary slip response format is not valid.');
+      }
+      final data = decoded['data'];
+      if (data is! Map<String, dynamic>) {
+        throw Exception('Generate salary slip response data is missing.');
+      }
+
+      final slipRaw = data['slip'];
+      final employeeRaw = data['employee'];
+      final breakdownRaw = data['breakdown'];
+
+      return SalaryGenerateResult(
+        message: decoded['message']?.toString().trim().isNotEmpty == true
+            ? decoded['message'].toString().trim()
+            : 'Salary slip generated successfully',
+        slip: slipRaw is Map ? _stringDynamicMap(slipRaw) : const {},
+        employee: employeeRaw is Map ? _stringDynamicMap(employeeRaw) : const {},
+        breakdown:
+            breakdownRaw is Map ? _stringDynamicMap(breakdownRaw) : const {},
+      );
+    } catch (_) {
+      throw Exception('Generate salary slip response format is not valid.');
+    }
+  }
+
+  Future<SalaryHistoryResult> salaryHistory({
+    required String userId,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.salaryHistory.replaceFirst('{userId}', userId.trim());
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'salaryHistory',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('salaryHistory', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch salary history.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Salary history response format is not valid.');
+      }
+      final data = decoded['data'];
+      if (data is! Map<String, dynamic>) {
+        throw Exception('Salary history data is missing.');
+      }
+      final employeeRaw = data['employee'];
+      final historyRaw = data['history'];
+      final history = historyRaw is List
+          ? historyRaw
+              .whereType<Map>()
+              .map(_stringDynamicMap)
+              .map(SalaryHistoryEntry.fromMap)
+              .toList()
+          : <SalaryHistoryEntry>[];
+      return SalaryHistoryResult(
+        employee: employeeRaw is Map ? _stringDynamicMap(employeeRaw) : const {},
+        history: history,
+      );
+    } catch (_) {
+      throw Exception('Salary history response format is not valid.');
+    }
+  }
+
+  Future<MySalaryResult> mySalary({
+    required int month,
+    required int year,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.mySalary}')
+        .replace(queryParameters: <String, String>{
+      'month': month.toString(),
+      'year': year.toString(),
+    });
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'mySalary',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('mySalary', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch your salary details.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('My salary response format is not valid.');
+      }
+      final data = decoded['data'];
+      if (data is! Map<String, dynamic>) {
+        throw Exception('My salary data is missing.');
+      }
+
+      final currentRaw = data['current_monthly_salary'];
+      final slipsRaw = data['salary_slips'];
+      final slips = slipsRaw is List
+          ? slipsRaw
+              .whereType<Map>()
+              .map(_stringDynamicMap)
+              .map(MySalarySlip.fromMap)
+              .toList()
+          : <MySalarySlip>[];
+      return MySalaryResult(
+        currentMonthlySalary:
+            currentRaw is Map ? MySalaryCurrent.fromMap(_stringDynamicMap(currentRaw)) : null,
+        salarySlips: slips,
+        message: decoded['message']?.toString().trim() ?? 'Your salary details',
+      );
+    } catch (_) {
+      throw Exception('My salary response format is not valid.');
+    }
   }
 
   Future<LeadsListResult> leads({
@@ -4449,6 +4938,19 @@ class AuthService {
     final users = source['users'];
     if (users is List) {
       return users.whereType<Map>().map(_stringDynamicMap).toList();
+    }
+
+    return null;
+  }
+
+  Map<String, dynamic>? _extractSalaryEmployeesPayload(dynamic source) {
+    if (source is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final data = source['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
     }
 
     return null;

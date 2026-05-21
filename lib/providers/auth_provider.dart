@@ -1,4 +1,5 @@
 import 'package:nextone/models/auth_models.dart';
+import 'package:nextone/models/salary_models.dart';
 import 'package:nextone/services/auth_service.dart';
 
 class AuthProvider {
@@ -59,6 +60,106 @@ class AuthProvider {
 
   Future<List<Map<String, dynamic>>> users({String? token}) {
     return _authService.users(token: token);
+  }
+
+  Future<SalaryEmployeesResult> salaryEmployees({String? token}) {
+    return _authService.salaryEmployees(token: token);
+  }
+
+  Future<SalarySlipsResult> salarySlips({
+    required int month,
+    required int year,
+    int page = 1,
+    int perPage = 20,
+    String? token,
+  }) {
+    return _authService.salarySlips(
+      month: month,
+      year: year,
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
+  Future<SalaryGenerateAllResult> salaryGenerateAll({
+    required int month,
+    required int year,
+    int? workingDaysOverride,
+    Map<String, num>? deductionsMap,
+    String? notes,
+    String? token,
+  }) {
+    return _authService.salaryGenerateAll(
+      month: month,
+      year: year,
+      workingDaysOverride: workingDaysOverride,
+      deductionsMap: deductionsMap,
+      notes: notes,
+      token: token,
+    );
+  }
+
+  Future<SalarySetResult> salarySet({
+    required String userId,
+    required double monthlySalary,
+    required double perDaySalary,
+    required int workingDaysInMonth,
+    required String effectiveFrom,
+    String? notes,
+    String? token,
+  }) {
+    return _authService.salarySet(
+      userId: userId,
+      monthlySalary: monthlySalary,
+      perDaySalary: perDaySalary,
+      workingDaysInMonth: workingDaysInMonth,
+      effectiveFrom: effectiveFrom,
+      notes: notes,
+      token: token,
+    );
+  }
+
+  Future<SalaryGenerateResult> salaryGenerate({
+    required String userId,
+    required int month,
+    required int year,
+    required double deductions,
+    int? workingDaysOverride,
+    String? notes,
+    String? token,
+  }) {
+    return _authService.salaryGenerate(
+      userId: userId,
+      month: month,
+      year: year,
+      deductions: deductions,
+      workingDaysOverride: workingDaysOverride,
+      notes: notes,
+      token: token,
+    );
+  }
+
+  Future<SalaryHistoryResult> salaryHistory({
+    required String userId,
+    String? token,
+  }) {
+    return _authService.salaryHistory(
+      userId: userId,
+      token: token,
+    );
+  }
+
+  Future<MySalaryResult> mySalary({
+    required int month,
+    required int year,
+    String? token,
+  }) {
+    return _authService.mySalary(
+      month: month,
+      year: year,
+      token: token,
+    );
   }
 
   Future<Map<String, dynamic>> usersDetail(

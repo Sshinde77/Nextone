@@ -113,4 +113,13 @@ class ApiConstants {
   static const String readallnotifications = '/notifications/read-all';
   static const String readsinglenotification = '/notifications/{id}/read';
   static const String deletesinglenotification = '/notifications/{id}';
+
+  // Salary Endpoints
+  static const String salaryEmployees = '/salary/employees';
+  static const String salarySlips = '/salary/slips';
+  static const String salaryGenerateAll = '/salary/generate-all';
+  static const String salarySet = '/salary/set';
+  static const String salaryGenerate = '/salary/generate';
+  static const String salaryHistory = '/salary/history/{userId}';
+  static const String mySalary = '/salary/my-salary';
 }
