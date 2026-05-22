@@ -347,17 +347,20 @@ class _HomePageState extends State<HomePage> {
               onSiteVisits: () {
                 setState(() => _currentIndex = 3);
               },
-              onProjects: () {
+              onRevisits: () {
                 setState(() => _currentIndex = 4);
               },
-              onTeam: () {
+              onProjects: () {
                 setState(() => _currentIndex = 5);
               },
-              onReports: () {
+              onTeam: () {
                 setState(() => _currentIndex = 6);
               },
-              onSettings: () {
+              onReports: () {
                 setState(() => _currentIndex = 7);
+              },
+              onSettings: () {
+                setState(() => _currentIndex = 8);
               },
               onMore: () {},
               onLess: () {},

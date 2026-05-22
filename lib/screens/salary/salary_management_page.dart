@@ -2183,6 +2183,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SalaryDetailPage(
+          userId: row.userId,
           name: row.name,
           role: row.role,
           email: row.email,

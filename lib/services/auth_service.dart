@@ -1725,6 +1725,52 @@ class AuthService {
     throw Exception('Attendance history response is not valid JSON.');
   }
 
+  Future<Map<String, dynamic>> attendanceUser({
+    required String userId,
+    int page = 1,
+    int perPage = 30,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final path = ApiConstants.attendanceUser.replaceFirst('{id}', userId);
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}$path',
+    ).replace(queryParameters: <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    });
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'attendanceUser',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('attendanceUser', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch user attendance history.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('User attendance history response is not valid JSON.');
+  }
+
   Future<Map<String, dynamic>> attendanceByMonth({
     required int month,
     required int year,
@@ -2746,6 +2792,79 @@ class AuthService {
       );
     } catch (_) {
       throw Exception('Site visits response format is not valid.');
+    }
+  }
+
+  Future<LeadsListResult> siteRevisits({
+    required String from,
+    required String to,
+    String? token,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}')
+        .replace(queryParameters: <String, String>{
+      'from': from.trim(),
+      'to': to.trim(),
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    });
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'siteRevisits',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('siteRevisits', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch site re-visits.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+
+      final resolvedCurrentPage = _readIntFromMap(
+            pagination,
+            ['page', 'current_page', 'currentPage'],
+          ) ??
+          page;
+      final resolvedPerPage = _readIntFromMap(
+            pagination,
+            ['per_page', 'perPage', 'page_size', 'limit'],
+          ) ??
+          perPage;
+      final resolvedTotalItems = _readIntFromMap(
+            pagination,
+            ['total', 'total_items', 'totalItems', 'count'],
+          ) ??
+          items.length;
+      final resolvedTotalPages = _readIntFromMap(
+            pagination,
+            ['total_pages', 'totalPages', 'last_page', 'lastPage'],
+          ) ??
+          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Site re-visits response format is not valid.');
     }
   }
 

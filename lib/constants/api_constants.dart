@@ -73,6 +73,7 @@ class ApiConstants {
   static const String editsitevisits = '/site-visits/{id}';
   static const String updatestatussitevisits = '/site-visits/{id}/status';
   static const String submitfeedbacksitevisits = '/site-visits/{id}/feedback';
+  static const String siteRevisits = '/site-revisits';
 
   // Export Endpoints
   static const String exportLeads = '/export/leads';
@@ -89,6 +90,7 @@ class ApiConstants {
   static const String attendanceUploadPhoto = '/attendance/upload-photo';
   static const String attendanceToday = '/attendance/today';
   static const String attendanceMe = '/attendance/me';
+  static const String attendanceUser = '/attendance/user/{id}';
   static const String attendanceCalendar = '/attendance/calendar';
   static const String attendanceByMonth = '/attendance/by-month';
   static const String attendanceByDate = '/attendance/by-date';

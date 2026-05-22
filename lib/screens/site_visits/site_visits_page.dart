@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/site_visits/site_revisits_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/utils/export_file_helper.dart';
@@ -270,39 +271,60 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
   Widget _buildQuickActions() {
     final compact = _isCompactMobile;
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _buildKpiTile(
-            label: 'Scheduled',
-            value: _countByStatus(_VisitStatus.scheduled).toString(),
-            color: AppColors.warning,
-          ),
-        ),
-        SizedBox(width: _s(8)),
-        Expanded(
-          child: _buildKpiTile(
-            label: 'Completed',
-            value: _countByStatus(_VisitStatus.completed).toString(),
-            color: AppColors.tertiary,
-          ),
-        ),
-        SizedBox(width: _s(8)),
-        Expanded(
-          child: FilledButton.icon(
-            onPressed: _openScheduleForm,
-            icon: Icon(Icons.add, size: _s(16)),
-            label: Text(compact ? 'Add' : 'Schedule'),
-            style: FilledButton.styleFrom(
-              minimumSize: Size.fromHeight(_s(52)),
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(_s(14)),
+        Row(
+          children: [
+            Expanded(
+              child: _buildKpiTile(
+                label: 'Scheduled',
+                value: _countByStatus(_VisitStatus.scheduled).toString(),
+                color: AppColors.warning,
               ),
-              padding: EdgeInsets.symmetric(horizontal: _s(8)),
-              textStyle: TextStyle(
-                fontSize: _fs(12),
-                fontWeight: FontWeight.w700,
+            ),
+            SizedBox(width: _s(8)),
+            Expanded(
+              child: _buildKpiTile(
+                label: 'Completed',
+                value: _countByStatus(_VisitStatus.completed).toString(),
+                color: AppColors.tertiary,
+              ),
+            ),
+            SizedBox(width: _s(8)),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _openScheduleForm,
+                icon: Icon(Icons.add, size: _s(16)),
+                label: Text(compact ? 'Add' : 'Schedule'),
+                style: FilledButton.styleFrom(
+                  minimumSize: Size.fromHeight(_s(52)),
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(_s(14)),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: _s(8)),
+                  textStyle: TextStyle(
+                    fontSize: _fs(12),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: _s(8)),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _openRevisitsPage,
+            icon: const Icon(Icons.repeat_rounded),
+            label: const Text('Open Re-visits'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: BorderSide(color: AppColors.primary.withOpacity(0.35)),
+              minimumSize: Size.fromHeight(_s(46)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(_s(12)),
               ),
             ),
           ),
@@ -1173,6 +1195,14 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       ..showSnackBar(
         const SnackBar(content: Text('Site visit scheduled successfully.')),
       );
+  }
+
+  Future<void> _openRevisitsPage() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const SiteRevisitsPage(showBackButton: true),
+      ),
+    );
   }
 
   Future<void> _openEditVisitForm(_SiteVisit visit) async {

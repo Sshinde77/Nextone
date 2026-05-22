@@ -447,6 +447,20 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> attendanceUser({
+    required String userId,
+    int page = 1,
+    int perPage = 30,
+    String? token,
+  }) {
+    return _authService.attendanceUser(
+      userId: userId,
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> attendanceByMonth({
     required int month,
     required int year,
@@ -688,6 +702,22 @@ class AuthProvider {
     int perPage = 20,
   }) {
     return _authService.siteVisits(
+      token: token,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
+  Future<LeadsListResult> siteRevisits({
+    required String from,
+    required String to,
+    String? token,
+    int page = 1,
+    int perPage = 20,
+  }) {
+    return _authService.siteRevisits(
+      from: from,
+      to: to,
       token: token,
       page: page,
       perPage: perPage,

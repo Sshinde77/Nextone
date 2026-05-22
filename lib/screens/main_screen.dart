@@ -7,6 +7,7 @@ import 'package:nextone/screens/phone_requests/phone_requests_page.dart';
 import 'package:nextone/screens/projects/projects_page.dart';
 import 'package:nextone/screens/salary/salary_management_page.dart';
 import 'package:nextone/screens/site_visits/site_visits_page.dart';
+import 'package:nextone/screens/site_visits/site_revisits_page.dart';
 import 'package:nextone/screens/team/team_page.dart';
 import 'package:nextone/screens/users/users_page.dart';
 import 'package:nextone/providers/auth_provider.dart';
@@ -33,6 +34,7 @@ class _MainScreenState extends State<MainScreen> {
     const LeadsPage(),
     const FollowUpPage(),
     const SiteVisitsPage(),
+    const SiteRevisitsPage(),
     const ProjectsPage(),
     const TeamPage(),
     const AttendancePage(),
@@ -84,7 +86,6 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
       body: _isLoadingAccess
           ? const Center(child: CircularProgressIndicator())
           : _screens[_currentIndex],
@@ -99,12 +100,13 @@ class _MainScreenState extends State<MainScreen> {
         onLeads: () => _setIndex(1),
         onFollowUps: () => _setIndex(2),
         onSiteVisits: () => _setIndex(3),
-        onProjects: () => _setIndex(4),
-        onTeam: () => _setIndex(5),
-        onReports: () => _setIndex(6),
-        onSettings: () => _setIndex(7),
-        onPhoneRequests: () => _setIndex(8),
-        onSalary: () => _setIndex(9),
+        onRevisits: () => _setIndex(4),
+        onProjects: () => _setIndex(5),
+        onTeam: () => _setIndex(6),
+        onReports: () => _setIndex(7),
+        onSettings: () => _setIndex(8),
+        onPhoneRequests: () => _setIndex(9),
+        onSalary: () => _setIndex(10),
         onMore: () {},
         onLess: () {},
       ),

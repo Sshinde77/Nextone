@@ -109,16 +109,17 @@ class RoleAccess {
       case 1:
       case 2:
       case 3:
-      case 6:
-      case 9:
-        return true;
       case 4:
-        return canViewProjects(role);
-      case 5:
-        return canViewTeam(role);
       case 7:
-        return canViewUsers(role);
+      case 10:
+        return true;
+      case 5:
+        return canViewProjects(role);
+      case 6:
+        return canViewTeam(role);
       case 8:
+        return canViewUsers(role);
+      case 9:
         return true;
       default:
         return false;
