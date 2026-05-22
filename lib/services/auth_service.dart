@@ -818,16 +818,19 @@ class AuthService {
   }
 
   Future<MySalaryResult> mySalary({
-    required int month,
+    int? month,
     required int year,
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.mySalary}')
-        .replace(queryParameters: <String, String>{
-      'month': month.toString(),
+    final query = <String, String>{
       'year': year.toString(),
-    });
+    };
+    if (month != null && month > 0) {
+      query['month'] = month.toString();
+    }
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.mySalary}')
+        .replace(queryParameters: query);
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'mySalary',

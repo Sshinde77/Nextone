@@ -151,7 +151,7 @@ class AuthProvider {
   }
 
   Future<MySalaryResult> mySalary({
-    required int month,
+    int? month,
     required int year,
     String? token,
   }) {
