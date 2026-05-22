@@ -753,6 +753,50 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> createSiteRevisit({
+    required String originalVisitId,
+    required String visitDate,
+    required String visitTime,
+    required String reason,
+    required String notes,
+    required bool transportArranged,
+    String? token,
+  }) {
+    return _authService.createSiteRevisit(
+      originalVisitId: originalVisitId,
+      visitDate: visitDate,
+      visitTime: visitTime,
+      reason: reason,
+      notes: notes,
+      transportArranged: transportArranged,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> editSiteRevisit({
+    required String id,
+    String? visitDate,
+    String? visitTime,
+    String? rescheduleReason,
+    String? assignedTo,
+    String? reason,
+    String? notes,
+    bool? transportArranged,
+    String? token,
+  }) {
+    return _authService.editSiteRevisit(
+      id: id,
+      visitDate: visitDate,
+      visitTime: visitTime,
+      rescheduleReason: rescheduleReason,
+      assignedTo: assignedTo,
+      reason: reason,
+      notes: notes,
+      transportArranged: transportArranged,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> editSiteVisit({
     required String id,
     String? visitDate,

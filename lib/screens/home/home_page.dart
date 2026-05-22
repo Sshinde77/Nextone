@@ -256,7 +256,7 @@ class _HomePageState extends State<HomePage> {
                   onLeadsTap: () => _openMainTab(1),
                   onSiteVisitsTap: () => _openMainTab(3),
                   onFollowUpsTap: () => _openMainTab(2),
-                  onProjectsTap: () => _openMainTab(4),
+                  onProjectsTap: () => _openMainTab(5),
                   showProjects: RoleAccess.canViewProjects(_currentRole),
                 ),
                 const SizedBox(height: 10),
@@ -265,13 +265,13 @@ class _HomePageState extends State<HomePage> {
                     onLeadsTap: () => _openMainTab(1),
                     onSiteVisitsTap: () => _openMainTab(3),
                     onFollowUpsTap: () => _openMainTab(2),
-                    onProjectsTap: () => _openMainTab(4),
-                    onTeamTap: () => _openMainTab(5),
-                    onAttendanceTap: () => _openMainTab(6),
+                    onProjectsTap: () => _openMainTab(5),
+                    onTeamTap: () => _openMainTab(6),
+                    onAttendanceTap: () => _openMainTab(7),
                     onNotificationsTap: () {
                       Navigator.pushNamed(context, AppRoutes.notifications);
                     },
-                    onReportsTap: () => _openMainTab(7),
+                    onReportsTap: () => _openMainTab(8),
                     showProjects: RoleAccess.canViewProjects(_currentRole),
                     showTeam: RoleAccess.canViewTeam(_currentRole),
                   ),
@@ -336,31 +336,31 @@ class _HomePageState extends State<HomePage> {
               showTeam: RoleAccess.canViewTeam(_currentRole),
               showUsers: RoleAccess.canViewUsers(_currentRole),
               onDashboard: () {
-                setState(() => _currentIndex = 0);
+                _openMainTab(0);
               },
               onLeads: () {
-                Navigator.pushNamed(context, AppRoutes.leads);
+                _openMainTab(1);
               },
               onFollowUps: () {
-                Navigator.pushNamed(context, AppRoutes.followUps);
+                _openMainTab(2);
               },
               onSiteVisits: () {
-                setState(() => _currentIndex = 3);
+                _openMainTab(3);
               },
               onRevisits: () {
-                setState(() => _currentIndex = 4);
+                _openMainTab(4);
               },
               onProjects: () {
-                setState(() => _currentIndex = 5);
+                _openMainTab(5);
               },
               onTeam: () {
-                setState(() => _currentIndex = 6);
+                _openMainTab(6);
               },
               onReports: () {
-                setState(() => _currentIndex = 7);
+                _openMainTab(7);
               },
               onSettings: () {
-                setState(() => _currentIndex = 8);
+                _openMainTab(8);
               },
               onMore: () {},
               onLess: () {},

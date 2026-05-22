@@ -2976,6 +2976,149 @@ class AuthService {
     };
   }
 
+  Future<Map<String, dynamic>> createSiteRevisit({
+    required String originalVisitId,
+    required String visitDate,
+    required String visitTime,
+    required String reason,
+    required String notes,
+    required bool transportArranged,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'original_visit_id': originalVisitId.trim(),
+      'visit_date': visitDate.trim(),
+      'visit_time': visitTime.trim(),
+      'reason': reason.trim(),
+      'notes': notes.trim(),
+      'transport_arranged': transportArranged,
+    });
+
+    _logRequest(
+      endpoint: 'createSiteRevisit',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('createSiteRevisit', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to schedule re-visit.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) {
+        return data;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'original_visit_id': originalVisitId.trim(),
+      'visit_date': visitDate.trim(),
+      'visit_time': visitTime.trim(),
+      'reason': reason.trim(),
+      'notes': notes.trim(),
+      'transport_arranged': transportArranged,
+    };
+  }
+
+  Future<Map<String, dynamic>> editSiteRevisit({
+    required String id,
+    String? visitDate,
+    String? visitTime,
+    String? rescheduleReason,
+    String? assignedTo,
+    String? reason,
+    String? notes,
+    bool? transportArranged,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Re-visit id is required.');
+    }
+
+    final payload = <String, dynamic>{};
+    if (visitDate != null && visitDate.trim().isNotEmpty) {
+      payload['visit_date'] = visitDate.trim();
+    }
+    if (visitTime != null && visitTime.trim().isNotEmpty) {
+      payload['visit_time'] = visitTime.trim();
+    }
+    if (rescheduleReason != null && rescheduleReason.trim().isNotEmpty) {
+      payload['reschedule_reason'] = rescheduleReason.trim();
+    }
+    if (assignedTo != null && assignedTo.trim().isNotEmpty) {
+      payload['assigned_to'] = assignedTo.trim();
+    }
+    if (reason != null) {
+      payload['reason'] = reason.trim();
+    }
+    if (notes != null) {
+      payload['notes'] = notes.trim();
+    }
+    if (transportArranged != null) {
+      payload['transport_arranged'] = transportArranged;
+    }
+    if (payload.isEmpty) {
+      throw Exception('No fields provided for re-visit update.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = '${ApiConstants.siteRevisits}/$normalizedId';
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    final body = jsonEncode(payload);
+
+    _logRequest(
+      endpoint: 'editSiteRevisit',
+      method: 'PUT',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .put(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('editSiteRevisit', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update re-visit.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) {
+        return data;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      ...payload,
+    };
+  }
+
   Future<Map<String, dynamic>> editSiteVisit({
     required String id,
     String? visitDate,

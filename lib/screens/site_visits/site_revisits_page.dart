@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
-import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/site_revisit_data_card.dart';
 
@@ -247,6 +246,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       statusColor: _statusColor(statusRaw),
       reason: reason,
       feedback: feedback,
+      onEdit: () => _openEditRevisit(item),
     );
   }
 
@@ -364,10 +364,642 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   }
 
   Future<void> _openScheduleRevisit() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SiteVisitFormPage()),
-    );
-    if (!mounted) return;
+    final created = await _showScheduleRevisitDialog();
+    if (created != true || !mounted) return;
     await _loadRevisits();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Re-visit scheduled successfully')),
+      );
   }
+
+  Future<bool?> _showScheduleRevisitDialog() async {
+    final visits = await _loadOriginalVisitsForDropdown();
+    if (!mounted) return false;
+
+    if (visits.isEmpty) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('No original site visits available')),
+        );
+      return false;
+    }
+
+    final reasonController = TextEditingController();
+    final notesController = TextEditingController();
+    _OriginalVisitOption? selectedVisit = visits.first;
+    DateTime? selectedDate;
+    TimeOfDay? selectedTime;
+    bool transportArranged = false;
+    bool isSubmitting = false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: !isSubmitting,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            String dateLabel = selectedDate == null
+                ? 'dd-mm-yyyy'
+                : _toYmd(selectedDate!);
+            String timeLabel = selectedTime == null
+                ? '--:--'
+                : '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}';
+
+            Future<void> pickDate() async {
+              final now = DateTime.now();
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: selectedDate ?? now,
+                firstDate: DateTime(now.year - 1),
+                lastDate: DateTime(now.year + 5),
+              );
+              if (picked == null) return;
+              setLocalState(() => selectedDate = picked);
+            }
+
+            Future<void> pickTime() async {
+              final picked = await showTimePicker(
+                context: context,
+                initialTime: selectedTime ?? const TimeOfDay(hour: 11, minute: 0),
+              );
+              if (picked == null) return;
+              setLocalState(() => selectedTime = picked);
+            }
+
+            Future<void> submit() async {
+              if (selectedVisit == null ||
+                  selectedDate == null ||
+                  selectedTime == null ||
+                  reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Original visit, date, time and reason are required.',
+                      ),
+                    ),
+                  );
+                return;
+              }
+
+              setLocalState(() => isSubmitting = true);
+              try {
+                await _authProvider.createSiteRevisit(
+                  originalVisitId: selectedVisit!.id,
+                  visitDate: _toYmd(selectedDate!),
+                  visitTime: timeLabel,
+                  reason: reasonController.text.trim(),
+                  notes: notesController.text.trim(),
+                  transportArranged: transportArranged,
+                  token: _authProvider.currentAuthToken,
+                );
+                if (!context.mounted) return;
+                Navigator.of(context).pop(true);
+              } catch (e) {
+                if (!context.mounted) return;
+                setLocalState(() => isSubmitting = false);
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                  );
+              }
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: SizedBox(
+                width: 520,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Schedule Re-visit',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(false),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Text('Original Site Visit *'),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<_OriginalVisitOption>(
+                          value: selectedVisit,
+                          isExpanded: true,
+                          decoration: _fieldDecoration(),
+                          items: visits
+                              .map(
+                                (v) => DropdownMenuItem<_OriginalVisitOption>(
+                                  value: v,
+                                  child: Text(v.label, overflow: TextOverflow.ellipsis),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: isSubmitting
+                              ? null
+                              : (value) => setLocalState(() => selectedVisit = value),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _pickerField(
+                                label: 'Visit Date *',
+                                value: dateLabel,
+                                icon: Icons.calendar_today_outlined,
+                                onTap: isSubmitting ? null : pickDate,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _pickerField(
+                                label: 'Visit Time *',
+                                value: timeLabel,
+                                icon: Icons.access_time_outlined,
+                                onTap: isSubmitting ? null : pickTime,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Assign To'),
+                        const SizedBox(height: 6),
+                        TextFormField(
+                          enabled: false,
+                          initialValue: selectedVisit?.assigneeName ?? '-',
+                          decoration: _fieldDecoration(
+                            hint: "Default: original visit's assignee",
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Reason for Re-visit *'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: reasonController,
+                          enabled: !isSubmitting,
+                          decoration: _fieldDecoration(
+                            hint: 'Client wanted to see 3BHK units again...',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Notes'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: notesController,
+                          enabled: !isSubmitting,
+                          maxLines: 3,
+                          decoration: _fieldDecoration(
+                            hint: 'Bring updated price list...',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        CheckboxListTile(
+                          value: transportArranged,
+                          onChanged: isSubmitting
+                              ? null
+                              : (value) => setLocalState(
+                                    () => transportArranged = value ?? false,
+                                  ),
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('Transport arranged for client'),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () => Navigator.of(context).pop(false),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: isSubmitting ? null : submit,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                ),
+                                child: isSubmitting
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text('Schedule Re-visit'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    reasonController.dispose();
+    notesController.dispose();
+    return result;
+  }
+
+  InputDecoration _fieldDecoration({String? hint}) {
+    return InputDecoration(
+      hintText: hint,
+      isDense: true,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+    );
+  }
+
+  Widget _pickerField({
+    required String label,
+    required String value,
+    required IconData icon,
+    required VoidCallback? onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: _fieldDecoration(),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    value,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                  ),
+                ),
+                Icon(icon, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<List<_OriginalVisitOption>> _loadOriginalVisitsForDropdown() async {
+    final result = await _authProvider.siteVisits(
+      token: _authProvider.currentAuthToken,
+      page: 1,
+      perPage: 200,
+    );
+
+    return result.items.map((item) {
+      final id = _readString(item['id'], fallback: '');
+      final leadName = _readString(item['lead_name'], fallback: 'Lead');
+      final projectName = _readString(item['project_name'], fallback: 'Project');
+      final assigneeName =
+          _readString(item['assigned_to_name'], fallback: 'Unassigned');
+      return _OriginalVisitOption(
+        id: id,
+        assigneeName: assigneeName,
+        label: '$leadName - $projectName',
+      );
+    }).where((e) => e.id.isNotEmpty).toList();
+  }
+
+  Future<void> _openEditRevisit(Map<String, dynamic> item) async {
+    final revisitId = _readString(item['id'], fallback: '');
+    if (revisitId.isEmpty) return;
+
+    DateTime? selectedDate = DateTime.tryParse(
+      _readString(item['visit_date'], fallback: ''),
+    )?.toLocal();
+    TimeOfDay? selectedTime;
+    final rawTime = _readString(item['visit_time'], fallback: '');
+    final timeParts = rawTime.split(':');
+    if (timeParts.length >= 2) {
+      selectedTime = TimeOfDay(
+        hour: int.tryParse(timeParts[0]) ?? 0,
+        minute: int.tryParse(timeParts[1]) ?? 0,
+      );
+    }
+
+    final reasonController = TextEditingController(
+      text: _readString(item['reason'], fallback: ''),
+    );
+    final notesController = TextEditingController(
+      text: _readString(item['notes'], fallback: ''),
+    );
+    final rescheduleReasonController = TextEditingController();
+    bool transportArranged = item['transport_arranged'] == true;
+    bool isSubmitting = false;
+
+    final usersRaw = await _authProvider.users(token: _authProvider.currentAuthToken);
+    final members = usersRaw
+        .map((u) => _TeamMemberOption(
+              id: _readString(u['id'], fallback: ''),
+              name: _readString(
+                u['full_name'] ??
+                    u['name'] ??
+                    '${u['first_name'] ?? ''} ${u['last_name'] ?? ''}',
+                fallback: 'Unknown',
+              ),
+            ))
+        .where((m) => m.id.isNotEmpty)
+        .toList();
+
+    _TeamMemberOption? selectedMember;
+    final assignedToId = _readString(item['assigned_to'], fallback: '');
+    if (assignedToId.isNotEmpty) {
+      for (final m in members) {
+        if (m.id == assignedToId) {
+          selectedMember = m;
+          break;
+        }
+      }
+    }
+
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            final dateLabel = selectedDate == null
+                ? 'dd-mm-yyyy'
+                : _toYmd(selectedDate!);
+            final timeLabel = selectedTime == null
+                ? '--:--'
+                : '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}';
+
+            Future<void> pickDate() async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: selectedDate ?? DateTime.now(),
+                firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                lastDate: DateTime.now().add(const Duration(days: 3650)),
+              );
+              if (picked == null) return;
+              setLocalState(() => selectedDate = picked);
+            }
+
+            Future<void> pickTime() async {
+              final picked = await showTimePicker(
+                context: context,
+                initialTime: selectedTime ?? const TimeOfDay(hour: 10, minute: 0),
+              );
+              if (picked == null) return;
+              setLocalState(() => selectedTime = picked);
+            }
+
+            Future<void> submit() async {
+              if (selectedDate == null || selectedTime == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Visit date and time are required.')),
+                );
+                return;
+              }
+              setLocalState(() => isSubmitting = true);
+              try {
+                await _authProvider.editSiteRevisit(
+                  id: revisitId,
+                  visitDate: _toYmd(selectedDate!),
+                  visitTime: timeLabel,
+                  rescheduleReason: rescheduleReasonController.text.trim(),
+                  assignedTo: selectedMember?.id,
+                  reason: reasonController.text.trim(),
+                  notes: notesController.text.trim(),
+                  transportArranged: transportArranged,
+                  token: _authProvider.currentAuthToken,
+                );
+                if (!context.mounted) return;
+                Navigator.of(context).pop(true);
+              } catch (e) {
+                if (!context.mounted) return;
+                setLocalState(() => isSubmitting = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                );
+              }
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: SizedBox(
+                width: 600,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Edit Re-visit',
+                                style: TextStyle(
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(false),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _pickerField(
+                                label: 'Visit Date',
+                                value: dateLabel,
+                                icon: Icons.calendar_today_outlined,
+                                onTap: isSubmitting ? null : pickDate,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _pickerField(
+                                label: 'Visit Time',
+                                value: timeLabel,
+                                icon: Icons.access_time_outlined,
+                                onTap: isSubmitting ? null : pickTime,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Text('Assign To'),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<_TeamMemberOption>(
+                          value: selectedMember,
+                          decoration: _fieldDecoration(hint: 'Select team member'),
+                          items: members
+                              .map(
+                                (m) => DropdownMenuItem<_TeamMemberOption>(
+                                  value: m,
+                                  child: Text(m.name, overflow: TextOverflow.ellipsis),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: isSubmitting
+                              ? null
+                              : (v) => setLocalState(() => selectedMember = v),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text('Reason'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: reasonController,
+                          enabled: !isSubmitting,
+                          decoration: _fieldDecoration(hint: 'Reason for re-visit...'),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text('Notes'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: notesController,
+                          enabled: !isSubmitting,
+                          maxLines: 3,
+                          decoration: _fieldDecoration(),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text('Reschedule Reason (if changing date/time)'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: rescheduleReasonController,
+                          enabled: !isSubmitting,
+                          decoration: _fieldDecoration(
+                            hint: 'Client requested morning slot...',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        CheckboxListTile(
+                          value: transportArranged,
+                          onChanged: isSubmitting
+                              ? null
+                              : (value) => setLocalState(
+                                    () => transportArranged = value ?? false,
+                                  ),
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('Transport arranged'),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () => Navigator.of(context).pop(false),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: isSubmitting ? null : submit,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                ),
+                                child: isSubmitting
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text('Update Re-visit'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    reasonController.dispose();
+    notesController.dispose();
+    rescheduleReasonController.dispose();
+    if (updated == true && mounted) {
+      await _loadRevisits();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Re-visit updated')));
+    }
+  }
+}
+
+class _OriginalVisitOption {
+  const _OriginalVisitOption({
+    required this.id,
+    required this.label,
+    required this.assigneeName,
+  });
+
+  final String id;
+  final String label;
+  final String assigneeName;
+}
+
+class _TeamMemberOption {
+  const _TeamMemberOption({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
 }
