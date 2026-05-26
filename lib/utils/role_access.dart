@@ -112,6 +112,7 @@ class RoleAccess {
       case 4:
       case 7:
       case 10:
+      case 11:
         return true;
       case 5:
         return canViewProjects(role);

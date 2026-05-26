@@ -21,6 +21,8 @@ class ProjectsPage extends StatefulWidget {
 class _ProjectsPageState extends State<ProjectsPage> {
   final TextEditingController _searchController = TextEditingController();
   final AuthProvider _authProvider = AuthProvider();
+  final RegExp _emailPattern =
+      RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
 
   List<_Project> _projects = const <_Project>[];
   bool _isLoading = true;
@@ -332,6 +334,14 @@ class _ProjectsPageState extends State<ProjectsPage> {
             icon: Icons.visibility_outlined,
             onTap: () => _openProjectDetails(project),
           ),
+          DataCardAction(
+            icon: Icons.share_outlined,
+            onTap: () => _shareProject(project),
+          ),
+          DataCardAction(
+            icon: Icons.download_outlined,
+            onTap: () => _openDownloadTypeSheet(project),
+          ),
           if (_canManageProjects)
             DataCardAction(
               icon: Icons.edit_outlined,
@@ -570,6 +580,528 @@ class _ProjectsPageState extends State<ProjectsPage> {
       }
     }
   }
+
+  Future<void> _openDownloadTypeSheet(_Project project) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Download Documents',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  leading: const Icon(Icons.home_work_outlined, color: AppColors.primary),
+                  title: const Text('Unit Plan'),
+                  onTap: () => Navigator.of(context).pop('unit_plans'),
+                ),
+                ListTile(
+                  leading:
+                      const Icon(Icons.collections_outlined, color: AppColors.primary),
+                  title: const Text('Creative'),
+                  onTap: () => Navigator.of(context).pop('creatives'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.folder_zip_outlined, color: AppColors.primary),
+                  title: const Text('All Documents'),
+                  onTap: () => Navigator.of(context).pop('all'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (selected == null) return;
+    if (selected == 'all') {
+      await _downloadAllProjectDocuments(project);
+      return;
+    }
+    await _downloadProjectDocumentsByType(project, selected);
+  }
+
+  Future<void> _downloadAllProjectDocuments(_Project project) async {
+    try {
+      final exported = await _authProvider.downloadAllProjectDocuments(
+        id: project.id,
+        token: _authProvider.currentAuthToken,
+      );
+      final fileName = exported.fileName.trim().isEmpty
+          ? '${project.name.replaceAll(' ', '_')}_documents.zip'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        _showSnackBar(
+          'Documents ready ($fileName), direct save is not supported on Web in this build.',
+        );
+        return;
+      }
+      await ExportFileHelper.saveToDownloadNextone(
+        fileName: fileName,
+        bytes: exported.bytes,
+      );
+      if (!mounted) return;
+      _showSnackBar('Downloaded all documents.');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _downloadProjectDocumentsByType(
+    _Project project,
+    String category,
+  ) async {
+    try {
+      final payload = await _authProvider.projectDocuments(
+        id: project.id,
+        token: _authProvider.currentAuthToken,
+      );
+      final docs = _extractDocuments(payload, category);
+      if (docs.isEmpty) {
+        _showSnackBar(
+          category == 'unit_plans'
+              ? 'No unit plan documents found.'
+              : 'No creative documents found.',
+        );
+        return;
+      }
+
+      var downloaded = 0;
+      for (final doc in docs) {
+        final exported = await _authProvider.downloadProjectDocument(
+          projectId: project.id,
+          documentId: doc.id,
+          token: _authProvider.currentAuthToken,
+        );
+        final fileName = exported.fileName.trim().isEmpty
+            ? doc.name
+            : exported.fileName.trim();
+        if (kIsWeb) continue;
+        await ExportFileHelper.saveToDownloadNextone(
+          fileName: fileName,
+          bytes: exported.bytes,
+        );
+        downloaded++;
+      }
+      if (!mounted) return;
+      if (kIsWeb) {
+        _showSnackBar(
+          'Download ready for ${docs.length} file(s), direct save is not supported on Web in this build.',
+        );
+      } else {
+        _showSnackBar('Downloaded $downloaded file(s).');
+      }
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  List<_ProjectDocRef> _extractDocuments(
+    Map<String, dynamic> payload,
+    String category,
+  ) {
+    dynamic source;
+    final data = payload['data'];
+    if (payload[category] is List) {
+      source = payload[category];
+    } else if (data is Map<String, dynamic> && data[category] is List) {
+      source = data[category];
+    } else {
+      final docs = payload['documents'] ??
+          (data is Map ? data['documents'] : null) ??
+          (data is List ? data : null);
+      if (docs is Map<String, dynamic> && docs[category] is List) {
+        source = docs[category];
+      } else if (docs is List) {
+        source = docs.where((item) {
+          if (item is! Map) return false;
+          final type = _readDocValue(
+            item['category'] ?? item['type'] ?? item['document_type'],
+          ).toLowerCase();
+          if (category == 'unit_plans') {
+            return type.contains('unit') || type.contains('plan');
+          }
+          return type.contains('creative');
+        }).toList();
+      }
+    }
+    if (source is! List) return const <_ProjectDocRef>[];
+    return source
+        .whereType<Map>()
+        .map((m) => _ProjectDocRef.fromMap(Map<String, dynamic>.from(m)))
+        .where((d) => d.id.isNotEmpty)
+        .toList();
+  }
+
+  String _readDocValue(dynamic value) {
+    if (value is String) return value.trim();
+    if (value is num || value is bool) return value.toString();
+    return '';
+  }
+
+  Future<void> _shareProject(_Project project) async {
+    final emailController = TextEditingController();
+    final messageController = TextEditingController(
+      text: 'Hi, please find the project details as discussed.',
+    );
+    final emails = <String>[];
+    var isSharing = false;
+
+    bool isValidEmail(String value) => _emailPattern.hasMatch(value.trim());
+
+    void addEmails(
+      String rawValue,
+      void Function(void Function()) setDialogState,
+    ) {
+      final parsed = rawValue
+          .split(RegExp(r'[,\n]'))
+          .map((item) => item.trim().toLowerCase())
+          .where((item) => item.isNotEmpty)
+          .toList();
+      if (parsed.isEmpty) return;
+      final invalid = parsed.where((item) => !isValidEmail(item)).toList();
+      if (invalid.isNotEmpty) {
+        _showSnackBar('Invalid email: ${invalid.first}');
+        return;
+      }
+      setDialogState(() {
+        for (final email in parsed) {
+          if (!emails.contains(email)) {
+            emails.add(email);
+          }
+        }
+      });
+      emailController.clear();
+    }
+
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> submit() async {
+              if (isSharing) return;
+              if (emailController.text.trim().isNotEmpty) {
+                addEmails(emailController.text, setDialogState);
+              }
+              if (emails.isEmpty) {
+                _showSnackBar('Please add at least one email.');
+                return;
+              }
+              setDialogState(() {
+                isSharing = true;
+              });
+              try {
+                final response = await _authProvider.shareProject(
+                  id: project.id,
+                  emails: emails,
+                  message: messageController.text.trim(),
+                  token: _authProvider.currentAuthToken,
+                );
+                if (!mounted) return;
+                final responseMessage =
+                    (response['message'] ?? 'Project shared successfully')
+                        .toString();
+                _showSnackBar(responseMessage);
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop(true);
+                }
+              } catch (error) {
+                if (!mounted) return;
+                _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+                if (dialogContext.mounted) {
+                  setDialogState(() {
+                    isSharing = false;
+                  });
+                }
+              }
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.share_outlined,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Share Project',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                project.name,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: isSharing
+                              ? null
+                              : () => Navigator.of(dialogContext).pop(false),
+                          icon: const Icon(Icons.close),
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 22),
+                    const Text(
+                      'Send to (press Enter or comma to add multiple)',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            onSubmitted: (_) =>
+                                addEmails(emailController.text, setDialogState),
+                            onChanged: (value) {
+                              if (value.endsWith(',')) {
+                                addEmails(value, setDialogState);
+                              }
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'client@example.com',
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide:
+                                    const BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide:
+                                    const BorderSide(color: AppColors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide:
+                                    const BorderSide(color: AppColors.primary),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          height: 46,
+                          child: OutlinedButton(
+                            onPressed: isSharing
+                                ? null
+                                : () => addEmails(
+                                      emailController.text,
+                                      setDialogState,
+                                    ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.primary),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text('Add'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (emails.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: emails
+                            .map(
+                              (email) => Chip(
+                                label: Text(email),
+                                onDeleted: isSharing
+                                    ? null
+                                    : () => setDialogState(
+                                          () => emails.remove(email),
+                                        ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Personal message (optional)',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: messageController,
+                      minLines: 3,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: 'Hi, please find the project details...',
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppColors.primary),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Text(
+                        'Email will include:\n'
+                        '- Full project details (location, price, RERA, configurations)\n'
+                        '- All unit plans + creatives attached as a ZIP file\n'
+                        '- Your personal message (if provided)',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          height: 1.45,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isSharing
+                                ? null
+                                : () => Navigator.of(dialogContext).pop(false),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              side: const BorderSide(color: AppColors.border),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: isSharing ? null : submit,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            icon: isSharing
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Icon(Icons.send_outlined, size: 18),
+                            label: Text(
+                              isSharing ? 'Sharing...' : 'Share Project',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    emailController.dispose();
+    messageController.dispose();
+  }
 }
 
 class _Project {
@@ -636,5 +1168,35 @@ class _Project {
       'created_by': createdBy,
       'total_leads': totalLeads,
     };
+  }
+}
+
+class _ProjectDocRef {
+  const _ProjectDocRef({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
+
+  factory _ProjectDocRef.fromMap(Map<String, dynamic> json) {
+    String read(dynamic value) {
+      if (value is String) return value.trim();
+      if (value is num || value is bool) return value.toString();
+      return '';
+    }
+
+    return _ProjectDocRef(
+      id: read(json['id'] ?? json['_id'] ?? json['doc_id'] ?? json['document_id']),
+      name: read(
+        json['name'] ??
+            json['file_name'] ??
+            json['filename'] ??
+            json['original_name'] ??
+            json['originalName'] ??
+            'document',
+      ),
+    );
   }
 }

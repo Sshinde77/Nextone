@@ -2796,20 +2796,10 @@ class AuthService {
   }
 
   Future<LeadsListResult> siteRevisits({
-    required String from,
-    required String to,
     String? token,
-    int page = 1,
-    int perPage = 20,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}')
-        .replace(queryParameters: <String, String>{
-      'from': from.trim(),
-      'to': to.trim(),
-      'page': page.toString(),
-      'per_page': perPage.toString(),
-    });
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'siteRevisits',
@@ -2839,7 +2829,76 @@ class AuthService {
             pagination,
             ['page', 'current_page', 'currentPage'],
           ) ??
-          page;
+          1;
+      final resolvedPerPage = _readIntFromMap(
+            pagination,
+            ['per_page', 'perPage', 'page_size', 'limit'],
+          ) ??
+          20;
+      final resolvedTotalItems = _readIntFromMap(
+            pagination,
+            ['total', 'total_items', 'totalItems', 'count'],
+          ) ??
+          items.length;
+      final resolvedTotalPages = _readIntFromMap(
+            pagination,
+            ['total_pages', 'totalPages', 'last_page', 'lastPage'],
+          ) ??
+          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Site re-visits response format is not valid.');
+    }
+  }
+
+  Future<LeadsListResult> closures({
+    String? token,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.closures}')
+        .replace(
+      queryParameters: <String, String>{
+        'page': page.toString(),
+        'per_page': perPage.toString(),
+      },
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'closures',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('closures', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch closures.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+
+      final resolvedCurrentPage =
+          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
+              page;
       final resolvedPerPage = _readIntFromMap(
             pagination,
             ['per_page', 'perPage', 'page_size', 'limit'],
@@ -2864,7 +2923,7 @@ class AuthService {
         totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
       );
     } catch (_) {
-      throw Exception('Site re-visits response format is not valid.');
+      throw Exception('Closures response format is not valid.');
     }
   }
 
@@ -2910,6 +2969,49 @@ class AuthService {
     } catch (_) {}
 
     throw Exception('Site visit details response format is not valid.');
+  }
+
+  Future<Map<String, dynamic>> siteRevisitDetail({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Re-visit id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = '${ApiConstants.siteRevisits}/$normalizedId';
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'siteRevisitDetail',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('siteRevisitDetail', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch re-visit details.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) {
+        return data;
+      }
+    } catch (_) {}
+
+    throw Exception('Re-visit details response format is not valid.');
   }
 
   Future<Map<String, dynamic>> createSiteVisit({
@@ -3036,6 +3138,274 @@ class AuthService {
     };
   }
 
+  Future<Map<String, dynamic>> createClosure({
+    required String leadId,
+    required String projectId,
+    String? siteVisitId,
+    required String bookingDate,
+    required String unitNumber,
+    required String towerBlock,
+    required int floorNumber,
+    required String unitType,
+    required num carpetAreaSqft,
+    required num superAreaSqft,
+    required num agreedPrice,
+    required num bookingAmount,
+    required String paymentPlan,
+    required bool loanRequired,
+    String? loanBank,
+    required num commissionPercent,
+    required bool commissionPaid,
+    String? closedByManager,
+    required String closureNotes,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.closures}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final payload = <String, dynamic>{
+      'lead_id': leadId.trim(),
+      'project_id': projectId.trim(),
+      'site_visit_id': siteVisitId?.trim().isEmpty ?? true ? null : siteVisitId!.trim(),
+      'booking_date': bookingDate.trim(),
+      'unit_number': unitNumber.trim(),
+      'tower_block': towerBlock.trim(),
+      'floor_number': floorNumber,
+      'unit_type': unitType.trim(),
+      'carpet_area_sqft': carpetAreaSqft,
+      'super_area_sqft': superAreaSqft,
+      'agreed_price': agreedPrice,
+      'booking_amount': bookingAmount,
+      'payment_plan': paymentPlan.trim(),
+      'loan_required': loanRequired,
+      'loan_bank': loanBank?.trim().isEmpty ?? true ? null : loanBank!.trim(),
+      'commission_percent': commissionPercent,
+      'commission_paid': commissionPaid,
+      'closed_by_manager': closedByManager?.trim().isEmpty ?? true ? null : closedByManager!.trim(),
+      'closure_notes': closureNotes.trim(),
+    };
+    final body = jsonEncode(payload);
+
+    _logRequest(
+      endpoint: 'createClosure',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('createClosure', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create closure.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) {
+        return data;
+      }
+    } catch (_) {}
+
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> editClosure({
+    required String id,
+    required String bookingDate,
+    required String unitNumber,
+    required String towerBlock,
+    required int floorNumber,
+    required String unitType,
+    required num carpetAreaSqft,
+    required num superAreaSqft,
+    required num agreedPrice,
+    required num bookingAmount,
+    required String paymentPlan,
+    required bool loanRequired,
+    String? loanBank,
+    required num commissionPercent,
+    required bool commissionPaid,
+    String? commissionPaidDate,
+    String? closedByManager,
+    required String closureNotes,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Closure id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.closuresDetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final payload = <String, dynamic>{
+      'booking_date': bookingDate.trim(),
+      'unit_number': unitNumber.trim(),
+      'tower_block': towerBlock.trim(),
+      'floor_number': floorNumber,
+      'unit_type': unitType.trim(),
+      'carpet_area_sqft': carpetAreaSqft,
+      'super_area_sqft': superAreaSqft,
+      'agreed_price': agreedPrice,
+      'booking_amount': bookingAmount,
+      'payment_plan': paymentPlan.trim(),
+      'loan_required': loanRequired,
+      'loan_bank': loanBank?.trim().isEmpty ?? true ? null : loanBank!.trim(),
+      'commission_percent': commissionPercent,
+      'commission_paid': commissionPaid,
+      'commission_paid_date':
+          commissionPaidDate?.trim().isEmpty ?? true ? null : commissionPaidDate!.trim(),
+      'closed_by_manager':
+          closedByManager?.trim().isEmpty ?? true ? null : closedByManager!.trim(),
+      'closure_notes': closureNotes.trim(),
+    };
+    final body = jsonEncode(payload);
+
+    _logRequest(
+      endpoint: 'editClosure',
+      method: 'PUT',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .put(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('editClosure', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update closure.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) {
+        return data;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      ...payload,
+    };
+  }
+
+  Future<Map<String, dynamic>> updateClosureStatus({
+    required String id,
+    required String status,
+    String note = '',
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Closure id is required.');
+    }
+    final normalizedStatus = status.trim().toLowerCase();
+    if (normalizedStatus.isEmpty) {
+      throw Exception('Status is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.closuresStatus.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    final body = jsonEncode(<String, dynamic>{
+      'status': normalizedStatus,
+      'note': note.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'updateClosureStatus',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('updateClosureStatus', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update closure status.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      'status': normalizedStatus,
+      'note': note.trim(),
+    };
+  }
+
+  Future<Map<String, dynamic>> closureLeadDetail({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Closure lead id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.closuresLeadDetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'closureLeadDetail',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('closureLeadDetail', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch closure detail.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) return data;
+    } catch (_) {}
+
+    throw Exception('Closure detail response format is not valid.');
+  }
+
   Future<Map<String, dynamic>> editSiteRevisit({
     required String id,
     String? visitDate,
@@ -3116,6 +3486,65 @@ class AuthService {
     return <String, dynamic>{
       'id': normalizedId,
       ...payload,
+    };
+  }
+
+  Future<Map<String, dynamic>> updateSiteRevisitStatus({
+    required String id,
+    required String status,
+    String note = '',
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Re-visit id is required.');
+    }
+    final normalizedStatus = status.trim();
+    if (normalizedStatus.isEmpty) {
+      throw Exception('Status is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = '${ApiConstants.siteRevisits}/$normalizedId/status';
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    final body = jsonEncode({
+      'status': normalizedStatus,
+      'note': note.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'updateSiteRevisitStatus',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('updateSiteRevisitStatus', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update re-visit status.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      'status': normalizedStatus,
+      'note': note.trim(),
     };
   }
 
@@ -4329,6 +4758,67 @@ class AuthService {
     } catch (_) {}
 
     throw Exception('Project documents response format is not valid.');
+  }
+
+  Future<Map<String, dynamic>> shareProject({
+    required String id,
+    required List<String> emails,
+    String? message,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+    final normalizedEmails = emails
+        .map((email) => email.trim())
+        .where((email) => email.isNotEmpty)
+        .toList();
+    if (normalizedEmails.isEmpty) {
+      throw Exception('At least one email is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.projectShare.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(
+      accept: 'application/json',
+      token: resolvedToken,
+    );
+    final bodyMap = <String, dynamic>{
+      'emails': normalizedEmails,
+      'message': (message ?? '').trim(),
+    };
+    final body = jsonEncode(bodyMap);
+    _logRequest(
+      endpoint: 'shareProject',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('shareProject', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to share project.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+
+    throw Exception('Share project response format is not valid.');
   }
 
   Future<Map<String, dynamic>> uploadProjectDocuments({

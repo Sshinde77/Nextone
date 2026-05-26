@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/screens/follow_ups/follow_up_page.dart';
 import 'package:nextone/screens/main_screen.dart';
+import 'package:nextone/screens/closures/closures_page.dart';
 import 'package:nextone/screens/auth/forgot_password_page.dart';
 import 'package:nextone/screens/auth/login_page.dart';
 import 'package:nextone/screens/auth/register_page.dart';
@@ -19,6 +20,7 @@ class AppRoutes {
   static const String siteVisits = '/site-visits';
   static const String siteVisitForm = '/site-visits/form';
   static const String notifications = '/notifications';
+  static const String closures = '/closures';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -44,6 +46,8 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const SiteVisitFormPage());
       case notifications:
         return MaterialPageRoute(builder: (_) => const NotificationsPage());
+      case closures:
+        return MaterialPageRoute(builder: (_) => const ClosuresPage());
       default:
         return MaterialPageRoute(
           builder: (_) =>

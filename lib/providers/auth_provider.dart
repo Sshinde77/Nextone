@@ -709,15 +709,19 @@ class AuthProvider {
   }
 
   Future<LeadsListResult> siteRevisits({
-    required String from,
-    required String to,
+    String? token,
+  }) {
+    return _authService.siteRevisits(
+      token: token,
+    );
+  }
+
+  Future<LeadsListResult> closures({
     String? token,
     int page = 1,
     int perPage = 20,
   }) {
-    return _authService.siteRevisits(
-      from: from,
-      to: to,
+    return _authService.closures(
       token: token,
       page: page,
       perPage: perPage,
@@ -729,6 +733,13 @@ class AuthProvider {
     String? token,
   }) {
     return _authService.siteVisitDetail(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> siteRevisitDetail({
+    required String id,
+    String? token,
+  }) {
+    return _authService.siteRevisitDetail(id: id, token: token);
   }
 
   Future<Map<String, dynamic>> createSiteVisit({
@@ -773,6 +784,120 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> createClosure({
+    required String leadId,
+    required String projectId,
+    String? siteVisitId,
+    required String bookingDate,
+    required String unitNumber,
+    required String towerBlock,
+    required int floorNumber,
+    required String unitType,
+    required num carpetAreaSqft,
+    required num superAreaSqft,
+    required num agreedPrice,
+    required num bookingAmount,
+    required String paymentPlan,
+    required bool loanRequired,
+    String? loanBank,
+    required num commissionPercent,
+    required bool commissionPaid,
+    String? closedByManager,
+    required String closureNotes,
+    String? token,
+  }) {
+    return _authService.createClosure(
+      leadId: leadId,
+      projectId: projectId,
+      siteVisitId: siteVisitId,
+      bookingDate: bookingDate,
+      unitNumber: unitNumber,
+      towerBlock: towerBlock,
+      floorNumber: floorNumber,
+      unitType: unitType,
+      carpetAreaSqft: carpetAreaSqft,
+      superAreaSqft: superAreaSqft,
+      agreedPrice: agreedPrice,
+      bookingAmount: bookingAmount,
+      paymentPlan: paymentPlan,
+      loanRequired: loanRequired,
+      loanBank: loanBank,
+      commissionPercent: commissionPercent,
+      commissionPaid: commissionPaid,
+      closedByManager: closedByManager,
+      closureNotes: closureNotes,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> editClosure({
+    required String id,
+    required String bookingDate,
+    required String unitNumber,
+    required String towerBlock,
+    required int floorNumber,
+    required String unitType,
+    required num carpetAreaSqft,
+    required num superAreaSqft,
+    required num agreedPrice,
+    required num bookingAmount,
+    required String paymentPlan,
+    required bool loanRequired,
+    String? loanBank,
+    required num commissionPercent,
+    required bool commissionPaid,
+    String? commissionPaidDate,
+    String? closedByManager,
+    required String closureNotes,
+    String? token,
+  }) {
+    return _authService.editClosure(
+      id: id,
+      bookingDate: bookingDate,
+      unitNumber: unitNumber,
+      towerBlock: towerBlock,
+      floorNumber: floorNumber,
+      unitType: unitType,
+      carpetAreaSqft: carpetAreaSqft,
+      superAreaSqft: superAreaSqft,
+      agreedPrice: agreedPrice,
+      bookingAmount: bookingAmount,
+      paymentPlan: paymentPlan,
+      loanRequired: loanRequired,
+      loanBank: loanBank,
+      commissionPercent: commissionPercent,
+      commissionPaid: commissionPaid,
+      commissionPaidDate: commissionPaidDate,
+      closedByManager: closedByManager,
+      closureNotes: closureNotes,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> updateClosureStatus({
+    required String id,
+    required String status,
+    String note = '',
+    String? token,
+  }) {
+    return _authService.updateClosureStatus(
+      id: id,
+      status: status,
+      note: note,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> closureLeadDetail({
+    required String id,
+    String? token,
+  }) {
+    return _authService.closureLeadDetail(
+      id: id,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> editSiteRevisit({
     required String id,
     String? visitDate,
@@ -793,6 +918,20 @@ class AuthProvider {
       reason: reason,
       notes: notes,
       transportArranged: transportArranged,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> updateSiteRevisitStatus({
+    required String id,
+    required String status,
+    String note = '',
+    String? token,
+  }) {
+    return _authService.updateSiteRevisitStatus(
+      id: id,
+      status: status,
+      note: note,
       token: token,
     );
   }
@@ -1078,6 +1217,20 @@ class AuthProvider {
 
   Future<void> deleteProject({required String id, String? token}) {
     return _authService.deleteProject(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> shareProject({
+    required String id,
+    required List<String> emails,
+    String? message,
+    String? token,
+  }) {
+    return _authService.shareProject(
+      id: id,
+      emails: emails,
+      message: message,
+      token: token,
+    );
   }
 
   Future<List<Map<String, dynamic>>> notifications({

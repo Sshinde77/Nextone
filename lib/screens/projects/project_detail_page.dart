@@ -810,7 +810,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: const LinearGradient(
-          colors: [Color(0xFFB1916C), Color(0xFF8A6E4F)],
+          colors: [AppColors.primaryLight, AppColors.primaryDark],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/site_visits/site_revisit_detail_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/site_revisit_data_card.dart';
 
@@ -37,10 +38,6 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   }
 
   Future<void> _loadRevisits() async {
-    final now = DateTime.now();
-    final from = DateTime(now.year, now.month, 1);
-    final to = DateTime(now.year, now.month + 1, 0);
-
     setState(() {
       _isLoading = true;
       _error = null;
@@ -48,11 +45,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
 
     try {
       final result = await _authProvider.siteRevisits(
-        from: _toYmd(from),
-        to: _toYmd(to),
         token: _authProvider.currentAuthToken,
-        page: 1,
-        perPage: 50,
       );
       if (!mounted) return;
       setState(() {
@@ -90,7 +83,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
             //     fontWeight: FontWeight.w600,
             //   ),
             // ),
-           
+
             const SizedBox(height: 12),
             _buildKpiRow(),
             const SizedBox(height: 12),
@@ -246,7 +239,9 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       statusColor: _statusColor(statusRaw),
       reason: reason,
       feedback: feedback,
+      onView: () => _openRevisitDetail(item),
       onEdit: () => _openEditRevisit(item),
+      onStatus: () => _openStatusUpdateDialog(item),
     );
   }
 
@@ -979,6 +974,251 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
         ..hideCurrentSnackBar()
         ..showSnackBar(const SnackBar(content: Text('Re-visit updated')));
     }
+  }
+
+  Future<void> _openStatusUpdateDialog(Map<String, dynamic> item) async {
+    final revisitId = _readString(item['id'], fallback: '');
+    if (revisitId.isEmpty) return;
+
+    final noteController = TextEditingController();
+    bool isSubmitting = false;
+    String selectedStatus = _statusToUi(_readString(item['status'], fallback: 'scheduled'));
+
+    final leadName = _readString(item['lead_name'], fallback: 'N/A');
+    final projectName = _readString(item['project_name'], fallback: 'N/A');
+    final visitDate = _formatDate(_readString(item['visit_date'], fallback: ''));
+    final visitTime = _readString(item['visit_time'], fallback: '-');
+
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            Future<void> submit() async {
+              if (selectedStatus.trim().isEmpty) return;
+              setLocalState(() => isSubmitting = true);
+              try {
+                await _authProvider.updateSiteRevisitStatus(
+                  id: revisitId,
+                  status: _uiToApiStatus(selectedStatus),
+                  note: noteController.text.trim(),
+                  token: _authProvider.currentAuthToken,
+                );
+                if (!context.mounted) return;
+                Navigator.of(context).pop(true);
+              } catch (e) {
+                if (!context.mounted) return;
+                setLocalState(() => isSubmitting = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                );
+              }
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: SizedBox(
+                width: 560,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Update Re-visit Status',
+                              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.of(context).pop(false),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7F9FC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: AppColors.primary.withOpacity(0.2),
+                              child: Text(
+                                _initials(leadName),
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    leadName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 22,
+                                    ),
+                                  ),
+                                  Text(
+                                    '$visitDate · $visitTime · $projectName',
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('New Status *'),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        value: selectedStatus,
+                        decoration: _fieldDecoration(),
+                        items: const [
+                          DropdownMenuItem(value: 'Scheduled', child: Text('Scheduled')),
+                          DropdownMenuItem(value: 'In Progress', child: Text('In Progress')),
+                          DropdownMenuItem(value: 'Done', child: Text('Done')),
+                          DropdownMenuItem(value: 'Rescheduled', child: Text('Rescheduled')),
+                          DropdownMenuItem(value: 'Cancelled', child: Text('Cancelled')),
+                        ],
+                        onChanged: isSubmitting
+                            ? null
+                            : (value) => setLocalState(
+                                  () => selectedStatus = value ?? 'Scheduled',
+                                ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('Note (optional)'),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: noteController,
+                        enabled: !isSubmitting,
+                        maxLines: 3,
+                        decoration: _fieldDecoration(hint: 'Add a note...'),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: isSubmitting ? null : submit,
+                              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                              child: isSubmitting
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text('Update Status'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    noteController.dispose();
+    if (updated == true && mounted) {
+      await _loadRevisits();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Re-visit status updated')));
+    }
+  }
+
+  String _uiToApiStatus(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'done':
+        return 'done';
+      case 'in progress':
+        return 'in_progress';
+      case 'rescheduled':
+        return 'rescheduled';
+      case 'cancelled':
+      case 'canceled':
+        return 'cancelled';
+      default:
+        return 'scheduled';
+    }
+  }
+
+  String _statusToUi(String status) {
+    switch (status.trim().toLowerCase()) {
+      case 'done':
+      case 'completed':
+        return 'Done';
+      case 'in_progress':
+      case 'in progress':
+        return 'In Progress';
+      case 'rescheduled':
+        return 'Rescheduled';
+      case 'cancelled':
+      case 'canceled':
+        return 'Cancelled';
+      default:
+        return 'Scheduled';
+    }
+  }
+
+  String _initials(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+
+  Future<void> _openRevisitDetail(Map<String, dynamic> item) async {
+    final id = _readString(item['id'], fallback: '');
+    if (id.isEmpty) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SiteRevisitDetailPage(revisitId: id),
+      ),
+    );
   }
 }
 

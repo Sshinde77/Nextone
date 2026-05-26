@@ -14,6 +14,7 @@ class CRMAppBottomNav extends StatefulWidget {
   final VoidCallback onSettings;
   final VoidCallback? onPhoneRequests;
   final VoidCallback? onSalary;
+  final VoidCallback? onClosures;
   final VoidCallback onMore;
   final VoidCallback onLess;
   final int? leadsBadgeCount;
@@ -39,6 +40,7 @@ class CRMAppBottomNav extends StatefulWidget {
     required this.onSettings,
     this.onPhoneRequests,
     this.onSalary,
+    this.onClosures,
     required this.onMore,
     required this.onLess,
     this.leadsBadgeCount,
@@ -137,6 +139,13 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           label: 'Salary',
           icon: Icons.payments_outlined,
           onTap: widget.onSalary!,
+        ),
+      if (widget.onClosures != null)
+        _NavEntry(
+          index: 11,
+          label: 'Closures',
+          icon: Icons.verified_outlined,
+          onTap: widget.onClosures!,
         ),
     ];
   }

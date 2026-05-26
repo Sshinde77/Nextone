@@ -38,25 +38,15 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   final _developerController = TextEditingController();
   final _cityController = TextEditingController();
   final _localityController = TextEditingController();
-  final _configurationsController = TextEditingController();
-  final _priceMinController = TextEditingController();
-  final _priceMaxController = TextEditingController();
+  final _priceRangeController = TextEditingController();
   final _totalUnitsController = TextEditingController();
   final _reraNumberController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  String _projectType = 'residential';
   String _status = 'active';
   List<PlatformFile> _unitPlanFiles = const <PlatformFile>[];
   List<PlatformFile> _creativeFiles = const <PlatformFile>[];
   bool _isSubmitting = false;
-
-  static const _projectTypes = <_SelectOption>[
-    _SelectOption(value: 'residential', label: 'Residential'),
-    _SelectOption(value: 'commercial', label: 'Commercial'),
-    _SelectOption(value: 'mixed_use', label: 'Mixed Use'),
-    _SelectOption(value: 'plots_land', label: 'Plots / Land'),
-  ];
 
   static const _statuses = <_SelectOption>[
     _SelectOption(value: 'active', label: 'Active'),
@@ -75,9 +65,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     _developerController.dispose();
     _cityController.dispose();
     _localityController.dispose();
-    _configurationsController.dispose();
-    _priceMinController.dispose();
-    _priceMaxController.dispose();
+    _priceRangeController.dispose();
     _totalUnitsController.dispose();
     _reraNumberController.dispose();
     _descriptionController.dispose();
@@ -94,7 +82,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     _developerController.text = _readString(data['developer']);
     _cityController.text = _readString(data['city']);
     _localityController.text = _readString(data['locality']);
-    _configurationsController.text = _listToCsv(data['configurations']);
+    _priceRangeController.text = _readString(data['price_range']);
     _totalUnitsController.text = _readString(data['total_units']);
     _reraNumberController.text = _readString(data['rera_number']);
     _descriptionController.text = _readString(data['description']);
@@ -104,17 +92,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       _status = status;
     }
 
-    final type = _readString(data['type'] ?? data['project_type'])
-        .toLowerCase()
-        .replaceAll(' ', '_')
-        .replaceAll('/', '_');
-    if (_projectTypes.any((option) => option.value == type)) {
-      _projectType = type;
-    }
-
-    final priceParts = _splitPriceRange(_readString(data['price_range']));
-    _priceMinController.text = priceParts.$1;
-    _priceMaxController.text = priceParts.$2;
   }
 
   String _readString(dynamic value) {
@@ -125,48 +102,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       return value.toString().trim();
     }
     return '';
-  }
-
-  String _listToCsv(dynamic value) {
-    if (value is List) {
-      return value
-          .map((e) => _readString(e))
-          .where((e) => e.isNotEmpty)
-          .join(', ');
-    }
-    return _readString(value);
-  }
-
-  List<String> _csvToList(String value) {
-    return value
-        .split(',')
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList();
-  }
-
-  (String, String) _splitPriceRange(String value) {
-    final numbers = RegExp(r'\d+(?:\.\d+)?')
-        .allMatches(value)
-        .map((match) => match.group(0) ?? '')
-        .where((item) => item.isNotEmpty)
-        .toList();
-    if (numbers.length >= 2) {
-      return (numbers.first, numbers[1]);
-    }
-    if (numbers.length == 1) {
-      return (numbers.first, '');
-    }
-    return ('', '');
-  }
-
-  String _priceRangeForApi() {
-    final min = _priceMinController.text.trim();
-    final max = _priceMaxController.text.trim();
-    if (min.isNotEmpty && max.isNotEmpty) {
-      return '$min - $max';
-    }
-    return min.isNotEmpty ? min : max;
   }
 
   Future<void> _submit() async {
@@ -184,8 +119,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       final developer = _developerController.text.trim();
       final city = _cityController.text.trim();
       final locality = _localityController.text.trim();
-      final configurations = _csvToList(_configurationsController.text);
-      final priceRange = _priceRangeForApi();
+      final priceRange = _priceRangeController.text.trim();
       final totalUnits = int.tryParse(_totalUnitsController.text.trim()) ?? 0;
       final reraNumber = _reraNumberController.text.trim();
       final description = _descriptionController.text.trim();
@@ -208,12 +142,12 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           city: city,
           locality: locality,
           address: address,
-          configurations: configurations,
+          configurations: const <String>[],
           priceRange: priceRange,
           totalUnits: totalUnits,
           possessionDate: _readString(widget.projectData?['possession_date']),
           reraNumber: reraNumber,
-          amenities: _csvToList(_listToCsv(widget.projectData?['amenities'])),
+          amenities: const <String>[],
           status: _status,
           description: description,
           unitPlanFilePaths: _filePaths(_unitPlanFiles),
@@ -227,7 +161,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           city: city,
           locality: locality,
           address: address,
-          configurations: configurations,
+          configurations: const <String>[],
           priceRange: priceRange,
           totalUnits: totalUnits,
           possessionDate: '',
@@ -469,16 +403,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                             isNarrow: isNarrow,
                             children: [
                               _buildSelectField(
-                                label: 'Type',
-                                value: _projectType,
-                                options: _projectTypes,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _projectType = value;
-                                  });
-                                },
-                              ),
-                              _buildSelectField(
                                 label: 'Status',
                                 value: _status,
                                 options: _statuses,
@@ -492,27 +416,9 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                           ),
                           const SizedBox(height: 12),
                           _buildTextField(
-                            controller: _configurationsController,
-                            label: 'Configurations',
-                            hintText: '2BHK, 3BHK, 4BHK',
-                          ),
-                          const SizedBox(height: 12),
-                          _buildResponsiveRow(
-                            isNarrow: isNarrow,
-                            children: [
-                              _buildTextField(
-                                controller: _priceMinController,
-                                label: 'Price Min (₹)',
-                                hintText: '8500000',
-                                keyboardType: TextInputType.number,
-                              ),
-                              _buildTextField(
-                                controller: _priceMaxController,
-                                label: 'Price Max (₹)',
-                                hintText: '24000000',
-                                keyboardType: TextInputType.number,
-                              ),
-                            ],
+                            controller: _priceRangeController,
+                            label: 'Price Range',
+                            hintText: '80L - 1.2Cr',
                           ),
                           const SizedBox(height: 12),
                           _buildResponsiveRow(
