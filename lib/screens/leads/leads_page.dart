@@ -1303,11 +1303,19 @@ class _LeadsPageState extends State<LeadsPage> {
         final bulkButton = _canUseBulkLeadTools
             ? OutlinedButton.icon(
                 onPressed: _isExporting ? null : _openLeadBulkDialog,
-                icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-                label: const Text('Bulk'),
+                icon: const Icon(Icons.cloud_upload_outlined, size: 16),
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Bulk',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
                 style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 48),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  fixedSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -1317,11 +1325,19 @@ class _LeadsPageState extends State<LeadsPage> {
 
         final addSourceButton = OutlinedButton.icon(
           onPressed: () {},
-          icon: const Icon(Icons.add_circle_outline, size: 18),
-          label: const Text('Add Source'),
+          icon: const Icon(Icons.add_circle_outline, size: 16),
+          label: const FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'Add Source',
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size(0, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            fixedSize: const Size.fromHeight(48),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -1330,11 +1346,19 @@ class _LeadsPageState extends State<LeadsPage> {
 
         final addButton = FilledButton.icon(
           onPressed: _openCreateLead,
-          icon: const Icon(Icons.add, size: 18),
-          label: const Text('Add Lead'),
+          icon: const Icon(Icons.add, size: 16),
+          label: const FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'Add Lead',
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
           style: FilledButton.styleFrom(
-            minimumSize: const Size(0, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            fixedSize: const Size.fromHeight(48),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             backgroundColor: AppColors.primary,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1342,26 +1366,30 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
         );
 
+        Widget actionButtonsRow() {
+          return Row(
+            children: [
+              if (exportButton != null) ...[
+                Expanded(child: exportButton),
+                const SizedBox(width: 8),
+              ],
+              if (bulkButton != null) ...[
+                Expanded(child: bulkButton),
+                const SizedBox(width: 8),
+              ],
+              Expanded(child: addSourceButton),
+              const SizedBox(width: 8),
+              Expanded(child: addButton),
+            ],
+          );
+        }
+
         if (isCompact) {
           return Column(
             children: [
               searchField,
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  if (exportButton != null) ...[
-                    Expanded(child: exportButton),
-                    const SizedBox(width: 8),
-                  ],
-                  if (bulkButton != null) ...[
-                    Expanded(child: bulkButton),
-                    const SizedBox(width: 8),
-                  ],
-                  Expanded(child: addSourceButton),
-                  const SizedBox(width: 8),
-                  Expanded(child: addButton),
-                ],
-              ),
+              actionButtonsRow(),
             ],
           );
         }
@@ -1370,17 +1398,12 @@ class _LeadsPageState extends State<LeadsPage> {
           children: [
             Expanded(child: searchField),
             const SizedBox(width: 12),
-            if (exportButton != null) ...[
-              exportButton,
-              const SizedBox(width: 8),
-            ],
-            if (bulkButton != null) ...[
-              bulkButton,
-              const SizedBox(width: 8),
-            ],
-            addSourceButton,
-            const SizedBox(width: 8),
-            addButton,
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: actionButtonsRow(),
+              ),
+            ),
           ],
         );
       },

@@ -30,7 +30,7 @@ class _UsersPageState extends State<UsersPage> {
   List<_UserItem> _users = <_UserItem>[];
   String _currentRole = '';
 
-  static const List<String> _roleFilters = <String>[
+  static const List<String> _fallbackRoleFilters = <String>[
     'All Roles',
     'Super Admin',
     'Admin',
@@ -38,6 +38,7 @@ class _UsersPageState extends State<UsersPage> {
     'Sales Executive',
     'External Caller',
   ];
+  List<String> _roleFilters = List<String>.from(_fallbackRoleFilters);
 
   static const List<String> _statusFilters = <String>[
     'All Status',
@@ -49,6 +50,7 @@ class _UsersPageState extends State<UsersPage> {
   void initState() {
     super.initState();
     _loadAccess();
+    _loadRoles();
     _loadUsers();
   }
 
@@ -98,6 +100,37 @@ class _UsersPageState extends State<UsersPage> {
         _error = error.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  Future<void> _loadRoles() async {
+    try {
+      final data =
+          await _authProvider.usersRoles(token: _authProvider.currentAuthToken);
+      if (!mounted) return;
+      final labels = data
+          .map((entry) => _readString(entry['label']))
+          .where((label) => label.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      if (labels.isEmpty) {
+        return;
+      }
+      final nextFilters = <String>['All Roles', ...labels];
+      setState(() {
+        _roleFilters = nextFilters;
+        if (!_roleFilters.contains(_selectedRole)) {
+          _selectedRole = 'All Roles';
+        }
+      });
+    } catch (_) {
+      // Keep fallback role filters if API fails.
+    }
+  }
+
+  String _readString(dynamic value) {
+    if (value == null) return '';
+    return value.toString().trim();
   }
 
   Future<void> _openCreateUser() async {

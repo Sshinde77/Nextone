@@ -390,6 +390,42 @@ class AuthService {
     throw Exception('Users response format is not valid.');
   }
 
+  Future<List<Map<String, dynamic>>> usersRoles({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.usersRoles}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'usersRoles',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('usersRoles', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch user roles.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final roles = _extractRoleList(body);
+      if (roles != null) {
+        return roles;
+      }
+    } catch (_) {
+      // Fall through to generic error below.
+    }
+
+    throw Exception('Roles response format is not valid.');
+  }
+
   Future<SalaryEmployeesResult> salaryEmployees({String? token}) async {
     final resolvedToken = token ?? _authToken;
     final uri =
@@ -5468,6 +5504,47 @@ class AuthService {
     }
   }
 
+  Future<void> registerFcmToken({
+    required String fcmToken,
+    required String platform,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    if (resolvedToken == null || resolvedToken.trim().isEmpty) {
+      throw Exception('Authentication token is required.');
+    }
+    final normalizedFcmToken = fcmToken.trim();
+    if (normalizedFcmToken.isEmpty) {
+      throw Exception('FCM token is required.');
+    }
+
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.fcmToken}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'fcm_token': normalizedFcmToken,
+      'platform': platform.trim().toLowerCase(),
+    });
+    _logRequest(
+      endpoint: 'registerFcmToken',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('registerFcmToken', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to register FCM token.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
   Map<String, String> _headers({required String accept, String? token}) {
     final headers = {'accept': accept, 'Content-Type': 'application/json'};
 
@@ -5693,6 +5770,28 @@ class AuthService {
     final users = source['users'];
     if (users is List) {
       return users.whereType<Map>().map(_stringDynamicMap).toList();
+    }
+
+    return null;
+  }
+
+  List<Map<String, dynamic>>? _extractRoleList(dynamic source) {
+    if (source is List) {
+      return source.whereType<Map>().map(_stringDynamicMap).toList();
+    }
+
+    if (source is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final data = source['data'];
+    if (data is List) {
+      return data.whereType<Map>().map(_stringDynamicMap).toList();
+    }
+
+    final roles = source['roles'];
+    if (roles is List) {
+      return roles.whereType<Map>().map(_stringDynamicMap).toList();
     }
 
     return null;

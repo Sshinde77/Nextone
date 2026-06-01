@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:nextone/services/auth_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -69,6 +71,7 @@ class PushNotificationService {
 
     _messaging.onTokenRefresh.listen((token) {
       developer.log('FCM token refreshed: $token', name: 'PushNotificationService');
+      unawaited(syncTokenWithBackend(token: token));
     });
   }
 
@@ -81,6 +84,41 @@ class PushNotificationService {
     } catch (e, stackTrace) {
       developer.log(
         'Failed to fetch FCM token',
+        name: 'PushNotificationService',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  static Future<void> syncTokenWithBackend({String? token}) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return;
+    }
+
+    final authToken = AuthService.currentAuthToken;
+    if (authToken == null || authToken.trim().isEmpty) {
+      return;
+    }
+
+    final resolvedToken = (token ?? await _messaging.getToken())?.trim();
+    if (resolvedToken == null || resolvedToken.isEmpty) {
+      return;
+    }
+
+    try {
+      await AuthService().registerFcmToken(
+        fcmToken: resolvedToken,
+        platform: 'android',
+        token: authToken,
+      );
+      developer.log(
+        'FCM token synced to backend.',
+        name: 'PushNotificationService',
+      );
+    } catch (e, stackTrace) {
+      developer.log(
+        'Failed to sync FCM token to backend.',
         name: 'PushNotificationService',
         error: e,
         stackTrace: stackTrace,

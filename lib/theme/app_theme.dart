@@ -4,8 +4,10 @@ import 'package:nextone/constants/app_colors.dart';
 
 abstract final class AppTheme {
   static ThemeData light() {
+    final appFontFamily = GoogleFonts.inter().fontFamily;
     final baseTheme = ThemeData(
       useMaterial3: true,
+      fontFamily: appFontFamily,
       colorScheme: ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.secondary,
@@ -30,60 +32,60 @@ abstract final class AppTheme {
     return baseTheme.copyWith(
       textTheme: defaultTextTheme.copyWith(
         displayLarge: defaultTextTheme.displayLarge?.copyWith(
-          fontFamily: GoogleFonts.playfairDisplay().fontFamily,
+          fontFamily: appFontFamily,
           fontWeight: FontWeight.bold,
           color: AppColors.primary,
         ),
         displayMedium: defaultTextTheme.displayMedium?.copyWith(
-          fontFamily: GoogleFonts.playfairDisplay().fontFamily,
+          fontFamily: appFontFamily,
           fontWeight: FontWeight.bold,
           color: AppColors.primary,
         ),
         displaySmall: defaultTextTheme.displaySmall?.copyWith(
-          fontFamily: GoogleFonts.playfairDisplay().fontFamily,
+          fontFamily: appFontFamily,
           fontWeight: FontWeight.bold,
           color: AppColors.primary,
         ),
         headlineLarge: defaultTextTheme.headlineLarge?.copyWith(
-          fontFamily: GoogleFonts.playfairDisplay().fontFamily,
+          fontFamily: appFontFamily,
           fontWeight: FontWeight.bold,
           color: AppColors.primary,
         ),
         headlineMedium: defaultTextTheme.headlineMedium?.copyWith(
-          fontFamily: GoogleFonts.playfairDisplay().fontFamily,
+          fontFamily: appFontFamily,
           fontWeight: FontWeight.bold,
           color: AppColors.primary,
         ),
         headlineSmall: defaultTextTheme.headlineSmall?.copyWith(
-          fontFamily: GoogleFonts.playfairDisplay().fontFamily,
+          fontFamily: appFontFamily,
           fontWeight: FontWeight.bold,
           color: AppColors.primary,
         ),
         titleLarge: defaultTextTheme.titleLarge?.copyWith(
-          fontFamily: GoogleFonts.playfairDisplay().fontFamily,
+          fontFamily: appFontFamily,
           fontWeight: FontWeight.bold,
           color: AppColors.primary,
         ),
         titleMedium: defaultTextTheme.titleMedium?.copyWith(
-          fontFamily: GoogleFonts.playfairDisplay().fontFamily,
+          fontFamily: appFontFamily,
           fontWeight: FontWeight.w700,
           color: AppColors.primary,
         ),
         titleSmall: defaultTextTheme.titleSmall?.copyWith(
-          fontFamily: GoogleFonts.playfairDisplay().fontFamily,
+          fontFamily: appFontFamily,
           fontWeight: FontWeight.w700,
           color: AppColors.primary,
         ),
         bodyMedium: defaultTextTheme.bodyMedium?.copyWith(
-          fontFamily: GoogleFonts.inter().fontFamily,
+          fontFamily: appFontFamily,
           color: Colors.grey[700],
         ),
         bodySmall: defaultTextTheme.bodySmall?.copyWith(
-          fontFamily: GoogleFonts.inter().fontFamily,
+          fontFamily: appFontFamily,
           color: Colors.grey[600],
         ),
         labelLarge: defaultTextTheme.labelLarge?.copyWith(
-          fontFamily: GoogleFonts.inter().fontFamily,
+          fontFamily: appFontFamily,
           fontWeight: FontWeight.w600,
           fontSize: 12,
           letterSpacing: 1.2,
@@ -93,7 +95,7 @@ abstract final class AppTheme {
       appBarTheme: AppBarTheme(
         centerTitle: false,
         titleTextStyle: defaultTextTheme.titleLarge?.copyWith(
-          fontFamily: GoogleFonts.playfairDisplay().fontFamily,
+          fontFamily: appFontFamily,
           fontWeight: FontWeight.bold,
           color: AppColors.primary,
         ),
@@ -130,7 +132,7 @@ abstract final class AppTheme {
             borderRadius: BorderRadius.circular(12),
           ),
           textStyle: TextStyle(
-            fontFamily: GoogleFonts.inter().fontFamily,
+            fontFamily: appFontFamily,
             fontWeight: FontWeight.w700,
             fontSize: 16,
           ),
@@ -139,7 +141,7 @@ abstract final class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           textStyle: TextStyle(
-            fontFamily: GoogleFonts.inter().fontFamily,
+            fontFamily: appFontFamily,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -147,7 +149,7 @@ abstract final class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           textStyle: TextStyle(
-            fontFamily: GoogleFonts.inter().fontFamily,
+            fontFamily: appFontFamily,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -155,7 +157,7 @@ abstract final class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           textStyle: TextStyle(
-            fontFamily: GoogleFonts.inter().fontFamily,
+            fontFamily: appFontFamily,
             fontWeight: FontWeight.w600,
           ),
         ),

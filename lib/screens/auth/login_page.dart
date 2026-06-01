@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/routes/app_routes.dart';
 import 'package:nextone/services/auth_service.dart';
+import 'package:nextone/services/push_notification_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -84,6 +84,7 @@ class _LoginPageState extends State<LoginPage> {
         _showSnackBar(errorMessage);
         return;
       }
+      unawaited(PushNotificationService.syncTokenWithBackend());
 
       _showSnackBar('Login successful.');
       Navigator.pushNamedAndRemoveUntil(
@@ -161,7 +162,7 @@ class _LoginPageState extends State<LoginPage> {
                   // Title
                   Text(
                     'Next One Realty',
-                    style: GoogleFonts.playfairDisplay(
+                    style: const TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,

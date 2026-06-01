@@ -40,16 +40,19 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
   final _authProvider = AuthProvider();
 
   bool _isSubmitting = false;
+  bool _isLoadingRoles = false;
   bool _obscurePassword = true;
   String? _selectedRoleValue;
   String _currentRole = '';
+  String _incomingRoleValue = '';
 
-  final List<_RoleOption> _roles = const [
+  static const List<_RoleOption> _fallbackRoles = <_RoleOption>[
     _RoleOption(label: 'Admin', value: 'admin'),
     _RoleOption(label: 'Sales Manager', value: 'sales_manager'),
     _RoleOption(label: 'Sales Executive', value: 'sales_executive'),
     _RoleOption(label: 'External Caller', value: 'external_caller'),
   ];
+  List<_RoleOption> _roles = List<_RoleOption>.from(_fallbackRoles);
 
   bool get _isEditMode => widget.isEditMode;
   String? get _memberId => widget.memberId?.trim();
@@ -61,7 +64,7 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
   void initState() {
     super.initState();
     _prefillDataForEdit();
-    _loadAccess();
+    _initializeRoleData();
   }
 
   @override
@@ -91,11 +94,23 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
       data['phone_number'] ?? data['phoneNumber'],
     );
 
-    final incomingRole = _readString(data['role']);
-    if (incomingRole.isNotEmpty &&
-        _roles.any((role) => role.value == incomingRole)) {
-      _selectedRoleValue = incomingRole;
+    _incomingRoleValue = _readString(data['role']);
+    if (_incomingRoleValue.isNotEmpty &&
+        _roles.any((role) => role.value == _incomingRoleValue)) {
+      _selectedRoleValue = _incomingRoleValue;
     }
+  }
+
+  Future<void> _initializeRoleData() async {
+    setState(() {
+      _isLoadingRoles = true;
+    });
+    await _loadAccess();
+    await _loadRoles();
+    if (!mounted) return;
+    setState(() {
+      _isLoadingRoles = false;
+    });
   }
 
   Future<void> _loadAccess() async {
@@ -107,6 +122,51 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
       });
     } catch (_) {
       // Role menu remains empty if access cannot be resolved.
+    }
+  }
+
+  Future<void> _loadRoles() async {
+    try {
+      final data =
+          await _authProvider.usersRoles(token: _authProvider.currentAuthToken);
+      if (!mounted) return;
+
+      final mapped = data
+          .map((entry) {
+            final value = _readString(entry['value']);
+            final label = _readString(entry['label']);
+            if (value.isEmpty || label.isEmpty) {
+              return null;
+            }
+            return _RoleOption(value: value, label: label);
+          })
+          .whereType<_RoleOption>()
+          .toList();
+
+      if (mapped.isEmpty) {
+        return;
+      }
+
+      final uniqueByValue = <String, _RoleOption>{};
+      for (final role in mapped) {
+        uniqueByValue[role.value] = role;
+      }
+      final roles = uniqueByValue.values.toList()
+        ..sort((a, b) => a.label.compareTo(b.label));
+
+      setState(() {
+        _roles = roles;
+        if (_incomingRoleValue.isNotEmpty &&
+            _roles.any((role) => role.value == _incomingRoleValue)) {
+          _selectedRoleValue = _incomingRoleValue;
+        }
+        if ((_selectedRoleValue ?? '').isNotEmpty &&
+            !_roles.any((role) => role.value == _selectedRoleValue)) {
+          _selectedRoleValue = null;
+        }
+      });
+    } catch (_) {
+      // Keep fallback roles if API fails.
     }
   }
 
@@ -389,7 +449,7 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                   Builder(
                     builder: (fieldContext) {
                       return GestureDetector(
-                        onTap: (_isEditMode || _isSubmitting)
+                        onTap: (_isEditMode || _isSubmitting || _isLoadingRoles)
                             ? null
                             : () => _openRoleMenu(fieldContext),
                         child: Container(
@@ -404,7 +464,9 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                _selectedRole?.label ?? 'Select role',
+                                _isLoadingRoles
+                                    ? 'Loading roles...'
+                                    : (_selectedRole?.label ?? 'Select role'),
                                 style: TextStyle(
                                   color: _selectedRole == null
                                       ? AppColors.textSecondary

@@ -62,6 +62,10 @@ class AuthProvider {
     return _authService.users(token: token);
   }
 
+  Future<List<Map<String, dynamic>>> usersRoles({String? token}) {
+    return _authService.usersRoles(token: token);
+  }
+
   Future<SalaryEmployeesResult> salaryEmployees({String? token}) {
     return _authService.salaryEmployees(token: token);
   }

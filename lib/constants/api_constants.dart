@@ -11,6 +11,7 @@ class ApiConstants {
 
   // User Endpoints
   static const String users = '/users';
+  static const String usersRoles = '/users/roles';
   static const String usersdetail = '/users/{id}';
   static const String deleteuser = '/users/{id}';
   static const String edituser = '/users/{id}'; 
@@ -120,6 +121,7 @@ class ApiConstants {
   static const String readallnotifications = '/notifications/read-all';
   static const String readsinglenotification = '/notifications/{id}/read';
   static const String deletesinglenotification = '/notifications/{id}';
+  static const String fcmToken = '/fcm/token';
 
   // Salary Endpoints
   static const String salaryEmployees = '/salary/employees';
