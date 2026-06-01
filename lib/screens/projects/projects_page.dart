@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +10,7 @@ import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
+import 'package:nextone/widgets/pagination_widget.dart';
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});
@@ -23,6 +24,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   final AuthProvider _authProvider = AuthProvider();
   final RegExp _emailPattern =
       RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
+  Timer? _searchDebounce;
 
   List<_Project> _projects = const <_Project>[];
   bool _isLoading = true;
@@ -30,18 +32,13 @@ class _ProjectsPageState extends State<ProjectsPage> {
   bool _isExporting = false;
   String? _loadError;
   String _currentRole = '';
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _perPage = 10;
+  int _totalItems = 0;
 
   bool get _canManageProjects => RoleAccess.canManageProjects(_currentRole);
   bool get _canExportData => RoleAccess.canExportData(_currentRole);
-
-  List<_Project> get _filteredProjects {
-    final query = _searchController.text.toLowerCase();
-    if (query.isEmpty) return _projects;
-    return _projects.where((p) {
-      return p.name.toLowerCase().contains(query) ||
-          p.location.toLowerCase().contains(query);
-    }).toList();
-  }
 
   @override
   void initState() {
@@ -64,26 +61,36 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadProjects() async {
+  Future<void> _loadProjects({int? page}) async {
+    final requestedPage = page ?? _currentPage;
     setState(() {
       _isLoading = true;
       _loadError = null;
     });
 
     try {
+      final filters = _parseSearchFilters(_searchController.text);
       final result = await _authProvider.projects(
         token: _authProvider.currentAuthToken,
-        page: 1,
-        perPage: 200,
+        city: filters.city,
+        search: filters.search,
+        page: requestedPage,
+        perPage: _perPage,
       );
       final items = result.items.map(_projectFromApi).toList();
       if (!mounted) return;
       setState(() {
         _projects = items;
+        _currentPage =
+            result.currentPage <= 0 ? requestedPage : result.currentPage;
+        _perPage = result.perPage <= 0 ? _perPage : result.perPage;
+        _totalItems = result.totalItems < 0 ? 0 : result.totalItems;
+        _totalPages = result.totalPages <= 0 ? 1 : result.totalPages;
       });
     } catch (error) {
       if (!mounted) return;
@@ -97,6 +104,42 @@ class _ProjectsPageState extends State<ProjectsPage> {
         });
       }
     }
+  }
+
+  _ProjectSearchFilters _parseSearchFilters(String rawInput) {
+    final input = rawInput.trim();
+    if (input.isEmpty) {
+      return const _ProjectSearchFilters();
+    }
+
+    String? city;
+    String remaining = input;
+
+    final cityTagMatch =
+        RegExp(r'city\s*:\s*([^\s,]+)', caseSensitive: false).firstMatch(input);
+    if (cityTagMatch != null) {
+      city = cityTagMatch.group(1)?.trim();
+      remaining = input.replaceFirst(cityTagMatch.group(0) ?? '', '').trim();
+    } else {
+      final csvParts = input.split(RegExp(r'\s*,\s*'));
+      if (csvParts.length >= 2) {
+        city = csvParts.first.trim();
+        remaining = csvParts.skip(1).join(' ').trim();
+      }
+    }
+
+    return _ProjectSearchFilters(
+      city: (city == null || city.isEmpty) ? null : city,
+      search: remaining.isEmpty ? null : remaining,
+    );
+  }
+
+  void _onSearchChanged(String _) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      _loadProjects(page: 1);
+    });
   }
 
   _Project _projectFromApi(Map<String, dynamic> payload) {
@@ -155,13 +198,13 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final projects = _filteredProjects;
+    final projects = _projects;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const CrmAppBar(title: 'Projects'),
       body: RefreshIndicator(
-        onRefresh: _loadProjects,
+        onRefresh: () => _loadProjects(page: _currentPage),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
           children: [
@@ -171,7 +214,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
             _buildSearchAndCreateRow(),
             const SizedBox(height: 16),
             Text(
-              'Projects (${projects.length})',
+              'Projects (${_totalItems > 0 ? _totalItems : projects.length})',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -188,8 +231,17 @@ class _ProjectsPageState extends State<ProjectsPage> {
               _buildErrorState()
             else if (projects.isEmpty)
               _buildEmptyState()
-            else
+            else ...[
               ...projects.map(_buildProjectCard),
+              const SizedBox(height: 8),
+              Center(
+                child: PaginationWidget(
+                  currentPage: _currentPage,
+                  totalPages: _totalPages,
+                  onPageChanged: (page) => _loadProjects(page: page),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -259,9 +311,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
             ),
             child: TextField(
               controller: _searchController,
-              onChanged: (_) => setState(() {}),
+              onChanged: _onSearchChanged,
               decoration: const InputDecoration(
-                hintText: 'Search projects',
+                hintText: 'Search (city:Mumbai Skyline) or (Mumbai, Skyline)',
                 hintStyle: TextStyle(color: AppColors.textSecondary),
                 prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
                 border: InputBorder.none,
@@ -614,18 +666,20 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 ),
                 const SizedBox(height: 10),
                 ListTile(
-                  leading: const Icon(Icons.home_work_outlined, color: AppColors.primary),
+                  leading: const Icon(Icons.home_work_outlined,
+                      color: AppColors.primary),
                   title: const Text('Unit Plan'),
                   onTap: () => Navigator.of(context).pop('unit_plans'),
                 ),
                 ListTile(
-                  leading:
-                      const Icon(Icons.collections_outlined, color: AppColors.primary),
+                  leading: const Icon(Icons.collections_outlined,
+                      color: AppColors.primary),
                   title: const Text('Creative'),
                   onTap: () => Navigator.of(context).pop('creatives'),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.folder_zip_outlined, color: AppColors.primary),
+                  leading: const Icon(Icons.folder_zip_outlined,
+                      color: AppColors.primary),
                   title: const Text('All Documents'),
                   onTap: () => Navigator.of(context).pop('all'),
                 ),
@@ -1016,7 +1070,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: AppColors.primary),
+                          borderSide:
+                              const BorderSide(color: AppColors.primary),
                         ),
                       ),
                     ),
@@ -1104,6 +1159,16 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 }
 
+class _ProjectSearchFilters {
+  const _ProjectSearchFilters({
+    this.city,
+    this.search,
+  });
+
+  final String? city;
+  final String? search;
+}
+
 class _Project {
   final String id;
   final String name;
@@ -1188,7 +1253,8 @@ class _ProjectDocRef {
     }
 
     return _ProjectDocRef(
-      id: read(json['id'] ?? json['_id'] ?? json['doc_id'] ?? json['document_id']),
+      id: read(
+          json['id'] ?? json['_id'] ?? json['doc_id'] ?? json['document_id']),
       name: read(
         json['name'] ??
             json['file_name'] ??

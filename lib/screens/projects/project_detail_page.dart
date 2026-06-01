@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/models/auth_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
@@ -36,21 +39,36 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   ];
 
   final _authProvider = AuthProvider();
+  final RegExp _emailPattern =
+      RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
+  final TextEditingController _leadsSearchController = TextEditingController();
 
   Map<String, dynamic>? _data;
   List<_ProjectDocument> _unitPlans = const <_ProjectDocument>[];
   List<_ProjectDocument> _creatives = const <_ProjectDocument>[];
   bool _isLoading = true;
   bool _isLoadingDocuments = true;
+  bool _isLoadingLeads = true;
   bool _isDocumentAction = false;
   String? _error;
   String? _documentsError;
+  String? _leadsError;
+  List<_ProjectLead> _projectLeads = const <_ProjectLead>[];
+  Timer? _leadsSearchDebounce;
 
   @override
   void initState() {
     super.initState();
     _data = widget.initialData;
     _loadDetail();
+    _loadProjectLeads();
+  }
+
+  @override
+  void dispose() {
+    _leadsSearchDebounce?.cancel();
+    _leadsSearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDetail() async {
@@ -114,6 +132,54 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     }
   }
 
+  Future<void> _loadProjectLeads({bool showLoading = true}) async {
+    if (showLoading) {
+      setState(() {
+        _isLoadingLeads = true;
+        _leadsError = null;
+      });
+    } else {
+      setState(() {
+        _leadsError = null;
+      });
+    }
+
+    try {
+      final result = await _authProvider.projectLeads(
+        id: widget.projectId,
+        token: _authProvider.currentAuthToken,
+        search: _leadsSearchController.text.trim().isEmpty
+            ? null
+            : _leadsSearchController.text.trim(),
+        page: 1,
+        perPage: 50,
+      );
+      if (!mounted) return;
+      setState(() {
+        _projectLeads = result.items
+            .map(
+                (item) => _ProjectLead.fromMap(Map<String, dynamic>.from(item)))
+            .where((lead) => lead.name.isNotEmpty || lead.id.isNotEmpty)
+            .toList();
+        _isLoadingLeads = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _leadsError = error.toString().replaceFirst('Exception: ', '');
+        _isLoadingLeads = false;
+      });
+    }
+  }
+
+  void _onLeadsSearchChanged(String _) {
+    _leadsSearchDebounce?.cancel();
+    _leadsSearchDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      _loadProjectLeads();
+    });
+  }
+
   Future<void> _uploadDocuments() async {
     if (_isDocumentAction) {
       return;
@@ -163,10 +229,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     try {
       await _authProvider.uploadProjectDocuments(
         id: widget.projectId,
-        unitPlanFilePaths:
-            uploadAsUnitPlans ? acceptedPaths : const <String>[],
-        creativeFilePaths:
-            uploadAsUnitPlans ? const <String>[] : acceptedPaths,
+        unitPlanFilePaths: uploadAsUnitPlans ? acceptedPaths : const <String>[],
+        creativeFilePaths: uploadAsUnitPlans ? const <String>[] : acceptedPaths,
         token: _authProvider.currentAuthToken,
       );
       await _loadDocuments(showLoading: false);
@@ -377,6 +441,352 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _shareProjectFromDetail() async {
+    final data = _data ?? const <String, dynamic>{};
+    final projectName = _readString(data['name']).isEmpty
+        ? 'Project'
+        : _readString(data['name']);
+
+    final emailController = TextEditingController();
+    final messageController = TextEditingController(
+      text: 'Hi, please find the project details as discussed.',
+    );
+    final emails = <String>[];
+    var isSharing = false;
+
+    bool isValidEmail(String value) => _emailPattern.hasMatch(value.trim());
+
+    void addEmails(
+      String rawValue,
+      void Function(void Function()) setDialogState,
+    ) {
+      final parsed = rawValue
+          .split(RegExp(r'[,\n]'))
+          .map((item) => item.trim().toLowerCase())
+          .where((item) => item.isNotEmpty)
+          .toList();
+      if (parsed.isEmpty) return;
+      final invalid = parsed.where((item) => !isValidEmail(item)).toList();
+      if (invalid.isNotEmpty) {
+        _showSnackBar('Invalid email: ${invalid.first}');
+        return;
+      }
+      setDialogState(() {
+        for (final email in parsed) {
+          if (!emails.contains(email)) {
+            emails.add(email);
+          }
+        }
+      });
+      emailController.clear();
+    }
+
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> submit() async {
+              if (isSharing) return;
+              if (emailController.text.trim().isNotEmpty) {
+                addEmails(emailController.text, setDialogState);
+              }
+              if (emails.isEmpty) {
+                _showSnackBar('Please add at least one email.');
+                return;
+              }
+              setDialogState(() {
+                isSharing = true;
+              });
+              try {
+                final response = await _authProvider.shareProject(
+                  id: widget.projectId,
+                  emails: emails,
+                  message: messageController.text.trim(),
+                  token: _authProvider.currentAuthToken,
+                );
+                if (!mounted) return;
+                final responseMessage =
+                    (response['message'] ?? 'Project shared successfully')
+                        .toString();
+                _showSnackBar(responseMessage);
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop(true);
+                }
+              } catch (error) {
+                if (!mounted) return;
+                _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+                if (dialogContext.mounted) {
+                  setDialogState(() {
+                    isSharing = false;
+                  });
+                }
+              }
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.share_outlined,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Share Project',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                projectName,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: isSharing
+                              ? null
+                              : () => Navigator.of(dialogContext).pop(false),
+                          icon: const Icon(Icons.close),
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 22),
+                    const Text(
+                      'Send to (press Enter or comma to add multiple)',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            onSubmitted: (_) =>
+                                addEmails(emailController.text, setDialogState),
+                            onChanged: (value) {
+                              if (value.endsWith(',')) {
+                                addEmails(value, setDialogState);
+                              }
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'client@example.com',
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide:
+                                    const BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide:
+                                    const BorderSide(color: AppColors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide:
+                                    const BorderSide(color: AppColors.primary),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          height: 46,
+                          child: OutlinedButton(
+                            onPressed: isSharing
+                                ? null
+                                : () => addEmails(
+                                      emailController.text,
+                                      setDialogState,
+                                    ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.primary),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text('Add'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (emails.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: emails
+                            .map(
+                              (email) => Chip(
+                                label: Text(email),
+                                onDeleted: isSharing
+                                    ? null
+                                    : () => setDialogState(
+                                          () => emails.remove(email),
+                                        ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Personal message (optional)',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: messageController,
+                      minLines: 3,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: 'Hi, please find the project details...',
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide:
+                              const BorderSide(color: AppColors.primary),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Text(
+                        'Email will include:\n'
+                        '- Full project details (location, price, RERA, configurations)\n'
+                        '- All unit plans + creatives attached as a ZIP file\n'
+                        '- Your personal message (if provided)',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          height: 1.45,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isSharing
+                                ? null
+                                : () => Navigator.of(dialogContext).pop(false),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              side: const BorderSide(color: AppColors.border),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: isSharing ? null : submit,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            icon: isSharing
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Icon(Icons.send_outlined, size: 18),
+                            label: Text(
+                              isSharing ? 'Sharing...' : 'Share Project',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    emailController.dispose();
+    messageController.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = _data ?? const <String, dynamic>{};
@@ -387,6 +797,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const CrmAppBar(title: 'Project Details', showBackButton: true),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _shareProjectFromDetail,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.share_outlined),
+        label: const Text('Share Project'),
+      ),
       body: _isLoading && _data == null
           ? const Center(child: CircularProgressIndicator())
           : _error != null && _data == null
@@ -439,17 +856,19 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       const SizedBox(height: 14),
                       _buildDocumentsSection(),
                       const SizedBox(height: 14),
-                      _buildSectionCard(
-                        title: 'Configurations',
-                        children: [
-                          _chipWrap(_readList(data['configurations']))
-                        ],
-                      ),
+                      _buildProjectLeadsSection(),
                       const SizedBox(height: 14),
-                      _buildSectionCard(
-                        title: 'Amenities',
-                        children: [_chipWrap(_readList(data['amenities']))],
-                      ),
+                      // _buildSectionCard(
+                      //   title: 'Configurations',
+                      //   children: [
+                      //     _chipWrap(_readList(data['configurations']))
+                      //   ],
+                      // ),
+                      // const SizedBox(height: 14),
+                      // _buildSectionCard(
+                      //   title: 'Amenities',
+                      //   children: [_chipWrap(_readList(data['amenities']))],
+                      // ),
                       const SizedBox(height: 14),
                       _buildSectionCard(
                         title: 'Meta',
@@ -641,6 +1060,277 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
+  Widget _buildProjectLeadsSection() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.person_search_outlined,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Project Leads',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'All leads interested in this project',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: TextField(
+                    controller: _leadsSearchController,
+                    onChanged: _onLeadsSearchChanged,
+                    decoration: const InputDecoration(
+                      hintText: 'Search leads...',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 12),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _isLoadingLeads ? null : () => _loadProjectLeads(),
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFFF8FAFC),
+                  side: const BorderSide(color: AppColors.border),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon:
+                    const Icon(Icons.refresh_rounded, color: AppColors.primary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (_isLoadingLeads)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_leadsError != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _leadsError!,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _loadProjectLeads,
+                  child: const Text('Retry'),
+                ),
+              ],
+            )
+          else if (_projectLeads.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Text(
+                'No leads found for this project.',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
+          else
+            ..._projectLeads.map(
+              (lead) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildProjectLeadCard(lead),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProjectLeadCard(_ProjectLead lead) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE8EEF6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                child: Text(
+                  _initials(lead.name),
+                  style: const TextStyle(
+                    color: AppColors.primaryDark,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  lead.name.isEmpty ? 'Unnamed Lead' : lead.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: lead.id.isEmpty
+                    ? null
+                    : () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => LeadDetailPage(leadId: lead.id),
+                          ),
+                        ),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(68, 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  side: const BorderSide(color: AppColors.border),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                child: const Text('View'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _metaPill(
+                icon: Icons.flag_outlined,
+                label: lead.statusLabel,
+                color: const Color(0xFF00A88F),
+              ),
+              _metaPill(
+                icon: Icons.person_outline,
+                label: lead.assignedTo.isEmpty ? 'Unassigned' : lead.assignedTo,
+                color: AppColors.primary,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _metaPill({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _initials(String fullName) {
+    final parts = fullName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return 'NA';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return '${parts.first.substring(0, 1)}${parts[1].substring(0, 1)}'
+        .toUpperCase();
+  }
+
   Widget _buildDocumentGroup({
     required String title,
     required List<_ProjectDocument> documents,
@@ -795,7 +1485,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           ),
           IconButton(
             tooltip: 'Delete',
-            onPressed: _isDocumentAction ? null : () => _deleteDocument(document),
+            onPressed:
+                _isDocumentAction ? null : () => _deleteDocument(document),
             icon: const Icon(Icons.delete_outline, color: Color(0xFF98A4B4)),
           ),
         ],
@@ -1167,5 +1858,56 @@ class _ProjectDocument {
     final parsed = DateTime.tryParse(raw);
     if (parsed == null) return raw;
     return DateFormat('dd MMM yyyy').format(parsed.toLocal());
+  }
+}
+
+class _ProjectLead {
+  const _ProjectLead({
+    required this.id,
+    required this.name,
+    required this.status,
+    required this.assignedTo,
+  });
+
+  final String id;
+  final String name;
+  final String status;
+  final String assignedTo;
+
+  String get statusLabel {
+    final normalized = status.trim();
+    if (normalized.isEmpty) return 'Unknown';
+    return normalized
+        .split(RegExp(r'[_\s]+'))
+        .where((part) => part.isNotEmpty)
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  factory _ProjectLead.fromMap(Map<String, dynamic> json) {
+    String read(dynamic value) {
+      if (value is String) return value.trim();
+      if (value is num || value is bool) return value.toString();
+      return '';
+    }
+
+    final assignedToObj =
+        json['assigned_to'] ?? json['assignedTo'] ?? json['owner'];
+    final assignedTo = assignedToObj is Map<String, dynamic>
+        ? read(
+            assignedToObj['name'] ??
+                assignedToObj['full_name'] ??
+                assignedToObj['fullName'] ??
+                assignedToObj['email'],
+          )
+        : read(assignedToObj);
+
+    return _ProjectLead(
+      id: read(json['id'] ?? json['_id'] ?? json['lead_id']),
+      name: read(json['name'] ?? json['lead_name'] ?? json['full_name']),
+      status: read(json['status'] ?? json['lead_status']),
+      assignedTo: assignedTo,
+    );
   }
 }

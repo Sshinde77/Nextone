@@ -1072,12 +1072,14 @@ class AuthProvider {
 
   Future<LeadsListResult> projects({
     String? token,
+    String? city,
     String? search,
     int page = 1,
     int perPage = 20,
   }) {
     return _authService.projects(
       token: token,
+      city: city,
       search: search,
       page: page,
       perPage: perPage,
@@ -1132,6 +1134,22 @@ class AuthProvider {
     String? token,
   }) {
     return _authService.projectDocuments(id: id, token: token);
+  }
+
+  Future<LeadsListResult> projectLeads({
+    required String id,
+    String? token,
+    String? search,
+    int page = 1,
+    int perPage = 20,
+  }) {
+    return _authService.projectLeads(
+      id: id,
+      token: token,
+      search: search,
+      page: page,
+      perPage: perPage,
+    );
   }
 
   Future<Map<String, dynamic>> uploadProjectDocuments({

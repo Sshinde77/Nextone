@@ -14,7 +14,7 @@ class ApiConstants {
   static const String usersRoles = '/users/roles';
   static const String usersdetail = '/users/{id}';
   static const String deleteuser = '/users/{id}';
-  static const String edituser = '/users/{id}'; 
+  static const String edituser = '/users/{id}';
   static const String edituserrole = '/users/{id}/role';
   static const String assignUserManager = '/users/{id}/assign-manager';
   static const String userPerformance = '/users/{id}/performance';
@@ -65,8 +65,10 @@ class ApiConstants {
       '/projects/{id}/documents/download-all';
   static const String projectDocumentDownload =
       '/projects/{id}/documents/{docId}/download';
-  static const String projectDocumentDelete = '/projects/{id}/documents/{docId}';
+  static const String projectDocumentDelete =
+      '/projects/{id}/documents/{docId}';
   static const String projectShare = '/projects/{id}/share';
+  static const String projectLeads = '/projects/{id}/leads';
 
   //site visit Endpoints
   static const String sitevisits = '/site-visits';
@@ -100,13 +102,13 @@ class ApiConstants {
   static const String attendanceCalendar = '/attendance/calendar';
   static const String attendanceByMonth = '/attendance/by-month';
   static const String attendanceByDate = '/attendance/by-date';
-  static const String attendanceSummary = '/attendance/summary';  
+  static const String attendanceSummary = '/attendance/summary';
   static const String attendancePending = '/attendance/pending';
   static const String attendanceapprove = '/attendance/{id}/approve';
 
   // Dashboard Endpoints
   static const String dashboardStats = '/dashboard/stats';
-  static const String dashboardUpcomingSiteVisits =   
+  static const String dashboardUpcomingSiteVisits =
       '/dashboard/upcoming-site-visits';
   static const String dashboardRecentActivity = '/dashboard/recent-activity';
   static const String dashboardLeadPipeline = '/dashboard/lead-pipeline';

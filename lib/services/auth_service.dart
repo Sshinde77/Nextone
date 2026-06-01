@@ -528,9 +528,8 @@ class AuthService {
       }
 
       final pagination = body['pagination'];
-      final paginationMap = pagination is Map<String, dynamic>
-          ? pagination
-          : <String, dynamic>{};
+      final paginationMap =
+          pagination is Map<String, dynamic> ? pagination : <String, dynamic>{};
 
       final totalRaw = paginationMap['total'];
       final resolvedTotal = totalRaw is num
@@ -716,7 +715,8 @@ class AuthService {
             ? decoded['message'].toString().trim()
             : 'Employee salary saved successfully',
         salary: salaryRaw is Map ? _stringDynamicMap(salaryRaw) : const {},
-        employee: employeeRaw is Map ? _stringDynamicMap(employeeRaw) : const {},
+        employee:
+            employeeRaw is Map ? _stringDynamicMap(employeeRaw) : const {},
       );
     } catch (_) {
       throw Exception('Set salary response format is not valid.');
@@ -733,7 +733,8 @@ class AuthService {
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryGenerate}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryGenerate}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final bodyMap = <String, dynamic>{
       'user_id': userId,
@@ -789,7 +790,8 @@ class AuthService {
             ? decoded['message'].toString().trim()
             : 'Salary slip generated successfully',
         slip: slipRaw is Map ? _stringDynamicMap(slipRaw) : const {},
-        employee: employeeRaw is Map ? _stringDynamicMap(employeeRaw) : const {},
+        employee:
+            employeeRaw is Map ? _stringDynamicMap(employeeRaw) : const {},
         breakdown:
             breakdownRaw is Map ? _stringDynamicMap(breakdownRaw) : const {},
       );
@@ -845,7 +847,8 @@ class AuthService {
               .toList()
           : <SalaryHistoryEntry>[];
       return SalaryHistoryResult(
-        employee: employeeRaw is Map ? _stringDynamicMap(employeeRaw) : const {},
+        employee:
+            employeeRaw is Map ? _stringDynamicMap(employeeRaw) : const {},
         history: history,
       );
     } catch (_) {
@@ -907,8 +910,9 @@ class AuthService {
               .toList()
           : <MySalarySlip>[];
       return MySalaryResult(
-        currentMonthlySalary:
-            currentRaw is Map ? MySalaryCurrent.fromMap(_stringDynamicMap(currentRaw)) : null,
+        currentMonthlySalary: currentRaw is Map
+            ? MySalaryCurrent.fromMap(_stringDynamicMap(currentRaw))
+            : null,
         salarySlips: slips,
         message: decoded['message']?.toString().trim() ?? 'Your salary details',
       );
@@ -1011,7 +1015,8 @@ class AuthService {
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportLeads}')
         .replace(queryParameters: query);
     final headers = _headers(
-      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      accept:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       token: resolvedToken,
     );
     _logRequest(
@@ -1133,14 +1138,16 @@ class AuthService {
     try {
       streamedResponse = await request.send().timeout(_requestTimeout);
     } on TimeoutException {
-      throw Exception('Server is taking too long to respond. Please try again.');
+      throw Exception(
+          'Server is taking too long to respond. Please try again.');
     } on SocketException {
       throw Exception('No internet connection or server is unreachable.');
     } on HandshakeException {
       throw Exception(
           'Secure connection failed. Check phone date/time and try again.');
     } on http.ClientException {
-      throw Exception('Network error while contacting server. Please try again.');
+      throw Exception(
+          'Network error while contacting server. Please try again.');
     }
 
     final response = await http.Response.fromStream(streamedResponse);
@@ -1225,7 +1232,8 @@ class AuthService {
     final uri =
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportSiteVisits}');
     final headers = _headers(
-      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      accept:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       token: resolvedToken,
     );
     _logRequest(
@@ -1263,7 +1271,8 @@ class AuthService {
     final uri =
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportFollowUps}');
     final headers = _headers(
-      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      accept:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       token: resolvedToken,
     );
     _logRequest(
@@ -1298,9 +1307,11 @@ class AuthService {
 
   Future<ExportFileResult> exportProjects({String? token}) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportProjects}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportProjects}');
     final headers = _headers(
-      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      accept:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       token: resolvedToken,
     );
     _logRequest(
@@ -1337,7 +1348,8 @@ class AuthService {
     final resolvedToken = token ?? _authToken;
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportUsers}');
     final headers = _headers(
-      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      accept:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       token: resolvedToken,
     );
     _logRequest(
@@ -1376,13 +1388,15 @@ class AuthService {
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportAttendance}')
-        .replace(queryParameters: <String, String>{
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportAttendance}')
+            .replace(queryParameters: <String, String>{
       'from': from.trim(),
       'to': to.trim(),
     });
     final headers = _headers(
-      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      accept:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       token: resolvedToken,
     );
     _logRequest(
@@ -1419,7 +1433,8 @@ class AuthService {
     final resolvedToken = token ?? _authToken;
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportAll}');
     final headers = _headers(
-      accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      accept:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       token: resolvedToken,
     );
     _logRequest(
@@ -1493,17 +1508,18 @@ class AuthService {
 
     http.StreamedResponse streamedResponse;
     try {
-      streamedResponse =
-          await request.send().timeout(_requestTimeout);
+      streamedResponse = await request.send().timeout(_requestTimeout);
     } on TimeoutException {
-      throw Exception('Server is taking too long to respond. Please try again.');
+      throw Exception(
+          'Server is taking too long to respond. Please try again.');
     } on SocketException {
       throw Exception('No internet connection or server is unreachable.');
     } on HandshakeException {
       throw Exception(
           'Secure connection failed. Check phone date/time and try again.');
     } on http.ClientException {
-      throw Exception('Network error while contacting server. Please try again.');
+      throw Exception(
+          'Network error while contacting server. Please try again.');
     }
 
     final response = await http.Response.fromStream(streamedResponse);
@@ -1538,7 +1554,8 @@ class AuthService {
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceCheckin}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceCheckin}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode(<String, dynamic>{
       'photo_url': photoUrl,
@@ -1556,8 +1573,9 @@ class AuthService {
       body: body,
     );
 
-    final response =
-        await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
     _logResponse('attendanceCheckIn', response);
 
     final error = _handleResponse(
@@ -1589,7 +1607,8 @@ class AuthService {
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceCheckout}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceCheckout}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode(<String, dynamic>{
       'photo_url': photoUrl,
@@ -1607,8 +1626,9 @@ class AuthService {
       body: body,
     );
 
-    final response =
-        await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
     _logResponse('attendanceCheckOut', response);
 
     final error = _handleResponse(
@@ -1632,7 +1652,8 @@ class AuthService {
 
   Future<Map<String, dynamic>> attendanceToday({String? token}) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceToday}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceToday}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'attendanceToday',
@@ -2016,7 +2037,8 @@ class AuthService {
     if (normalizedId.isEmpty) {
       throw Exception('Attendance approval id is required.');
     }
-    final endpoint = ApiConstants.attendanceapprove.replaceAll('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.attendanceapprove.replaceAll('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final payload = <String, dynamic>{
@@ -2112,8 +2134,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint =
-        ApiConstants.phoneRevealCheck.replaceFirst('{leadId}', normalizedLeadId);
+    final endpoint = ApiConstants.phoneRevealCheck
+        .replaceFirst('{leadId}', normalizedLeadId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
 
@@ -2163,7 +2185,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.phoneRevealRequest}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.phoneRevealRequest}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({
       'lead_id': normalizedLeadId,
@@ -2178,8 +2201,9 @@ class AuthService {
       body: body,
     );
 
-    final response =
-        await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
     _logResponse('requestPhoneReveal', response);
 
     final error = _handleResponse(
@@ -2211,17 +2235,15 @@ class AuthService {
     required String reason,
     String? token,
   }) async {
-    final normalizedLeadIds = leadIds
-        .map((id) => id.trim())
-        .where((id) => id.isNotEmpty)
-        .toList();
+    final normalizedLeadIds =
+        leadIds.map((id) => id.trim()).where((id) => id.isNotEmpty).toList();
     if (normalizedLeadIds.isEmpty) {
       throw Exception('Select at least one lead.');
     }
 
     final resolvedToken = token ?? _authToken;
-    final uri =
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.phoneRevealBulkRequest}');
+    final uri = Uri.parse(
+        '${ApiConstants.baseUrl}${ApiConstants.phoneRevealBulkRequest}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({
       'lead_ids': normalizedLeadIds,
@@ -2236,8 +2258,9 @@ class AuthService {
       body: body,
     );
 
-    final response =
-        await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
     _logResponse('bulkRequestPhoneReveal', response);
 
     final error = _handleResponse(
@@ -2429,7 +2452,8 @@ class AuthService {
             pagination,
             ['total_pages', 'totalPages', 'last_page', 'lastPage'],
           ) ??
-          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
 
       return LeadsListResult(
         items: items,
@@ -2835,7 +2859,8 @@ class AuthService {
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'siteRevisits',
@@ -2880,7 +2905,8 @@ class AuthService {
             pagination,
             ['total_pages', 'totalPages', 'last_page', 'lastPage'],
           ) ??
-          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
 
       return LeadsListResult(
         items: items,
@@ -2900,8 +2926,8 @@ class AuthService {
     int perPage = 20,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.closures}')
-        .replace(
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.closures}').replace(
       queryParameters: <String, String>{
         'page': page.toString(),
         'per_page': perPage.toString(),
@@ -2932,9 +2958,9 @@ class AuthService {
       final items = _extractLeadsItems(body);
       final pagination = _extractPaginationMap(body);
 
-      final resolvedCurrentPage =
-          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
-              page;
+      final resolvedCurrentPage = _readIntFromMap(
+              pagination, ['page', 'current_page', 'currentPage']) ??
+          page;
       final resolvedPerPage = _readIntFromMap(
             pagination,
             ['per_page', 'perPage', 'page_size', 'limit'],
@@ -2949,7 +2975,8 @@ class AuthService {
             pagination,
             ['total_pages', 'totalPages', 'last_page', 'lastPage'],
           ) ??
-          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
 
       return LeadsListResult(
         items: items,
@@ -3124,7 +3151,8 @@ class AuthService {
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({
       'original_visit_id': originalVisitId.trim(),
@@ -3202,7 +3230,8 @@ class AuthService {
     final payload = <String, dynamic>{
       'lead_id': leadId.trim(),
       'project_id': projectId.trim(),
-      'site_visit_id': siteVisitId?.trim().isEmpty ?? true ? null : siteVisitId!.trim(),
+      'site_visit_id':
+          siteVisitId?.trim().isEmpty ?? true ? null : siteVisitId!.trim(),
       'booking_date': bookingDate.trim(),
       'unit_number': unitNumber.trim(),
       'tower_block': towerBlock.trim(),
@@ -3217,7 +3246,9 @@ class AuthService {
       'loan_bank': loanBank?.trim().isEmpty ?? true ? null : loanBank!.trim(),
       'commission_percent': commissionPercent,
       'commission_paid': commissionPaid,
-      'closed_by_manager': closedByManager?.trim().isEmpty ?? true ? null : closedByManager!.trim(),
+      'closed_by_manager': closedByManager?.trim().isEmpty ?? true
+          ? null
+          : closedByManager!.trim(),
       'closure_notes': closureNotes.trim(),
     };
     final body = jsonEncode(payload);
@@ -3281,7 +3312,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.closuresDetail.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.closuresDetail.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final payload = <String, dynamic>{
@@ -3299,10 +3331,12 @@ class AuthService {
       'loan_bank': loanBank?.trim().isEmpty ?? true ? null : loanBank!.trim(),
       'commission_percent': commissionPercent,
       'commission_paid': commissionPaid,
-      'commission_paid_date':
-          commissionPaidDate?.trim().isEmpty ?? true ? null : commissionPaidDate!.trim(),
-      'closed_by_manager':
-          closedByManager?.trim().isEmpty ?? true ? null : closedByManager!.trim(),
+      'commission_paid_date': commissionPaidDate?.trim().isEmpty ?? true
+          ? null
+          : commissionPaidDate!.trim(),
+      'closed_by_manager': closedByManager?.trim().isEmpty ?? true
+          ? null
+          : closedByManager!.trim(),
       'closure_notes': closureNotes.trim(),
     };
     final body = jsonEncode(payload);
@@ -3358,7 +3392,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.closuresStatus.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.closuresStatus.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: '*/*', token: resolvedToken);
     final body = jsonEncode(<String, dynamic>{
@@ -3411,7 +3446,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.closuresLeadDetail.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.closuresLeadDetail.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: '*/*', token: resolvedToken);
     _logRequest(
@@ -4211,7 +4247,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.userPerformance.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.userPerformance.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint').replace(
       queryParameters: <String, String>{
         'from': normalizedFrom,
@@ -4475,6 +4512,7 @@ class AuthService {
 
   Future<LeadsListResult> projects({
     String? token,
+    String? city,
     String? search,
     int page = 1,
     int perPage = 20,
@@ -4484,6 +4522,9 @@ class AuthService {
       'page': page.toString(),
       'per_page': perPage.toString(),
     };
+    if (city != null && city.trim().isNotEmpty) {
+      query['city'] = city.trim();
+    }
     if (search != null && search.trim().isNotEmpty) {
       query['search'] = search.trim();
     }
@@ -4796,6 +4837,82 @@ class AuthService {
     throw Exception('Project documents response format is not valid.');
   }
 
+  Future<LeadsListResult> projectLeads({
+    required String id,
+    String? token,
+    String? search,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.projectLeads.replaceFirst('{id}', normalizedId);
+    final query = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
+
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint')
+        .replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'projectLeads',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('projectLeads', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch project leads.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+
+      final resolvedCurrentPage = _readIntFromMap(
+              pagination, ['page', 'current_page', 'currentPage']) ??
+          page;
+      final resolvedPerPage = _readIntFromMap(
+              pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
+          perPage;
+      final resolvedTotalItems = _readIntFromMap(
+              pagination, ['total', 'total_items', 'totalItems', 'count']) ??
+          items.length;
+      final resolvedTotalPages = _readIntFromMap(pagination,
+              ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Project leads response format is not valid.');
+    }
+  }
+
   Future<Map<String, dynamic>> shareProject({
     required String id,
     required List<String> emails,
@@ -4815,7 +4932,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.projectShare.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.projectShare.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(
       accept: 'application/json',
@@ -4961,8 +5079,9 @@ class AuthService {
     return ExportFileResult(
       fileName: fileName,
       bytes: response.bodyBytes,
-      contentType:
-          contentTypeHeader.trim().isEmpty ? 'application/zip' : contentTypeHeader,
+      contentType: contentTypeHeader.trim().isEmpty
+          ? 'application/zip'
+          : contentTypeHeader,
     );
   }
 
@@ -5246,8 +5365,9 @@ class AuthService {
       query['unread'] = unreadOnly.toString();
     }
 
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.notifications}')
-        .replace(queryParameters: query);
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.notifications}')
+            .replace(queryParameters: query);
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'notifications',
@@ -6308,10 +6428,9 @@ class AuthService {
     final storedAuthToken = preferences.getString(_authTokenStorageKey);
     final storedRefreshToken = preferences.getString(_refreshTokenStorageKey);
 
-    _authToken =
-        (storedAuthToken != null && storedAuthToken.trim().isNotEmpty)
-            ? storedAuthToken
-            : null;
+    _authToken = (storedAuthToken != null && storedAuthToken.trim().isNotEmpty)
+        ? storedAuthToken
+        : null;
     _refreshToken =
         (storedRefreshToken != null && storedRefreshToken.trim().isNotEmpty)
             ? storedRefreshToken
