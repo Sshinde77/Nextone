@@ -20,6 +20,13 @@ class ProjectsPage extends StatefulWidget {
 }
 
 class _ProjectsPageState extends State<ProjectsPage> {
+  static const List<String> _statusOptions = <String>[
+    'active',
+    'inactive',
+    'upcoming',
+    'completed',
+  ];
+
   final TextEditingController _searchController = TextEditingController();
   final AuthProvider _authProvider = AuthProvider();
   final RegExp _emailPattern =
@@ -32,6 +39,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   bool _isExporting = false;
   String? _loadError;
   String _currentRole = '';
+  String? _selectedStatus;
   int _currentPage = 1;
   int _totalPages = 1;
   int _perPage = 10;
@@ -78,6 +86,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       final result = await _authProvider.projects(
         token: _authProvider.currentAuthToken,
         city: filters.city,
+        status: _selectedStatus,
         search: filters.search,
         page: requestedPage,
         perPage: _perPage,
@@ -140,6 +149,13 @@ class _ProjectsPageState extends State<ProjectsPage> {
       if (!mounted) return;
       _loadProjects(page: 1);
     });
+  }
+
+  void _onStatusChanged(String? value) {
+    setState(() {
+      _selectedStatus = value;
+    });
+    _loadProjects(page: 1);
   }
 
   _Project _projectFromApi(Map<String, dynamic> payload) {
@@ -302,6 +318,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
     return Row(
       children: [
         Expanded(
+          flex: 2,
           child: Container(
             height: 50,
             decoration: BoxDecoration(
@@ -318,6 +335,48 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String?>(
+                value: _selectedStatus,
+                isExpanded: true,
+                icon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppColors.textSecondary,
+                ),
+                hint: const Text(
+                  'Status',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                items: <DropdownMenuItem<String?>>[
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('All'),
+                  ),
+                  ..._statusOptions.map(
+                    (status) => DropdownMenuItem<String?>(
+                      value: status,
+                      child: Text(_formatStatusLabel(status)),
+                    ),
+                  ),
+                ],
+                onChanged: _onStatusChanged,
               ),
             ),
           ),
@@ -357,6 +416,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
           ),
       ],
     );
+  }
+
+  String _formatStatusLabel(String value) {
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1).toLowerCase();
   }
 
   Widget _buildProjectCard(_Project project) {

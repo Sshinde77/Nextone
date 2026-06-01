@@ -1,5 +1,6 @@
 import 'package:nextone/screens/attendance/attendance_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:nextone/screens/closures/closures_page.dart';
 import 'package:nextone/screens/follow_ups/follow_up_page.dart';
 import 'package:nextone/screens/home/home_page.dart';
@@ -29,6 +30,7 @@ class _MainScreenState extends State<MainScreen> {
   final AuthProvider _authProvider = AuthProvider();
   String _currentRole = '';
   bool _isLoadingAccess = true;
+  DateTime? _lastBackPressAt;
 
   final List<Widget> _screens = [
     const HomePage(showBottomNav: false),
@@ -85,34 +87,65 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  Future<void> _handleSystemBack() async {
+    if (_currentIndex != 0) {
+      _setIndex(0);
+      return;
+    }
+
+    final now = DateTime.now();
+    final pressedRecently = _lastBackPressAt != null &&
+        now.difference(_lastBackPressAt!) <= const Duration(seconds: 2);
+
+    if (pressedRecently) {
+      await SystemNavigator.pop();
+      return;
+    }
+
+    _lastBackPressAt = now;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Press back again to exit')),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _isLoadingAccess
-          ? const Center(child: CircularProgressIndicator())
-          : _screens[_currentIndex],
-      bottomNavigationBar: CRMAppBottomNav(
-        currentIndex: _currentIndex,
-        showProjects: RoleAccess.canViewProjects(_currentRole),
-        showTeam: RoleAccess.canViewTeam(_currentRole),
-        showUsers: RoleAccess.canViewUsers(_currentRole),
-        showPhoneRequests: RoleAccess.canViewPhoneRequests(_currentRole),
-        showSalary: RoleAccess.canViewSalaryManagement(_currentRole),
-        onDashboard: () => _setIndex(0),
-        onLeads: () => _setIndex(1),
-        onFollowUps: () => _setIndex(2),
-        onSiteVisits: () => _setIndex(3),
-        onRevisits: () => _setIndex(4),
-        onProjects: () => _setIndex(5),
-        onTeam: () => _setIndex(6),
-        onReports: () => _setIndex(7),
-        onSettings: () => _setIndex(8),
-        onNotifications: () => Navigator.pushNamed(context, '/notifications'),
-        onPhoneRequests: () => _setIndex(9),
-        onSalary: () => _setIndex(10),
-        onMore: () {},
-        onLess: () {},
-        onClosures: () => _setIndex(11),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await _handleSystemBack();
+      },
+      child: Scaffold(
+        body: _isLoadingAccess
+            ? const Center(child: CircularProgressIndicator())
+            : _screens[_currentIndex],
+        bottomNavigationBar: CRMAppBottomNav(
+          currentIndex: _currentIndex,
+          showProjects: RoleAccess.canViewProjects(_currentRole),
+          showTeam: RoleAccess.canViewTeam(_currentRole),
+          showUsers: RoleAccess.canViewUsers(_currentRole),
+          showPhoneRequests: RoleAccess.canViewPhoneRequests(_currentRole),
+          showSalary: RoleAccess.canViewSalaryManagement(_currentRole),
+          onDashboard: () => _setIndex(0),
+          onLeads: () => _setIndex(1),
+          onFollowUps: () => _setIndex(2),
+          onSiteVisits: () => _setIndex(3),
+          onRevisits: () => _setIndex(4),
+          onProjects: () => _setIndex(5),
+          onTeam: () => _setIndex(6),
+          onReports: () => _setIndex(7),
+          onSettings: () => _setIndex(8),
+          onNotifications: () => Navigator.pushNamed(context, '/notifications'),
+          onPhoneRequests: () => _setIndex(9),
+          onSalary: () => _setIndex(10),
+          onMore: () {},
+          onLess: () {},
+          onClosures: () => _setIndex(11),
+        ),
       ),
     );
   }

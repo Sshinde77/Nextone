@@ -1,18 +1,20 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
 import 'package:nextone/screens/leads/lead_bulk_upload_page.dart';
 import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/screens/leads/lead_form_page.dart';
+import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
+import 'package:nextone/widgets/pagination_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LeadsPage extends StatefulWidget {
@@ -23,17 +25,36 @@ class LeadsPage extends StatefulWidget {
 }
 
 class _LeadsPageState extends State<LeadsPage> {
+  static const List<String> _statusOptions = <String>[
+    'new',
+    'contacted',
+    'interested',
+    'follow_up',
+    'site_visit_scheduled',
+    'site_visit_done',
+    'negotiation',
+    'booked',
+    'lost',
+  ];
+
+  static const List<String> _defaultSourceOptions = <String>[
+    'Facebook',
+    'Walk-in',
+    'Referral',
+  ];
+
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _reassignNoteController =
-      TextEditingController();
+  final TextEditingController _reassignNoteController = TextEditingController();
   final Set<String> _selectedLeadIds = <String>{};
   final AuthProvider _authProvider = AuthProvider();
   bool _isBulkSelectionMode = false;
   bool _isExporting = false;
   bool _isSubmittingReassign = false;
+  bool _isLoadingLeadSources = false;
   String? _activeShareLeadId;
   String? _selectedAssigneeId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
+  List<_LeadSourceOption> _leadSources = const <_LeadSourceOption>[];
 
   Timer? _searchDebounce;
   bool _isLoadingLeads = true;
@@ -41,13 +62,31 @@ class _LeadsPageState extends State<LeadsPage> {
   String _currentRole = '';
 
   int _currentPage = 1;
-  final int _pageSize = 20;
+  final int _pageSize = 10;
   int _totalPages = 1;
   int _totalItems = 0;
   String _searchQuery = '';
+  String? _selectedStatus;
+  String? _selectedSource;
+  String? _selectedTeamId;
   List<_LeadModel> _currentPageLeads = <_LeadModel>[];
   final Map<String, _LeadPhoneAccess> _leadPhoneAccessById =
       <String, _LeadPhoneAccess>{};
+
+  List<String> get _sourceOptions {
+    final values = <String>{
+      ..._defaultSourceOptions,
+      ..._leadSources
+          .where((source) => source.isActive)
+          .map((source) => source.name)
+          .where((name) => name.trim().isNotEmpty),
+      ..._currentPageLeads
+          .map((lead) => lead.source)
+          .where((s) => s.trim().isNotEmpty),
+    }.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return values;
+  }
 
   bool get _isAllCurrentPageSelected {
     final leads = _currentPageLeads;
@@ -70,6 +109,7 @@ class _LeadsPageState extends State<LeadsPage> {
     super.initState();
     _loadAccess();
     _loadAssigneeOptions();
+    _loadLeadSources();
     _loadLeads();
   }
 
@@ -121,6 +161,40 @@ class _LeadsPageState extends State<LeadsPage> {
       });
     } catch (_) {
       // Keep the leads list usable even if users cannot be loaded.
+    }
+  }
+
+  Future<void> _loadLeadSources() async {
+    setState(() {
+      _isLoadingLeadSources = true;
+    });
+
+    try {
+      final items = await _authProvider.leadSourcesConfig(
+        token: _authProvider.currentAuthToken,
+      );
+      final sources = items.map(_LeadSourceOption.fromApi).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _leadSources = sources;
+        _isLoadingLeadSources = false;
+        if (_selectedSource != null &&
+            !sources.any((source) => source.name == _selectedSource)) {
+          _selectedSource = null;
+        }
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingLeadSources = false;
+      });
     }
   }
 
@@ -183,6 +257,9 @@ class _LeadsPageState extends State<LeadsPage> {
     try {
       final result = await _authProvider.leads(
         token: _authProvider.currentAuthToken,
+        status: _selectedStatus,
+        source: _selectedSource,
+        assignedTo: _selectedTeamId,
         search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
         page: _currentPage,
         perPage: _pageSize,
@@ -294,6 +371,696 @@ class _LeadsPageState extends State<LeadsPage> {
     });
   }
 
+  Future<void> _openFiltersSheet() async {
+    String? tempStatus = _selectedStatus;
+    String? tempSource = _selectedSource;
+    String? tempTeamId = _selectedTeamId;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return _buildSheetContainer(
+              title: 'Lead Filters',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String?>(
+                    initialValue: tempStatus,
+                    decoration: _sheetFieldDecoration('Select status'),
+                    items: <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All'),
+                      ),
+                      ..._statusOptions.map(
+                        (status) => DropdownMenuItem<String?>(
+                          value: status,
+                          child: Text(_formatLeadStatusLabel(status)),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setSheetState(() {
+                        tempStatus = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String?>(
+                    initialValue: tempSource,
+                    decoration: _sheetFieldDecoration('Select source'),
+                    items: <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All'),
+                      ),
+                      ..._sourceOptions.map(
+                        (source) => DropdownMenuItem<String?>(
+                          value: source,
+                          child: Text(source),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setSheetState(() {
+                        tempSource = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String?>(
+                    initialValue: tempTeamId,
+                    decoration: _sheetFieldDecoration('Select team member'),
+                    items: <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All'),
+                      ),
+                      ..._assigneeOptions.map(
+                        (assignee) => DropdownMenuItem<String?>(
+                          value: assignee.id,
+                          child: Text(assignee.name),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setSheetState(() {
+                        tempTeamId = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedStatus = null;
+                              _selectedSource = null;
+                              _selectedTeamId = null;
+                              _currentPage = 1;
+                              _selectedLeadIds.clear();
+                              _isBulkSelectionMode = false;
+                            });
+                            Navigator.of(context).pop();
+                            _loadLeads();
+                          },
+                          child: const Text('Reset'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedStatus = tempStatus;
+                              _selectedSource = tempSource;
+                              _selectedTeamId = tempTeamId;
+                              _currentPage = 1;
+                              _selectedLeadIds.clear();
+                              _isBulkSelectionMode = false;
+                            });
+                            Navigator.of(context).pop();
+                            _loadLeads();
+                          },
+                          child: const Text('Apply'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openManageLeadSourcesDialog() async {
+    final createController = TextEditingController();
+    bool isSubmitting = false;
+    bool isRefreshing = false;
+
+    Future<void> refreshSources(
+        void Function(void Function()) setDialogState) async {
+      final previousSelectedSource = _selectedSource;
+      setDialogState(() {
+        isRefreshing = true;
+      });
+      try {
+        final items = await _authProvider.leadSourcesConfig(
+          token: _authProvider.currentAuthToken,
+        );
+        final sources = items.map(_LeadSourceOption.fromApi).toList()
+          ..sort(
+              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        if (!mounted) return;
+        setState(() {
+          _leadSources = sources;
+          if (_selectedSource != null &&
+              !sources.any((source) => source.name == _selectedSource)) {
+            _selectedSource = null;
+          }
+        });
+        if (previousSelectedSource != _selectedSource) {
+          await _loadLeads();
+        }
+      } catch (error) {
+        if (!mounted) return;
+        _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      } finally {
+        if (mounted) {
+          setDialogState(() {
+            isRefreshing = false;
+          });
+        }
+      }
+    }
+
+    Future<void> createSource(
+      void Function(void Function()) setDialogState,
+    ) async {
+      final name = createController.text.trim();
+      if (name.isEmpty) {
+        _showSnackBar('Please enter source name.');
+        return;
+      }
+
+      setDialogState(() {
+        isSubmitting = true;
+      });
+      try {
+        await _authProvider.createLeadSource(
+          name: name,
+          token: _authProvider.currentAuthToken,
+        );
+        createController.clear();
+        await refreshSources(setDialogState);
+        if (!mounted) return;
+        _showSnackBar('Lead source created successfully.');
+      } catch (error) {
+        if (!mounted) return;
+        _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      } finally {
+        if (mounted) {
+          setDialogState(() {
+            isSubmitting = false;
+          });
+        }
+      }
+    }
+
+    Future<void> editSource(
+      _LeadSourceOption source,
+      void Function(void Function()) setDialogState,
+    ) async {
+      final nameController = TextEditingController(text: source.name);
+      bool isActive = source.isActive;
+      bool isSaving = false;
+
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setEditState) {
+              return AlertDialog(
+                title: const Text('Edit Lead Source'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        hintText: 'Source name',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Active'),
+                      value: isActive,
+                      onChanged: (value) {
+                        setEditState(() {
+                          isActive = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed:
+                        isSaving ? null : () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            final name = nameController.text.trim();
+                            if (name.isEmpty) {
+                              _showSnackBar('Please enter source name.');
+                              return;
+                            }
+                            setEditState(() {
+                              isSaving = true;
+                            });
+                            try {
+                              await _authProvider.updateLeadSource(
+                                id: source.id,
+                                name: name,
+                                isActive: isActive,
+                                token: _authProvider.currentAuthToken,
+                              );
+                              if (mounted && _selectedSource == source.name) {
+                                setState(() {
+                                  _selectedSource = name;
+                                });
+                              }
+                              if (!context.mounted) return;
+                              Navigator.of(context).pop();
+                              await refreshSources(setDialogState);
+                              if (!mounted) return;
+                              _showSnackBar(
+                                  'Lead source updated successfully.');
+                            } catch (error) {
+                              if (!mounted) return;
+                              _showSnackBar(
+                                error
+                                    .toString()
+                                    .replaceFirst('Exception: ', ''),
+                              );
+                              if (context.mounted) {
+                                setEditState(() {
+                                  isSaving = false;
+                                });
+                              }
+                            }
+                          },
+                    child: Text(isSaving ? 'Saving...' : 'Save'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+      nameController.dispose();
+    }
+
+    Future<void> deleteSource(
+      _LeadSourceOption source,
+      void Function(void Function()) setDialogState,
+    ) async {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Delete Lead Source'),
+            content: Text('Delete "${source.name}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Delete'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (confirmed != true) {
+        return;
+      }
+
+      try {
+        await _authProvider.deleteLeadSource(
+          id: source.id,
+          token: _authProvider.currentAuthToken,
+        );
+        await refreshSources(setDialogState);
+        if (!mounted) return;
+        _showSnackBar('Lead source deleted successfully.');
+      } catch (error) {
+        if (!mounted) return;
+        _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      }
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: ConstrainedBox(
+                constraints:
+                    const BoxConstraints(maxWidth: 620, maxHeight: 560),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Manage Lead Sources',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            visualDensity: VisualDensity.compact,
+                            splashRadius: 18,
+                            icon: const Icon(Icons.close, size: 20),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: createController,
+                              decoration: InputDecoration(
+                                hintText: 'New source name (e.g. LinkedIn)',
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide:
+                                      const BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                      color: AppColors.primary),
+                                ),
+                              ),
+                              onSubmitted: (_) => createSource(setDialogState),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            height: 40,
+                            child: FilledButton.icon(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => createSource(setDialogState),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              icon: const Icon(Icons.add, size: 16),
+                              label: Text(isSubmitting ? 'Adding...' : 'Add'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                decoration: const BoxDecoration(
+                                  border: Border(
+                                    bottom: BorderSide(color: AppColors.border),
+                                  ),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 4,
+                                      child: Text(
+                                        'Source Name',
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        'Status',
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Align(
+                                        alignment: Alignment.centerRight,
+                                        child: Text(
+                                          'Actions',
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: isRefreshing || _isLoadingLeadSources
+                                    ? const Center(
+                                        child: CircularProgressIndicator(),
+                                      )
+                                    : _leadSources.isEmpty
+                                        ? const Center(
+                                            child: Text(
+                                              'No lead sources found.',
+                                              style: TextStyle(
+                                                color: AppColors.textSecondary,
+                                              ),
+                                            ),
+                                          )
+                                        : ListView.separated(
+                                            itemCount: _leadSources.length,
+                                            separatorBuilder: (_, __) =>
+                                                const Divider(height: 1),
+                                            itemBuilder: (context, index) {
+                                              final source =
+                                                  _leadSources[index];
+                                              return Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 14,
+                                                  vertical: 10,
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Expanded(
+                                                      flex: 4,
+                                                      child: Text(
+                                                        source.name,
+                                                        style: const TextStyle(
+                                                          color: AppColors
+                                                              .textPrimary,
+                                                          fontSize: 14,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Expanded(
+                                                      flex: 2,
+                                                      child: Align(
+                                                        alignment: Alignment
+                                                            .centerLeft,
+                                                        child: Container(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 5,
+                                                          ),
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: source
+                                                                    .isActive
+                                                                ? const Color(
+                                                                    0xFFDDF7E7,
+                                                                  )
+                                                                : const Color(
+                                                                    0xFFF1F5F9,
+                                                                  ),
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                              999,
+                                                            ),
+                                                          ),
+                                                          child: Text(
+                                                            source.isActive
+                                                                ? 'ACTIVE'
+                                                                : 'INACTIVE',
+                                                            style: TextStyle(
+                                                              color: source
+                                                                      .isActive
+                                                                  ? const Color(
+                                                                      0xFF1E8E4A,
+                                                                    )
+                                                                  : AppColors
+                                                                      .textSecondary,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w800,
+                                                              fontSize: 10,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Expanded(
+                                                      flex: 2,
+                                                      child: Align(
+                                                        alignment: Alignment
+                                                            .centerRight,
+                                                        child: Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            IconButton(
+                                                              visualDensity:
+                                                                  VisualDensity
+                                                                      .compact,
+                                                              splashRadius: 16,
+                                                              constraints:
+                                                                  const BoxConstraints(
+                                                                minWidth: 32,
+                                                                minHeight: 32,
+                                                              ),
+                                                              onPressed: () =>
+                                                                  editSource(
+                                                                source,
+                                                                setDialogState,
+                                                              ),
+                                                              icon: const Icon(
+                                                                Icons
+                                                                    .edit_outlined,
+                                                                color: AppColors
+                                                                    .textSecondary,
+                                                                size: 18,
+                                                              ),
+                                                            ),
+                                                            IconButton(
+                                                              visualDensity:
+                                                                  VisualDensity
+                                                                      .compact,
+                                                              splashRadius: 16,
+                                                              constraints:
+                                                                  const BoxConstraints(
+                                                                minWidth: 32,
+                                                                minHeight: 32,
+                                                              ),
+                                                              onPressed: () =>
+                                                                  deleteSource(
+                                                                source,
+                                                                setDialogState,
+                                                              ),
+                                                              icon: const Icon(
+                                                                Icons
+                                                                    .delete_outline,
+                                                                color: AppColors
+                                                                    .textSecondary,
+                                                                size: 18,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    createController.dispose();
+  }
+
+  void _changePage(int page) {
+    setState(() {
+      _currentPage = page;
+      _selectedLeadIds.clear();
+      _isBulkSelectionMode = false;
+    });
+    _loadLeads();
+  }
+
+  String _formatLeadStatusLabel(String value) {
+    return value
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+  }
+
   Future<void> _openCreateLead() async {
     final created = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const LeadFormPage()),
@@ -320,7 +1087,8 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Future<void> _callLead(String phoneNumber) async {
-    if (phoneNumber.trim().isEmpty || phoneNumber.trim().toUpperCase() == 'N/A') {
+    if (phoneNumber.trim().isEmpty ||
+        phoneNumber.trim().toUpperCase() == 'N/A') {
       _showSnackBar('Phone number is not available.');
       return;
     }
@@ -441,7 +1209,8 @@ class _LeadsPageState extends State<LeadsPage> {
                     controller: reasonController,
                     minLines: 3,
                     maxLines: 4,
-                    decoration: _sheetFieldDecoration('Reason for phone access'),
+                    decoration:
+                        _sheetFieldDecoration('Reason for phone access'),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -475,9 +1244,10 @@ class _LeadsPageState extends State<LeadsPage> {
                                     .toString()
                                     .replaceFirst('Exception: ', '');
                                 if (message.toLowerCase().contains(
-                                  'already have a pending request',
-                                )) {
-                                  _showSnackBar('Request pending for this lead.');
+                                      'already have a pending request',
+                                    )) {
+                                  _showSnackBar(
+                                      'Request pending for this lead.');
                                 } else {
                                   _showSnackBar(message);
                                 }
@@ -605,6 +1375,56 @@ class _LeadsPageState extends State<LeadsPage> {
     reasonController.dispose();
   }
 
+  Future<void> _openBulkFollowUpForm() async {
+    final selectedIds = _selectedLeadIds.toList(growable: false);
+    if (selectedIds.isEmpty) {
+      _showSnackBar('Select at least one lead.');
+      return;
+    }
+    if (selectedIds.length != 1) {
+      _showSnackBar(
+        'Schedule follow-up uses the existing single-lead form. Select one lead.',
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FollowUpFormPage(initialLeadId: selectedIds.first),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+    await _loadLeads();
+  }
+
+  Future<void> _openBulkSiteVisitForm() async {
+    final selectedIds = _selectedLeadIds.toList(growable: false);
+    if (selectedIds.isEmpty) {
+      _showSnackBar('Select at least one lead.');
+      return;
+    }
+    if (selectedIds.length != 1) {
+      _showSnackBar(
+        'Schedule site visit uses the existing single-lead form. Select one lead.',
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SiteVisitFormPage(initialLeadId: selectedIds.first),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+    await _loadLeads();
+  }
+
   Future<void> _openReassignSheet(_LeadModel lead) async {
     if (_assigneeOptions.isEmpty) {
       _showSnackBar('No active assignee available.');
@@ -627,7 +1447,8 @@ class _LeadsPageState extends State<LeadsPage> {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return _buildSheetContainer(
-              title: lead.assignedToId.isEmpty ? 'Assign Lead' : 'Reassign Lead',
+              title:
+                  lead.assignedToId.isEmpty ? 'Assign Lead' : 'Reassign Lead',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -669,7 +1490,8 @@ class _LeadsPageState extends State<LeadsPage> {
                               setSheetState(() {
                                 _isSubmittingReassign = true;
                               });
-                              final reassigned = await _submitReassignment(lead);
+                              final reassigned =
+                                  await _submitReassignment(lead);
                               if (!mounted) {
                                 return;
                               }
@@ -1032,8 +1854,9 @@ class _LeadsPageState extends State<LeadsPage> {
               });
             }
 
-            final isValidRange =
-                fromDate != null && toDate != null && !toDate!.isBefore(fromDate!);
+            final isValidRange = fromDate != null &&
+                toDate != null &&
+                !toDate!.isBefore(fromDate!);
 
             return AlertDialog(
               title: const Text('Export Leads'),
@@ -1270,10 +2093,31 @@ class _LeadsPageState extends State<LeadsPage> {
             controller: _searchController,
             onChanged: _onSearchChanged,
             decoration: const InputDecoration(
-              hintText: 'Search by name, status, assignee',
+              hintText: 'Search by lead name, email, or phone',
               prefixIcon: Icon(Icons.search, size: 20),
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(vertical: 13),
+            ),
+          ),
+        );
+
+        final filterButton = OutlinedButton.icon(
+          onPressed: _openFiltersSheet,
+          icon: const Icon(Icons.filter_alt_outlined, size: 16),
+          label: const FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'Filters',
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            fixedSize: const Size.fromHeight(48),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
         );
@@ -1324,12 +2168,12 @@ class _LeadsPageState extends State<LeadsPage> {
             : null;
 
         final addSourceButton = OutlinedButton.icon(
-          onPressed: () {},
+          onPressed: _openManageLeadSourcesDialog,
           icon: const Icon(Icons.add_circle_outline, size: 16),
           label: const FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              'Add Source',
+              'Manage Source',
               maxLines: 1,
               softWrap: false,
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -1377,6 +2221,8 @@ class _LeadsPageState extends State<LeadsPage> {
                 Expanded(child: bulkButton),
                 const SizedBox(width: 8),
               ],
+              Expanded(child: filterButton),
+              const SizedBox(width: 8),
               Expanded(child: addSourceButton),
               const SizedBox(width: 8),
               Expanded(child: addButton),
@@ -1445,7 +2291,7 @@ class _LeadsPageState extends State<LeadsPage> {
                           Icons.person_add_alt_1_outlined,
                           size: 16,
                         ),
-                        label: const Text('Assign'),
+                        label: const Text('Reassign'),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 40),
                         ),
@@ -1463,36 +2309,92 @@ class _LeadsPageState extends State<LeadsPage> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _openBulkFollowUpForm,
+                        icon: const Icon(Icons.event_note_outlined, size: 16),
+                        label: const Text('Schedule Follow-up'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 40),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _openBulkSiteVisitForm,
+                        icon: const Icon(Icons.location_on_outlined, size: 16),
+                        label: const Text('Schedule Site Visit'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 40),
+                        ),
+                      ),
+                    ),
                   ],
                 );
               }
 
-              return Row(
+              return Column(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed:
-                          _isSubmittingReassign ? null : _openBulkAssignSheet,
-                      icon: const Icon(
-                        Icons.person_add_alt_1_outlined,
-                        size: 16,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isSubmittingReassign
+                              ? null
+                              : _openBulkAssignSheet,
+                          icon: const Icon(
+                            Icons.person_add_alt_1_outlined,
+                            size: 16,
+                          ),
+                          label: const Text('Reassign'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 40),
+                          ),
+                        ),
                       ),
-                      label: const Text('Assign'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 40),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _openBulkPhoneRequestSheet,
+                          icon: const Icon(Icons.phone_outlined, size: 16),
+                          label: const Text('Request Phone Access'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 40),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _openBulkPhoneRequestSheet,
-                      icon: const Icon(Icons.phone_outlined, size: 16),
-                      label: const Text('Request Phone Access'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 40),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _openBulkFollowUpForm,
+                          icon: const Icon(Icons.event_note_outlined, size: 16),
+                          label: const Text('Schedule Follow-up'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 40),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _openBulkSiteVisitForm,
+                          icon:
+                              const Icon(Icons.location_on_outlined, size: 16),
+                          label: const Text('Schedule Site Visit'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 40),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               );
@@ -1584,67 +2486,67 @@ class _LeadsPageState extends State<LeadsPage> {
                 child: Column(
                   children: [
                     DataCard(
-                  name: lead.name,
-                  leadId: '',
-                  status: lead.status,
-                  priority: lead.priority,
-                  priorityColor: lead.priorityColor,
-                  nextFollowUpDate: lead.nextFollowUpDate,
-                  leftMetaLabel: 'Callback Time',
-                  rightMetaLabel: 'Next Follow-up',
-                  budget: lead.budget,
-                  phone: _displayPhoneForLead(lead),
-                  profileImageUrl: lead.profileImageUrl,
-                  assigneeName: lead.assignee.name,
-                  assigneeImageUrl: lead.assignee.imageUrl,
-                  onTap: () => _viewLeadDetail(lead.id),
-                  actions: [
-                    DataCardAction(
-                      icon: Icons.call_outlined,
-                      onTap: () => _handleCallAction(lead),
-                    ),
-                    DataCardAction(
-                      icon: Icons.share_outlined,
-                      color: const Color(0xFF7B1FA2),
-                      onTap: () {
+                      name: lead.name,
+                      leadId: '',
+                      status: lead.status,
+                      priority: lead.priority,
+                      priorityColor: lead.priorityColor,
+                      nextFollowUpDate: lead.nextFollowUpDate,
+                      leftMetaLabel: 'Callback Time',
+                      rightMetaLabel: 'Next Follow-up',
+                      budget: lead.budget,
+                      phone: _displayPhoneForLead(lead),
+                      profileImageUrl: lead.profileImageUrl,
+                      assigneeName: lead.assignee.name,
+                      assigneeImageUrl: lead.assignee.imageUrl,
+                      onTap: () => _viewLeadDetail(lead.id),
+                      actions: [
+                        DataCardAction(
+                          icon: Icons.call_outlined,
+                          onTap: () => _handleCallAction(lead),
+                        ),
+                        DataCardAction(
+                          icon: Icons.share_outlined,
+                          color: const Color(0xFF7B1FA2),
+                          onTap: () {
+                            setState(() {
+                              _activeShareLeadId = isShareOpen ? null : lead.id;
+                            });
+                          },
+                        ),
+                        DataCardAction(
+                          icon: Icons.person_add_alt_1_outlined,
+                          color: AppColors.primary,
+                          onTap: () => _openReassignSheet(lead),
+                        ),
+                        DataCardAction(
+                          icon: Icons.edit_outlined,
+                          onTap: () => _openEditLead(lead),
+                        ),
+                        DataCardAction(
+                          icon: Icons.delete_outline,
+                          color: const Color(0xFFD32F2F),
+                          onTap: () {},
+                        ),
+                      ],
+                      bulkSelectionMode: _isBulkSelectionMode,
+                      isSelected: _selectedLeadIds.contains(lead.id),
+                      onLongPress: () {
                         setState(() {
-                          _activeShareLeadId = isShareOpen ? null : lead.id;
+                          _isBulkSelectionMode = true;
+                          _selectedLeadIds.add(lead.id);
                         });
                       },
-                    ),
-                    DataCardAction(
-                      icon: Icons.person_add_alt_1_outlined,
-                      color: AppColors.primary,
-                      onTap: () => _openReassignSheet(lead),
-                    ),
-                    DataCardAction(
-                      icon: Icons.edit_outlined,
-                      onTap: () => _openEditLead(lead),
-                    ),
-                    DataCardAction(
-                      icon: Icons.delete_outline,
-                      color: const Color(0xFFD32F2F),
-                      onTap: () {},
-                    ),
-                  ],
-                  bulkSelectionMode: _isBulkSelectionMode,
-                  isSelected: _selectedLeadIds.contains(lead.id),
-                  onLongPress: () {
-                    setState(() {
-                      _isBulkSelectionMode = true;
-                      _selectedLeadIds.add(lead.id);
-                    });
-                  },
-                    onSelectionChanged: (selected) {
-                      setState(() {
-                      if (selected) {
-                        _selectedLeadIds.add(lead.id);
-                      } else {
-                        _selectedLeadIds.remove(lead.id);
-                      }
-                      _syncBulkSelectionMode();
-                      });
-                    },
+                      onSelectionChanged: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedLeadIds.add(lead.id);
+                          } else {
+                            _selectedLeadIds.remove(lead.id);
+                          }
+                          _syncBulkSelectionMode();
+                        });
+                      },
                     ),
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 220),
@@ -1663,7 +2565,8 @@ class _LeadsPageState extends State<LeadsPage> {
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFDCE3F7)),
+                                border:
+                                    Border.all(color: const Color(0xFFDCE3F7)),
                               ),
                               child: Row(
                                 children: [
@@ -1672,7 +2575,8 @@ class _LeadsPageState extends State<LeadsPage> {
                                       label: 'WhatsApp',
                                       icon: Icons.chat_outlined,
                                       color: const Color(0xFF25D366),
-                                      onTap: () => _sendLeadDetailsViaWhatsApp(lead),
+                                      onTap: () =>
+                                          _sendLeadDetailsViaWhatsApp(lead),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -1681,7 +2585,8 @@ class _LeadsPageState extends State<LeadsPage> {
                                       label: 'Email',
                                       icon: Icons.email_outlined,
                                       color: const Color(0xFF1976D2),
-                                      onTap: () => _sendLeadDetailsViaEmail(lead),
+                                      onTap: () =>
+                                          _sendLeadDetailsViaEmail(lead),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -1793,10 +2698,12 @@ class _LeadsPageState extends State<LeadsPage> {
     final totalItems = _totalItems;
     final totalPages = _totalPages <= 0 ? 1 : _totalPages;
     final currentPage = _currentPage.clamp(1, totalPages);
-
     final start = totalItems == 0 ? 0 : ((currentPage - 1) * _pageSize) + 1;
-    final end =
-        totalItems == 0 ? 0 : math.min(currentPage * _pageSize, totalItems);
+    final end = totalItems == 0
+        ? 0
+        : (currentPage * _pageSize > totalItems
+            ? totalItems
+            : currentPage * _pageSize);
 
     return Container(
       width: double.infinity,
@@ -1820,37 +2727,16 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 4,
+            spacing: 8,
             children: [
-              IconButton(
-                onPressed: !_isLoadingLeads && currentPage > 1
-                    ? () {
-                        setState(() {
-                          _currentPage -= 1;
-                          _selectedLeadIds.clear();
-                          _isBulkSelectionMode = false;
-                        });
-                        _loadLeads();
-                      }
-                    : null,
-                icon: const Icon(Icons.chevron_left),
-              ),
               Text(
                 'Page $currentPage of $totalPages',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
-              IconButton(
-                onPressed: !_isLoadingLeads && currentPage < totalPages
-                    ? () {
-                        setState(() {
-                          _currentPage += 1;
-                          _selectedLeadIds.clear();
-                          _isBulkSelectionMode = false;
-                        });
-                        _loadLeads();
-                      }
-                    : null,
-                icon: const Icon(Icons.chevron_right),
+              PaginationWidget(
+                currentPage: currentPage,
+                totalPages: totalPages,
+                onPageChanged: _isLoadingLeads ? (_) {} : _changePage,
               ),
             ],
           ),
@@ -1914,6 +2800,52 @@ class _AssigneeOption {
 
   final String id;
   final String name;
+}
+
+class _LeadSourceOption {
+  const _LeadSourceOption({
+    required this.id,
+    required this.name,
+    required this.isActive,
+  });
+
+  final String id;
+  final String name;
+  final bool isActive;
+
+  factory _LeadSourceOption.fromApi(Map<String, dynamic> json) {
+    String readString(dynamic value) {
+      if (value is String) {
+        return value.trim();
+      }
+      if (value is num || value is bool) {
+        return value.toString().trim();
+      }
+      return '';
+    }
+
+    bool readBool(dynamic value) {
+      if (value is bool) {
+        return value;
+      }
+      if (value is num) {
+        return value != 0;
+      }
+      if (value is String) {
+        final normalized = value.trim().toLowerCase();
+        return normalized == 'true' || normalized == '1' || normalized == 'yes';
+      }
+      return false;
+    }
+
+    return _LeadSourceOption(
+      id: readString(json['id'] ?? json['source_id'] ?? json['uuid']),
+      name: readString(json['name'] ?? json['source']),
+      isActive: readBool(
+        json['is_active'] ?? json['isActive'] ?? json['active'] ?? true,
+      ),
+    );
+  }
 }
 
 class _LeadModel {
@@ -2099,7 +3031,6 @@ class _LeadModel {
     final asString = _readString(value);
     return asString.isEmpty ? 'N/A' : asString;
   }
-
 }
 
 class _PersonModel {

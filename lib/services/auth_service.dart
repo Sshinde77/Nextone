@@ -923,7 +923,9 @@ class AuthService {
 
   Future<LeadsListResult> leads({
     String? token,
+    String? status,
     String? source,
+    String? assignedTo,
     String? from,
     String? to,
     String? search,
@@ -936,8 +938,14 @@ class AuthService {
       'per_page': perPage.toString(),
     };
 
+    if (status != null && status.trim().isNotEmpty) {
+      query['status'] = status.trim();
+    }
     if (source != null && source.trim().isNotEmpty) {
       query['source'] = source.trim();
+    }
+    if (assignedTo != null && assignedTo.trim().isNotEmpty) {
+      query['assigned_to'] = assignedTo.trim();
     }
     if (from != null && from.trim().isNotEmpty) {
       query['from'] = from.trim();
@@ -4513,6 +4521,7 @@ class AuthService {
   Future<LeadsListResult> projects({
     String? token,
     String? city,
+    String? status,
     String? search,
     int page = 1,
     int perPage = 20,
@@ -4524,6 +4533,9 @@ class AuthService {
     };
     if (city != null && city.trim().isNotEmpty) {
       query['city'] = city.trim();
+    }
+    if (status != null && status.trim().isNotEmpty) {
+      query['status'] = status.trim();
     }
     if (search != null && search.trim().isNotEmpty) {
       query['search'] = search.trim();
@@ -6050,6 +6062,61 @@ class AuthService {
     return null;
   }
 
+  List<Map<String, dynamic>> _extractLeadSourceItems(dynamic source) {
+    List<Map<String, dynamic>> readList(dynamic value) {
+      if (value is List) {
+        return value.whereType<Map>().map(_stringDynamicMap).toList();
+      }
+      return const <Map<String, dynamic>>[];
+    }
+
+    final fromRootList = readList(source);
+    if (fromRootList.isNotEmpty) {
+      return fromRootList;
+    }
+
+    if (source is! Map<String, dynamic>) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    for (final key in ['data', 'sources', 'items', 'results']) {
+      final fromKey = readList(source[key]);
+      if (fromKey.isNotEmpty) {
+        return fromKey;
+      }
+    }
+
+    final data = source['data'];
+    if (data is Map<String, dynamic>) {
+      for (final key in ['sources', 'items', 'results']) {
+        final fromNested = readList(data[key]);
+        if (fromNested.isNotEmpty) {
+          return fromNested;
+        }
+      }
+    }
+
+    return const <Map<String, dynamic>>[];
+  }
+
+  Map<String, dynamic>? _extractLeadSourceMap(dynamic source) {
+    if (source is Map<String, dynamic>) {
+      final data = source['data'];
+      if (data is Map<String, dynamic>) {
+        return _stringDynamicMap(data);
+      }
+
+      for (final key in ['source', 'item', 'result']) {
+        final value = source[key];
+        if (value is Map<String, dynamic>) {
+          return _stringDynamicMap(value);
+        }
+      }
+      return _stringDynamicMap(source);
+    }
+    return null;
+  }
+
   int _deriveTotalPages({required int total, required int perPage}) {
     if (total <= 0) {
       return 1;
@@ -6348,6 +6415,372 @@ class AuthService {
       return _stringDynamicMap(data);
     } catch (_) {
       throw Exception('Lead sources response format is not valid.');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> leadSourcesConfig({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.leadSourcesConfig}',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'leadSourcesConfig',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('leadSourcesConfig', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch lead sources.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final items = _extractLeadSourceItems(decoded);
+      return items;
+    } catch (_) {
+      throw Exception('Lead sources response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> createLeadSource({
+    required String name,
+    String? token,
+  }) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) {
+      throw Exception('Lead source name is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.leadSourcesConfig}',
+    );
+    final headers = _headers(
+      accept: 'application/json',
+      token: resolvedToken,
+    );
+    final payload = jsonEncode(<String, dynamic>{'name': normalizedName});
+    _logRequest(
+      endpoint: 'createLeadSource',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: payload,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: payload)
+        .timeout(_requestTimeout);
+    _logResponse('createLeadSource', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create lead source.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final item = _extractLeadSourceMap(decoded);
+      if (item != null) {
+        return item;
+      }
+    } catch (_) {}
+    return <String, dynamic>{'name': normalizedName, 'is_active': true};
+  }
+
+  Future<Map<String, dynamic>> updateLeadSource({
+    required String id,
+    required String name,
+    required bool isActive,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    final normalizedName = name.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead source id is required.');
+    }
+    if (normalizedName.isEmpty) {
+      throw Exception('Lead source name is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.leadSourceConfigDetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(
+      accept: 'application/json',
+      token: resolvedToken,
+    );
+    final payload = jsonEncode(<String, dynamic>{
+      'name': normalizedName,
+      'is_active': isActive,
+    });
+    _logRequest(
+      endpoint: 'updateLeadSource',
+      method: 'PUT',
+      uri: uri,
+      headers: headers,
+      body: payload,
+    );
+
+    final response = await http
+        .put(uri, headers: headers, body: payload)
+        .timeout(_requestTimeout);
+    _logResponse('updateLeadSource', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update lead source.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final item = _extractLeadSourceMap(decoded);
+      if (item != null) {
+        return item;
+      }
+    } catch (_) {}
+    return <String, dynamic>{
+      'id': normalizedId,
+      'name': normalizedName,
+      'is_active': isActive,
+    };
+  }
+
+  Future<void> deleteLeadSource({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead source id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.leadSourceConfigDetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteLeadSource',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteLeadSource', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete lead source.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> leadStatusesConfig({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.leadStatusesConfig}',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'leadStatusesConfig',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('leadStatusesConfig', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch lead statuses.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      return _extractLeadSourceItems(decoded);
+    } catch (_) {
+      throw Exception('Lead statuses response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> createLeadStatus({
+    required String key,
+    required String label,
+    required String color,
+    required int sortOrder,
+    String? token,
+  }) async {
+    final normalizedKey = key.trim();
+    final normalizedLabel = label.trim();
+    if (normalizedKey.isEmpty || normalizedLabel.isEmpty) {
+      throw Exception('Status key and label are required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.leadStatusesConfig}',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final payload = jsonEncode(<String, dynamic>{
+      'key': normalizedKey,
+      'label': normalizedLabel,
+      'color': color.trim(),
+      'sort_order': sortOrder,
+    });
+    _logRequest(
+      endpoint: 'createLeadStatus',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: payload,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: payload)
+        .timeout(_requestTimeout);
+    _logResponse('createLeadStatus', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create lead status.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final item = _extractLeadSourceMap(decoded);
+      if (item != null) {
+        return item;
+      }
+    } catch (_) {}
+    return <String, dynamic>{
+      'key': normalizedKey,
+      'label': normalizedLabel,
+      'color': color.trim(),
+      'sort_order': sortOrder,
+      'is_active': true,
+    };
+  }
+
+  Future<Map<String, dynamic>> updateLeadStatusConfig({
+    required String id,
+    required String label,
+    required String color,
+    required bool isActive,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    final normalizedLabel = label.trim();
+    if (normalizedId.isEmpty || normalizedLabel.isEmpty) {
+      throw Exception('Status id and label are required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.leadStatusConfigDetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final payload = jsonEncode(<String, dynamic>{
+      'label': normalizedLabel,
+      'color': color.trim(),
+      'is_active': isActive,
+    });
+    _logRequest(
+      endpoint: 'updateLeadStatusConfig',
+      method: 'PUT',
+      uri: uri,
+      headers: headers,
+      body: payload,
+    );
+
+    final response = await http
+        .put(uri, headers: headers, body: payload)
+        .timeout(_requestTimeout);
+    _logResponse('updateLeadStatusConfig', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update lead status config.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final item = _extractLeadSourceMap(decoded);
+      if (item != null) {
+        return item;
+      }
+    } catch (_) {}
+    return <String, dynamic>{
+      'id': normalizedId,
+      'label': normalizedLabel,
+      'color': color.trim(),
+      'is_active': isActive,
+    };
+  }
+
+  Future<void> deleteLeadStatusConfig({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Status id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.leadStatusConfigDetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteLeadStatusConfig',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteLeadStatusConfig', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete lead status config.',
+    );
+    if (error != null) {
+      throw Exception(error);
     }
   }
 

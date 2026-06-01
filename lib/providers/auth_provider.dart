@@ -283,7 +283,9 @@ class AuthProvider {
 
   Future<LeadsListResult> leads({
     String? token,
+    String? status,
     String? source,
+    String? assignedTo,
     String? from,
     String? to,
     String? search,
@@ -292,7 +294,9 @@ class AuthProvider {
   }) {
     return _authService.leads(
       token: token,
+      status: status,
       source: source,
+      assignedTo: assignedTo,
       from: from,
       to: to,
       search: search,
@@ -1073,6 +1077,7 @@ class AuthProvider {
   Future<LeadsListResult> projects({
     String? token,
     String? city,
+    String? status,
     String? search,
     int page = 1,
     int perPage = 20,
@@ -1080,6 +1085,7 @@ class AuthProvider {
     return _authService.projects(
       token: token,
       city: city,
+      status: status,
       search: search,
       page: page,
       perPage: perPage,
@@ -1345,6 +1351,90 @@ class AuthProvider {
     return _authService.dashboardLeadSources(
       from: from,
       to: to,
+      token: token,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> leadSourcesConfig({String? token}) {
+    return _authService.leadSourcesConfig(token: token);
+  }
+
+  Future<Map<String, dynamic>> createLeadSource({
+    required String name,
+    String? token,
+  }) {
+    return _authService.createLeadSource(
+      name: name,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> updateLeadSource({
+    required String id,
+    required String name,
+    required bool isActive,
+    String? token,
+  }) {
+    return _authService.updateLeadSource(
+      id: id,
+      name: name,
+      isActive: isActive,
+      token: token,
+    );
+  }
+
+  Future<void> deleteLeadSource({
+    required String id,
+    String? token,
+  }) {
+    return _authService.deleteLeadSource(
+      id: id,
+      token: token,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> leadStatusesConfig({String? token}) {
+    return _authService.leadStatusesConfig(token: token);
+  }
+
+  Future<Map<String, dynamic>> createLeadStatus({
+    required String key,
+    required String label,
+    required String color,
+    required int sortOrder,
+    String? token,
+  }) {
+    return _authService.createLeadStatus(
+      key: key,
+      label: label,
+      color: color,
+      sortOrder: sortOrder,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> updateLeadStatusConfig({
+    required String id,
+    required String label,
+    required String color,
+    required bool isActive,
+    String? token,
+  }) {
+    return _authService.updateLeadStatusConfig(
+      id: id,
+      label: label,
+      color: color,
+      isActive: isActive,
+      token: token,
+    );
+  }
+
+  Future<void> deleteLeadStatusConfig({
+    required String id,
+    String? token,
+  }) {
+    return _authService.deleteLeadStatusConfig(
+      id: id,
       token: token,
     );
   }
