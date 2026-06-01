@@ -12,6 +12,7 @@ class CRMAppBottomNav extends StatefulWidget {
   final VoidCallback onTeam;
   final VoidCallback onReports;
   final VoidCallback onSettings;
+  final VoidCallback? onNotifications;
   final VoidCallback? onPhoneRequests;
   final VoidCallback? onSalary;
   final VoidCallback? onClosures;
@@ -23,6 +24,7 @@ class CRMAppBottomNav extends StatefulWidget {
   final bool showProjects;
   final bool showTeam;
   final bool showUsers;
+  final bool showNotifications;
   final bool showPhoneRequests;
   final bool showSalary;
 
@@ -38,6 +40,7 @@ class CRMAppBottomNav extends StatefulWidget {
     required this.onTeam,
     required this.onReports,
     required this.onSettings,
+    this.onNotifications,
     this.onPhoneRequests,
     this.onSalary,
     this.onClosures,
@@ -49,6 +52,7 @@ class CRMAppBottomNav extends StatefulWidget {
     this.showProjects = true,
     this.showTeam = true,
     this.showUsers = true,
+    this.showNotifications = true,
     this.showPhoneRequests = false,
     this.showSalary = false,
   });
@@ -73,6 +77,13 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
         icon: Icons.dashboard_outlined,
         onTap: widget.onDashboard,
       ),
+      if (widget.showProjects)
+        _NavEntry(
+          index: 5,
+          label: 'Projects',
+          icon: Icons.apartment_outlined,
+          onTap: widget.onProjects,
+        ),
       _NavEntry(
         index: 1,
         label: 'Leads',
@@ -82,23 +93,42 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
       ),
       _NavEntry(
         index: 2,
-        label: 'Follow-ups',
+        label: 'Follow-Ups',
         icon: Icons.check_circle_outline,
         onTap: widget.onFollowUps,
         badgeCount: widget.followUpsBadgeCount,
       ),
       _NavEntry(
         index: 3,
-        label: 'Visits',
+        label: 'Site Visits',
         icon: Icons.location_on_outlined,
         onTap: widget.onSiteVisits,
       ),
-      if (widget.showProjects)
+      _NavEntry(
+        index: 4,
+        label: 'Re-visits',
+        icon: Icons.repeat_rounded,
+        onTap: widget.onRevisits,
+      ),
+      if (widget.onClosures != null)
         _NavEntry(
-          index: 5,
-          label: 'Projects',
-          icon: Icons.apartment_outlined,
-          onTap: widget.onProjects,
+          index: 11,
+          label: 'Closures',
+          icon: Icons.verified_outlined,
+          onTap: widget.onClosures!,
+        ),
+      _NavEntry(
+        index: 7,
+        label: 'Attendance',
+        icon: Icons.fact_check,
+        onTap: widget.onReports,
+      ),
+      if (widget.showSalary && widget.onSalary != null)
+        _NavEntry(
+          index: 10,
+          label: 'Salary',
+          icon: Icons.payments_outlined,
+          onTap: widget.onSalary!,
         ),
       if (widget.showTeam)
         _NavEntry(
@@ -107,12 +137,6 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           icon: Icons.groups_outlined,
           onTap: widget.onTeam,
         ),
-      _NavEntry(
-        index: 7,
-        label: 'Attendance',
-        icon: Icons.fact_check,
-        onTap: widget.onReports,
-      ),
       if (widget.showUsers)
         _NavEntry(
           index: 8,
@@ -120,32 +144,19 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           icon: Icons.manage_accounts_outlined,
           onTap: widget.onSettings,
         ),
-      _NavEntry(
-        index: 4,
-        label: 'Re-visits',
-        icon: Icons.repeat_rounded,
-        onTap: widget.onRevisits,
-      ),
+      if (widget.showNotifications && widget.onNotifications != null)
+        _NavEntry(
+          index: -1,
+          label: 'Notifications',
+          icon: Icons.notifications_outlined,
+          onTap: widget.onNotifications!,
+        ),
       if (widget.showPhoneRequests && widget.onPhoneRequests != null)
         _NavEntry(
           index: 9,
-          label: 'Phone',
+          label: 'Phone Requests',
           icon: Icons.phone_callback_outlined,
           onTap: widget.onPhoneRequests!,
-        ),
-      if (widget.showSalary && widget.onSalary != null)
-        _NavEntry(
-          index: 10,
-          label: 'Salary',
-          icon: Icons.payments_outlined,
-          onTap: widget.onSalary!,
-        ),
-      if (widget.onClosures != null)
-        _NavEntry(
-          index: 11,
-          label: 'Closures',
-          icon: Icons.verified_outlined,
-          onTap: widget.onClosures!,
         ),
     ];
   }

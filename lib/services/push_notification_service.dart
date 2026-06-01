@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:nextone/services/auth_service.dart';
 
 @pragma('vm:entry-point')
@@ -17,11 +18,37 @@ class PushNotificationService {
   PushNotificationService._();
 
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  static final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+  static const AndroidNotificationChannel _androidChannel =
+      AndroidNotificationChannel(
+    'nextone_foreground_notifications',
+    'Foreground Notifications',
+    description: 'Shows incoming FCM alerts when app is in foreground.',
+    importance: Importance.high,
+  );
 
   static Future<void> initialize() async {
+    await _initializeLocalNotifications();
     await _requestPermission();
+    await _configureForegroundPresentation();
     await _configureListeners();
     await _printToken();
+  }
+
+  static Future<void> _initializeLocalNotifications() async {
+    if (kIsWeb) return;
+
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const initializationSettings =
+        InitializationSettings(android: androidSettings);
+
+    await _localNotifications.initialize(initializationSettings);
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(_androidChannel);
   }
 
   static Future<void> _requestPermission() async {
@@ -44,7 +71,7 @@ class PushNotificationService {
   static Future<void> _configureListeners() async {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       developer.log(
         'Foreground message: ${message.messageId}, '
         'title=${message.notification?.title}, '
@@ -52,6 +79,8 @@ class PushNotificationService {
         'data=${message.data}',
         name: 'PushNotificationService',
       );
+
+      await _showForegroundNotification(message);
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
@@ -70,9 +99,47 @@ class PushNotificationService {
     }
 
     _messaging.onTokenRefresh.listen((token) {
-      developer.log('FCM token refreshed: $token', name: 'PushNotificationService');
+      developer.log('FCM token refreshed: $token',
+          name: 'PushNotificationService');
       unawaited(syncTokenWithBackend(token: token));
     });
+  }
+
+  static Future<void> _configureForegroundPresentation() async {
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+  }
+
+  static Future<void> _showForegroundNotification(RemoteMessage message) async {
+    if (kIsWeb) return;
+
+    final title =
+        message.notification?.title ?? message.data['title']?.toString();
+    final body = message.notification?.body ?? message.data['body']?.toString();
+
+    if ((title == null || title.isEmpty) && (body == null || body.isEmpty)) {
+      return;
+    }
+
+    final androidDetails = AndroidNotificationDetails(
+      _androidChannel.id,
+      _androidChannel.name,
+      channelDescription: _androidChannel.description,
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+
+    final notificationDetails = NotificationDetails(android: androidDetails);
+
+    await _localNotifications.show(
+      message.hashCode,
+      title ?? 'New notification',
+      body ?? '',
+      notificationDetails,
+    );
   }
 
   static Future<void> _printToken() async {

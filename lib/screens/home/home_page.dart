@@ -362,6 +362,9 @@ class _HomePageState extends State<HomePage> {
               onSettings: () {
                 _openMainTab(8);
               },
+              onNotifications: () {
+                Navigator.pushNamed(context, '/notifications');
+              },
               onMore: () {},
               onLess: () {},
             )

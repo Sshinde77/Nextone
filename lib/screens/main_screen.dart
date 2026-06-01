@@ -107,6 +107,7 @@ class _MainScreenState extends State<MainScreen> {
         onTeam: () => _setIndex(6),
         onReports: () => _setIndex(7),
         onSettings: () => _setIndex(8),
+        onNotifications: () => Navigator.pushNamed(context, '/notifications'),
         onPhoneRequests: () => _setIndex(9),
         onSalary: () => _setIndex(10),
         onMore: () {},
