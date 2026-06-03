@@ -114,13 +114,18 @@ class SiteRevisitDataCard extends StatelessWidget {
             children: [
               _action(Icons.remove_red_eye_outlined, onView),
               _action(Icons.edit_outlined, onEdit),
-              _action(Icons.check_circle_outline, onStatus),
+              if (!_isDoneStatus) _action(Icons.check_circle_outline, onStatus),
               _action(Icons.delete_outline, onDelete),
             ],
           ),
         ],
       ),
     );
+  }
+
+  bool get _isDoneStatus {
+    final normalized = statusLabel.trim().toLowerCase();
+    return normalized == 'done' || normalized == 'completed';
   }
 
   Widget _action(IconData icon, VoidCallback? onTap) {

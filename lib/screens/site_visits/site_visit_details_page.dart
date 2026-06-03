@@ -62,15 +62,61 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
   @override
   Widget build(BuildContext context) {
     final data = _visitData;
-    final lead = data['lead'] ?? {};
-    final project = data['project'] ?? {};
-    final assignedTo = data['assigned_to'] ?? {};
     final status = data['status']?.toString() ?? 'N/A';
     final visitDate = _formatDate(data['visit_date']);
     final visitTime = data['visit_time']?.toString() ?? 'N/A';
     final transportArranged = data['transport_arranged'] == true;
     final notes = data['notes']?.toString() ?? 'No notes provided.';
-    final feedback = data['feedback'];
+    final leadName = _readField(
+      data,
+      flatKey: 'lead_name',
+      nestedParentKey: 'lead',
+      nestedFieldKey: 'name',
+      fallback: 'N/A',
+    );
+    final leadPhone = _readField(
+      data,
+      flatKey: 'lead_phone',
+      nestedParentKey: 'lead',
+      nestedFieldKey: 'phone',
+      fallback: '',
+    );
+    final leadEmail = _readField(
+      data,
+      flatKey: 'lead_email',
+      nestedParentKey: 'lead',
+      nestedFieldKey: 'email',
+      fallback: '',
+    );
+    final projectName = _readField(
+      data,
+      flatKey: 'project_name',
+      nestedParentKey: 'project',
+      nestedFieldKey: 'name',
+      fallback: 'N/A',
+    );
+    final projectCity = _readField(
+      data,
+      flatKey: 'project_city',
+      nestedParentKey: 'project',
+      nestedFieldKey: 'city',
+      fallback: '-',
+    );
+    final projectAddress = _readField(
+      data,
+      flatKey: 'project_address',
+      nestedParentKey: 'project',
+      nestedFieldKey: 'address',
+      fallback: '-',
+    );
+    final assigneeName = _readField(
+      data,
+      flatKey: 'assigned_to_name',
+      nestedParentKey: 'assigned_to',
+      nestedFieldKey: 'full_name',
+      fallback: 'Unassigned',
+    );
+    final feedback = _feedbackData(data);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -102,52 +148,58 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
                   physics: const BouncingScrollPhysics(),
                   child: Column(
                     children: [
-                      _buildHeader(status),
+                      _buildHeroCard(
+                        status: status,
+                        visitDate: visitDate,
+                        visitTime: visitTime,
+                        transportArranged: transportArranged,
+                        leadName: leadName,
+                        projectName: projectName,
+                        assigneeName: assigneeName,
+                      ),
                       Padding(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
                         child: Column(
                           children: [
-                            _buildScheduleCard(
-                                visitDate, visitTime, transportArranged),
-                            const SizedBox(height: 16),
                             _buildSectionCard(
                               title: 'Lead Information',
                               icon: Icons.person_outline,
+                              accent: AppColors.primary,
                               children: [
-                                _buildInfoRow('Name', lead['name'] ?? 'N/A'),
-                                _buildInfoRow('Phone', lead['phone'] ?? 'N/A',
+                                _buildInfoRow('Name', leadName),
+                                _buildInfoRow('Phone', leadPhone,
                                     isLink: true,
-                                    onTap: () => _launchCaller(lead['phone'])),
-                                _buildInfoRow('Email', lead['email'] ?? 'N/A',
+                                    onTap: () => _launchCaller(leadPhone)),
+                                _buildInfoRow('Email', leadEmail,
                                     isLink: true,
-                                    onTap: () => _launchEmail(lead['email'])),
+                                    onTap: () => _launchEmail(leadEmail)),
                               ],
                             ),
                             const SizedBox(height: 16),
                             _buildSectionCard(
                               title: 'Project Information',
                               icon: Icons.apartment_outlined,
+                              accent: const Color(0xFF0F766E),
                               children: [
-                                _buildInfoRow(
-                                    'Project', project['name'] ?? 'N/A'),
-                                _buildInfoRow('City', project['city'] ?? 'N/A'),
-                                _buildInfoRow(
-                                    'Address', project['address'] ?? 'N/A'),
+                                _buildInfoRow('Project', projectName),
+                                _buildInfoRow('City', projectCity),
+                                _buildInfoRow('Address', projectAddress),
                               ],
                             ),
                             const SizedBox(height: 16),
                             _buildSectionCard(
                               title: 'Assignment',
                               icon: Icons.assignment_ind_outlined,
+                              accent: const Color(0xFF8B5CF6),
                               children: [
-                                _buildInfoRow('Assigned To',
-                                    assignedTo['full_name'] ?? 'Unassigned'),
+                                _buildInfoRow('Assigned To', assigneeName),
                               ],
                             ),
                             const SizedBox(height: 16),
                             _buildSectionCard(
                               title: 'Visit Notes',
                               icon: Icons.note_outlined,
+                              accent: const Color(0xFFD97706),
                               children: [
                                 Text(
                                   notes,
@@ -164,10 +216,43 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
                               _buildSectionCard(
                                 title: 'Feedback',
                                 icon: Icons.feedback_outlined,
+                                accent: const Color(0xFFDC2626),
                                 children: _buildFeedbackWidgets(feedback),
                               ),
                             ],
                             const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: leadPhone.trim().isEmpty
+                                        ? null
+                                        : () => _launchCaller(leadPhone),
+                                    icon: const Icon(Icons.call_outlined),
+                                    label: const Text('Call Lead'),
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize:
+                                          const Size(double.infinity, 48),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: leadEmail.trim().isEmpty
+                                        ? null
+                                        : () => _launchEmail(leadEmail),
+                                    icon: const Icon(Icons.email_outlined),
+                                    label: const Text('Email'),
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize:
+                                          const Size(double.infinity, 48),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
                             SizedBox(
                               width: double.infinity,
                               child: FilledButton.icon(
@@ -177,6 +262,13 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
                                   _hasFeedback(feedback)
                                       ? 'Update Feedback'
                                       : 'Submit Feedback',
+                                ),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 50),
+                                  backgroundColor: AppColors.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
                                 ),
                               ),
                             ),
@@ -190,117 +282,221 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
     );
   }
 
-  Widget _buildHeader(String status) {
+  Widget _buildHeroCard({
+    required String status,
+    required String visitDate,
+    required String visitTime,
+    required bool transportArranged,
+    required String leadName,
+    required String projectName,
+    required String assigneeName,
+  }) {
+    final statusColor = _getStatusColor(status);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.05),
-        border: const Border(
-          bottom: BorderSide(color: AppColors.border),
-        ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _getStatusColor(status).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border:
-                  Border.all(color: _getStatusColor(status).withOpacity(0.2)),
-            ),
-            child: Text(
-              status.toUpperCase(),
-              style: TextStyle(
-                color: _getStatusColor(status),
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Site Visit Overview',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScheduleCard(String date, String time, bool transport) {
-    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary.withOpacity(0.12),
+            Colors.white,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildScheduleItem(Icons.calendar_today_outlined, 'Date', date),
-          _buildDivider(),
-          _buildScheduleItem(Icons.access_time, 'Time', time),
-          _buildDivider(),
-          _buildScheduleItem(
-            transport ? Icons.directions_car : Icons.directions_walk,
-            'Transport',
-            transport ? 'Arranged' : 'Self',
-            iconColor: transport ? AppColors.success : AppColors.textSecondary,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  Icons.event_available_outlined,
+                  color: statusColor,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Site Visit Details',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      projectName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        height: 1.15,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      leadName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _statusChip(status),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _heroMetric(
+                  icon: Icons.calendar_today_outlined,
+                  label: 'Date',
+                  value: visitDate,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _heroMetric(
+                  icon: Icons.access_time_rounded,
+                  label: 'Time',
+                  value: visitTime,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _heroMetric(
+                  icon: transportArranged
+                      ? Icons.directions_car_rounded
+                      : Icons.directions_walk_rounded,
+                  label: 'Transport',
+                  value: transportArranged ? 'Arranged' : 'Self',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _softChip('Lead: $leadName'),
+              _softChip('Coordinator: $assigneeName'),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDivider() {
+  Widget _heroMetric({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
     return Container(
-      height: 40,
-      width: 1,
-      color: AppColors.border,
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-    );
-  }
-
-  Widget _buildScheduleItem(IconData icon, String label, String value,
-      {Color? iconColor}) {
-    return Expanded(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAFE),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Column(
         children: [
-          Icon(icon, size: 20, color: iconColor ?? AppColors.primary),
-          const SizedBox(height: 8),
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(height: 6),
           Text(
             label,
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 10,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
+            textAlign: TextAlign.center,
             style: const TextStyle(
               color: AppColors.textPrimary,
               fontSize: 12,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
             ),
-            textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _softChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _statusChip(String status) {
+    final color = _getStatusColor(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Text(
+        status.toUpperCase(),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.8,
+        ),
       ),
     );
   }
@@ -308,37 +504,50 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
   Widget _buildSectionCard({
     required String title,
     required IconData icon,
+    required Color accent,
     required List<Widget> children,
   }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 20, color: AppColors.primary),
-              const SizedBox(width: 8),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, size: 18, color: accent),
+              ),
+              const SizedBox(width: 10),
               Text(
                 title,
                 style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 15,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Divider(height: 1, color: AppColors.border),
-          ),
+          const SizedBox(height: 14),
           ...children,
         ],
       ),
@@ -422,10 +631,72 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
   }
 
   bool _hasFeedback(dynamic feedback) {
-    if (feedback == null) return false;
+    final map = _readMap(feedback);
+    if (map.isNotEmpty) return true;
     if (feedback is String) return feedback.trim().isNotEmpty;
-    if (feedback is Map) return feedback.isNotEmpty;
-    return true;
+    return false;
+  }
+
+  Map<String, dynamic> _readMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map(
+        (key, dynamic entry) => MapEntry(key.toString(), entry),
+      );
+    }
+    return const <String, dynamic>{};
+  }
+
+  String _readString(dynamic value, {String fallback = 'N/A'}) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty || text.toLowerCase() == 'null') {
+      return fallback;
+    }
+    return text;
+  }
+
+  String _nestedString(
+    Map<String, dynamic> source,
+    String nestedKey,
+    String valueKey, {
+    String fallback = 'N/A',
+  }) {
+    final nested = _readMap(source[nestedKey]);
+    return _readString(nested[valueKey], fallback: fallback);
+  }
+
+  String _readField(
+    Map<String, dynamic> source, {
+    required String flatKey,
+    required String nestedParentKey,
+    required String nestedFieldKey,
+    String fallback = 'N/A',
+  }) {
+    final flatValue = _readString(source[flatKey], fallback: '');
+    if (flatValue.isNotEmpty) {
+      return flatValue;
+    }
+    return _nestedString(
+      source,
+      nestedParentKey,
+      nestedFieldKey,
+      fallback: fallback,
+    );
+  }
+
+  Map<String, dynamic> _feedbackData(Map<String, dynamic> source) {
+    final nested = _readMap(source['feedback']);
+    return <String, dynamic>{
+      'rating': source['rating'] ?? nested['rating'],
+      'client_reaction': source['client_reaction'] ?? nested['client_reaction'],
+      'interested_in': source['interested_in'] ?? nested['interested_in'],
+      'next_step': source['next_step'] ?? nested['next_step'],
+      'remarks':
+          source['feedback_remarks'] ?? source['remarks'] ?? nested['remarks'],
+    }..removeWhere(
+        (key, value) => value == null || value.toString().trim().isEmpty);
   }
 
   List<Widget> _buildFeedbackWidgets(dynamic feedback) {
@@ -470,10 +741,7 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
   }
 
   Future<void> _submitFeedback() async {
-    final feedback = _visitData['feedback'];
-    final feedbackMap = feedback is Map<String, dynamic>
-        ? feedback
-        : const <String, dynamic>{};
+    final feedbackMap = _feedbackData(_visitData);
 
     final remarksController = TextEditingController(
       text: feedbackMap['remarks']?.toString() ?? '',
@@ -516,11 +784,15 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       value: reaction,
-                      decoration: const InputDecoration(labelText: 'Client Reaction'),
+                      decoration:
+                          const InputDecoration(labelText: 'Client Reaction'),
                       items: const [
-                        DropdownMenuItem(value: 'positive', child: Text('Positive')),
-                        DropdownMenuItem(value: 'neutral', child: Text('Neutral')),
-                        DropdownMenuItem(value: 'negative', child: Text('Negative')),
+                        DropdownMenuItem(
+                            value: 'positive', child: Text('Positive')),
+                        DropdownMenuItem(
+                            value: 'neutral', child: Text('Neutral')),
+                        DropdownMenuItem(
+                            value: 'negative', child: Text('Negative')),
                       ],
                       onChanged: (value) {
                         if (value != null) {

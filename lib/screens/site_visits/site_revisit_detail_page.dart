@@ -104,7 +104,8 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
     final status = _readString(_data!['status'], fallback: 'scheduled');
     final date = _formatDate(_readString(_data!['visit_date'], fallback: ''));
     final time = _readString(_data!['visit_time'], fallback: '-');
-    final transport = _data!['transport_arranged'] == true ? 'Arranged' : 'Not Arranged';
+    final transport =
+        _data!['transport_arranged'] == true ? 'Arranged' : 'Not Arranged';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -125,7 +126,8 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.repeat_rounded, color: Colors.white, size: 28),
+                child: const Icon(Icons.repeat_rounded,
+                    color: Colors.white, size: 28),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -134,7 +136,8 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
                   children: [
                     const Text(
                       'Re-visit',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -227,49 +230,52 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
   }
 
   Widget _leadCard() {
-    final lead = _asMap(_data!['lead']);
     return _entityCard(
       title: 'Lead Information',
-      primary: _readString(lead['name'], fallback: 'N/A'),
-      secondary: _readString(lead['phone'], fallback: '-'),
-      tertiary: _readString(lead['email'], fallback: '-'),
+      primary: _nestedString('lead', 'name', fallback: 'N/A'),
+      secondary: _nestedString('lead', 'phone', fallback: '-'),
+      tertiary: _nestedString('lead', 'email', fallback: '-'),
       icon: Icons.person_outline,
     );
   }
 
   Widget _projectCard() {
-    final project = _asMap(_data!['project']);
     return _entityCard(
       title: 'Project',
-      primary: _readString(project['name'], fallback: 'N/A'),
-      secondary: _readString(project['city'], fallback: '-'),
-      tertiary: _readString(project['address'], fallback: '-'),
+      primary: _nestedString('project', 'name', fallback: 'N/A'),
+      secondary: _nestedString('project', 'city', fallback: '-'),
+      tertiary: _nestedString('project', 'address', fallback: '-'),
       icon: Icons.apartment_outlined,
     );
   }
 
   Widget _assigneeCard() {
-    final assignee = _asMap(_data!['assigned_to']);
     return _entityCard(
       title: 'Coordinator',
-      primary: _readString(assignee['full_name'], fallback: 'N/A'),
-      secondary: _readString(assignee['id'], fallback: '-'),
+      primary: _nestedString('assigned_to', 'full_name', fallback: 'N/A'),
+      secondary: _nestedString('assigned_to', 'id', fallback: '-'),
       tertiary: '',
       icon: Icons.groups_outlined,
     );
   }
 
   Widget _feedbackCard() {
-    final feedback = _asMap(_data!['feedback']);
     return _entityCard(
       title: 'Feedback',
-      primary: feedback.isEmpty ? '-' : _readString(feedback['note'], fallback: '-'),
-      secondary: feedback.isEmpty
-          ? '-'
-          : _readString(feedback['client_reaction'], fallback: '-'),
-      tertiary: feedback.isEmpty ? '-' : _readString(feedback['next_step'], fallback: '-'),
+      primary: _nestedString('feedback', 'note', fallback: '-'),
+      secondary: _nestedString('feedback', 'client_reaction', fallback: '-'),
+      tertiary: _nestedString('feedback', 'next_step', fallback: '-'),
       icon: Icons.rate_review_outlined,
     );
+  }
+
+  String _nestedString(
+    String parentKey,
+    String childKey, {
+    required String fallback,
+  }) {
+    final nested = _asMap(_data![parentKey]);
+    return _readString(nested[childKey], fallback: fallback);
   }
 
   Widget _entityCard({
@@ -301,10 +307,12 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 15),
                 ),
                 const SizedBox(height: 6),
-                Text(primary, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(primary,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 2),
                 Text(
                   secondary,
@@ -366,7 +374,8 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_error ?? 'Unable to load details', style: const TextStyle(color: AppColors.error)),
+          Text(_error ?? 'Unable to load details',
+              style: const TextStyle(color: AppColors.error)),
           const SizedBox(height: 10),
           FilledButton(
             onPressed: _loadDetail,
@@ -388,7 +397,8 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
       ),
       child: const Text(
         'No details found.',
-        style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+        style: TextStyle(
+            color: AppColors.textSecondary, fontWeight: FontWeight.w600),
       ),
     );
   }

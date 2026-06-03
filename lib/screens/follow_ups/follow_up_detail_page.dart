@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
@@ -108,7 +109,8 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Lead is not available for this follow-up.')),
+          const SnackBar(
+              content: Text('Lead is not available for this follow-up.')),
         );
       return;
     }
@@ -118,6 +120,33 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
         builder: (_) => SiteVisitFormPage(initialLeadId: leadId),
       ),
     );
+  }
+
+  Future<void> _openEditFollowUp() async {
+    final data = _detail;
+    if (data == null) {
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FollowUpFormPage(
+          followUpId: widget.followUpId,
+          followUpData: <String, dynamic>{
+            'title': data['title'],
+            'lead_id': data['lead_id'],
+            'due_date': data['due_date'],
+            'priority': data['priority'],
+            'notes': data['notes'],
+          },
+        ),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+    await _loadDetail();
   }
 
   @override
@@ -222,24 +251,6 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
           children: [
             _kv('Is Completed', isCompleted ? 'Yes' : 'No'),
             _kv('Completed At', _readDateTime(data['completed_at'])),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: (isCompleted || _isUpdatingStatus)
-                    ? null
-                    : _confirmAndUpdateCompletionStatus,
-                icon: _isUpdatingStatus
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.check_circle_outline),
-                label:
-                    Text(_isUpdatingStatus ? 'Updating...' : 'Update Status'),
-              ),
-            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -315,6 +326,42 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
                     fontSize: 12.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: (completed || _isUpdatingStatus)
+                      ? null
+                      : _confirmAndUpdateCompletionStatus,
+                  icon: _isUpdatingStatus
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.check_circle_outline, size: 18),
+                  label: Text(
+                    completed ? 'Completed' : 'Complete Follow Up',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 44),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _openEditFollowUp,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Edit Follow Up'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 44),
                   ),
                 ),
               ),

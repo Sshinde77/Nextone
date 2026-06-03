@@ -24,6 +24,10 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   String? _error;
   List<Map<String, dynamic>> _items = const <Map<String, dynamic>>[];
   String _statusFilter = 'all';
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalItems = 0;
+  final int _perPage = 10;
 
   @override
   void initState() {
@@ -37,7 +41,11 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     super.dispose();
   }
 
-  Future<void> _loadRevisits() async {
+  Future<void> _loadRevisits({int? page}) async {
+    final nextPage = page ?? _currentPage;
+    final apiStatus =
+        _statusFilter == 'all' ? null : _statusFilter.trim().toLowerCase();
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -46,10 +54,16 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     try {
       final result = await _authProvider.siteRevisits(
         token: _authProvider.currentAuthToken,
+        status: apiStatus,
+        page: nextPage,
+        perPage: _perPage,
       );
       if (!mounted) return;
       setState(() {
         _items = result.items;
+        _currentPage = result.currentPage;
+        _totalPages = result.totalPages;
+        _totalItems = result.totalItems;
         _isLoading = false;
       });
     } catch (e) {
@@ -88,7 +102,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
             _buildKpiRow(),
             const SizedBox(height: 12),
 
-             Align(
+            Align(
               alignment: Alignment.centerRight,
               child: FilledButton.icon(
                 onPressed: _openScheduleRevisit,
@@ -111,8 +125,11 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
               _buildError()
             else if (visibleItems.isEmpty)
               _buildEmpty()
-            else
+            else ...[
               ...visibleItems.map(_buildCard),
+              const SizedBox(height: 12),
+              _buildPagination(),
+            ],
           ],
         ),
       ),
@@ -191,14 +208,21 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
             child: DropdownButton<String>(
               value: _statusFilter,
               items: const [
-                DropdownMenuItem(value: 'all', child: Text('All Status')),
+                DropdownMenuItem(value: 'all', child: Text('All')),
                 DropdownMenuItem(value: 'scheduled', child: Text('Scheduled')),
+                DropdownMenuItem(value: 'done', child: Text('Done')),
+                DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
                 DropdownMenuItem(
                     value: 'rescheduled', child: Text('Rescheduled')),
+                DropdownMenuItem(value: 'no_show', child: Text('No Show')),
               ],
               onChanged: (value) {
                 if (value == null) return;
-                setState(() => _statusFilter = value);
+                setState(() {
+                  _statusFilter = value;
+                  _currentPage = 1;
+                });
+                _loadRevisits(page: 1);
               },
             ),
           ),
@@ -208,6 +232,50 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
           icon: const Icon(Icons.refresh),
         ),
       ],
+    );
+  }
+
+  Widget _buildPagination() {
+    if (_totalPages <= 1) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          OutlinedButton(
+            onPressed: _isLoading || _currentPage <= 1
+                ? null
+                : () => _loadRevisits(page: _currentPage - 1),
+            child: const Text('Previous'),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Page $_currentPage of $_totalPages - $_totalItems total',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          OutlinedButton(
+            onPressed: _isLoading || _currentPage >= _totalPages
+                ? null
+                : () => _loadRevisits(page: _currentPage + 1),
+            child: const Text('Next'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -282,7 +350,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
         borderRadius: BorderRadius.circular(14),
       ),
       child: const Text(
-        'No re-visits found for current month.',
+        'No re-visits found for the selected filters.',
         style: TextStyle(color: AppColors.textSecondary),
       ),
     );
@@ -334,14 +402,14 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   }
 
   bool _matchesFilter(Map<String, dynamic> item) {
-    final status = _readString(item['status'], fallback: 'scheduled')
-        .toLowerCase()
-        .trim();
+    final status =
+        _readString(item['status'], fallback: 'scheduled').toLowerCase().trim();
     final query = _searchController.text.trim().toLowerCase();
     final lead = _readString(item['lead_name'], fallback: '').toLowerCase();
     final project =
         _readString(item['project_name'], fallback: '').toLowerCase();
-    final textMatch = query.isEmpty || lead.contains(query) || project.contains(query);
+    final textMatch =
+        query.isEmpty || lead.contains(query) || project.contains(query);
     final statusMatch = _statusFilter == 'all' || status == _statusFilter;
     return textMatch && statusMatch;
   }
@@ -397,9 +465,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setLocalState) {
-            String dateLabel = selectedDate == null
-                ? 'dd-mm-yyyy'
-                : _toYmd(selectedDate!);
+            String dateLabel =
+                selectedDate == null ? 'dd-mm-yyyy' : _toYmd(selectedDate!);
             String timeLabel = selectedTime == null
                 ? '--:--'
                 : '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}';
@@ -419,7 +486,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
             Future<void> pickTime() async {
               final picked = await showTimePicker(
                 context: context,
-                initialTime: selectedTime ?? const TimeOfDay(hour: 11, minute: 0),
+                initialTime:
+                    selectedTime ?? const TimeOfDay(hour: 11, minute: 0),
               );
               if (picked == null) return;
               setLocalState(() => selectedTime = picked);
@@ -461,7 +529,9 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
                   ..showSnackBar(
-                    SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                    SnackBar(
+                        content:
+                            Text(e.toString().replaceFirst('Exception: ', ''))),
                   );
               }
             }
@@ -510,13 +580,15 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                               .map(
                                 (v) => DropdownMenuItem<_OriginalVisitOption>(
                                   value: v,
-                                  child: Text(v.label, overflow: TextOverflow.ellipsis),
+                                  child: Text(v.label,
+                                      overflow: TextOverflow.ellipsis),
                                 ),
                               )
                               .toList(),
                           onChanged: isSubmitting
                               ? null
-                              : (value) => setLocalState(() => selectedVisit = value),
+                              : (value) =>
+                                  setLocalState(() => selectedVisit = value),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -683,18 +755,22 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       perPage: 200,
     );
 
-    return result.items.map((item) {
-      final id = _readString(item['id'], fallback: '');
-      final leadName = _readString(item['lead_name'], fallback: 'Lead');
-      final projectName = _readString(item['project_name'], fallback: 'Project');
-      final assigneeName =
-          _readString(item['assigned_to_name'], fallback: 'Unassigned');
-      return _OriginalVisitOption(
-        id: id,
-        assigneeName: assigneeName,
-        label: '$leadName - $projectName',
-      );
-    }).where((e) => e.id.isNotEmpty).toList();
+    return result.items
+        .map((item) {
+          final id = _readString(item['id'], fallback: '');
+          final leadName = _readString(item['lead_name'], fallback: 'Lead');
+          final projectName =
+              _readString(item['project_name'], fallback: 'Project');
+          final assigneeName =
+              _readString(item['assigned_to_name'], fallback: 'Unassigned');
+          return _OriginalVisitOption(
+            id: id,
+            assigneeName: assigneeName,
+            label: '$leadName - $projectName',
+          );
+        })
+        .where((e) => e.id.isNotEmpty)
+        .toList();
   }
 
   Future<void> _openEditRevisit(Map<String, dynamic> item) async {
@@ -724,7 +800,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     bool transportArranged = item['transport_arranged'] == true;
     bool isSubmitting = false;
 
-    final usersRaw = await _authProvider.users(token: _authProvider.currentAuthToken);
+    final usersRaw =
+        await _authProvider.users(token: _authProvider.currentAuthToken);
     final members = usersRaw
         .map((u) => _TeamMemberOption(
               id: _readString(u['id'], fallback: ''),
@@ -754,9 +831,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setLocalState) {
-            final dateLabel = selectedDate == null
-                ? 'dd-mm-yyyy'
-                : _toYmd(selectedDate!);
+            final dateLabel =
+                selectedDate == null ? 'dd-mm-yyyy' : _toYmd(selectedDate!);
             final timeLabel = selectedTime == null
                 ? '--:--'
                 : '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}';
@@ -775,7 +851,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
             Future<void> pickTime() async {
               final picked = await showTimePicker(
                 context: context,
-                initialTime: selectedTime ?? const TimeOfDay(hour: 10, minute: 0),
+                initialTime:
+                    selectedTime ?? const TimeOfDay(hour: 10, minute: 0),
               );
               if (picked == null) return;
               setLocalState(() => selectedTime = picked);
@@ -784,7 +861,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
             Future<void> submit() async {
               if (selectedDate == null || selectedTime == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Visit date and time are required.')),
+                  const SnackBar(
+                      content: Text('Visit date and time are required.')),
                 );
                 return;
               }
@@ -807,13 +885,16 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                 if (!context.mounted) return;
                 setLocalState(() => isSubmitting = false);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                  SnackBar(
+                      content:
+                          Text(e.toString().replaceFirst('Exception: ', ''))),
                 );
               }
             }
 
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: SizedBox(
                 width: 600,
                 child: Padding(
@@ -869,12 +950,14 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                         const SizedBox(height: 6),
                         DropdownButtonFormField<_TeamMemberOption>(
                           value: selectedMember,
-                          decoration: _fieldDecoration(hint: 'Select team member'),
+                          decoration:
+                              _fieldDecoration(hint: 'Select team member'),
                           items: members
                               .map(
                                 (m) => DropdownMenuItem<_TeamMemberOption>(
                                   value: m,
-                                  child: Text(m.name, overflow: TextOverflow.ellipsis),
+                                  child: Text(m.name,
+                                      overflow: TextOverflow.ellipsis),
                                 ),
                               )
                               .toList(),
@@ -888,7 +971,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                         TextField(
                           controller: reasonController,
                           enabled: !isSubmitting,
-                          decoration: _fieldDecoration(hint: 'Reason for re-visit...'),
+                          decoration:
+                              _fieldDecoration(hint: 'Reason for re-visit...'),
                         ),
                         const SizedBox(height: 10),
                         const Text('Notes'),
@@ -982,11 +1066,13 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
 
     final noteController = TextEditingController();
     bool isSubmitting = false;
-    String selectedStatus = _statusToUi(_readString(item['status'], fallback: 'scheduled'));
+    String selectedStatus =
+        _statusToUi(_readString(item['status'], fallback: 'scheduled'));
 
     final leadName = _readString(item['lead_name'], fallback: 'N/A');
     final projectName = _readString(item['project_name'], fallback: 'N/A');
-    final visitDate = _formatDate(_readString(item['visit_date'], fallback: ''));
+    final visitDate =
+        _formatDate(_readString(item['visit_date'], fallback: ''));
     final visitTime = _readString(item['visit_time'], fallback: '-');
 
     final updated = await showDialog<bool>(
@@ -1010,13 +1096,16 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                 if (!context.mounted) return;
                 setLocalState(() => isSubmitting = false);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                  SnackBar(
+                      content:
+                          Text(e.toString().replaceFirst('Exception: ', ''))),
                 );
               }
             }
 
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: SizedBox(
                 width: 560,
                 child: Padding(
@@ -1030,7 +1119,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                           const Expanded(
                             child: Text(
                               'Update Re-visit Status',
-                              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                  fontSize: 34, fontWeight: FontWeight.w700),
                             ),
                           ),
                           IconButton(
@@ -1054,7 +1144,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                           children: [
                             CircleAvatar(
                               radius: 18,
-                              backgroundColor: AppColors.primary.withOpacity(0.2),
+                              backgroundColor:
+                                  AppColors.primary.withOpacity(0.2),
                               child: Text(
                                 _initials(leadName),
                                 style: const TextStyle(
@@ -1095,11 +1186,15 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                         value: selectedStatus,
                         decoration: _fieldDecoration(),
                         items: const [
-                          DropdownMenuItem(value: 'Scheduled', child: Text('Scheduled')),
-                          DropdownMenuItem(value: 'In Progress', child: Text('In Progress')),
+                          DropdownMenuItem(
+                              value: 'Scheduled', child: Text('Scheduled')),
+                          DropdownMenuItem(
+                              value: 'In Progress', child: Text('In Progress')),
                           DropdownMenuItem(value: 'Done', child: Text('Done')),
-                          DropdownMenuItem(value: 'Rescheduled', child: Text('Rescheduled')),
-                          DropdownMenuItem(value: 'Cancelled', child: Text('Cancelled')),
+                          DropdownMenuItem(
+                              value: 'Rescheduled', child: Text('Rescheduled')),
+                          DropdownMenuItem(
+                              value: 'Cancelled', child: Text('Cancelled')),
                         ],
                         onChanged: isSubmitting
                             ? null
@@ -1131,7 +1226,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                           Expanded(
                             child: FilledButton(
                               onPressed: isSubmitting ? null : submit,
-                              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                              style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary),
                               child: isSubmitting
                                   ? const SizedBox(
                                       width: 18,
@@ -1162,7 +1258,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Re-visit status updated')));
+        ..showSnackBar(
+            const SnackBar(content: Text('Re-visit status updated')));
     }
   }
 
@@ -1201,11 +1298,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   }
 
   String _initials(String name) {
-    final parts = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((e) => e.isNotEmpty)
-        .toList();
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
     if (parts.isEmpty) return '?';
     if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();

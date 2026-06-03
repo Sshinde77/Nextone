@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -8,6 +8,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_detail_page.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
+import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -26,124 +27,28 @@ class _FollowUpPageState extends State<FollowUpPage> {
   final Set<String> _selectedFollowUpIds = <String>{};
   final AuthProvider _authProvider = AuthProvider();
   bool _isBulkSelectionMode = false;
+  Timer? _searchDebounce;
 
   int _currentPage = 1;
-  final int _pageSize = 5;
+  final int _pageSize = 20;
   String _searchQuery = '';
+  String _selectedTeamId = '';
   bool _isLoadingFollowUps = false;
+  bool _isLoadingTeams = false;
   bool _isExporting = false;
   String? _loadError;
   String _currentRole = '';
+  int _totalItems = 0;
+  int _totalPages = 1;
 
-  final List<_FollowUpModel> _allFollowUps = <_FollowUpModel>[
-    _FollowUpModel(
-      id: 'FU-2026-001',
-      leadId: 'L-2026-0001',
-      customerName: 'Rajesh Khanna',
-      status: 'Scheduled',
-      statusColor: const Color(0xFF1E88E5),
-      priority: 'High',
-      priorityColor: const Color(0xFFE53935),
-      dueDate: '2026-04-25',
-      dueTime: '10:30 AM',
-      channel: 'Call',
-      notes: 'Discuss unit options and payment plan.',
-      assignee: _PersonModel(
-        name: 'Amit Kumar',
-        imageUrl: 'https://i.pravatar.cc/160?img=21',
-      ),
-    ),
-    _FollowUpModel(
-      id: 'FU-2026-002',
-      leadId: 'L-2026-0002',
-      customerName: 'Meera Reddy',
-      status: 'Pending',
-      statusColor: const Color(0xFFFB8C00),
-      priority: 'Medium',
-      priorityColor: const Color(0xFFFB8C00),
-      dueDate: '2026-04-24',
-      dueTime: '02:15 PM',
-      channel: 'WhatsApp',
-      notes: 'Share project brochure and floor plans.',
-      assignee: _PersonModel(
-        name: 'Sneha Gupta',
-        imageUrl: 'https://i.pravatar.cc/160?img=22',
-      ),
-    ),
-    _FollowUpModel(
-      id: 'FU-2026-003',
-      leadId: 'L-2026-0003',
-      customerName: 'Suresh Iyer',
-      status: 'Overdue',
-      statusColor: const Color(0xFFD32F2F),
-      priority: 'High',
-      priorityColor: const Color(0xFFE53935),
-      dueDate: '2026-04-22',
-      dueTime: '11:00 AM',
-      channel: 'Meeting',
-      notes: 'Negotiation follow-up pending final approval.',
-      assignee: _PersonModel(
-        name: 'Priya Menon',
-        imageUrl: 'https://i.pravatar.cc/160?img=23',
-      ),
-    ),
-    _FollowUpModel(
-      id: 'FU-2026-004',
-      leadId: 'L-2026-0005',
-      customerName: 'Vikram Rao',
-      status: 'Scheduled',
-      statusColor: const Color(0xFF1E88E5),
-      priority: 'Medium',
-      priorityColor: const Color(0xFFFB8C00),
-      dueDate: '2026-04-27',
-      dueTime: '04:00 PM',
-      channel: 'Call',
-      notes: 'Reconfirm site visit for Sunday.',
-      assignee: _PersonModel(
-        name: 'Neha Joshi',
-        imageUrl: 'https://i.pravatar.cc/160?img=25',
-      ),
-    ),
-    _FollowUpModel(
-      id: 'FU-2026-005',
-      leadId: 'L-2026-0007',
-      customerName: 'Kavya Nair',
-      status: 'Completed',
-      statusColor: const Color(0xFF2E7D32),
-      priority: 'High',
-      priorityColor: const Color(0xFFE53935),
-      dueDate: '2026-04-23',
-      dueTime: '09:00 AM',
-      channel: 'Demo',
-      notes: 'Demo done. Awaiting feedback by tomorrow.',
-      assignee: _PersonModel(
-        name: 'Sneha Gupta',
-        imageUrl: 'https://i.pravatar.cc/160?img=22',
-      ),
-    ),
-    _FollowUpModel(
-      id: 'FU-2026-006',
-      leadId: 'L-2026-0009',
-      customerName: 'Pooja Kapoor',
-      status: 'Pending',
-      statusColor: const Color(0xFFFB8C00),
-      priority: 'Low',
-      priorityColor: const Color(0xFF1E88E5),
-      dueDate: '2026-04-30',
-      dueTime: '01:30 PM',
-      channel: 'Email',
-      notes: 'Send revised costing sheet.',
-      assignee: _PersonModel(
-        name: 'Priya Menon',
-        imageUrl: 'https://i.pravatar.cc/160?img=23',
-      ),
-    ),
-  ];
+  final List<_FollowUpModel> _followUps = <_FollowUpModel>[];
+  final List<_TeamOption> _teamOptions = <_TeamOption>[];
 
   @override
   void initState() {
     super.initState();
     _loadAccess();
+    _loadTeamOptions();
     _loadFollowUps();
   }
 
@@ -161,6 +66,54 @@ class _FollowUpPageState extends State<FollowUpPage> {
     }
   }
 
+  Future<void> _loadTeamOptions() async {
+    setState(() {
+      _isLoadingTeams = true;
+    });
+
+    try {
+      final users =
+          await _authProvider.users(token: _authProvider.currentAuthToken);
+      final options = users
+          .map(_teamOptionFromUser)
+          .whereType<_TeamOption>()
+          .toList()
+        ..sort(
+            (a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _teamOptions
+          ..clear()
+          ..addAll(options);
+        _isLoadingTeams = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingTeams = false;
+      });
+    }
+  }
+
+  void _scheduleFollowUpReload({bool resetPage = false}) {
+    if (resetPage) {
+      _currentPage = 1;
+    }
+
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) {
+        return;
+      }
+      _loadFollowUps(page: _currentPage);
+    });
+  }
+
   Future<void> _openCreateFollowUp() async {
     final payload = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(builder: (_) => const FollowUpFormPage()),
@@ -176,8 +129,9 @@ class _FollowUpPageState extends State<FollowUpPage> {
     );
 
     setState(() {
-      _allFollowUps.insert(0, created);
+      _followUps.insert(0, created);
       _currentPage = 1;
+      _totalItems += 1;
     });
   }
 
@@ -207,14 +161,50 @@ class _FollowUpPageState extends State<FollowUpPage> {
       assignee: followUp.assignee,
     );
 
-    final index = _allFollowUps.indexWhere((item) => item.id == followUp.id);
+    final index = _followUps.indexWhere((item) => item.id == followUp.id);
     if (index < 0) {
       return;
     }
 
     setState(() {
-      _allFollowUps[index] = updated;
+      _followUps[index] = updated;
     });
+  }
+
+  Future<void> _openBulkSiteVisitForm() async {
+    final selectedFollowUps = _followUps
+        .where((followUp) => _selectedFollowUpIds.contains(followUp.id))
+        .toList(growable: false);
+
+    if (selectedFollowUps.isEmpty) {
+      _showSnackBar('Select at least one follow-up.');
+      return;
+    }
+    if (selectedFollowUps.length != 1) {
+      _showSnackBar(
+        'Convert to site visit uses the existing single-lead form. Select one follow-up.',
+      );
+      return;
+    }
+
+    final selectedFollowUp = selectedFollowUps.first;
+    if (selectedFollowUp.leadId.trim().isEmpty ||
+        selectedFollowUp.leadId.trim() == 'N/A') {
+      _showSnackBar('Lead information is not available for this follow-up.');
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            SiteVisitFormPage(initialLeadId: selectedFollowUp.leadId.trim()),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+    await _loadFollowUps(page: _currentPage);
   }
 
   Future<void> _viewFollowUp(_FollowUpModel followUp) async {
@@ -261,7 +251,10 @@ class _FollowUpPageState extends State<FollowUpPage> {
         return;
       }
       setState(() {
-        _allFollowUps.removeWhere((item) => item.id == followUp.id);
+        _followUps.removeWhere((item) => item.id == followUp.id);
+        if (_totalItems > 0) {
+          _totalItems -= 1;
+        }
         _selectedFollowUpIds.remove(followUp.id);
         _syncBulkSelectionMode();
       });
@@ -325,13 +318,13 @@ class _FollowUpPageState extends State<FollowUpPage> {
         token: _authProvider.currentAuthToken,
       );
 
-      final index = _allFollowUps.indexWhere((item) => item.id == followUp.id);
+      final index = _followUps.indexWhere((item) => item.id == followUp.id);
       if (index < 0 || !mounted) {
         return;
       }
 
       setState(() {
-        _allFollowUps[index] = _allFollowUps[index].copyWith(
+        _followUps[index] = _followUps[index].copyWith(
           status: 'Completed',
           statusColor: const Color(0xFF2E7D32),
         );
@@ -431,6 +424,28 @@ class _FollowUpPageState extends State<FollowUpPage> {
     return '';
   }
 
+  _TeamOption? _teamOptionFromUser(Map<String, dynamic> user) {
+    final id = _readString(user['id'] ?? user['user_id'] ?? user['userId']);
+    if (id.isEmpty) {
+      return null;
+    }
+
+    final firstName = _readString(user['first_name'] ?? user['firstName']);
+    final lastName = _readString(user['last_name'] ?? user['lastName']);
+    final fullName = _readString(
+      user['full_name'] ?? user['fullName'] ?? user['name'],
+    );
+
+    final label = fullName.isNotEmpty
+        ? fullName
+        : [firstName, lastName].where((part) => part.isNotEmpty).join(' ');
+
+    return _TeamOption(
+      id: id,
+      label: label.isEmpty ? id : label,
+    );
+  }
+
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -476,39 +491,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
     }
   }
 
-  List<_FollowUpModel> get _filteredFollowUps {
-    final query = _searchQuery.trim().toLowerCase();
-    if (query.isEmpty) {
-      return _allFollowUps;
-    }
-
-    return _allFollowUps.where((followUp) {
-      return followUp.customerName.toLowerCase().contains(query) ||
-          followUp.id.toLowerCase().contains(query) ||
-          followUp.leadId.toLowerCase().contains(query) ||
-          followUp.status.toLowerCase().contains(query) ||
-          followUp.assignee.name.toLowerCase().contains(query);
-    }).toList();
-  }
-
-  int get _totalPages {
-    if (_filteredFollowUps.isEmpty) {
-      return 1;
-    }
-    return (_filteredFollowUps.length / _pageSize).ceil();
-  }
-
-  List<_FollowUpModel> get _currentPageFollowUps {
-    final followUps = _filteredFollowUps;
-    if (followUps.isEmpty) {
-      return const <_FollowUpModel>[];
-    }
-
-    final safePage = _currentPage.clamp(1, _totalPages);
-    final start = (safePage - 1) * _pageSize;
-    final end = math.min(start + _pageSize, followUps.length);
-    return followUps.sublist(start, end);
-  }
+  List<_FollowUpModel> get _currentPageFollowUps => _followUps;
 
   bool get _isAllCurrentPageSelected {
     final followUps = _currentPageFollowUps;
@@ -528,19 +511,27 @@ class _FollowUpPageState extends State<FollowUpPage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadFollowUps() async {
+  Future<void> _loadFollowUps({int? page}) async {
+    final targetPage = page ?? _currentPage;
     setState(() {
       _isLoadingFollowUps = true;
       _loadError = null;
+      _currentPage = targetPage;
     });
 
     try {
       final result = await _authProvider.followUps(
         token: _authProvider.currentAuthToken,
+        assignedTo:
+            _selectedTeamId.trim().isEmpty ? null : _selectedTeamId.trim(),
+        search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+        page: targetPage,
+        perPage: _pageSize,
       );
 
       final mapped = result.items
@@ -551,11 +542,13 @@ class _FollowUpPageState extends State<FollowUpPage> {
         return;
       }
       setState(() {
-        _allFollowUps
+        _followUps
           ..clear()
           ..addAll(mapped);
+        _currentPage = result.currentPage;
+        _totalPages = result.totalPages <= 0 ? 1 : result.totalPages;
+        _totalItems = result.totalItems;
         _isLoadingFollowUps = false;
-        _currentPage = 1;
         _selectedFollowUpIds.clear();
         _isBulkSelectionMode = false;
       });
@@ -698,7 +691,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
                     ),
                     const SizedBox(height: 8),
                     FilledButton(
-                      onPressed: _loadFollowUps,
+                      onPressed: () => _loadFollowUps(page: _currentPage),
                       child: const Text('Retry'),
                     ),
                   ],
@@ -737,10 +730,10 @@ class _FollowUpPageState extends State<FollowUpPage> {
             onChanged: (value) {
               setState(() {
                 _searchQuery = value;
-                _currentPage = 1;
                 _selectedFollowUpIds.clear();
                 _isBulkSelectionMode = false;
               });
+              _scheduleFollowUpReload(resetPage: true);
             },
             decoration: const InputDecoration(
               hintText: 'Search by customer, status',
@@ -748,6 +741,52 @@ class _FollowUpPageState extends State<FollowUpPage> {
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(vertical: 13),
             ),
+          ),
+        );
+
+        final teamFilter = SizedBox(
+          height: 48,
+          child: DropdownButtonFormField<String>(
+            initialValue: _selectedTeamId.isEmpty ? '' : _selectedTeamId,
+            isExpanded: true,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            items: [
+              const DropdownMenuItem<String>(
+                value: '',
+                child: Text('All Teams'),
+              ),
+              ..._teamOptions.map(
+                (team) => DropdownMenuItem<String>(
+                  value: team.id,
+                  child: Text(
+                    team.label,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ],
+            onChanged: _isLoadingTeams
+                ? null
+                : (value) {
+                    setState(() {
+                      _selectedTeamId = value ?? '';
+                      _selectedFollowUpIds.clear();
+                      _isBulkSelectionMode = false;
+                    });
+                    _scheduleFollowUpReload(resetPage: true);
+                  },
           ),
         );
 
@@ -776,7 +815,6 @@ class _FollowUpPageState extends State<FollowUpPage> {
         final addButton = FilledButton.icon(
           onPressed: _openCreateFollowUp,
           icon: const Icon(Icons.add, size: 18),
-          
           label: const Text('Add Follow Up'),
           style: FilledButton.styleFrom(
             minimumSize: const Size(0, 48),
@@ -791,7 +829,13 @@ class _FollowUpPageState extends State<FollowUpPage> {
         if (isCompact) {
           return Column(
             children: [
-              searchField,
+              Row(
+                children: [
+                  Expanded(flex: 2, child: searchField),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 1, child: teamFilter),
+                ],
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -809,6 +853,8 @@ class _FollowUpPageState extends State<FollowUpPage> {
         return Row(
           children: [
             Expanded(child: searchField),
+            const SizedBox(width: 12),
+            SizedBox(width: 240, child: teamFilter),
             const SizedBox(width: 12),
             if (exportButton != null) ...[
               exportButton,
@@ -845,9 +891,9 @@ class _FollowUpPageState extends State<FollowUpPage> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.check_circle_outline, size: 16),
-                  label: const Text('Mark Done'),
+                  onPressed: _openBulkSiteVisitForm,
+                  icon: const Icon(Icons.meeting_room_outlined, size: 16),
+                  label: const Text('Convert to Site Visit'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 40),
                   ),
@@ -857,14 +903,26 @@ class _FollowUpPageState extends State<FollowUpPage> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {},
-                  icon: const Icon(Icons.schedule_outlined, size: 16),
-                  label: const Text('Reschedule'),
+                  icon: const Icon(Icons.check_circle_outline, size: 16),
+                  label: const Text('Mark Done'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 40),
                   ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.schedule_outlined, size: 16),
+              label: const Text('Reschedule'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 40),
+              ),
+            ),
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -1003,7 +1061,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
         ],
         const Spacer(),
         Text(
-          '${_filteredFollowUps.length} total follow-ups',
+          '$_totalItems total follow-ups',
           style: const TextStyle(
             fontWeight: FontWeight.w600,
             color: AppColors.textSecondary,
@@ -1015,7 +1073,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   Widget _buildPagination() {
-    final totalItems = _filteredFollowUps.length;
+    final totalItems = _totalItems;
     final totalPages = _totalPages;
     final currentPage = _currentPage.clamp(1, totalPages);
     final start = totalItems == 0 ? 0 : ((currentPage - 1) * _pageSize) + 1;
@@ -1047,11 +1105,9 @@ class _FollowUpPageState extends State<FollowUpPage> {
               IconButton(
                 onPressed: currentPage > 1
                     ? () {
-                        setState(() {
-                          _currentPage -= 1;
-                          _selectedFollowUpIds.clear();
-                          _isBulkSelectionMode = false;
-                        });
+                        _selectedFollowUpIds.clear();
+                        _isBulkSelectionMode = false;
+                        _loadFollowUps(page: currentPage - 1);
                       }
                     : null,
                 icon: const Icon(Icons.chevron_left),
@@ -1063,11 +1119,9 @@ class _FollowUpPageState extends State<FollowUpPage> {
               IconButton(
                 onPressed: currentPage < totalPages
                     ? () {
-                        setState(() {
-                          _currentPage += 1;
-                          _selectedFollowUpIds.clear();
-                          _isBulkSelectionMode = false;
-                        });
+                        _selectedFollowUpIds.clear();
+                        _isBulkSelectionMode = false;
+                        _loadFollowUps(page: currentPage + 1);
                       }
                     : null,
                 icon: const Icon(Icons.chevron_right),
@@ -1407,4 +1461,14 @@ class _PersonModel {
   final String name;
   final String imageUrl;
   final String phone;
+}
+
+class _TeamOption {
+  const _TeamOption({
+    required this.id,
+    required this.label,
+  });
+
+  final String id;
+  final String label;
 }

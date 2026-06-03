@@ -21,6 +21,10 @@ class _ClosuresPageState extends State<ClosuresPage> {
   bool _isLoading = false;
   String? _error;
   List<Map<String, dynamic>> _items = const <Map<String, dynamic>>[];
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalItems = 0;
+  final int _perPage = 10;
 
   @override
   void initState() {
@@ -34,7 +38,11 @@ class _ClosuresPageState extends State<ClosuresPage> {
     super.dispose();
   }
 
-  Future<void> _loadClosures() async {
+  Future<void> _loadClosures({int? page}) async {
+    final nextPage = page ?? _currentPage;
+    final apiStatus =
+        _statusFilter == 'all' ? null : _statusFilter.trim().toLowerCase();
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -42,10 +50,16 @@ class _ClosuresPageState extends State<ClosuresPage> {
     try {
       final result = await _authProvider.closures(
         token: _authProvider.currentAuthToken,
+        status: apiStatus,
+        page: nextPage,
+        perPage: _perPage,
       );
       if (!mounted) return;
       setState(() {
         _items = result.items;
+        _currentPage = result.currentPage;
+        _totalPages = result.totalPages;
+        _totalItems = result.totalItems;
         _isLoading = false;
       });
     } catch (e) {
@@ -59,12 +73,13 @@ class _ClosuresPageState extends State<ClosuresPage> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleItems = _items.where(_matchesFilter).toList();
+    final visibleItems = _items.where(_matchesSearch).toList();
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: CrmAppBar(title: 'Closures', showBackButton: widget.showBackButton),
+      appBar:
+          CrmAppBar(title: 'Closures', showBackButton: widget.showBackButton),
       body: RefreshIndicator(
-        onRefresh: _loadClosures,
+        onRefresh: () => _loadClosures(page: _currentPage),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
@@ -82,7 +97,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 ),
                 FilledButton.icon(
                   onPressed: _openCreateClosureDialog,
-                  style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                  style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary),
                   icon: const Icon(Icons.add),
                   label: const Text('Book Lead'),
                 ),
@@ -102,8 +118,11 @@ class _ClosuresPageState extends State<ClosuresPage> {
               _buildError()
             else if (visibleItems.isEmpty)
               _buildEmpty()
-            else
+            else ...[
               ...visibleItems.map(_buildCard),
+              const SizedBox(height: 12),
+              _buildPagination(),
+            ],
           ],
         ),
       ),
@@ -119,14 +138,16 @@ class _ClosuresPageState extends State<ClosuresPage> {
       token: _authProvider.currentAuthToken,
       perPage: 100,
     );
-    final users = await _authProvider.users(token: _authProvider.currentAuthToken);
+    final users =
+        await _authProvider.users(token: _authProvider.currentAuthToken);
 
     if (!mounted) return;
     final leads = leadResult.items;
     final projects = projectResult.items;
     if (leads.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No leads available for closure booking.')),
+        const SnackBar(
+            content: Text('No leads available for closure booking.')),
       );
       return;
     }
@@ -204,14 +225,16 @@ class _ClosuresPageState extends State<ClosuresPage> {
                       double.tryParse(carpetAreaController.text.trim()) ?? 0,
                   superAreaSqft:
                       double.tryParse(superAreaController.text.trim()) ?? 0,
-                  agreedPrice: double.tryParse(agreedPriceController.text.trim()) ?? 0,
+                  agreedPrice:
+                      double.tryParse(agreedPriceController.text.trim()) ?? 0,
                   bookingAmount:
                       double.tryParse(bookingAmountController.text.trim()) ?? 0,
                   paymentPlan: paymentPlanController.text.trim(),
                   loanRequired: loanRequired,
                   loanBank: loanBankController.text.trim(),
-                  commissionPercent:
-                      double.tryParse(commissionPercentController.text.trim()) ?? 0,
+                  commissionPercent: double.tryParse(
+                          commissionPercentController.text.trim()) ??
+                      0,
                   commissionPaid: commissionPaid,
                   closedByManager: selectedManagerId,
                   closureNotes: notesController.text.trim(),
@@ -223,13 +246,16 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 setLocalState(() => isSubmitting = false);
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                  SnackBar(
+                      content:
+                          Text(e.toString().replaceFirst('Exception: ', ''))),
                 );
               }
             }
 
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: SizedBox(
                 width: 650,
                 child: SingleChildScrollView(
@@ -243,11 +269,14 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           const Expanded(
                             child: Text(
                               'Create Closure - Book Lead',
-                              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                  fontSize: 26, fontWeight: FontWeight.w700),
                             ),
                           ),
                           IconButton(
-                            onPressed: isSubmitting ? null : () => Navigator.of(context).pop(false),
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.of(context).pop(false),
                             icon: const Icon(Icons.close),
                           ),
                         ],
@@ -271,7 +300,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                                 ),
                               )
                               .toList(),
-                          onChanged: (v) => setLocalState(() => selectedLeadId = v),
+                          onChanged: (v) =>
+                              setLocalState(() => selectedLeadId = v),
                         ),
                         const SizedBox(height: 10),
                         _dropdownField(
@@ -289,16 +319,21 @@ class _ClosuresPageState extends State<ClosuresPage> {
                                 ),
                               )
                               .toList(),
-                          onChanged: (v) => setLocalState(() => selectedProjectId = v),
+                          onChanged: (v) =>
+                              setLocalState(() => selectedProjectId = v),
                         ),
                         const SizedBox(height: 10),
                         _dateField('Booking Date *', bookingDate, pickDate),
                         const SizedBox(height: 10),
                         Row(
                           children: [
-                            Expanded(child: _textField('Unit Number *', unitNumberController)),
+                            Expanded(
+                                child: _textField(
+                                    'Unit Number *', unitNumberController)),
                             const SizedBox(width: 8),
-                            Expanded(child: _textField('Tower / Block', towerController)),
+                            Expanded(
+                                child: _textField(
+                                    'Tower / Block', towerController)),
                           ],
                         ),
                         const SizedBox(height: 10),
@@ -325,7 +360,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               child: _textField(
                                 'Carpet Area (sqft)',
                                 carpetAreaController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 hintText: 'Carpet',
                               ),
                             ),
@@ -335,10 +372,12 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         _textField(
                           'Super Area (sqft)',
                           superAreaController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                         ),
                         const SizedBox(height: 10),
-                        _textField('Closure Notes', notesController, maxLines: 3),
+                        _textField('Closure Notes', notesController,
+                            maxLines: 3),
                       ] else if (step == 'financials') ...[
                         Row(
                           children: [
@@ -347,7 +386,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                                 'Agreed Price (Rs) *',
                                 agreedPriceController,
                                 keyboardType:
-                                    const TextInputType.numberWithOptions(decimal: true),
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 hintText: '9500000',
                                 prefixText: 'Rs ',
                                 onChanged: (_) => setLocalState(() {}),
@@ -359,7 +399,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                                 'Booking Amount (Rs)',
                                 bookingAmountController,
                                 keyboardType:
-                                    const TextInputType.numberWithOptions(decimal: true),
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 hintText: '500000',
                                 prefixText: 'Rs ',
                               ),
@@ -375,7 +416,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               .map(
                                 (e) => DropdownMenuItem<String>(
                                   value: e,
-                                  child: Text(e, overflow: TextOverflow.ellipsis),
+                                  child:
+                                      Text(e, overflow: TextOverflow.ellipsis),
                                 ),
                               )
                               .toList(),
@@ -389,7 +431,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         const SizedBox(height: 10),
                         CheckboxListTile(
                           value: loanRequired,
-                          onChanged: (v) => setLocalState(() => loanRequired = v ?? false),
+                          onChanged: (v) =>
+                              setLocalState(() => loanRequired = v ?? false),
                           title: const Text(
                             'Home loan required',
                             style: TextStyle(
@@ -397,7 +440,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 8),
                           controlAffinity: ListTileControlAffinity.leading,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -414,7 +458,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                                 'Commission % (auto-calcs amount)',
                                 commissionPercentController,
                                 keyboardType:
-                                    const TextInputType.numberWithOptions(decimal: true),
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 hintText: '2',
                                 prefixText: '% ',
                                 onChanged: (_) => setLocalState(() {}),
@@ -425,9 +470,12 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               child: _readOnlyField(
                                 'Commission Amount (Rs)',
                                 _rupee(
-                                  (double.tryParse(agreedPriceController.text.trim()) ?? 0) *
+                                  (double.tryParse(agreedPriceController.text
+                                              .trim()) ??
+                                          0) *
                                       (double.tryParse(
-                                            commissionPercentController.text.trim(),
+                                            commissionPercentController.text
+                                                .trim(),
                                           ) ??
                                           0) /
                                       100,
@@ -454,12 +502,14 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               )
                               .where((e) => (e.value ?? '').isNotEmpty)
                               .toList(),
-                          onChanged: (v) => setLocalState(() => selectedManagerId = v),
+                          onChanged: (v) =>
+                              setLocalState(() => selectedManagerId = v),
                         ),
                         const SizedBox(height: 10),
                         CheckboxListTile(
                           value: commissionPaid,
-                          onChanged: (v) => setLocalState(() => commissionPaid = v ?? false),
+                          onChanged: (v) =>
+                              setLocalState(() => commissionPaid = v ?? false),
                           title: const Text(
                             'Commission already paid',
                             style: TextStyle(
@@ -467,7 +517,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 8),
                           controlAffinity: ListTileControlAffinity.leading,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -480,7 +531,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: isSubmitting ? null : () => Navigator.of(context).pop(false),
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(false),
                               child: const Text('Cancel'),
                             ),
                           ),
@@ -488,12 +541,14 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           Expanded(
                             child: FilledButton(
                               onPressed: isSubmitting ? null : submit,
-                              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                              style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary),
                               child: isSubmitting
                                   ? const SizedBox(
                                       height: 18,
                                       width: 18,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white),
                                     )
                                   : const Text('Book Lead'),
                             ),
@@ -550,7 +605,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
               label,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: selected ? AppColors.textPrimary : AppColors.textSecondary,
+                color:
+                    selected ? AppColors.textPrimary : AppColors.textSecondary,
               ),
             ),
           ),
@@ -634,7 +690,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
           keyboardType: keyboardType,
           maxLines: maxLines,
           onChanged: onChanged,
-          decoration: _fieldDecoration(hint: hintText ?? label, prefixText: prefixText),
+          decoration:
+              _fieldDecoration(hint: hintText ?? label, prefixText: prefixText),
         ),
       ],
     );
@@ -647,7 +704,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
         Text(label),
         const SizedBox(height: 6),
         InputDecorator(
-          decoration: _fieldDecoration(hint: 'Auto-calculated', prefixText: 'Rs '),
+          decoration:
+              _fieldDecoration(hint: 'Auto-calculated', prefixText: 'Rs '),
           child: Text(
             value,
             style: const TextStyle(
@@ -674,9 +732,12 @@ class _ClosuresPageState extends State<ClosuresPage> {
 
   Widget _buildKpiRow() {
     final total = _items.length;
-    final totalDealValue = _items.fold<double>(0, (sum, e) => sum + _toDouble(e['agreed_price']));
-    final totalCommission = _items.fold<double>(0, (sum, e) => sum + _toDouble(e['commission_amount']));
-    final commissionPaid = _items.where((e) => e['commission_paid'] == true).length;
+    final totalDealValue =
+        _items.fold<double>(0, (sum, e) => sum + _toDouble(e['agreed_price']));
+    final totalCommission = _items.fold<double>(
+        0, (sum, e) => sum + _toDouble(e['commission_amount']));
+    final commissionPaid =
+        _items.where((e) => e['commission_paid'] == true).length;
     final commissionPending = total - commissionPaid;
 
     return SizedBox(
@@ -685,9 +746,12 @@ class _ClosuresPageState extends State<ClosuresPage> {
         scrollDirection: Axis.horizontal,
         children: [
           _kpiTile('Total Closures', total.toString(), const Color(0xFF2563EB)),
-          _kpiTile('Total Deal Value', _rupee(totalDealValue), const Color(0xFF0A9A55)),
-          _kpiTile('Commission Paid', _rupee(totalCommission), const Color(0xFF16A34A)),
-          _kpiTile('Comm. Pending', commissionPending.toString(), const Color(0xFFD97706)),
+          _kpiTile('Total Deal Value', _rupee(totalDealValue),
+              const Color(0xFF0A9A55)),
+          _kpiTile('Commission Paid', _rupee(totalCommission),
+              const Color(0xFF16A34A)),
+          _kpiTile('Comm. Pending', commissionPending.toString(),
+              const Color(0xFFD97706)),
         ],
       ),
     );
@@ -707,9 +771,13 @@ class _ClosuresPageState extends State<ClosuresPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.w700)),
+          Text(value,
+              style: TextStyle(
+                  color: color, fontSize: 20, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          Text(label, style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          Text(label,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -726,36 +794,55 @@ class _ClosuresPageState extends State<ClosuresPage> {
               isDense: true,
               hintText: 'Search lead, project, unit...',
               prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ),
         const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _statusFilter,
-              items: const [
-                DropdownMenuItem(value: 'all', child: Text('All Status')),
-                DropdownMenuItem(value: 'confirmed', child: Text('Confirmed')),
-                DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() => _statusFilter = value);
-              },
-            ),
-          ),
+        SizedBox(width: 180, child: _buildStatusDropdown()),
+        IconButton(
+          onPressed: _refreshClosures,
+          icon: const Icon(Icons.refresh),
         ),
-        IconButton(onPressed: _loadClosures, icon: const Icon(Icons.refresh)),
       ],
     );
+  }
+
+  Widget _buildStatusDropdown() {
+    return DropdownButtonFormField<String>(
+      value: _statusFilter,
+      isExpanded: true,
+      decoration: InputDecoration(
+        isDense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+      ),
+      items: const [
+        DropdownMenuItem(value: 'all', child: Text('All')),
+        DropdownMenuItem(value: 'confirmed', child: Text('confirmed')),
+        DropdownMenuItem(value: 'cancelled', child: Text('cancelled')),
+        DropdownMenuItem(value: 'on_hold', child: Text('on_hold')),
+      ],
+      onChanged: (value) {
+        if (value == null) return;
+        setState(() {
+          _statusFilter = value;
+          _currentPage = 1;
+        });
+        _loadClosures(page: 1);
+      },
+    );
+  }
+
+  void _refreshClosures() {
+    _loadClosures(page: _currentPage);
   }
 
   Widget _buildCard(Map<String, dynamic> item) {
@@ -806,23 +893,25 @@ class _ClosuresPageState extends State<ClosuresPage> {
   Future<void> _openEditClosureDialog(Map<String, dynamic> item) async {
     final id = _readString(item['id'], fallback: '');
     if (id.isEmpty) return;
-    final users = await _authProvider.users(token: _authProvider.currentAuthToken);
+    final users =
+        await _authProvider.users(token: _authProvider.currentAuthToken);
     if (!mounted) return;
 
     String step = 'booking';
     bool isSubmitting = false;
     DateTime bookingDate =
-        DateTime.tryParse(_readString(item['booking_date'], fallback: '')) ?? DateTime.now();
+        DateTime.tryParse(_readString(item['booking_date'], fallback: '')) ??
+            DateTime.now();
 
-    final unitNumberController =
-        TextEditingController(text: _readString(item['unit_number'], fallback: ''));
-    final towerController =
-        TextEditingController(text: _readString(item['tower_block'], fallback: ''));
+    final unitNumberController = TextEditingController(
+        text: _readString(item['unit_number'], fallback: ''));
+    final towerController = TextEditingController(
+        text: _readString(item['tower_block'], fallback: ''));
     final floorController = TextEditingController(
       text: item['floor_number']?.toString() ?? '',
     );
-    final unitTypeController =
-        TextEditingController(text: _readString(item['unit_type'], fallback: ''));
+    final unitTypeController = TextEditingController(
+        text: _readString(item['unit_type'], fallback: ''));
     final carpetAreaController = TextEditingController(
       text: _readString(item['carpet_area_sqft'], fallback: ''),
     );
@@ -835,7 +924,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
     final bookingAmountController = TextEditingController(
       text: _readString(item['booking_amount'], fallback: ''),
     );
-    String? selectedPaymentPlan = _readString(item['payment_plan'], fallback: '');
+    String? selectedPaymentPlan =
+        _readString(item['payment_plan'], fallback: '');
     const paymentPlans = <String>[
       'Construction Linked Plan',
       'Down Payment Plan',
@@ -843,14 +933,14 @@ class _ClosuresPageState extends State<ClosuresPage> {
       'Subvention Plan',
     ];
     bool loanRequired = item['loan_required'] == true;
-    final loanBankController =
-        TextEditingController(text: _readString(item['loan_bank'], fallback: ''));
+    final loanBankController = TextEditingController(
+        text: _readString(item['loan_bank'], fallback: ''));
     final commissionPercentController = TextEditingController(
       text: _readString(item['commission_percent'], fallback: '2'),
     );
     bool commissionPaid = item['commission_paid'] == true;
-    DateTime? commissionPaidDate =
-        DateTime.tryParse(_readString(item['commission_paid_date'], fallback: ''));
+    DateTime? commissionPaidDate = DateTime.tryParse(
+        _readString(item['commission_paid_date'], fallback: ''));
     String? selectedManagerId =
         _readString(item['closed_by_manager'], fallback: '').isEmpty
             ? null
@@ -893,15 +983,20 @@ class _ClosuresPageState extends State<ClosuresPage> {
                   towerBlock: towerController.text.trim(),
                   floorNumber: int.tryParse(floorController.text.trim()) ?? 0,
                   unitType: unitTypeController.text.trim(),
-                  carpetAreaSqft: double.tryParse(carpetAreaController.text.trim()) ?? 0,
-                  superAreaSqft: double.tryParse(superAreaController.text.trim()) ?? 0,
-                  agreedPrice: double.tryParse(agreedPriceController.text.trim()) ?? 0,
-                  bookingAmount: double.tryParse(bookingAmountController.text.trim()) ?? 0,
+                  carpetAreaSqft:
+                      double.tryParse(carpetAreaController.text.trim()) ?? 0,
+                  superAreaSqft:
+                      double.tryParse(superAreaController.text.trim()) ?? 0,
+                  agreedPrice:
+                      double.tryParse(agreedPriceController.text.trim()) ?? 0,
+                  bookingAmount:
+                      double.tryParse(bookingAmountController.text.trim()) ?? 0,
                   paymentPlan: selectedPaymentPlan ?? '',
                   loanRequired: loanRequired,
                   loanBank: loanBankController.text.trim(),
-                  commissionPercent:
-                      double.tryParse(commissionPercentController.text.trim()) ?? 0,
+                  commissionPercent: double.tryParse(
+                          commissionPercentController.text.trim()) ??
+                      0,
                   commissionPaid: commissionPaid,
                   commissionPaidDate:
                       commissionPaid && commissionPaidDate != null
@@ -917,13 +1012,16 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 setLocalState(() => isSubmitting = false);
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                  SnackBar(
+                      content:
+                          Text(e.toString().replaceFirst('Exception: ', ''))),
                 );
               }
             }
 
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: SizedBox(
                 width: 650,
                 child: SingleChildScrollView(
@@ -937,11 +1035,14 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           const Expanded(
                             child: Text(
                               'Edit Closure',
-                              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                  fontSize: 26, fontWeight: FontWeight.w700),
                             ),
                           ),
                           IconButton(
-                            onPressed: isSubmitting ? null : () => Navigator.of(context).pop(false),
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.of(context).pop(false),
                             icon: const Icon(Icons.close),
                           ),
                         ],
@@ -954,9 +1055,13 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         const SizedBox(height: 10),
                         Row(
                           children: [
-                            Expanded(child: _textField('Unit Number', unitNumberController)),
+                            Expanded(
+                                child: _textField(
+                                    'Unit Number', unitNumberController)),
                             const SizedBox(width: 8),
-                            Expanded(child: _textField('Tower / Block', towerController)),
+                            Expanded(
+                                child: _textField(
+                                    'Tower / Block', towerController)),
                           ],
                         ),
                         const SizedBox(height: 10),
@@ -983,7 +1088,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               child: _textField(
                                 'Carpet Area (sqft)',
                                 carpetAreaController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 hintText: 'Carpet',
                               ),
                             ),
@@ -993,10 +1100,12 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         _textField(
                           'Super Area (sqft)',
                           superAreaController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                         ),
                         const SizedBox(height: 10),
-                        _textField('Closure Notes', notesController, maxLines: 3),
+                        _textField('Closure Notes', notesController,
+                            maxLines: 3),
                       ] else if (step == 'financials') ...[
                         Row(
                           children: [
@@ -1005,7 +1114,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                                 'Agreed Price (Rs) *',
                                 agreedPriceController,
                                 keyboardType:
-                                    const TextInputType.numberWithOptions(decimal: true),
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 hintText: '9500000',
                                 prefixText: 'Rs ',
                                 onChanged: (_) => setLocalState(() {}),
@@ -1017,7 +1127,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                                 'Booking Amount (Rs)',
                                 bookingAmountController,
                                 keyboardType:
-                                    const TextInputType.numberWithOptions(decimal: true),
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 hintText: '500000',
                                 prefixText: 'Rs ',
                               ),
@@ -1027,22 +1138,27 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         const SizedBox(height: 10),
                         _dropdownField(
                           label: 'Payment Plan',
-                          value: (selectedPaymentPlan ?? '').isEmpty ? null : selectedPaymentPlan,
+                          value: (selectedPaymentPlan ?? '').isEmpty
+                              ? null
+                              : selectedPaymentPlan,
                           hint: 'Select payment plan...',
                           items: paymentPlans
                               .map(
                                 (e) => DropdownMenuItem<String>(
                                   value: e,
-                                  child: Text(e, overflow: TextOverflow.ellipsis),
+                                  child:
+                                      Text(e, overflow: TextOverflow.ellipsis),
                                 ),
                               )
                               .toList(),
-                          onChanged: (v) => setLocalState(() => selectedPaymentPlan = v),
+                          onChanged: (v) =>
+                              setLocalState(() => selectedPaymentPlan = v),
                         ),
                         const SizedBox(height: 10),
                         CheckboxListTile(
                           value: loanRequired,
-                          onChanged: (v) => setLocalState(() => loanRequired = v ?? false),
+                          onChanged: (v) =>
+                              setLocalState(() => loanRequired = v ?? false),
                           title: const Text(
                             'Home loan required',
                             style: TextStyle(
@@ -1050,7 +1166,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 8),
                           controlAffinity: ListTileControlAffinity.leading,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -1065,7 +1182,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                                 'Commission % (auto-calcs amount)',
                                 commissionPercentController,
                                 keyboardType:
-                                    const TextInputType.numberWithOptions(decimal: true),
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 hintText: '2',
                                 prefixText: '% ',
                                 onChanged: (_) => setLocalState(() {}),
@@ -1076,9 +1194,12 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               child: _readOnlyField(
                                 'Commission Amount (Rs)',
                                 _rupee(
-                                  (double.tryParse(agreedPriceController.text.trim()) ?? 0) *
+                                  (double.tryParse(agreedPriceController.text
+                                              .trim()) ??
+                                          0) *
                                       (double.tryParse(
-                                            commissionPercentController.text.trim(),
+                                            commissionPercentController.text
+                                                .trim(),
                                           ) ??
                                           0) /
                                       100,
@@ -1105,7 +1226,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               )
                               .where((e) => (e.value ?? '').isNotEmpty)
                               .toList(),
-                          onChanged: (v) => setLocalState(() => selectedManagerId = v),
+                          onChanged: (v) =>
+                              setLocalState(() => selectedManagerId = v),
                         ),
                         const SizedBox(height: 10),
                         if (commissionPaid) ...[
@@ -1115,11 +1237,12 @@ class _ClosuresPageState extends State<ClosuresPage> {
                             () async {
                               final picked = await showDatePicker(
                                 context: context,
-                                initialDate: commissionPaidDate ?? DateTime.now(),
-                                firstDate:
-                                    DateTime.now().subtract(const Duration(days: 3650)),
-                                lastDate:
-                                    DateTime.now().add(const Duration(days: 3650)),
+                                initialDate:
+                                    commissionPaidDate ?? DateTime.now(),
+                                firstDate: DateTime.now()
+                                    .subtract(const Duration(days: 3650)),
+                                lastDate: DateTime.now()
+                                    .add(const Duration(days: 3650)),
                               );
                               if (picked == null) return;
                               setLocalState(() => commissionPaidDate = picked);
@@ -1142,7 +1265,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 8),
                           controlAffinity: ListTileControlAffinity.leading,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -1155,7 +1279,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: isSubmitting ? null : () => Navigator.of(context).pop(false),
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(false),
                               child: const Text('Cancel'),
                             ),
                           ),
@@ -1163,12 +1289,14 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           Expanded(
                             child: FilledButton(
                               onPressed: isSubmitting ? null : submit,
-                              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                              style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary),
                               child: isSubmitting
                                   ? const SizedBox(
                                       height: 18,
                                       width: 18,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white),
                                     )
                                   : const Text('Update Closure'),
                             ),
@@ -1202,7 +1330,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Closure updated successfully.')));
+        ..showSnackBar(
+            const SnackBar(content: Text('Closure updated successfully.')));
     }
   }
 
@@ -1212,12 +1341,14 @@ class _ClosuresPageState extends State<ClosuresPage> {
 
     final noteController = TextEditingController();
     bool isSubmitting = false;
-    final currentStatus = _readString(item['status'], fallback: 'confirmed').toLowerCase();
+    final currentStatus =
+        _readString(item['status'], fallback: 'confirmed').toLowerCase();
     String selectedStatus = _statusToUi(currentStatus);
 
     final leadName = _readString(item['lead_name'], fallback: 'N/A');
     final projectName = _readString(item['project_name'], fallback: 'N/A');
-    final bookingDate = _formatDate(_readString(item['booking_date'], fallback: ''));
+    final bookingDate =
+        _formatDate(_readString(item['booking_date'], fallback: ''));
 
     List<String> allowedStatuses;
     if (currentStatus == 'confirmed') {
@@ -1249,13 +1380,16 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 if (!context.mounted) return;
                 setLocalState(() => isSubmitting = false);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                  SnackBar(
+                      content:
+                          Text(e.toString().replaceFirst('Exception: ', ''))),
                 );
               }
             }
 
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: SizedBox(
                 width: 560,
                 child: Padding(
@@ -1269,11 +1403,14 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           const Expanded(
                             child: Text(
                               'Change Closure Status',
-                              style: TextStyle(fontSize: 36, fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                  fontSize: 36, fontWeight: FontWeight.w700),
                             ),
                           ),
                           IconButton(
-                            onPressed: isSubmitting ? null : () => Navigator.of(context).pop(false),
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.of(context).pop(false),
                             icon: const Icon(Icons.close),
                           ),
                         ],
@@ -1291,7 +1428,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           children: [
                             CircleAvatar(
                               radius: 18,
-                              backgroundColor: AppColors.primary.withOpacity(0.2),
+                              backgroundColor:
+                                  AppColors.primary.withOpacity(0.2),
                               child: Text(
                                 _initials(leadName),
                                 style: const TextStyle(
@@ -1342,7 +1480,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         onChanged: isSubmitting
                             ? null
                             : (value) => setLocalState(
-                                  () => selectedStatus = value ?? selectedStatus,
+                                  () =>
+                                      selectedStatus = value ?? selectedStatus,
                                 ),
                       ),
                       const SizedBox(height: 12),
@@ -1352,14 +1491,17 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         controller: noteController,
                         enabled: !isSubmitting,
                         maxLines: 3,
-                        decoration: _fieldDecoration(hint: 'Reason for status change...'),
+                        decoration: _fieldDecoration(
+                            hint: 'Reason for status change...'),
                       ),
                       const SizedBox(height: 14),
                       Row(
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: isSubmitting ? null : () => Navigator.of(context).pop(false),
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(false),
                               child: const Text('Cancel'),
                             ),
                           ),
@@ -1367,7 +1509,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           Expanded(
                             child: FilledButton(
                               onPressed: isSubmitting ? null : submit,
-                              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                              style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary),
                               child: isSubmitting
                                   ? const SizedBox(
                                       width: 18,
@@ -1428,11 +1571,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
   }
 
   String _initials(String name) {
-    final parts = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((e) => e.isNotEmpty)
-        .toList();
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
     if (parts.isEmpty) return '?';
     if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
@@ -1450,7 +1590,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_error ?? 'Unable to load closures.', style: const TextStyle(color: AppColors.error)),
+          Text(_error ?? 'Unable to load closures.',
+              style: const TextStyle(color: AppColors.error)),
           const SizedBox(height: 10),
           FilledButton(
             onPressed: _loadClosures,
@@ -1471,19 +1612,63 @@ class _ClosuresPageState extends State<ClosuresPage> {
         border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: const Text('No closures found.', style: TextStyle(color: AppColors.textSecondary)),
+      child: const Text('No closures found.',
+          style: TextStyle(color: AppColors.textSecondary)),
     );
   }
 
-  bool _matchesFilter(Map<String, dynamic> item) {
-    final status = _readString(item['status'], fallback: 'pending').toLowerCase();
+  Widget _buildPagination() {
+    if (_totalPages <= 1) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          OutlinedButton(
+            onPressed: _isLoading || _currentPage <= 1
+                ? null
+                : () => _loadClosures(page: _currentPage - 1),
+            child: const Text('Previous'),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Page $_currentPage of $_totalPages - $_totalItems total',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          OutlinedButton(
+            onPressed: _isLoading || _currentPage >= _totalPages
+                ? null
+                : () => _loadClosures(page: _currentPage + 1),
+            child: const Text('Next'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _matchesSearch(Map<String, dynamic> item) {
     final query = _searchController.text.trim().toLowerCase();
     final lead = _readString(item['lead_name'], fallback: '').toLowerCase();
-    final project = _readString(item['project_name'], fallback: '').toLowerCase();
+    final project =
+        _readString(item['project_name'], fallback: '').toLowerCase();
     final unit = _readString(item['unit_number'], fallback: '').toLowerCase();
-    final textMatch = query.isEmpty || lead.contains(query) || project.contains(query) || unit.contains(query);
-    final statusMatch = _statusFilter == 'all' || status == _statusFilter;
-    return textMatch && statusMatch;
+    return query.isEmpty ||
+        lead.contains(query) ||
+        project.contains(query) ||
+        unit.contains(query);
   }
 
   String _readString(dynamic value, {required String fallback}) {
@@ -1510,7 +1695,20 @@ class _ClosuresPageState extends State<ClosuresPage> {
     final parsed = DateTime.tryParse(iso);
     if (parsed == null) return '-';
     final local = parsed.toLocal();
-    const months = <String>['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return '${local.day.toString().padLeft(2, '0')} ${months[local.month - 1]} ${local.year}';
   }
 

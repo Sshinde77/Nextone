@@ -627,6 +627,7 @@ class AuthProvider {
 
   Future<LeadsListResult> followUps({
     String? token,
+    String? assignedTo,
     String? dueFrom,
     String? dueTo,
     String? search,
@@ -635,6 +636,7 @@ class AuthProvider {
   }) {
     return _authService.followUps(
       token: token,
+      assignedTo: assignedTo,
       dueFrom: dueFrom,
       dueTo: dueTo,
       search: search,
@@ -706,11 +708,13 @@ class AuthProvider {
 
   Future<LeadsListResult> siteVisits({
     String? token,
+    String? status,
     int page = 1,
     int perPage = 20,
   }) {
     return _authService.siteVisits(
       token: token,
+      status: status,
       page: page,
       perPage: perPage,
     );
@@ -718,19 +722,27 @@ class AuthProvider {
 
   Future<LeadsListResult> siteRevisits({
     String? token,
+    String? status,
+    int page = 1,
+    int perPage = 20,
   }) {
     return _authService.siteRevisits(
       token: token,
+      status: status,
+      page: page,
+      perPage: perPage,
     );
   }
 
   Future<LeadsListResult> closures({
     String? token,
+    String? status,
     int page = 1,
     int perPage = 20,
   }) {
     return _authService.closures(
       token: token,
+      status: status,
       page: page,
       perPage: perPage,
     );

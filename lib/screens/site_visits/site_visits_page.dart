@@ -18,7 +18,14 @@ class SiteVisitsPage extends StatefulWidget {
   State<SiteVisitsPage> createState() => _SiteVisitsPageState();
 }
 
-enum _VisitStatus { scheduled, inProgress, completed, cancelled }
+enum _VisitStatus {
+  scheduled,
+  inProgress,
+  completed,
+  cancelled,
+  rescheduled,
+  noShow,
+}
 
 class _SiteVisit {
   _SiteVisit({
@@ -78,6 +85,11 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   bool _isExporting = false;
   String? _loadError;
   String _currentRole = '';
+  String _selectedStatus = 'scheduled';
+  int _currentPage = 1;
+  int _perPage = 10;
+  int _totalPages = 1;
+  int _totalItems = 0;
   late DateTime _focusedMonth;
   late DateTime _selectedDate;
   late List<_SiteVisit> _visits;
@@ -215,6 +227,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                   ),
                   SizedBox(height: _s(10)),
                   _buildQuickActions(),
+                  SizedBox(height: _s(12)),
+                  _buildStatusAndRevisitsRow(),
                   SizedBox(height: _s(14)),
                   if (_isCalendarView) ...[
                     AnimatedSwitcher(
@@ -259,6 +273,12 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                     _buildEmptyState()
                   else
                     ...visibleVisits.map(_buildVisitCard),
+                  if (!_isLoadingVisits &&
+                      _loadError == null &&
+                      _totalPages > 1) ...[
+                    SizedBox(height: _s(12)),
+                    _buildPaginationControls(),
+                  ],
                   SizedBox(height: _s(90)),
                 ],
               ),
@@ -312,24 +332,206 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
             ),
           ],
         ),
-        SizedBox(height: _s(8)),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _openRevisitsPage,
-            icon: const Icon(Icons.repeat_rounded),
-            label: const Text('Open Re-visits'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: BorderSide(color: AppColors.primary.withOpacity(0.35)),
-              minimumSize: Size.fromHeight(_s(46)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(_s(12)),
-              ),
-            ),
+      ],
+    );
+  }
+
+  Widget _buildStatusAndRevisitsRow() {
+    final revisitButton = SizedBox(
+      height: _s(46),
+      child: OutlinedButton.icon(
+        onPressed: _openRevisitsPage,
+        icon: const Icon(Icons.repeat_rounded, size: 18),
+        label: const Text('Open Re-visits'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: BorderSide(color: AppColors.primary.withOpacity(0.35)),
+          minimumSize: const Size(0, 46),
+          padding: EdgeInsets.symmetric(horizontal: _s(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(_s(12)),
           ),
         ),
+      ),
+    );
+
+    return Row(
+      children: [
+        Expanded(child: _buildStatusFilterBar()),
+        SizedBox(width: _s(10)),
+        SizedBox(width: 170, child: revisitButton),
       ],
+    );
+  }
+
+  Widget _buildStatusFilterBar() {
+    final statusOptions = <DropdownMenuItem<String>>[
+      const DropdownMenuItem<String>(
+        value: '',
+        child: Text('All'),
+      ),
+      const DropdownMenuItem<String>(
+        value: 'scheduled',
+        child: Text('scheduled'),
+      ),
+      const DropdownMenuItem<String>(
+        value: 'done',
+        child: Text('done'),
+      ),
+      const DropdownMenuItem<String>(
+        value: 'cancelled',
+        child: Text('cancelled'),
+      ),
+      const DropdownMenuItem<String>(
+        value: 'rescheduled',
+        child: Text('rescheduled'),
+      ),
+      const DropdownMenuItem<String>(
+        value: 'no_show',
+        child: Text('no_show'),
+      ),
+    ];
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(_s(12)),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButtonFormField<String>(
+          initialValue: _selectedStatus,
+          isExpanded: true,
+          iconEnabledColor: AppColors.primary,
+          dropdownColor: Colors.white,
+          menuMaxHeight: 260,
+          borderRadius: BorderRadius.circular(_s(12)),
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: _fs(12),
+            fontWeight: FontWeight.w700,
+          ),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: _s(12),
+              vertical: _s(12),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(_s(12)),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(_s(12)),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(_s(12)),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.4),
+            ),
+          ),
+          selectedItemBuilder: (context) {
+            return statusOptions.map((item) {
+              final label = (item.child as Text).data ?? 'All';
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: _fs(12),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              );
+            }).toList();
+          },
+          items: statusOptions
+              .map(
+                (item) => DropdownMenuItem<String>(
+                  value: item.value,
+                  child: Text(
+                    (item.child as Text).data ?? 'All',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: _isLoadingVisits
+              ? null
+              : (value) {
+                  setState(() {
+                    _selectedStatus = value ?? '';
+                  });
+                  _loadSiteVisits(page: 1);
+                },
+          icon: const Icon(Icons.keyboard_arrow_down_rounded),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationControls() {
+    final isFirstPage = _currentPage <= 1;
+    final isLastPage = _currentPage >= _totalPages;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(_s(12)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(_s(14)),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Page $_currentPage of $_totalPages'
+            '${_totalItems > 0 ? ' - $_totalItems total' : ''}',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: _fs(10.5),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: _s(10)),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: isFirstPage || _isLoadingVisits
+                      ? null
+                      : () => _loadSiteVisits(page: _currentPage - 1),
+                  icon: const Icon(Icons.chevron_left_rounded),
+                  label: const Text('Previous'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 42),
+                  ),
+                ),
+              ),
+              SizedBox(width: _s(10)),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: isLastPage || _isLoadingVisits
+                      ? null
+                      : () => _loadSiteVisits(page: _currentPage + 1),
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  label: const Text('Next'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 42),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1139,7 +1341,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           ),
           SizedBox(height: _s(8)),
           Text(
-            'No visits scheduled for this date',
+            _isCalendarView
+                ? 'No visits scheduled for this date'
+                : 'No site visits found.',
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: _fs(12),
@@ -1148,7 +1352,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           ),
           SizedBox(height: _s(5)),
           Text(
-            'Tap Schedule to create a new site visit.',
+            _isCalendarView
+                ? 'Tap Schedule to create a new site visit.'
+                : 'Try a different status or page.',
             style: TextStyle(color: AppColors.textSecondary, fontSize: _fs(10)),
           ),
           SizedBox(height: _s(10)),
@@ -1188,7 +1394,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     if (created == null || !mounted) {
       return;
     }
-    await _loadSiteVisits();
+    await _loadSiteVisits(page: _currentPage);
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -1236,7 +1442,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     if (updated == null || !mounted) {
       return;
     }
-    await _loadSiteVisits();
+    await _loadSiteVisits(page: _currentPage);
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -1590,6 +1796,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         return 'Completed';
       case _VisitStatus.cancelled:
         return 'Cancelled';
+      case _VisitStatus.rescheduled:
+        return 'Rescheduled';
+      case _VisitStatus.noShow:
+        return 'No Show';
     }
   }
 
@@ -1603,10 +1813,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         return AppColors.tertiary;
       case _VisitStatus.cancelled:
         return AppColors.error;
+      case _VisitStatus.rescheduled:
+        return AppColors.info;
+      case _VisitStatus.noShow:
+        return const Color(0xFF6B7280);
     }
   }
 
-  Future<void> _loadSiteVisits() async {
+  Future<void> _loadSiteVisits({int? page}) async {
+    final targetPage = page ?? _currentPage;
     setState(() {
       _isLoadingVisits = true;
       _loadError = null;
@@ -1615,8 +1830,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     try {
       final result = await _authProvider.siteVisits(
         token: _authProvider.currentAuthToken,
-        page: 1,
-        perPage: 200,
+        status: _selectedStatus.trim().isEmpty ? null : _selectedStatus.trim(),
+        page: targetPage,
+        perPage: _perPage,
       );
       final mapped = result.items
           .map(_visitFromApi)
@@ -1628,6 +1844,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       }
       setState(() {
         _visits = mapped;
+        _currentPage =
+            result.currentPage <= 0 ? targetPage : result.currentPage;
+        _totalPages = result.totalPages <= 0 ? 1 : result.totalPages;
+        _totalItems = result.totalItems;
         _isLoadingVisits = false;
       });
     } catch (e) {
@@ -1663,7 +1883,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
     final leadName = _readString(
       json['lead_name'] ??
-      leadMap['name'] ?? leadMap['full_name'] ?? leadMap['first_name'],
+          leadMap['name'] ??
+          leadMap['full_name'] ??
+          leadMap['first_name'],
     );
     final projectName = _readString(json['project_name'] ?? projectMap['name']);
     final assigneeName = _readString(
@@ -1726,6 +1948,11 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       case 'cancelled':
       case 'canceled':
         return _VisitStatus.cancelled;
+      case 'rescheduled':
+        return _VisitStatus.rescheduled;
+      case 'no_show':
+      case 'no show':
+        return _VisitStatus.noShow;
       case 'scheduled':
       default:
         return _VisitStatus.scheduled;
@@ -1740,6 +1967,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         return 'in_progress';
       case _VisitStatus.cancelled:
         return 'cancelled';
+      case _VisitStatus.rescheduled:
+        return 'rescheduled';
+      case _VisitStatus.noShow:
+        return 'no_show';
       case _VisitStatus.scheduled:
         return 'scheduled';
     }

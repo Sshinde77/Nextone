@@ -2477,6 +2477,7 @@ class AuthService {
 
   Future<LeadsListResult> followUps({
     String? token,
+    String? assignedTo,
     String? dueFrom,
     String? dueTo,
     String? search,
@@ -2491,6 +2492,9 @@ class AuthService {
     }
     if (perPage != null && perPage > 0) {
       query['per_page'] = perPage.toString();
+    }
+    if (assignedTo != null && assignedTo.trim().isNotEmpty) {
+      query['assigned_to'] = assignedTo.trim();
     }
 
     if (dueFrom != null && dueFrom.trim().isNotEmpty) {
@@ -2807,11 +2811,22 @@ class AuthService {
 
   Future<LeadsListResult> siteVisits({
     String? token,
+    String? status,
     int page = 1,
     int perPage = 20,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.sitevisits}');
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    final normalizedStatus = status?.trim() ?? '';
+    if (normalizedStatus.isNotEmpty) {
+      queryParams['status'] = normalizedStatus;
+    }
+
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.sitevisits}')
+        .replace(queryParameters: queryParams);
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'siteVisits',
@@ -2865,10 +2880,21 @@ class AuthService {
 
   Future<LeadsListResult> siteRevisits({
     String? token,
+    String? status,
+    int page = 1,
+    int perPage = 20,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri =
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}');
+    final query = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    if (status != null && status.trim().isNotEmpty) {
+      query['status'] = status.trim();
+    }
+
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}')
+        .replace(queryParameters: query);
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'siteRevisits',
@@ -2898,12 +2924,12 @@ class AuthService {
             pagination,
             ['page', 'current_page', 'currentPage'],
           ) ??
-          1;
+          page;
       final resolvedPerPage = _readIntFromMap(
             pagination,
             ['per_page', 'perPage', 'page_size', 'limit'],
           ) ??
-          20;
+          perPage;
       final resolvedTotalItems = _readIntFromMap(
             pagination,
             ['total', 'total_items', 'totalItems', 'count'],
@@ -2930,16 +2956,22 @@ class AuthService {
 
   Future<LeadsListResult> closures({
     String? token,
+    String? status,
     int page = 1,
     int perPage = 20,
   }) async {
     final resolvedToken = token ?? _authToken;
+    final queryParameters = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    if (status != null && status.trim().isNotEmpty) {
+      queryParameters['status'] = status.trim();
+    }
+
     final uri =
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.closures}').replace(
-      queryParameters: <String, String>{
-        'page': page.toString(),
-        'per_page': perPage.toString(),
-      },
+      queryParameters: queryParameters,
     );
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
@@ -2970,19 +3002,13 @@ class AuthService {
               pagination, ['page', 'current_page', 'currentPage']) ??
           page;
       final resolvedPerPage = _readIntFromMap(
-            pagination,
-            ['per_page', 'perPage', 'page_size', 'limit'],
-          ) ??
+              pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
           perPage;
       final resolvedTotalItems = _readIntFromMap(
-            pagination,
-            ['total', 'total_items', 'totalItems', 'count'],
-          ) ??
+              pagination, ['total', 'total_items', 'totalItems', 'count']) ??
           items.length;
-      final resolvedTotalPages = _readIntFromMap(
-            pagination,
-            ['total_pages', 'totalPages', 'last_page', 'lastPage'],
-          ) ??
+      final resolvedTotalPages = _readIntFromMap(pagination,
+              ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
           _deriveTotalPages(
               total: resolvedTotalItems, perPage: resolvedPerPage);
 
