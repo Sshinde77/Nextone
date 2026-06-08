@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String baseUrl = 'https://nextoneapi.asynk.in/api/v1';
+  static const String baseUrl = 'https://api.nextonerealty.in';
 
   // Auth Endpoints
   static const String login = '/auth/login';
