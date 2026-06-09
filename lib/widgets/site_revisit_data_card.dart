@@ -16,6 +16,8 @@ class SiteRevisitDataCard extends StatelessWidget {
     required this.statusColor,
     required this.reason,
     required this.feedback,
+    this.nextStep,
+    this.rating,
     this.onView,
     this.onEdit,
     this.onStatus,
@@ -34,6 +36,8 @@ class SiteRevisitDataCard extends StatelessWidget {
   final Color statusColor;
   final String reason;
   final String feedback;
+  final String? nextStep;
+  final int? rating;
   final VoidCallback? onView;
   final VoidCallback? onEdit;
   final VoidCallback? onStatus;
@@ -106,8 +110,7 @@ class SiteRevisitDataCard extends StatelessWidget {
           _infoRow('Time', visitTimeLabel),
           _infoRow('Assigned To', assignedToName),
           _infoRow('Transport', transportLabel),
-          _infoRow('Reason', reason),
-          _infoRow('Feedback', feedback),
+          if (rating != null && rating! > 0) _infoRow('Rating', '$rating/5'),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -209,4 +212,3 @@ class _InitialAvatar extends StatelessWidget {
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   }
 }
-

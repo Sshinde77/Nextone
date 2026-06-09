@@ -292,7 +292,9 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       _readString(item['visit_date'], fallback: ''),
     );
     final visitTime = _readString(item['visit_time'], fallback: '-');
-    final feedback = _readString(item['client_reaction'], fallback: '-');
+    final feedback = _formatFeedbackValue(item['client_reaction']);
+    final nextStep = _formatFeedbackValue(item['next_step']);
+    final rating = _readInt(item['rating']);
 
     return SiteRevisitDataCard(
       leadName: leadName,
@@ -307,6 +309,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       statusColor: _statusColor(statusRaw),
       reason: reason,
       feedback: feedback,
+      nextStep: nextStep,
+      rating: rating,
       onView: () => _openRevisitDetail(item),
       onEdit: () => _openEditRevisit(item),
       onStatus: () => _openStatusUpdateDialog(item),
@@ -363,6 +367,23 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   String _readString(dynamic value, {required String fallback}) {
     final text = value?.toString().trim() ?? '';
     return text.isEmpty || text.toLowerCase() == 'null' ? fallback : text;
+  }
+
+  String _formatFeedbackValue(dynamic value) {
+    final raw = _readString(value, fallback: '');
+    if (raw.isEmpty) return '-';
+    final normalized = raw.trim().replaceAll('_', ' ');
+    return normalized
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .map((part) => part[0].toUpperCase() + part.substring(1).toLowerCase())
+        .join(' ');
+  }
+
+  int? _readInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString().trim() ?? '');
   }
 
   String _formatDate(String iso) {
@@ -1337,4 +1358,3 @@ class _TeamMemberOption {
   final String id;
   final String name;
 }
-

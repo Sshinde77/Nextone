@@ -266,6 +266,11 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
   Widget _feedbackCard() {
     final feedback = _feedbackData();
     final hasFeedback = _hasFeedback(feedback);
+    final ratingText = _readString(feedback['rating'], fallback: '');
+    final reaction = _formatFeedbackValue(feedback['client_reaction']);
+    final nextStep = _formatFeedbackValue(feedback['next_step']);
+    final interestedIn = _readString(feedback['interested_in'], fallback: '-');
+    final remarks = _readString(feedback['remarks'], fallback: '-');
 
     return Container(
       width: double.infinity,
@@ -274,54 +279,128 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              CircleAvatar(
-                backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                child: const Icon(Icons.rate_review_outlined,
-                    color: AppColors.primary, size: 20),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.feedback_outlined,
+                  size: 18,
+                  color: Color(0xFFDC2626),
+                ),
               ),
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
-                  'Feedback',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  'Client Feedback',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
+              if (hasFeedback)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFDF6E8),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFF6D48F)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 16,
+                        color: Color(0xFFF59E0B),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        ratingText.isEmpty ? '-' : '$ratingText/5',
+                        style: const TextStyle(
+                          color: Color(0xFF8A5A00),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 10),
-          const Text(
-            'Open the feedback form for this completed re-visit.',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-              height: 1.4,
+          if (hasFeedback) ...[
+            _feedbackDetailTile(
+              label: 'Reaction',
+              value: reaction,
+              icon: Icons.trending_up_rounded,
+              iconColor: const Color(0xFF2563EB),
             ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: hasFeedback ? null : _openFeedbackForm,
-              icon: const Icon(Icons.star_border_rounded),
-              label: Text(
-                hasFeedback ? 'Feedback Submitted' : 'Submit Feedback',
+            const SizedBox(height: 12),
+            _feedbackDetailTile(
+              label: 'Next Step',
+              value: nextStep,
+              icon: Icons.adjust_rounded,
+              iconColor: const Color(0xFFA855F7),
+            ),
+            const SizedBox(height: 12),
+            _feedbackDetailTile(
+              label: 'Interested In',
+              value: interestedIn,
+              icon: Icons.home_work_outlined,
+              iconColor: const Color(0xFF0F766E),
+            ),
+            const SizedBox(height: 12),
+            _feedbackDetailTile(
+              label: 'Remarks',
+              value: remarks,
+              icon: Icons.sticky_note_2_outlined,
+              iconColor: const Color(0xFFD97706),
+            ),
+          ] else ...[
+            const Text(
+              'Open the feedback form for this completed re-visit.',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.4,
               ),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _openFeedbackForm,
+                icon: const Icon(Icons.star_border_rounded),
+                label: const Text('Submit Feedback'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
             ),
-          ),
-          if (hasFeedback) ...[
             const SizedBox(height: 10),
             const Text(
               'Feedback can be submitted only one time for a re-visit.',
@@ -456,6 +535,93 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
     return feedback.isNotEmpty;
   }
 
+  Widget _feedbackDetailTile({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAFE),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE6EEF8)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 16, color: iconColor),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.toUpperCase(),
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatFeedbackValue(dynamic value) {
+    final raw = _readString(value, fallback: '-');
+    if (raw == '-') return raw;
+    final normalized = raw.trim().toLowerCase().replaceAll('_', ' ');
+    switch (normalized) {
+      case 'very positive':
+      case 'very_positive':
+        return 'Very Positive';
+      case 'positive':
+        return 'Positive';
+      case 'neutral':
+        return 'Neutral';
+      case 'negative':
+        return 'Negative';
+      case 'not interested':
+      case 'not_interested':
+        return 'Not Interested';
+      case 'booked':
+        return 'Booked';
+      case 'negotiation':
+        return 'Negotiation';
+      case 'follow up':
+      case 'follow_up':
+        return 'Follow Up';
+      default:
+        return raw;
+    }
+  }
+
   Future<void> _openFeedbackForm() async {
     final feedback = _feedbackData();
     final hasFeedback = _hasFeedback(feedback);
@@ -577,4 +743,3 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
     return '${local.day.toString().padLeft(2, '0')} ${months[local.month - 1]} ${local.year}';
   }
 }
-
