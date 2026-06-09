@@ -20,7 +20,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentIndex = 0;
+  final int _currentIndex = 0;
   final AuthProvider _authProvider = AuthProvider();
   bool _statsLoading = true;
   String? _statsError;
@@ -225,7 +225,6 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isNarrow = screenWidth < 380;
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final navReservedHeight = 76.0 + 12.0;
     final bodyBottomPadding =
@@ -383,7 +382,6 @@ class _HeaderBlock extends StatefulWidget {
 class _HeaderBlockState extends State<_HeaderBlock> {
   final AuthProvider _authProvider = AuthProvider();
   bool _isExporting = false;
-  _ExportModuleType? _activeExportType;
   String _currentRole = '';
 
   @override
@@ -458,7 +456,6 @@ class _HeaderBlockState extends State<_HeaderBlock> {
     }
     setState(() {
       _isExporting = true;
-      _activeExportType = moduleType;
     });
 
     try {
@@ -528,90 +525,8 @@ class _HeaderBlockState extends State<_HeaderBlock> {
       if (mounted) {
         setState(() {
           _isExporting = false;
-          _activeExportType = null;
         });
       }
-    }
-  }
-
-  Future<void> _openExportMenu() async {
-    final renderBox = context.findRenderObject() as RenderBox?;
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
-    if (renderBox == null || overlay == null) {
-      return;
-    }
-    final offset = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
-
-    final selected = await showMenu<_ExportModuleType>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-        offset.dx + 120,
-        offset.dy + 88,
-        overlay.size.width - offset.dx - 8,
-        overlay.size.height - offset.dy,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      color: Colors.white,
-      items: [
-        const PopupMenuItem<_ExportModuleType>(
-          enabled: false,
-          height: 34,
-          child: Text(
-            'DOWNLOAD EXCEL (.XLSX)',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-        ..._ExportModuleType.values.map(
-          (item) => PopupMenuItem<_ExportModuleType>(
-            value: item,
-            height: 44,
-            child: Row(
-              children: [
-                Icon(item.icon, size: 16, color: item.color),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    item.label,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF344054),
-                    ),
-                  ),
-                ),
-                if (item == _ExportModuleType.allModules)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F2FF),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Text(
-                      'All',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-
-    if (selected != null && mounted) {
-      await _exportModule(selected);
     }
   }
 
@@ -620,7 +535,6 @@ class _HeaderBlockState extends State<_HeaderBlock> {
     final now = DateTime.now();
     final greeting = _greetingForHour(now.hour);
     final formattedDate = _formatDate(now);
-    final canExport = RoleAccess.canExportData(_currentRole);
     final actionButtons = Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -2308,7 +2222,7 @@ class _SegmentToggle extends StatelessWidget {
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -2404,3 +2318,4 @@ class _DashCard extends StatelessWidget {
     );
   }
 }
+

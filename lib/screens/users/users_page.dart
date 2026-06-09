@@ -1,4 +1,3 @@
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +23,6 @@ class _UsersPageState extends State<UsersPage> {
   String _selectedRole = 'All Roles';
   String _selectedStatus = 'All Status';
   bool _isLoading = true;
-  bool _isExporting = false;
   final Set<String> _assigningManagerUserIds = <String>{};
   String? _error;
   List<_UserItem> _users = <_UserItem>[];
@@ -357,44 +355,6 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  Future<void> _exportUsers() async {
-    if (!_canExportData) {
-      _showSnackBar('You do not have permission to export users.');
-      return;
-    }
-    setState(() {
-      _isExporting = true;
-    });
-    try {
-      final exported = await _authProvider.exportUsers(
-        token: _authProvider.currentAuthToken,
-      );
-      final fileName = exported.fileName.trim().isEmpty
-          ? 'users_export.xlsx'
-          : exported.fileName.trim();
-      if (kIsWeb) {
-        _showSnackBar(
-          'Export generated ($fileName), but direct file save is not supported on Web in this build.',
-        );
-        return;
-      }
-      final file = await ExportFileHelper.saveToDownloadNextone(
-        fileName: fileName,
-        bytes: exported.bytes,
-      );
-      if (!mounted) return;
-      _showSnackBar('Users export downloaded: ${file.path}');
-    } catch (error) {
-      if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isExporting = false;
-        });
-      }
-    }
-  }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context)

@@ -645,7 +645,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
         Text(label),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
-          value: (value ?? '').isEmpty ? null : value,
+          initialValue: (value ?? '').isEmpty ? null : value,
           decoration: _fieldDecoration(hint: hint),
           items: items,
           onChanged: onChanged,
@@ -812,7 +812,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
 
   Widget _buildStatusDropdown() {
     return DropdownButtonFormField<String>(
-      value: _statusFilter,
+      initialValue: _statusFilter,
       isExpanded: true,
       decoration: InputDecoration(
         isDense: true,
@@ -1354,7 +1354,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
     if (currentStatus == 'confirmed') {
       allowedStatuses = <String>['Confirmed', 'On Hold', 'Cancelled'];
     } else {
-      allowedStatuses = <String>['$selectedStatus'];
+      allowedStatuses = <String>[selectedStatus];
     }
     if (!allowedStatuses.contains(selectedStatus)) {
       selectedStatus = allowedStatuses.first;
@@ -1429,7 +1429,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                             CircleAvatar(
                               radius: 18,
                               backgroundColor:
-                                  AppColors.primary.withOpacity(0.2),
+                                  AppColors.primary.withValues(alpha: 0.2),
                               child: Text(
                                 _initials(leadName),
                                 style: const TextStyle(
@@ -1467,7 +1467,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                       const Text('New Status'),
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
-                        value: selectedStatus,
+                        initialValue: selectedStatus,
                         decoration: _fieldDecoration(hint: 'Select status'),
                         items: allowedStatuses
                             .map(
@@ -1727,3 +1727,4 @@ class _ClosuresPageState extends State<ClosuresPage> {
     }
   }
 }
+

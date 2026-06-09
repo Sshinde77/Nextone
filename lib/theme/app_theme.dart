@@ -13,12 +13,10 @@ abstract final class AppTheme {
         secondary: AppColors.secondary,
         tertiary: AppColors.tertiary,
         surface: AppColors.surface,
-        background: AppColors.background,
         error: AppColors.error,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: AppColors.primary,
-        onBackground: AppColors.primary,
       ),
       scaffoldBackgroundColor: AppColors.background,
     );

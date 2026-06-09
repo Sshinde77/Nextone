@@ -1004,6 +1004,26 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> submitSiteRevisitFeedback({
+    required String id,
+    required int rating,
+    required String clientReaction,
+    required String interestedIn,
+    required String nextStep,
+    required String remarks,
+    String? token,
+  }) {
+    return _authService.submitSiteRevisitFeedback(
+      id: id,
+      rating: rating,
+      clientReaction: clientReaction,
+      interestedIn: interestedIn,
+      nextStep: nextStep,
+      remarks: remarks,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> leadDetail({required String id, String? token}) {
     return _authService.leadDetail(id: id, token: token);
   }

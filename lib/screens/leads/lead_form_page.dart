@@ -152,12 +152,11 @@ class _LeadFormPageState extends State<LeadFormPage> {
     } catch (_) {
       // Keep list-prefilled values as fallback when detail fetch fails.
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _isLoadingLeadDetails = false;
+        });
       }
-      setState(() {
-        _isLoadingLeadDetails = false;
-      });
     }
   }
 

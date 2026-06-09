@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/site_visits/feedback_form_dialog.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class SiteRevisitDetailPage extends StatefulWidget {
@@ -91,8 +92,11 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
               _projectCard(),
               const SizedBox(height: 10),
               _assigneeCard(),
-              const SizedBox(height: 10),
-              _feedbackCard(),
+              if (_isCompletedStatus(
+                  _readString(_data!['status'], fallback: ''))) ...[
+                const SizedBox(height: 10),
+                _feedbackCard(),
+              ],
             ],
           ],
         ),
@@ -260,12 +264,77 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
   }
 
   Widget _feedbackCard() {
-    return _entityCard(
-      title: 'Feedback',
-      primary: _nestedString('feedback', 'note', fallback: '-'),
-      secondary: _nestedString('feedback', 'client_reaction', fallback: '-'),
-      tertiary: _nestedString('feedback', 'next_step', fallback: '-'),
-      icon: Icons.rate_review_outlined,
+    final feedback = _feedbackData();
+    final hasFeedback = _hasFeedback(feedback);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                child: const Icon(Icons.rate_review_outlined,
+                    color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Feedback',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Open the feedback form for this completed re-visit.',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: hasFeedback ? null : _openFeedbackForm,
+              icon: const Icon(Icons.star_border_rounded),
+              label: Text(
+                hasFeedback ? 'Feedback Submitted' : 'Submit Feedback',
+              ),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+          if (hasFeedback) ...[
+            const SizedBox(height: 10),
+            const Text(
+              'Feedback can be submitted only one time for a re-visit.',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -297,7 +366,7 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            backgroundColor: AppColors.primary.withOpacity(0.12),
+            backgroundColor: AppColors.primary.withValues(alpha: 0.12),
             child: Icon(icon, color: AppColors.primary, size: 20),
           ),
           const SizedBox(width: 10),
@@ -349,7 +418,7 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -361,6 +430,77 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
         ),
       ),
     );
+  }
+
+  bool _isCompletedStatus(String status) {
+    final normalized = status.trim().toLowerCase();
+    return normalized == 'completed' || normalized == 'done';
+  }
+
+  Map<String, dynamic> _feedbackData() {
+    final source = _data ?? const <String, dynamic>{};
+    final nested = _asMap(source['feedback']);
+
+    return <String, dynamic>{
+      'rating': source['rating'] ?? nested['rating'],
+      'client_reaction': source['client_reaction'] ?? nested['client_reaction'],
+      'interested_in': source['interested_in'] ?? nested['interested_in'],
+      'next_step': source['next_step'] ?? nested['next_step'],
+      'remarks':
+          source['feedback_remarks'] ?? source['remarks'] ?? nested['remarks'],
+    }..removeWhere(
+        (key, value) => value == null || value.toString().trim().isEmpty);
+  }
+
+  bool _hasFeedback(Map<String, dynamic> feedback) {
+    return feedback.isNotEmpty;
+  }
+
+  Future<void> _openFeedbackForm() async {
+    final feedback = _feedbackData();
+    final hasFeedback = _hasFeedback(feedback);
+    if (hasFeedback) {
+      _showSnackBar('Feedback has already been submitted for this re-visit.');
+      return;
+    }
+    final result = await showFeedbackFormDialog(
+      context: context,
+      title: 'Submit Feedback',
+      submitLabel: 'Submit Feedback',
+      initialData: FeedbackFormData.fromMap(feedback),
+    );
+
+    if (result == null) {
+      return;
+    }
+
+    try {
+      await _authProvider.submitSiteRevisitFeedback(
+        id: widget.revisitId,
+        rating: result.rating,
+        clientReaction: result.apiClientReaction,
+        interestedIn: result.interestedIn,
+        nextStep: result.apiNextStep,
+        remarks: result.remarks,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Feedback submitted successfully.');
+      await _loadDetail();
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _errorCard() {
@@ -437,3 +577,4 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
     return '${local.day.toString().padLeft(2, '0')} ${months[local.month - 1]} ${local.year}';
   }
 }
+

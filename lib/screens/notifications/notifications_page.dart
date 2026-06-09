@@ -323,7 +323,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1D4ED8).withOpacity(0.25),
+            color: const Color(0xFF1D4ED8).withValues(alpha: 0.25),
             blurRadius: 22,
             offset: const Offset(0, 12),
           ),
@@ -352,7 +352,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           ? 'Realtime sync active'
                           : 'Realtime sync offline',
                       style: TextStyle(
-                        color: const Color(0xFFDBEAFE).withOpacity(0.95),
+                        color: const Color(0xFFDBEAFE).withValues(alpha: 0.95),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -370,7 +370,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 icon: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.16),
+                    color: Colors.white.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
@@ -435,7 +435,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.16),
+          color: Colors.white.withValues(alpha: 0.16),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: Colors.white, size: 19),
@@ -451,9 +451,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.14),
+        color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.18)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
       ),
       child: Column(
         children: [
@@ -489,7 +489,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border.withOpacity(0.95)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.95)),
       ),
       child: compact
           ? Column(
@@ -519,7 +519,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   Widget _typeDropdown() {
     return DropdownButtonFormField<String>(
-      value: _notificationTypes.contains(_selectedType) ? _selectedType : 'all',
+      initialValue: _notificationTypes.contains(_selectedType) ? _selectedType : 'all',
       isExpanded: true,
       decoration: InputDecoration(
         labelText: 'Category',
@@ -696,12 +696,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isRead
-                  ? AppColors.border.withOpacity(0.8)
-                  : _typeColor(type).withOpacity(0.32),
+                  ? AppColors.border.withValues(alpha: 0.8)
+                  : _typeColor(type).withValues(alpha: 0.32),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 12,
                 offset: const Offset(0, 5),
               ),
@@ -717,7 +717,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: _typeColor(type).withOpacity(0.14),
+                      color: _typeColor(type).withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(_typeIcon(type), color: _typeColor(type), size: 21),
@@ -870,3 +870,4 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 }
+

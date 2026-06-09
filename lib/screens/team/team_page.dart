@@ -95,7 +95,6 @@ class _TeamPageState extends State<TeamPage> {
   @override
   Widget build(BuildContext context) {
     final members = _filteredMembers;
-    final bestPerformer = _bestPerformer;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -573,154 +572,7 @@ class _TeamPageState extends State<TeamPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _exportMembers() async {
-    if (!_canExportData) {
-      _showSnackBar('You do not have permission to export team data.');
-      return;
-    }
-    await CsvExportHelper.exportRowsToClipboard(
-      context: context,
-      fileLabel: 'Team',
-      headers: const <String>[
-        'ID',
-        'Name',
-        'Email',
-        'Role',
-        'Active Leads',
-        'Closed Leads',
-        'Conversion Rate',
-      ],
-      rows: _filteredMembers
-          .map(
-            (member) => <String>[
-              member.id,
-              member.name,
-              (member.originalData['email'] ?? '').toString(),
-              member.role,
-              member.activeLeads.toString(),
-              member.closedLeads.toString(),
-              member.conversionRate.toStringAsFixed(1),
-            ],
-          )
-          .toList(),
-    );
-  }
 
-  Widget _buildBestPerformerCard(_TeamMember member) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x10000000),
-            blurRadius: 16,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Best Performer',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _InitialAvatar(name: member.name, size: 54),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      member.name,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 24,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      member.role,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.success,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const Text(
-                        'TOP PERFORMER',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 10,
-                          letterSpacing: .5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.secondary,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Icon(
-                  Icons.person_add_alt_1,
-                  color: AppColors.primary,
-                  size: 18,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  'Leads Handled',
-                  member.activeLeads.toString(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildStatCard(
-                  'Conversion Rate',
-                  '${member.conversionRate.toStringAsFixed(1)}%',
-                  valueColor: AppColors.success,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _buildActionButtonsRow(member),
-        ],
-      ),
-    );
-  }
 
   Widget _buildActionButtonsRow(_TeamMember member) {
     final isDeleting =
@@ -792,9 +644,9 @@ class _TeamPageState extends State<TeamPage> {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: color.withOpacity(isDisabled ? 0.05 : 0.1),
+        color: color.withValues(alpha: isDisabled ? 0.05 : 0.1),
         shape: BoxShape.circle,
-        border: Border.all(color: color.withOpacity(isDisabled ? 0.12 : 0.2)),
+        border: Border.all(color: color.withValues(alpha: isDisabled ? 0.12 : 0.2)),
       ),
       child: isLoading
           ? Padding(
@@ -959,38 +811,6 @@ class _TeamPageState extends State<TeamPage> {
     );
   }
 
-  Widget _buildMiniStat(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.secondary,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: .6,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildInfoCard({
     required String message,
@@ -1223,3 +1043,4 @@ class _RoleOption {
 
   const _RoleOption({required this.label, required this.value});
 }
+

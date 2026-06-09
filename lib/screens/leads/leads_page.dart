@@ -1454,7 +1454,7 @@ class _LeadsPageState extends State<LeadsPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: _selectedAssigneeId,
+                    initialValue: _selectedAssigneeId,
                     isExpanded: true,
                     decoration: _sheetFieldDecoration('Select assignee'),
                     items: _assigneeOptions
@@ -1587,7 +1587,7 @@ class _LeadsPageState extends State<LeadsPage> {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
-                    value: _selectedAssigneeId,
+                    initialValue: _selectedAssigneeId,
                     isExpanded: true,
                     decoration: _sheetFieldDecoration('Select assignee'),
                     items: _assigneeOptions

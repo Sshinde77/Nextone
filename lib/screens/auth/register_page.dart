@@ -158,7 +158,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           borderRadius: BorderRadius.circular(32),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -284,7 +284,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               Text('SELECT ROLE', style: textTheme.labelLarge),
                               const SizedBox(height: 8),
                               DropdownButtonFormField<String>(
-                                value: _selectedRole,
+                                initialValue: _selectedRole,
                                 isExpanded: true,
                                 dropdownColor: Colors.white,
                                 borderRadius: BorderRadius.circular(12),
@@ -299,7 +299,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                         Icon(
                                           _getIconData(role['icon']!),
                                           size: 20,
-                                          color: AppColors.primary.withOpacity(
+                                          color: AppColors.primary.withValues(alpha: 
                                             0.7,
                                           ),
                                         ),
@@ -404,3 +404,4 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 }
+

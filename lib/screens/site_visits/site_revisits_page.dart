@@ -573,7 +573,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                         const Text('Original Site Visit *'),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<_OriginalVisitOption>(
-                          value: selectedVisit,
+                          initialValue: selectedVisit,
                           isExpanded: true,
                           decoration: _fieldDecoration(),
                           items: visits
@@ -949,7 +949,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                         const Text('Assign To'),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<_TeamMemberOption>(
-                          value: selectedMember,
+                          initialValue: selectedMember,
                           decoration:
                               _fieldDecoration(hint: 'Select team member'),
                           items: members
@@ -1145,7 +1145,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                             CircleAvatar(
                               radius: 18,
                               backgroundColor:
-                                  AppColors.primary.withOpacity(0.2),
+                                  AppColors.primary.withValues(alpha: 0.2),
                               child: Text(
                                 _initials(leadName),
                                 style: const TextStyle(
@@ -1183,7 +1183,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                       const Text('New Status *'),
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
-                        value: selectedStatus,
+                        initialValue: selectedStatus,
                         decoration: _fieldDecoration(),
                         items: const [
                           DropdownMenuItem(
@@ -1337,3 +1337,4 @@ class _TeamMemberOption {
   final String id;
   final String name;
 }
+

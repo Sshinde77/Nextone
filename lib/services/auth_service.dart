@@ -26,12 +26,6 @@ class AuthService {
 
   static String? get currentAuthToken => _authToken;
 
-  get name => null;
-  get email => null;
-  get source => null;
-  get assignedTo => null;
-  get notes => null;
-
   static Future<bool> hasPersistedSession() async {
     if (_authToken != null && _authToken!.trim().isNotEmpty) {
       return true;
@@ -323,7 +317,7 @@ class AuthService {
     }
 
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.logout}');
-    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final headers = _headers(accept: '*/*', token: resolvedToken);
     final body = jsonEncode(payload);
     _logRequest(
       endpoint: 'logout',
@@ -3790,12 +3784,15 @@ class AuthService {
     final endpoint = ApiConstants.submitfeedbacksitevisits
         .replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
-    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final normalizedClientReaction =
+        _normalizeFeedbackEnumValue(clientReaction);
+    final normalizedNextStep = _normalizeFeedbackEnumValue(nextStep);
+    final headers = _headers(accept: '*/*', token: resolvedToken);
     final body = jsonEncode({
       'rating': rating,
-      'client_reaction': clientReaction.trim(),
+      'client_reaction': normalizedClientReaction,
       'interested_in': interestedIn.trim(),
-      'next_step': nextStep.trim(),
+      'next_step': normalizedNextStep,
       'remarks': remarks.trim(),
     });
 
@@ -3831,11 +3828,90 @@ class AuthService {
     return <String, dynamic>{
       'id': normalizedId,
       'rating': rating,
-      'client_reaction': clientReaction.trim(),
+      'client_reaction': normalizedClientReaction,
       'interested_in': interestedIn.trim(),
-      'next_step': nextStep.trim(),
+      'next_step': normalizedNextStep,
       'remarks': remarks.trim(),
     };
+  }
+
+  Future<Map<String, dynamic>> submitSiteRevisitFeedback({
+    required String id,
+    required int rating,
+    required String clientReaction,
+    required String interestedIn,
+    required String nextStep,
+    required String remarks,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Site revisit id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.submitfeedbacksiteRevisits
+        .replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final normalizedClientReaction =
+        _normalizeFeedbackEnumValue(clientReaction);
+    final normalizedNextStep = _normalizeFeedbackEnumValue(nextStep);
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    final body = jsonEncode({
+      'rating': rating,
+      'client_reaction': normalizedClientReaction,
+      'interested_in': interestedIn.trim(),
+      'next_step': normalizedNextStep,
+      'remarks': remarks.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'submitSiteRevisitFeedback',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('submitSiteRevisitFeedback', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to submit site revisit feedback.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) {
+        return data;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      'rating': rating,
+      'client_reaction': normalizedClientReaction,
+      'interested_in': interestedIn.trim(),
+      'next_step': normalizedNextStep,
+      'remarks': remarks.trim(),
+    };
+  }
+
+  String _normalizeFeedbackEnumValue(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll('&', 'and')
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
   }
 
   Future<void> deleteFollowUp({
@@ -4069,14 +4145,11 @@ class AuthService {
 
     return <String, dynamic>{
       'id': normalizedId,
-      'name': name.trim(),
       'phone': phone.trim(),
-      'email': email.trim(),
-      'source': source.trim(),
-      'assigned_to': assignedTo.trim(),
+      'callback_time': callbackTime.trim(),
+      'next_followup_time': nextFollowUpTime.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
-      'notes': notes.trim(),
     };
   }
 

@@ -86,7 +86,7 @@ class SiteRevisitDataCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
@@ -186,7 +186,7 @@ class _InitialAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return CircleAvatar(
       radius: 21,
-      backgroundColor: AppColors.primary.withOpacity(0.12),
+      backgroundColor: AppColors.primary.withValues(alpha: 0.12),
       child: Text(
         _initials(name),
         style: const TextStyle(
@@ -209,3 +209,4 @@ class _InitialAvatar extends StatelessWidget {
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   }
 }
+

@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String baseUrl = 'https://api.nextonerealty.in';
+  static const String baseUrl = 'https://api.nextonerealty.in/api/v1';
 
   // Auth Endpoints
   static const String login = '/auth/login';
@@ -82,6 +82,8 @@ class ApiConstants {
   static const String updatestatussitevisits = '/site-visits/{id}/status';
   static const String submitfeedbacksitevisits = '/site-visits/{id}/feedback';
   static const String siteRevisits = '/site-revisits';
+  static const String submitfeedbacksiteRevisits =
+      '/site-revisits/{id}/feedback';
   static const String closures = '/closures';
   static const String closuresDetail = '/closures/{id}';
   static const String closuresStatus = '/closures/{id}/status';

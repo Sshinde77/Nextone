@@ -147,7 +147,7 @@ class _LoginPageState extends State<LoginPage> {
                               const Color(0xFFB1916C)), // Kept original color
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -184,7 +184,7 @@ class _LoginPageState extends State<LoginPage> {
                       border: Border.all(color: AppColors.border),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
+                          color: Colors.black.withValues(alpha: 0.02),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -292,7 +292,7 @@ class _LoginPageState extends State<LoginPage> {
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -380,8 +380,9 @@ class _LoginPageState extends State<LoginPage> {
             validator: (value) {
               final digits = _normalizedPhoneDigits(value ?? '');
               if (digits.isEmpty) return 'Phone is required';
-              if (!_indiaPhoneRegex.hasMatch(digits))
+              if (!_indiaPhoneRegex.hasMatch(digits)) {
                 return 'Enter valid 10-digit number';
+              }
               return null;
             },
           ),
@@ -466,3 +467,4 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
+

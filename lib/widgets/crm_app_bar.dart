@@ -290,7 +290,7 @@ class _CrmAppBarState extends State<CrmAppBar> {
               border: Border.all(color: Color(0xFFB1916C)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -352,7 +352,7 @@ class _CrmAppBarState extends State<CrmAppBar> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -375,3 +375,4 @@ class _CrmAppBarState extends State<CrmAppBar> {
     );
   }
 }
+

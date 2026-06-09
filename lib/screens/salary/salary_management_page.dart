@@ -828,8 +828,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     }
 
     final title = _mySalarySelectedMonth == 0
-        ? '${_selectedYear} SALARY SUMMARY'
-        : '${DateFormat('MMM').format(DateTime(_selectedYear, _mySalarySelectedMonth)).toUpperCase()} ${_selectedYear} SALARY SUMMARY';
+        ? '$_selectedYear SALARY SUMMARY'
+        : '${DateFormat('MMM').format(DateTime(_selectedYear, _mySalarySelectedMonth)).toUpperCase()} $_selectedYear SALARY SUMMARY';
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -971,7 +971,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
               children: [
                 Expanded(
                   child: Text(
-                    '${_myDailyPresentFullCount} full + ${_myDailyPresentHalfCount} half days',
+                    '$_myDailyPresentFullCount full + $_myDailyPresentHalfCount half days',
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w600,

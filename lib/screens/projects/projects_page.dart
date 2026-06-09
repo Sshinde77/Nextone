@@ -36,7 +36,6 @@ class _ProjectsPageState extends State<ProjectsPage> {
   List<_Project> _projects = const <_Project>[];
   bool _isLoading = true;
   bool _isDeleting = false;
-  bool _isExporting = false;
   String? _loadError;
   String _currentRole = '';
   String? _selectedStatus;
@@ -474,69 +473,6 @@ class _ProjectsPageState extends State<ProjectsPage> {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
-    final normalized = status.toLowerCase();
-    final color =
-        normalized == 'active' ? AppColors.success : AppColors.warning;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        normalized.isEmpty ? 'N/A' : normalized.toUpperCase(),
-        style:
-            TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 10),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: AppColors.primary),
-        const SizedBox(width: 8),
-        Text(
-          '$label: ',
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCircleActionButton(
-      IconData icon, Color color, VoidCallback onPressed) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        shape: BoxShape.circle,
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: IconButton(
-        padding: EdgeInsets.zero,
-        icon: Icon(icon, size: 18, color: color),
-        onPressed: onPressed,
-      ),
-    );
-  }
-
   Widget _buildErrorState() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -656,45 +592,6 @@ class _ProjectsPageState extends State<ProjectsPage> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  Future<void> _exportProjects() async {
-    if (!_canExportData) {
-      _showSnackBar('You do not have permission to export projects.');
-      return;
-    }
-    setState(() {
-      _isExporting = true;
-    });
-    try {
-      final exported = await _authProvider.exportProjects(
-        token: _authProvider.currentAuthToken,
-      );
-      final fileName = exported.fileName.trim().isEmpty
-          ? 'projects_export.xlsx'
-          : exported.fileName.trim();
-      if (kIsWeb) {
-        _showSnackBar(
-          'Export generated ($fileName), but direct file save is not supported on Web in this build.',
-        );
-        return;
-      }
-      final file = await ExportFileHelper.saveToDownloadNextone(
-        fileName: fileName,
-        bytes: exported.bytes,
-      );
-      if (!mounted) return;
-      _showSnackBar('Projects export downloaded: ${file.path}');
-    } catch (error) {
-      if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isExporting = false;
-        });
-      }
-    }
   }
 
   Future<void> _openDownloadTypeSheet(_Project project) async {

@@ -1649,51 +1649,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
-  Widget _chipWrap(List<String> items) {
-    final values = items.isEmpty ? <String>['Not specified'] : items;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: values
-          .map(
-            (item) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(999),
-                border:
-                    Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-              ),
-              child: Text(
-                item,
-                style: const TextStyle(
-                    color: AppColors.primaryDark,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700),
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-
-  List<String> _readList(dynamic value) {
-    if (value is List) {
-      return value
-          .map((e) => _readString(e))
-          .where((e) => e.isNotEmpty)
-          .toList();
-    }
-    if (value is String && value.trim().isNotEmpty) {
-      return value
-          .split(',')
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
-    }
-    return const <String>[];
-  }
-
   List<_ProjectDocument> _readDocuments(
     Map<String, dynamic> payload,
     String category,

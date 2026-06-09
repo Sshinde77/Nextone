@@ -414,7 +414,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: _selectedNextStatus,
+                initialValue: _selectedNextStatus,
                 isExpanded: true,
                 decoration: _fieldDecoration('Select status'),
                 items: nextStatuses
@@ -483,7 +483,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: _selectedAssigneeId,
+                initialValue: _selectedAssigneeId,
                 isExpanded: true,
                 decoration: _fieldDecoration('Select assignee'),
                 items: _assigneeOptions
@@ -1383,7 +1383,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: AppColors.primary.withOpacity(0.1),
+            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
             child: Text(
               _lead!.name.isNotEmpty ? _lead!.name[0].toUpperCase() : '?',
               style: const TextStyle(
@@ -1666,7 +1666,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -1816,7 +1816,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -1826,7 +1826,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         children: [
           CircleAvatar(
             radius: 26,
-            backgroundColor: AppColors.primary.withOpacity(0.1),
+            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
             child: Text(
               _lead!.name.isNotEmpty ? _lead!.name[0].toUpperCase() : '?',
               style: const TextStyle(
@@ -1866,7 +1866,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
@@ -1954,7 +1954,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
@@ -2421,3 +2421,4 @@ class _PipelineStatusOption {
     );
   }
 }
+

@@ -8,7 +8,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
-import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -24,7 +23,6 @@ class _AttendancePageState extends State<AttendancePage> {
   int _selectedTabIndex = 0;
   final AuthProvider _authProvider = AuthProvider();
   final ScrollController _monthGridHorizontalController = ScrollController();
-  bool _isExporting = false;
   String _currentRole = '';
   bool _isAttendanceSubmitting = false;
   bool _isCheckedIn = false;
@@ -254,7 +252,9 @@ class _AttendancePageState extends State<AttendancePage> {
       }
 
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
       final address = await _resolveAddress(position.latitude, position.longitude);
       final device = _deviceDescription();
@@ -1229,12 +1229,6 @@ class _AttendancePageState extends State<AttendancePage> {
     }
   }
 
-  int _summaryCount(String key) {
-    final summary = _calendarData['summary'];
-    if (summary is Map<String, dynamic>) return _readIntValue(summary[key], 0);
-    return 0;
-  }
-
   int _summaryCountForRow(Map<String, dynamic> row, String key) {
     final summary = row['summary'];
     if (summary is Map<String, dynamic>) return _readIntValue(summary[key], 0);
@@ -1314,18 +1308,6 @@ class _AttendancePageState extends State<AttendancePage> {
       'absent': absent,
       'leave': leave,
     };
-  }
-
-  String _summaryHours() {
-    final summary = _calendarData['summary'];
-    if (summary is Map<String, dynamic>) {
-      return _readStringFromMap(
-        summary,
-        const ['total_working_hours'],
-        fallback: '0',
-      );
-    }
-    return '0';
   }
 
   int _approvalNotCheckedOutCount(List<Map<String, dynamic>> rows) {
@@ -1544,68 +1526,6 @@ class _AttendancePageState extends State<AttendancePage> {
     final m = local.minute.toString().padLeft(2, '0');
     final amPm = h24 >= 12 ? 'PM' : 'AM';
     return '$h12:$m $amPm';
-  }
-
-  Future<void> _exportAttendance() async {
-    if (!_canExportData) {
-      _showSnackBar('You do not have permission to export attendance.');
-      return;
-    }
-    final range = await _showExportDateRangeDialog();
-    if (!mounted || range == null) {
-      return;
-    }
-    setState(() {
-      _isExporting = true;
-    });
-    final from = _formatDateForApi(range.start);
-    final to = _formatDateForApi(range.end);
-    try {
-      final exported = await _authProvider.exportAttendance(
-        from: from,
-        to: to,
-        token: _authProvider.currentAuthToken,
-      );
-      final fileName = exported.fileName.trim().isEmpty
-          ? 'attendance_${from}_to_$to.xlsx'
-          : exported.fileName.trim();
-      if (kIsWeb) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(
-                'Export generated ($fileName), but direct file save is not supported on Web in this build.',
-              ),
-            ),
-          );
-        return;
-      }
-      final file = await ExportFileHelper.saveToDownloadNextone(
-        fileName: fileName,
-        bytes: exported.bytes,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text('Attendance export downloaded: ${file.path}')),
-        );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
-        );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isExporting = false;
-        });
-      }
-    }
   }
 
   Future<DateTimeRange?> _showExportDateRangeDialog() async {
@@ -4158,9 +4078,6 @@ class _AttendancePageState extends State<AttendancePage> {
                                   onPressed: _isApprovingStatus
                                       ? null
                                       : () => Navigator.of(dialogContext).pop(true),
-                                  child: Text(
-                                    _isApprovingStatus ? 'Updating...' : 'Confirm Change',
-                                  ),
                                   style: ElevatedButton.styleFrom(
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 13),
@@ -4172,6 +4089,9 @@ class _AttendancePageState extends State<AttendancePage> {
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
                                     ),
+                                  ),
+                                  child: Text(
+                                    _isApprovingStatus ? 'Updating...' : 'Confirm Change',
                                   ),
                                 ),
                               ),
@@ -4202,9 +4122,6 @@ class _AttendancePageState extends State<AttendancePage> {
                                   onPressed: _isApprovingStatus
                                       ? null
                                       : () => Navigator.of(dialogContext).pop(true),
-                                  child: Text(
-                                    _isApprovingStatus ? 'Updating...' : 'Confirm Change',
-                                  ),
                                   style: ElevatedButton.styleFrom(
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 13),
@@ -4216,6 +4133,9 @@ class _AttendancePageState extends State<AttendancePage> {
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
                                     ),
+                                  ),
+                                  child: Text(
+                                    _isApprovingStatus ? 'Updating...' : 'Confirm Change',
                                   ),
                                 ),
                               ),

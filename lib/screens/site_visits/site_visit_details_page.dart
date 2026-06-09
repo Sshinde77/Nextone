@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/screens/site_visits/feedback_form_dialog.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -117,6 +118,7 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
       fallback: 'Unassigned',
     );
     final feedback = _feedbackData(data);
+    final isCompleted = _isCompletedStatus(status);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -211,13 +213,10 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
                                 ),
                               ],
                             ),
-                            if (_hasFeedback(feedback)) ...[
+                            if (isCompleted) ...[
                               const SizedBox(height: 16),
-                              _buildSectionCard(
-                                title: 'Feedback',
-                                icon: Icons.feedback_outlined,
-                                accent: const Color(0xFFDC2626),
-                                children: _buildFeedbackWidgets(feedback),
+                              _buildFeedbackActionCard(
+                                feedback: feedback,
                               ),
                             ],
                             const SizedBox(height: 16),
@@ -252,26 +251,6 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton.icon(
-                                onPressed: _submitFeedback,
-                                icon: const Icon(Icons.rate_review_outlined),
-                                label: Text(
-                                  _hasFeedback(feedback)
-                                      ? 'Update Feedback'
-                                      : 'Submit Feedback',
-                                ),
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size(double.infinity, 50),
-                                  backgroundColor: AppColors.primary,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                              ),
-                            ),
                             const SizedBox(height: 32),
                           ],
                         ),
@@ -299,7 +278,7 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primary.withOpacity(0.12),
+            AppColors.primary.withValues(alpha: 0.12),
             Colors.white,
           ],
           begin: Alignment.topLeft,
@@ -309,7 +288,7 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -325,7 +304,7 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
                 width: 58,
                 height: 58,
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.14),
+                  color: statusColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(
@@ -485,9 +464,9 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.25)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Text(
         status.toUpperCase(),
@@ -516,7 +495,7 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 14,
             offset: const Offset(0, 8),
           ),
@@ -531,7 +510,7 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.12),
+                  color: accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, size: 18, color: accent),
@@ -637,6 +616,11 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
     return false;
   }
 
+  bool _isCompletedStatus(String status) {
+    final normalized = status.trim().toLowerCase();
+    return normalized == 'completed' || normalized == 'done';
+  }
+
   Map<String, dynamic> _readMap(dynamic value) {
     if (value is Map<String, dynamic>) {
       return value;
@@ -699,166 +683,262 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
         (key, value) => value == null || value.toString().trim().isEmpty);
   }
 
-  List<Widget> _buildFeedbackWidgets(dynamic feedback) {
-    if (feedback is Map<String, dynamic>) {
-      final rating = feedback['rating']?.toString() ?? '';
-      final reaction = feedback['client_reaction']?.toString() ?? '';
-      final interestedIn = feedback['interested_in']?.toString() ?? '';
-      final nextStep = feedback['next_step']?.toString() ?? '';
-      final remarks = feedback['remarks']?.toString() ?? '';
+  Widget _buildFeedbackActionCard({
+    required Map<String, dynamic> feedback,
+  }) {
+    final hasFeedback = _hasFeedback(feedback);
+    final ratingText = feedback['rating']?.toString().trim() ?? '';
+    final reaction = _formatFeedbackValue(feedback['client_reaction']);
+    final nextStep = _formatFeedbackValue(feedback['next_step']);
+    final interestedIn = _readString(feedback['interested_in'], fallback: '-');
+    final remarks = _readString(feedback['remarks'], fallback: '-');
 
-      final widgets = <Widget>[];
-      if (rating.trim().isNotEmpty) {
-        widgets.add(_buildInfoRow('Rating', rating));
-      }
-      if (reaction.trim().isNotEmpty) {
-        widgets.add(_buildInfoRow('Reaction', reaction));
-      }
-      if (interestedIn.trim().isNotEmpty) {
-        widgets.add(_buildInfoRow('Interested In', interestedIn));
-      }
-      if (nextStep.trim().isNotEmpty) {
-        widgets.add(_buildInfoRow('Next Step', nextStep));
-      }
-      if (remarks.trim().isNotEmpty) {
-        widgets.add(_buildInfoRow('Remarks', remarks));
-      }
-      if (widgets.isNotEmpty) {
-        return widgets;
-      }
-    }
-
-    return <Widget>[
-      Text(
-        feedback.toString(),
-        style: const TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 14,
-          height: 1.5,
-        ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-    ];
-  }
-
-  Future<void> _submitFeedback() async {
-    final feedbackMap = _feedbackData(_visitData);
-
-    final remarksController = TextEditingController(
-      text: feedbackMap['remarks']?.toString() ?? '',
-    );
-    final interestedController = TextEditingController(
-      text: feedbackMap['interested_in']?.toString() ?? '',
-    );
-    final nextStepController = TextEditingController(
-      text: feedbackMap['next_step']?.toString() ?? '',
-    );
-    String reaction = feedbackMap['client_reaction']?.toString() ?? 'positive';
-    int rating = int.tryParse(feedbackMap['rating']?.toString() ?? '') ?? 4;
-
-    final shouldSubmit = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setLocalState) {
-            return AlertDialog(
-              title: const Text('Submit Feedback'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List<Widget>.generate(5, (index) {
-                        final star = index + 1;
-                        return IconButton(
-                          onPressed: () => setLocalState(() => rating = star),
-                          icon: Icon(
-                            star <= rating
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
-                            color: AppColors.warning,
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: reaction,
-                      decoration:
-                          const InputDecoration(labelText: 'Client Reaction'),
-                      items: const [
-                        DropdownMenuItem(
-                            value: 'positive', child: Text('Positive')),
-                        DropdownMenuItem(
-                            value: 'neutral', child: Text('Neutral')),
-                        DropdownMenuItem(
-                            value: 'negative', child: Text('Negative')),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setLocalState(() => reaction = value);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: interestedController,
-                      decoration: const InputDecoration(
-                        labelText: 'Interested In',
-                        hintText: '3BHK - Floor 12',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: nextStepController,
-                      decoration: const InputDecoration(
-                        labelText: 'Next Step',
-                        hintText: 'negotiation',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: remarksController,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        labelText: 'Remarks',
-                        hintText: 'Client feedback remarks',
-                      ),
-                    ),
-                  ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.feedback_outlined,
+                  size: 18,
+                  color: Color(0xFFDC2626),
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancel'),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Client Feedback',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Save'),
+              ),
+              if (hasFeedback)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFDF6E8),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFF6D48F),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 16,
+                        color: Color(0xFFF59E0B),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        ratingText.isEmpty ? '-' : '$ratingText/5',
+                        style: const TextStyle(
+                          color: Color(0xFF8A5A00),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (hasFeedback) ...[
+            _buildFeedbackDetailTile(
+              label: 'Reaction',
+              value: reaction,
+              icon: Icons.trending_up_rounded,
+              iconColor: const Color(0xFF2563EB),
+            ),
+            const SizedBox(height: 12),
+            _buildFeedbackDetailTile(
+              label: 'Next Step',
+              value: nextStep,
+              icon: Icons.adjust_rounded,
+              iconColor: const Color(0xFFA855F7),
+            ),
+            const SizedBox(height: 12),
+            _buildFeedbackDetailTile(
+              label: 'Interested In',
+              value: interestedIn,
+              icon: Icons.home_work_outlined,
+              iconColor: const Color(0xFF0F766E),
+            ),
+            const SizedBox(height: 12),
+            _buildFeedbackDetailTile(
+              label: 'Remarks',
+              value: remarks,
+              icon: Icons.sticky_note_2_outlined,
+              iconColor: const Color(0xFFD97706),
+            ),
+          ] else ...[
+            const Text(
+              'Complete the feedback form for this completed visit.',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _openFeedbackForm,
+                icon: const Icon(Icons.rate_review_outlined),
+                label: const Text('Submit Feedback'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          if (hasFeedback) ...[
+            const SizedBox(height: 14),
+            const Text(
+              'Feedback can be submitted only one time for a site visit.',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeedbackDetailTile({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEAECEF)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.toUpperCase(),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.9,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
                 ),
               ],
-            );
-          },
-        );
-      },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatFeedbackValue(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty || text.toLowerCase() == 'null') {
+      return '-';
+    }
+
+    return text
+        .split(RegExp(r'[_\s-]+'))
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+  }
+
+  Future<void> _openFeedbackForm() async {
+    final feedbackMap = _feedbackData(_visitData);
+    final hasFeedback = _hasFeedback(feedbackMap);
+    if (hasFeedback) {
+      _showSnackBar('Feedback has already been submitted for this site visit.');
+      return;
+    }
+    final result = await showFeedbackFormDialog(
+      context: context,
+      title: 'Submit Feedback',
+      submitLabel: 'Submit Feedback',
+      initialData: FeedbackFormData.fromMap(feedbackMap),
     );
 
-    if (shouldSubmit != true) {
-      remarksController.dispose();
-      interestedController.dispose();
-      nextStepController.dispose();
+    if (result == null) {
       return;
     }
 
     try {
       await _authProvider.submitSiteVisitFeedback(
         id: widget.visitId,
-        rating: rating,
-        clientReaction: reaction,
-        interestedIn: interestedController.text.trim(),
-        nextStep: nextStepController.text.trim(),
-        remarks: remarksController.text.trim(),
+        rating: result.rating,
+        clientReaction: result.apiClientReaction,
+        interestedIn: result.interestedIn,
+        nextStep: result.apiNextStep,
+        remarks: result.remarks,
         token: _authProvider.currentAuthToken,
       );
       if (!mounted) {
@@ -871,10 +951,6 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
         return;
       }
       _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      remarksController.dispose();
-      interestedController.dispose();
-      nextStepController.dispose();
     }
   }
 
@@ -900,3 +976,4 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
     }
   }
 }
+

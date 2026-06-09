@@ -522,7 +522,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -545,7 +545,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.3),
+                      color: AppColors.primary.withValues(alpha: 0.3),
                       blurRadius: 15,
                       offset: const Offset(0, 8),
                     ),
@@ -1094,7 +1094,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 10,
-              color: text.withOpacity(0.9),
+              color: text.withValues(alpha: 0.9),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -1725,9 +1725,9 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: color.withOpacity(isDisabled ? 0.05 : 0.1),
+          color: color.withValues(alpha: isDisabled ? 0.05 : 0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(isDisabled ? 0.12 : 0.2)),
+          border: Border.all(color: color.withValues(alpha: isDisabled ? 0.12 : 0.2)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

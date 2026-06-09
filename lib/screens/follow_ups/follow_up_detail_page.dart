@@ -303,7 +303,7 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
                 ),
               ),
               const SizedBox(width: 10),
-              _pill(priorityLabel, priorityColor.withOpacity(0.12),
+              _pill(priorityLabel, priorityColor.withValues(alpha: 0.12),
                   priorityColor),
             ],
           ),
@@ -562,3 +562,4 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
     }
   }
 }
+

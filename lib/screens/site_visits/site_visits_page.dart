@@ -1,13 +1,9 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/site_visits/site_revisits_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
-import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
@@ -82,12 +78,11 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
   bool _isCalendarView = false;
   bool _isLoadingVisits = false;
-  bool _isExporting = false;
   String? _loadError;
   String _currentRole = '';
-  String _selectedStatus = 'scheduled';
+  String _selectedStatus = '';
   int _currentPage = 1;
-  int _perPage = 10;
+  final int _perPage = 10;
   int _totalPages = 1;
   int _totalItems = 0;
   late DateTime _focusedMonth;
@@ -143,7 +138,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           ? "Today's Visits"
           : 'Visits on $_selectedDateLabel';
     }
-    return 'All Scheduled Visits';
+    return 'All Site Visits';
   }
 
   String get _selectedDateLabel {
@@ -256,7 +251,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                         Text(
                           _selectedDateLabel.toUpperCase(),
                           style: TextStyle(
-                            color: AppColors.textSecondary.withOpacity(0.6),
+                            color:
+                                AppColors.textSecondary.withValues(alpha: 0.6),
                             fontSize: _fs(9),
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.3,
@@ -345,7 +341,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         label: const Text('Open Re-visits'),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
-          side: BorderSide(color: AppColors.primary.withOpacity(0.35)),
+          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.35)),
           minimumSize: const Size(0, 46),
           padding: EdgeInsets.symmetric(horizontal: _s(14)),
           shape: RoundedRectangleBorder(
@@ -576,10 +572,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(_s(14)),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: _s(12),
             offset: const Offset(0, 6),
           ),
@@ -663,7 +659,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: _s(3),
                     offset: Offset(0, _s(1)),
                   ),
@@ -703,7 +699,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         borderRadius: BorderRadius.circular(_s(18)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: _s(14),
             offset: Offset(0, _s(6)),
           ),
@@ -791,105 +787,6 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     );
   }
 
-  Widget _buildSliderCard() {
-    final start = _selectedDate.subtract(const Duration(days: 3));
-    final days = List<DateTime>.generate(
-      10,
-      (index) => DateTime(start.year, start.month, start.day + index),
-    );
-
-    return Container(
-      key: const ValueKey('slider'),
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: _s(14), horizontal: _s(6)),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(_s(18)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: _s(14),
-            offset: Offset(0, _s(6)),
-          ),
-        ],
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: Row(
-          children: days.map((date) {
-            final isSelected = _isSameDate(date, _selectedDate);
-            final dayLabel = _weekDayShort(date);
-            final hasVisits = _visitsForDay(date).isNotEmpty;
-
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedDate = date;
-                  _focusedMonth = DateTime(date.year, date.month, 1);
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: EdgeInsets.symmetric(horizontal: _s(7)),
-                width: _s(52),
-                padding: EdgeInsets.symmetric(vertical: _s(10)),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(_s(16)),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.3),
-                            blurRadius: _s(8),
-                            offset: Offset(0, _s(3)),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      dayLabel,
-                      style: TextStyle(
-                        color: isSelected
-                            ? Colors.white.withOpacity(0.8)
-                            : AppColors.textSecondary.withOpacity(0.7),
-                        fontSize: _fs(8),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: _s(8)),
-                    Text(
-                      '${date.day}',
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.primary,
-                        fontSize: _fs(15),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: _s(4)),
-                    Container(
-                      width: _s(5),
-                      height: _s(5),
-                      decoration: BoxDecoration(
-                        color: hasVisits
-                            ? (isSelected ? Colors.white : AppColors.warning)
-                            : Colors.transparent,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
   Widget _calendarNavButton(IconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
@@ -963,7 +860,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                             style: TextStyle(
                               fontSize: _fs(10),
                               color: !isCurrentMonth
-                                  ? AppColors.textSecondary.withOpacity(0.35)
+                                  ? AppColors.textSecondary
+                                      .withValues(alpha: 0.35)
                                   : isSelected
                                       ? AppColors.primary
                                       : AppColors.textPrimary,
@@ -1023,7 +921,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         Text(
           label,
           style: TextStyle(
-            color: AppColors.textSecondary.withOpacity(0.8),
+            color: AppColors.textSecondary.withValues(alpha: 0.8),
             fontSize: _fs(7),
             fontWeight: FontWeight.bold,
             letterSpacing: 0.2,
@@ -1034,7 +932,6 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Widget _buildVisitCard(_SiteVisit visit) {
-    final statusColor = _statusColor(visit.status);
     final statusLabel = _statusLabel(visit.status);
     final date = visit.dateTime;
     final dateOnly =
@@ -1054,7 +951,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           border: Border.all(color: const Color(0xFFCFE0F6)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: _s(8),
               offset: const Offset(0, 2),
             ),
@@ -1135,6 +1032,19 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                     label: 'Time',
                     icon: Icons.schedule_outlined,
                     value: timeOnly,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: _s(8)),
+            Row(
+              children: [
+                Expanded(
+                  child: _visitInfoBlock(
+                    label: 'Rating',
+                    icon: Icons.star_rounded,
+                    value: visit.rating > 0 ? '${visit.rating}/5' : 'N/A',
+                    iconColor: Colors.amber,
                   ),
                 ),
               ],
@@ -1237,35 +1147,6 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     );
   }
 
-  Widget _visitDetailRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: _s(82),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: _fs(9.5),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: _fs(10.5),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _cardActionButton({
     required IconData icon,
     required VoidCallback onTap,
@@ -1336,7 +1217,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         children: [
           Icon(
             Icons.event_busy_outlined,
-            color: AppColors.textSecondary.withOpacity(0.6),
+            color: AppColors.textSecondary.withValues(alpha: 0.6),
             size: _s(26),
           ),
           SizedBox(height: _s(8)),
@@ -1693,45 +1574,6 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     return _visits.where((visit) => visit.status == status).length;
   }
 
-  Future<void> _exportSiteVisits() async {
-    if (!_canExportData) {
-      _showSnackBar('You do not have permission to export site visits.');
-      return;
-    }
-    setState(() {
-      _isExporting = true;
-    });
-    try {
-      final exported = await _authProvider.exportSiteVisits(
-        token: _authProvider.currentAuthToken,
-      );
-      final fileName = exported.fileName.trim().isEmpty
-          ? 'site_visits_export.xlsx'
-          : exported.fileName.trim();
-      if (kIsWeb) {
-        _showSnackBar(
-          'Export generated ($fileName), but direct file save is not supported on Web in this build.',
-        );
-        return;
-      }
-      final file = await ExportFileHelper.saveToDownloadNextone(
-        fileName: fileName,
-        bytes: exported.bytes,
-      );
-      if (!mounted) return;
-      _showSnackBar('Site visits export downloaded: ${file.path}');
-    } catch (error) {
-      if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isExporting = false;
-        });
-      }
-    }
-  }
-
   List<_SiteVisit> _visitsForDay(DateTime day) {
     return _visits.where((visit) => _isSameDate(visit.dateTime, day)).toList();
   }
@@ -1899,7 +1741,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     final feedbackMap = json['feedback'] is Map<String, dynamic>
         ? (json['feedback'] as Map<String, dynamic>)
         : const <String, dynamic>{};
-    final rating = _readInt(feedbackMap['rating']) ?? 0;
+    final rating =
+        _readInt(json['rating']) ?? _readInt(feedbackMap['rating']) ?? 0;
     final feedbackText = _readString(
       feedbackMap['remarks'] ??
           feedbackMap['feedback'] ??
