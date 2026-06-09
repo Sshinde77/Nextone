@@ -5,6 +5,7 @@ import 'package:nextone/models/lead_detail_model.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -88,7 +89,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _errorMessage = AppErrorHandler.friendlyMessage(e);
       });
     }
   }
@@ -342,7 +343,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       if (!mounted) {
         return null;
       }
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
       return null;
     } finally {
       if (mounted) {
@@ -378,7 +379,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     } finally {
       if (mounted) {
         setState(() {
@@ -585,7 +586,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       _showSnackBar('Stage updated successfully.');
     } catch (e) {
       if (!mounted) return;
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     } finally {
       if (mounted) {
         setState(() {
@@ -629,7 +630,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         _showSnackBar('Pipeline status created.');
       } catch (e) {
         if (!mounted) return;
-        _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+        _showSnackBar(AppErrorHandler.friendlyMessage(e));
       } finally {
         if (mounted) {
           setDialogState(() => isSubmitting = false);
@@ -2169,7 +2170,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       _showSnackBar('Phone access request sent for review.');
       await _loadPhoneAccess();
     } catch (e) {
-      final message = e.toString().replaceFirst('Exception: ', '');
+      final message = AppErrorHandler.friendlyMessage(e);
       if (message.toLowerCase().contains('already have a pending request')) {
         _showSnackBar('Request pending for this lead.');
         if (mounted) {

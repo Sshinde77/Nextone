@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/models/auth_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
@@ -102,7 +103,7 @@ class _PhoneRequestsPageState extends State<PhoneRequestsPage> {
       if (!mounted) return;
       setState(() {
         _isLoadingRequests = false;
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _errorMessage = AppErrorHandler.friendlyMessage(e);
       });
     }
   }
@@ -247,7 +248,7 @@ class _PhoneRequestsPageState extends State<PhoneRequestsPage> {
       await _loadRequests();
       _showSnackBar('Request approved.');
     } catch (e) {
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     } finally {
       if (mounted) {
         setState(() => _updatingRequestIds.remove(request.id));
@@ -270,7 +271,7 @@ class _PhoneRequestsPageState extends State<PhoneRequestsPage> {
       await _loadRequests();
       _showSnackBar('Request declined.');
     } catch (e) {
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     } finally {
       if (mounted) {
         setState(() => _updatingRequestIds.remove(request.id));

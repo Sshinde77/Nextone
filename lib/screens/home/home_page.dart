@@ -5,6 +5,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/routes/app_routes.dart';
 import 'package:nextone/screens/attendance/attendance_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -519,7 +520,7 @@ class _HeaderBlockState extends State<_HeaderBlock> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+          SnackBar(content: Text(AppErrorHandler.friendlyMessage(error))),
         );
     } finally {
       if (mounted) {

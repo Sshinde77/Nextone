@@ -10,6 +10,7 @@ import 'package:nextone/screens/leads/lead_bulk_upload_page.dart';
 import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/screens/leads/lead_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -292,7 +293,7 @@ class _LeadsPageState extends State<LeadsPage> {
         _isLoadingLeads = false;
         _selectedLeadIds.clear();
         _leadPhoneAccessById.clear();
-        _loadError = error.toString().replaceFirst('Exception: ', '');
+        _loadError = AppErrorHandler.friendlyMessage(error);
       });
     }
   }
@@ -534,7 +535,7 @@ class _LeadsPageState extends State<LeadsPage> {
         }
       } catch (error) {
         if (!mounted) return;
-        _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+        _showSnackBar(AppErrorHandler.friendlyMessage(error));
       } finally {
         if (mounted) {
           setDialogState(() {
@@ -567,7 +568,7 @@ class _LeadsPageState extends State<LeadsPage> {
         _showSnackBar('Lead source created successfully.');
       } catch (error) {
         if (!mounted) return;
-        _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+        _showSnackBar(AppErrorHandler.friendlyMessage(error));
       } finally {
         if (mounted) {
           setDialogState(() {
@@ -655,11 +656,9 @@ class _LeadsPageState extends State<LeadsPage> {
                                   'Lead source updated successfully.');
                             } catch (error) {
                               if (!mounted) return;
-                              _showSnackBar(
-                                error
-                                    .toString()
-                                    .replaceFirst('Exception: ', ''),
-                              );
+                                _showSnackBar(
+                                  AppErrorHandler.friendlyMessage(error),
+                                );
                               if (context.mounted) {
                                 setEditState(() {
                                   isSaving = false;
@@ -716,7 +715,7 @@ class _LeadsPageState extends State<LeadsPage> {
         _showSnackBar('Lead source deleted successfully.');
       } catch (error) {
         if (!mounted) return;
-        _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+        _showSnackBar(AppErrorHandler.friendlyMessage(error));
       }
     }
 
@@ -1240,9 +1239,8 @@ class _LeadsPageState extends State<LeadsPage> {
                                   _currentPageLeads,
                                 );
                               } catch (e) {
-                                final message = e
-                                    .toString()
-                                    .replaceFirst('Exception: ', '');
+                                final message =
+                                    AppErrorHandler.friendlyMessage(e);
                                 if (message.toLowerCase().contains(
                                       'already have a pending request',
                                     )) {
@@ -1345,7 +1343,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                 );
                               } catch (e) {
                                 _showSnackBar(
-                                  e.toString().replaceFirst('Exception: ', ''),
+                                  AppErrorHandler.friendlyMessage(e),
                                 );
                               } finally {
                                 if (mounted) {
@@ -1543,7 +1541,7 @@ class _LeadsPageState extends State<LeadsPage> {
       if (!mounted) {
         return false;
       }
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
       return false;
     }
   }
@@ -1681,7 +1679,7 @@ class _LeadsPageState extends State<LeadsPage> {
       if (!mounted) {
         return false;
       }
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
       return false;
     }
   }
@@ -1762,7 +1760,7 @@ class _LeadsPageState extends State<LeadsPage> {
       }
       final message = error is UnsupportedError
           ? 'This platform does not support local file save for export yet.'
-          : error.toString().replaceFirst('Exception: ', '');
+          : AppErrorHandler.friendlyMessage(error);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(

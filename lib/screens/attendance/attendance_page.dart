@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -299,7 +300,7 @@ class _AttendancePageState extends State<AttendancePage> {
           : 'Checked out successfully.');
     } catch (e) {
       if (!mounted) return;
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     } finally {
       if (mounted) {
         setState(() => _isAttendanceSubmitting = false);
@@ -459,7 +460,7 @@ class _AttendancePageState extends State<AttendancePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _todayError = e.toString().replaceFirst('Exception: ', '');
+        _todayError = AppErrorHandler.friendlyMessage(e);
       });
     } finally {
       if (mounted) {
@@ -488,7 +489,7 @@ class _AttendancePageState extends State<AttendancePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _calendarError = e.toString().replaceFirst('Exception: ', '');
+        _calendarError = AppErrorHandler.friendlyMessage(e);
       });
     } finally {
       if (mounted) {
@@ -517,7 +518,7 @@ class _AttendancePageState extends State<AttendancePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _myHistoryError = e.toString().replaceFirst('Exception: ', '');
+        _myHistoryError = AppErrorHandler.friendlyMessage(e);
       });
     } finally {
       if (mounted) {
@@ -580,7 +581,7 @@ class _AttendancePageState extends State<AttendancePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _monthGridError = e.toString().replaceFirst('Exception: ', '');
+        _monthGridError = AppErrorHandler.friendlyMessage(e);
       });
     } finally {
       if (mounted) {
@@ -1100,7 +1101,7 @@ class _AttendancePageState extends State<AttendancePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _dailyViewError = e.toString().replaceFirst('Exception: ', '');
+        _dailyViewError = AppErrorHandler.friendlyMessage(e);
       });
     } finally {
       if (mounted) {
@@ -2602,7 +2603,7 @@ class _AttendancePageState extends State<AttendancePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _summaryError = e.toString().replaceFirst('Exception: ', '');
+        _summaryError = AppErrorHandler.friendlyMessage(e);
       });
     } finally {
       if (mounted) {
@@ -3579,7 +3580,7 @@ class _AttendancePageState extends State<AttendancePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _approvalsError = e.toString().replaceFirst('Exception: ', '');
+        _approvalsError = AppErrorHandler.friendlyMessage(e);
       });
     } finally {
       if (mounted) {
@@ -4171,7 +4172,7 @@ class _AttendancePageState extends State<AttendancePage> {
         _showSnackBar('Status updated for $name.');
       } catch (e) {
         if (!mounted) return;
-        _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+        _showSnackBar(AppErrorHandler.friendlyMessage(e));
       } finally {
         if (mounted) {
           setState(() {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class ClosureDetailPage extends StatefulWidget {
@@ -46,7 +47,7 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = AppErrorHandler.friendlyMessage(e);
       });
     }
   }

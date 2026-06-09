@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/closures/closure_detail_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/widgets/closure_data_card.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
@@ -66,7 +67,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = AppErrorHandler.friendlyMessage(e);
       });
     }
   }
@@ -248,7 +249,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                       content:
-                          Text(e.toString().replaceFirst('Exception: ', ''))),
+                          Text(AppErrorHandler.friendlyMessage(e))),
                 );
               }
             }
@@ -1014,7 +1015,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                       content:
-                          Text(e.toString().replaceFirst('Exception: ', ''))),
+                          Text(AppErrorHandler.friendlyMessage(e))),
                 );
               }
             }
@@ -1382,7 +1383,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                       content:
-                          Text(e.toString().replaceFirst('Exception: ', ''))),
+                          Text(AppErrorHandler.friendlyMessage(e))),
                 );
               }
             }
