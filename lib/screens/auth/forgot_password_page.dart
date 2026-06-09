@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -76,7 +77,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {

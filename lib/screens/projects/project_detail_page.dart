@@ -8,6 +8,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/models/auth_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/leads/lead_detail_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
@@ -89,7 +90,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = AppErrorHandler.friendlyMessage(error);
       });
     } finally {
       if (mounted) {
@@ -126,7 +127,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _documentsError = error.toString().replaceFirst('Exception: ', '');
+        _documentsError = AppErrorHandler.friendlyMessage(error);
         _isLoadingDocuments = false;
       });
     }
@@ -166,7 +167,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _leadsError = error.toString().replaceFirst('Exception: ', '');
+        _leadsError = AppErrorHandler.friendlyMessage(error);
         _isLoadingLeads = false;
       });
     }
@@ -238,7 +239,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       _showSnackBar('Documents uploaded successfully.');
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {
@@ -316,7 +317,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       await _saveExportedFile(exported, 'Documents ZIP');
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {
@@ -353,7 +354,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       );
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {
@@ -404,7 +405,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       _showSnackBar('Document deleted successfully.');
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {
@@ -516,7 +517,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 }
               } catch (error) {
                 if (!mounted) return;
-                _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+                _showSnackBar(AppErrorHandler.friendlyMessage(error));
                 if (dialogContext.mounted) {
                   setDialogState(() {
                     isSharing = false;

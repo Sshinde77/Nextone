@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
@@ -232,15 +233,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   String _friendlyError(Object error) {
-    final raw = error.toString().replaceFirst('Exception: ', '').trim();
-    if (_isTimeoutError(raw)) {
-      return 'Request timed out. Pull to refresh or try again in a moment.';
-    }
-    return raw;
+    return AppErrorHandler.friendlyMessage(error);
   }
 
   bool _isTimeoutError(Object error) {
-    return error.toString().toLowerCase().contains('timeoutexception');
+    return AppErrorHandler.friendlyMessage(error) ==
+        AppErrorHandler.timeoutMessage;
   }
 
   @override

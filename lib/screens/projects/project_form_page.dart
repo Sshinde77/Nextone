@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 
 class ProjectFormPage extends StatefulWidget {
   const ProjectFormPage({
@@ -183,7 +184,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {

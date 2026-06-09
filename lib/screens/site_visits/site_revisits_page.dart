@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/site_visits/site_revisit_detail_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/site_revisit_data_card.dart';
 
@@ -70,7 +71,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = AppErrorHandler.friendlyMessage(e);
       });
     }
   }
@@ -551,8 +552,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                   ..hideCurrentSnackBar()
                   ..showSnackBar(
                     SnackBar(
-                        content:
-                            Text(e.toString().replaceFirst('Exception: ', ''))),
+                        content: Text(AppErrorHandler.friendlyMessage(e))),
                   );
               }
             }
@@ -906,9 +906,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                 if (!context.mounted) return;
                 setLocalState(() => isSubmitting = false);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content:
-                          Text(e.toString().replaceFirst('Exception: ', ''))),
+                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
                 );
               }
             }
@@ -1117,9 +1115,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                 if (!context.mounted) return;
                 setLocalState(() => isSubmitting = false);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content:
-                          Text(e.toString().replaceFirst('Exception: ', ''))),
+                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
                 );
               }
             }

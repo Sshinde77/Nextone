@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/screens/site_visits/feedback_form_dialog.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -55,7 +56,7 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
       }
       setState(() {
         _isLoading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = AppErrorHandler.friendlyMessage(e);
       });
     }
   }
@@ -950,7 +951,7 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     }
   }
 

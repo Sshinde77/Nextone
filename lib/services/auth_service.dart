@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
@@ -8,6 +7,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:nextone/constants/api_constants.dart';
 import 'package:nextone/models/auth_models.dart';
 import 'package:nextone/models/salary_models.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
@@ -77,15 +77,15 @@ class AuthService {
         ),
       );
     } on TimeoutException {
-      return 'Server is taking too long to respond. Please try again.';
+      return AppErrorHandler.timeoutMessage;
     } on SocketException {
-      return 'No internet connection or server is unreachable.';
+      return AppErrorHandler.noInternetMessage;
     } on HandshakeException {
-      return 'Secure connection failed. Check phone date/time and try again.';
+      return AppErrorHandler.unknownMessage;
     } on http.ClientException {
-      return 'Network error while contacting server. Please try again.';
+      return AppErrorHandler.unknownMessage;
     } catch (_) {
-      return 'Unable to connect to the server. Please try again.';
+      return AppErrorHandler.unknownMessage;
     }
 
     _logResponse('login', response);
@@ -138,15 +138,15 @@ class AuthService {
         ),
       );
     } on TimeoutException {
-      return 'Server is taking too long to respond. Please try again.';
+      return AppErrorHandler.timeoutMessage;
     } on SocketException {
-      return 'No internet connection or server is unreachable.';
+      return AppErrorHandler.noInternetMessage;
     } on HandshakeException {
-      return 'Secure connection failed. Check phone date/time and try again.';
+      return AppErrorHandler.unknownMessage;
     } on http.ClientException {
-      return 'Network error while contacting server. Please try again.';
+      return AppErrorHandler.unknownMessage;
     } catch (_) {
-      return 'Unable to connect to the server. Please try again.';
+      return AppErrorHandler.unknownMessage;
     }
 
     _logResponse('register', response);
@@ -5793,14 +5793,14 @@ class AuthService {
     required Map<String, String> headers,
     String? body,
   }) {
-    developer.log(
+    AppErrorHandler.logDebug(
       '[$endpoint] REQUEST $method $uri\nHeaders: $headers${body == null ? '' : '\nBody: $body'}',
       name: 'AuthService',
     );
   }
 
   void _logResponse(String endpoint, http.Response response) {
-    developer.log(
+    AppErrorHandler.logDebug(
       '[$endpoint] ${response.statusCode} ${response.reasonPhrase ?? ''}\n${response.body}',
       name: 'AuthService',
     );
@@ -5814,19 +5814,11 @@ class AuthService {
       return null;
     }
 
-    try {
-      final dynamic body = jsonDecode(response.body);
-      if (body is Map<String, dynamic>) {
-        final message = _readMessage(body);
-        if (message != null && message.trim().isNotEmpty) {
-          return message;
-        }
-      }
-    } catch (_) {
-      // Fall back to the default message when the error payload is not JSON.
-    }
-
-    return fallbackMessage;
+    return AppErrorHandler.friendlyMessageFromResponse(
+      response.statusCode,
+      response.body,
+      fallbackMessage: fallbackMessage,
+    );
   }
 
   Future<void> _storeTokensFromResponse(String responseBody) async {
@@ -6990,7 +6982,7 @@ class AuthService {
 
   static Future<void> _pingBackend() async {
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.profile}');
-    developer.log(
+    AppErrorHandler.logDebug(
       '[warmUpBackend] REQUEST GET $uri\nHeaders: {accept: application/json}',
       name: 'AuthService',
     );
@@ -7002,7 +6994,7 @@ class AuthService {
         ),
         timeout: const Duration(seconds: 20),
       );
-      developer.log(
+      AppErrorHandler.logDebug(
         '[warmUpBackend] ${response.statusCode} ${response.reasonPhrase ?? ''}\n${response.body}',
         name: 'AuthService',
       );
@@ -7023,25 +7015,25 @@ class AuthService {
         return await request().timeout(resolvedTimeout);
       } on TimeoutException catch (error) {
         lastError = error;
-        developer.log(
+        AppErrorHandler.logDebug(
           'Request attempt $attempt failed with timeout: $error',
           name: 'AuthService',
         );
       } on SocketException catch (error) {
         lastError = error;
-        developer.log(
+        AppErrorHandler.logDebug(
           'Request attempt $attempt failed with socket error: $error',
           name: 'AuthService',
         );
       } on HandshakeException catch (error) {
         lastError = error;
-        developer.log(
+        AppErrorHandler.logDebug(
           'Request attempt $attempt failed with handshake error: $error',
           name: 'AuthService',
         );
       } on http.ClientException catch (error) {
         lastError = error;
-        developer.log(
+        AppErrorHandler.logDebug(
           'Request attempt $attempt failed with client error: $error',
           name: 'AuthService',
         );
@@ -7056,6 +7048,6 @@ class AuthService {
       throw lastError;
     }
 
-    throw Exception('Request failed without a specific error.');
+    throw Exception(AppErrorHandler.unknownMessage);
   }
 }

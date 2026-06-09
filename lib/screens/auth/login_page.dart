@@ -6,6 +6,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/routes/app_routes.dart';
 import 'package:nextone/services/auth_service.dart';
 import 'package:nextone/services/push_notification_service.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -94,17 +95,10 @@ class _LoginPageState extends State<LoginPage> {
       );
     } on TimeoutException {
       if (!mounted) return;
-      _showSnackBar(
-        'Login request timed out. Please check your internet and try again.',
-      );
+      _showSnackBar(AppErrorHandler.timeoutMessage);
     } catch (error) {
       if (!mounted) return;
-      final message = error.toString().replaceFirst('Exception: ', '').trim();
-      _showSnackBar(
-        message.isEmpty
-            ? 'Unable to connect to the server. Please try again.'
-            : message,
-      );
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {

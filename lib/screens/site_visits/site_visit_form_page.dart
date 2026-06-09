@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class SiteVisitFormPage extends StatefulWidget {
@@ -86,7 +87,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading form data: $e')),
+          SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
         );
         setState(() => _isLoadingDropdowns = false);
       }
@@ -262,8 +263,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            SnackBar(
-                content: Text(e.toString().replaceFirst('Exception: ', ''))),
+            SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
           );
       }
     } finally {

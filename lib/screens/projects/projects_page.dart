@@ -6,6 +6,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/projects/project_detail_page.dart';
 import 'package:nextone/screens/projects/project_form_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -103,7 +104,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _loadError = error.toString().replaceFirst('Exception: ', '');
+        _loadError = AppErrorHandler.friendlyMessage(error);
       });
     } finally {
       if (mounted) {
@@ -578,7 +579,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       await _loadProjects();
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {
@@ -681,7 +682,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       _showSnackBar('Downloaded all documents.');
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     }
   }
 
@@ -731,7 +732,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       }
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     }
   }
 
@@ -848,7 +849,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 }
               } catch (error) {
                 if (!mounted) return;
-                _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+                _showSnackBar(AppErrorHandler.friendlyMessage(error));
                 if (dialogContext.mounted) {
                   setDialogState(() {
                     isSharing = false;
