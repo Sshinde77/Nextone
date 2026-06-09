@@ -8,6 +8,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_detail_page.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
@@ -260,7 +261,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     }
   }
 
@@ -331,7 +332,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     }
   }
 
@@ -517,7 +518,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
       }
       setState(() {
         _isLoadingFollowUps = false;
-        _loadError = e.toString().replaceFirst('Exception: ', '');
+        _loadError = AppErrorHandler.friendlyMessage(e);
       });
     }
   }

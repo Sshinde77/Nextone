@@ -5,6 +5,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/team/add_team_member_page.dart';
 import 'package:nextone/screens/team/team_member_details_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/assign_manager_dialog.dart';
@@ -95,7 +96,7 @@ class _UsersPageState extends State<UsersPage> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = AppErrorHandler.friendlyMessage(error);
       });
     }
   }
@@ -213,7 +214,7 @@ class _UsersPageState extends State<UsersPage> {
       await _loadUsers();
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     }
   }
 
@@ -345,7 +346,7 @@ class _UsersPageState extends State<UsersPage> {
       _showSnackBar('Manager assigned to ${user.name}.');
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {

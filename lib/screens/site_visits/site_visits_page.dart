@@ -1474,7 +1474,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     }
   }
 
@@ -1566,7 +1566,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     }
   }
 
@@ -1698,7 +1698,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       }
       setState(() {
         _isLoadingVisits = false;
-        _loadError = e.toString().replaceFirst('Exception: ', '');
+        _loadError = AppErrorHandler.friendlyMessage(e);
       });
     }
   }

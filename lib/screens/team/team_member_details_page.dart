@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/team/add_team_member_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
@@ -106,7 +107,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
 
       setState(() {
         _isLoading = false;
-        _loadError = error.toString().replaceFirst('Exception: ', '');
+        _loadError = AppErrorHandler.friendlyMessage(error);
       });
     }
   }
@@ -171,7 +172,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
       if (!mounted) return;
       setState(() {
         _isHistoryLoading = false;
-        _historyError = error.toString().replaceFirst('Exception: ', '');
+        _historyError = AppErrorHandler.friendlyMessage(error);
       });
     }
   }
@@ -211,7 +212,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
       if (!mounted) return;
       setState(() {
         _isPerformanceLoading = false;
-        _performanceError = error.toString().replaceFirst('Exception: ', '');
+        _performanceError = AppErrorHandler.friendlyMessage(error);
       });
     }
   }
@@ -298,7 +299,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {

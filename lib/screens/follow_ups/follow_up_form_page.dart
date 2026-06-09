@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class FollowUpFormPage extends StatefulWidget {
@@ -126,7 +127,7 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
       setState(() {
         _leadOptions = const <_LeadOption>[];
         _isLoadingLeads = false;
-        _leadLoadError = e.toString().replaceFirst('Exception: ', '');
+        _leadLoadError = AppErrorHandler.friendlyMessage(e);
       });
     }
   }
@@ -243,7 +244,7 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(e.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     } finally {
       if (mounted) {
         setState(() {

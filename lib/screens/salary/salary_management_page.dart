@@ -4,6 +4,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/models/salary_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/salary/salary_detail_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
@@ -95,7 +96,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       if (!mounted) return;
       setState(() {
         _isLoadingEmployees = false;
-        _employeesError = error.toString().replaceFirst('Exception: ', '');
+        _employeesError = AppErrorHandler.friendlyMessage(error);
       });
     }
   }
@@ -127,7 +128,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       if (!mounted) return;
       setState(() {
         _isLoadingSlips = false;
-        _slipsError = error.toString().replaceFirst('Exception: ', '');
+        _slipsError = AppErrorHandler.friendlyMessage(error);
       });
     }
   }
@@ -170,7 +171,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       if (!mounted) return;
       setState(() {
         _isLoadingMySalary = false;
-        _mySalaryError = error.toString().replaceFirst('Exception: ', '');
+        _mySalaryError = AppErrorHandler.friendlyMessage(error);
       });
     }
   }
@@ -2362,7 +2363,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text(error.toString().replaceFirst('Exception: ', '')),
+            content: Text(AppErrorHandler.friendlyMessage(error)),
           ),
         );
     } finally {
@@ -2747,7 +2748,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                               ..showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    error.toString().replaceFirst('Exception: ', ''),
+                                    AppErrorHandler.friendlyMessage(error),
                                   ),
                                 ),
                               );
@@ -2999,7 +3000,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                               ..showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    error.toString().replaceFirst('Exception: ', ''),
+                                    AppErrorHandler.friendlyMessage(error),
                                   ),
                                 ),
                               );
@@ -3082,7 +3083,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
               } catch (e) {
                 setModalState(() {
                   isLoading = false;
-                  error = e.toString().replaceFirst('Exception: ', '');
+                  error = AppErrorHandler.friendlyMessage(e);
                 });
               }
             }

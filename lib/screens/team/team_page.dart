@@ -4,6 +4,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/team/add_team_member_page.dart';
 import 'package:nextone/screens/team/team_member_details_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/csv_export_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/assign_manager_dialog.dart';
@@ -177,7 +178,7 @@ class _TeamPageState extends State<TeamPage> {
       setState(() {
         _members.clear();
         _isLoadingMembers = false;
-        _membersLoadError = error.toString().replaceFirst('Exception: ', '');
+        _membersLoadError = AppErrorHandler.friendlyMessage(error);
       });
     }
   }
@@ -299,7 +300,7 @@ class _TeamPageState extends State<TeamPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {
@@ -420,7 +421,7 @@ class _TeamPageState extends State<TeamPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {
@@ -556,7 +557,7 @@ class _TeamPageState extends State<TeamPage> {
       _showSnackBar('Manager assigned to ${member.name}.');
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {
