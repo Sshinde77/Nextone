@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
@@ -262,7 +263,7 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {

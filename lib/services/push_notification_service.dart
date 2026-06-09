@@ -1,14 +1,14 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:nextone/services/auth_service.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  developer.log(
+  AppErrorHandler.logDebug(
     'Background message received: ${message.messageId}, data=${message.data}',
     name: 'PushNotificationService',
   );
@@ -62,7 +62,7 @@ class PushNotificationService {
       sound: true,
     );
 
-    developer.log(
+    AppErrorHandler.logDebug(
       'Notification permission status: ${settings.authorizationStatus.name}',
       name: 'PushNotificationService',
     );
@@ -72,7 +72,7 @@ class PushNotificationService {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-      developer.log(
+      AppErrorHandler.logDebug(
         'Foreground message: ${message.messageId}, '
         'title=${message.notification?.title}, '
         'body=${message.notification?.body}, '
@@ -84,7 +84,7 @@ class PushNotificationService {
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      developer.log(
+      AppErrorHandler.logDebug(
         'Notification tapped: ${message.messageId}, data=${message.data}',
         name: 'PushNotificationService',
       );
@@ -92,14 +92,14 @@ class PushNotificationService {
 
     final initialMessage = await _messaging.getInitialMessage();
     if (initialMessage != null) {
-      developer.log(
+      AppErrorHandler.logDebug(
         'Opened from terminated state: ${initialMessage.messageId}, data=${initialMessage.data}',
         name: 'PushNotificationService',
       );
     }
 
     _messaging.onTokenRefresh.listen((token) {
-      developer.log('FCM token refreshed: $token',
+      AppErrorHandler.logDebug('FCM token refreshed: $token',
           name: 'PushNotificationService');
       unawaited(syncTokenWithBackend(token: token));
     });
@@ -146,10 +146,11 @@ class PushNotificationService {
     try {
       if (!kIsWeb) {
         final token = await _messaging.getToken();
-        developer.log('FCM token: $token', name: 'PushNotificationService');
+        AppErrorHandler.logDebug('FCM token: $token',
+            name: 'PushNotificationService');
       }
     } catch (e, stackTrace) {
-      developer.log(
+      AppErrorHandler.logDebug(
         'Failed to fetch FCM token',
         name: 'PushNotificationService',
         error: e,
@@ -179,12 +180,12 @@ class PushNotificationService {
         platform: 'android',
         token: authToken,
       );
-      developer.log(
+      AppErrorHandler.logDebug(
         'FCM token synced to backend.',
         name: 'PushNotificationService',
       );
     } catch (e, stackTrace) {
-      developer.log(
+      AppErrorHandler.logDebug(
         'Failed to sync FCM token to backend.',
         name: 'PushNotificationService',
         error: e,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 
 class SalaryDetailPage extends StatefulWidget {
   const SalaryDetailPage({
@@ -128,7 +129,7 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = AppErrorHandler.friendlyMessage(e);
         _isLoading = false;
       });
     }

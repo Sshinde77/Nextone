@@ -4,6 +4,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class FollowUpDetailPage extends StatefulWidget {
@@ -56,7 +57,7 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
       }
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _errorMessage = AppErrorHandler.friendlyMessage(e);
       });
     }
   }
@@ -551,7 +552,7 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+          SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
         );
     } finally {
       if (mounted) {

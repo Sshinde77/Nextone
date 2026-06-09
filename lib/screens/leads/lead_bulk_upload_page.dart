@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 
 class LeadBulkUploadResult {
@@ -152,7 +153,7 @@ class _LeadBulkUploadPageState extends State<LeadBulkUploadPage> {
       _showSnackBar('Lead template downloaded: ${file.path}');
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {
@@ -196,7 +197,7 @@ class _LeadBulkUploadPageState extends State<LeadBulkUploadPage> {
       });
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {
@@ -237,7 +238,7 @@ class _LeadBulkUploadPageState extends State<LeadBulkUploadPage> {
       );
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(error.toString().replaceFirst('Exception: ', ''));
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     } finally {
       if (mounted) {
         setState(() {
