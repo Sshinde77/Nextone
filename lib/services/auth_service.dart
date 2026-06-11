@@ -5060,6 +5060,8 @@ class AuthService {
     required String id,
     required List<String> emails,
     String? message,
+    List<String> fields = const <String>[],
+    List<String> documentIds = const <String>[],
     String? token,
   }) async {
     final normalizedId = id.trim();
@@ -5069,6 +5071,14 @@ class AuthService {
     final normalizedEmails = emails
         .map((email) => email.trim())
         .where((email) => email.isNotEmpty)
+        .toList();
+    final normalizedFields = fields
+        .map((field) => field.trim())
+        .where((field) => field.isNotEmpty)
+        .toList();
+    final normalizedDocumentIds = documentIds
+        .map((documentId) => documentId.trim())
+        .where((documentId) => documentId.isNotEmpty)
         .toList();
     if (normalizedEmails.isEmpty) {
       throw Exception('At least one email is required.');
@@ -5085,6 +5095,8 @@ class AuthService {
     final bodyMap = <String, dynamic>{
       'emails': normalizedEmails,
       'message': (message ?? '').trim(),
+      'fields': normalizedFields,
+      'document_ids': normalizedDocumentIds,
     };
     final body = jsonEncode(bodyMap);
     _logRequest(

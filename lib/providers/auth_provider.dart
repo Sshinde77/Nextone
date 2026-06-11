@@ -1307,12 +1307,16 @@ class AuthProvider {
     required String id,
     required List<String> emails,
     String? message,
+    List<String> fields = const <String>[],
+    List<String> documentIds = const <String>[],
     String? token,
   }) {
     return _authService.shareProject(
       id: id,
       emails: emails,
       message: message,
+      fields: fields,
+      documentIds: documentIds,
       token: token,
     );
   }

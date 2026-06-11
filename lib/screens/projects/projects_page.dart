@@ -27,6 +27,18 @@ class _ProjectsPageState extends State<ProjectsPage> {
     'upcoming',
     'completed',
   ];
+  static const List<_ShareFieldOption> _shareFieldOptions = <_ShareFieldOption>[
+    _ShareFieldOption(key: 'name', label: 'Project Name'),
+    _ShareFieldOption(key: 'developer', label: 'Developer'),
+    _ShareFieldOption(key: 'city', label: 'City'),
+    _ShareFieldOption(key: 'locality', label: 'Locality'),
+    _ShareFieldOption(key: 'price_range', label: 'Price Range'),
+    _ShareFieldOption(key: 'total_units', label: 'Total Units'),
+    _ShareFieldOption(key: 'rera_number', label: 'RERA Number'),
+    _ShareFieldOption(key: 'configurations', label: 'Configurations'),
+    _ShareFieldOption(key: 'status', label: 'Status'),
+    _ShareFieldOption(key: 'description', label: 'Description'),
+  ];
 
   final TextEditingController _searchController = TextEditingController();
   final AuthProvider _authProvider = AuthProvider();
@@ -46,7 +58,6 @@ class _ProjectsPageState extends State<ProjectsPage> {
   int _totalItems = 0;
 
   bool get _canManageProjects => RoleAccess.canManageProjects(_currentRole);
-  bool get _canExportData => RoleAccess.canExportData(_currentRole);
 
   @override
   void initState() {
@@ -782,18 +793,236 @@ class _ProjectsPageState extends State<ProjectsPage> {
         .toList();
   }
 
+  List<_ProjectDocRef> _extractAllDocuments(Map<String, dynamic> payload) {
+    final collected = <_ProjectDocRef>[];
+    final seenIds = <String>{};
+
+    void addDocs(dynamic source) {
+      if (source is! List) return;
+      for (final item in source.whereType<Map>()) {
+        final doc = _ProjectDocRef.fromMap(Map<String, dynamic>.from(item));
+        if (doc.id.isEmpty || !seenIds.add(doc.id)) {
+          continue;
+        }
+        collected.add(doc);
+      }
+    }
+
+    final data = payload['data'];
+    addDocs(payload['unit_plans']);
+    addDocs(payload['creatives']);
+    addDocs(payload['payment_plans']);
+    addDocs(payload['videos']);
+    if (data is Map<String, dynamic>) {
+      addDocs(data['unit_plans']);
+      addDocs(data['creatives']);
+      addDocs(data['payment_plans']);
+      addDocs(data['videos']);
+      addDocs(data['documents']);
+    }
+
+    final docs = payload['documents'] ?? (data is List ? data : null);
+    if (docs is Map<String, dynamic>) {
+      addDocs(docs['unit_plans']);
+      addDocs(docs['creatives']);
+      addDocs(docs['payment_plans']);
+      addDocs(docs['videos']);
+    } else {
+      addDocs(docs);
+    }
+
+    return collected;
+  }
+
   String _readDocValue(dynamic value) {
     if (value is String) return value.trim();
     if (value is num || value is bool) return value.toString();
     return '';
   }
 
+  Future<List<String>?> _openMultiSelectSheet({
+    required String title,
+    required List<_ShareOptionItem> options,
+    required List<String> initialSelectedIds,
+  }) async {
+    final initial = List<String>.from(initialSelectedIds);
+    return showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final selectedIds = List<String>.from(initial);
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 14,
+                  bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+                ),
+                child: SizedBox(
+                  height: 420,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.border,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        options.isEmpty
+                            ? 'No options available.'
+                            : 'Select one or more options.',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: options.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Nothing available to select.',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: options.length,
+                                separatorBuilder: (_, __) =>
+                                    const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final option = options[index];
+                                  final selected =
+                                      selectedIds.contains(option.id);
+                                  return CheckboxListTile(
+                                    value: selected,
+                                    dense: true,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                    activeColor: AppColors.primary,
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(
+                                      option.label,
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    onChanged: (value) {
+                                      setSheetState(() {
+                                        if (value == true) {
+                                          if (!selectedIds
+                                              .contains(option.id)) {
+                                            selectedIds.add(option.id);
+                                          }
+                                        } else {
+                                          selectedIds.remove(option.id);
+                                        }
+                                      });
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(sheetContext).pop(),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(46),
+                                side: const BorderSide(color: AppColors.border),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.of(sheetContext)
+                                  .pop(List<String>.from(selectedIds)),
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(46),
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Apply'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _shareProject(_Project project) async {
+    List<_ProjectDocRef> availableDocuments = const <_ProjectDocRef>[];
+    try {
+      final payload = await _authProvider.projectDocuments(
+        id: project.id,
+        token: _authProvider.currentAuthToken,
+      );
+      availableDocuments = _extractAllDocuments(payload);
+    } catch (error) {
+      if (mounted) {
+        _showSnackBar(
+          'Could not load project documents. You can still share the project details.',
+        );
+      }
+    }
+    if (!mounted) {
+      return;
+    }
+
     final emailController = TextEditingController();
     final messageController = TextEditingController(
-      text: 'Hi, please find the project details as discussed.',
+      text: 'Hi, here are the project details!',
     );
     final emails = <String>[];
+    final selectedFieldKeys = <String>['name'];
+    final selectedDocumentIds = <String>[];
     var isSharing = false;
 
     bool isValidEmail(String value) => _emailPattern.hasMatch(value.trim());
@@ -846,6 +1075,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
                   id: project.id,
                   emails: emails,
                   message: messageController.text.trim(),
+                  fields: selectedFieldKeys,
+                  documentIds: selectedDocumentIds,
                   token: _authProvider.currentAuthToken,
                 );
                 if (!mounted) return;
@@ -1047,24 +1278,180 @@ class _ProjectsPageState extends State<ProjectsPage> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
+                    const Text(
+                      'Fields to include',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
-                      child: const Text(
-                        'Email will include:\n'
-                        '- Full project details (location, price, RERA, configurations)\n'
-                        '- All unit plans + creatives attached as a ZIP file\n'
-                        '- Your personal message (if provided)',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
-                          height: 1.45,
-                          fontWeight: FontWeight.w500,
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: isSharing
+                          ? null
+                          : () async {
+                              final result = await _openMultiSelectSheet(
+                                title: 'Select fields',
+                                options: _shareFieldOptions
+                                    .map(
+                                      (option) => _ShareOptionItem(
+                                        id: option.key,
+                                        label: option.label,
+                                      ),
+                                    )
+                                    .toList(),
+                                initialSelectedIds: selectedFieldKeys,
+                              );
+                              if (result == null || !dialogContext.mounted) {
+                                return;
+                              }
+                              setDialogState(() {
+                                selectedFieldKeys
+                                  ..clear()
+                                  ..addAll(result);
+                              });
+                            },
+                      borderRadius: BorderRadius.circular(14),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.primary),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                selectedFieldKeys.isEmpty
+                                    ? 'Select fields'
+                                    : _shareFieldOptions
+                                        .where((option) => selectedFieldKeys
+                                            .contains(option.key))
+                                        .map((option) => option.label)
+                                        .join(', '),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: selectedFieldKeys.isEmpty
+                                      ? AppColors.textSecondary
+                                      : AppColors.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: AppColors.textSecondary,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Documents to include',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: isSharing
+                          ? null
+                          : () async {
+                              final result = await _openMultiSelectSheet(
+                                title: 'Select documents',
+                                options: availableDocuments
+                                    .map(
+                                      (document) => _ShareOptionItem(
+                                        id: document.id,
+                                        label: document.name,
+                                      ),
+                                    )
+                                    .toList(),
+                                initialSelectedIds: selectedDocumentIds,
+                              );
+                              if (result == null || !dialogContext.mounted) {
+                                return;
+                              }
+                              setDialogState(() {
+                                selectedDocumentIds
+                                  ..clear()
+                                  ..addAll(result);
+                              });
+                            },
+                      borderRadius: BorderRadius.circular(14),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.primary),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                selectedDocumentIds.isEmpty
+                                    ? 'Select documents'
+                                    : availableDocuments
+                                        .where((document) => selectedDocumentIds
+                                            .contains(document.id))
+                                        .map((document) => document.name)
+                                        .join(', '),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: selectedDocumentIds.isEmpty
+                                      ? AppColors.textSecondary
+                                      : AppColors.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: AppColors.textSecondary,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -1245,4 +1632,24 @@ class _ProjectDocRef {
       ),
     );
   }
+}
+
+class _ShareFieldOption {
+  const _ShareFieldOption({
+    required this.key,
+    required this.label,
+  });
+
+  final String key;
+  final String label;
+}
+
+class _ShareOptionItem {
+  const _ShareOptionItem({
+    required this.id,
+    required this.label,
+  });
+
+  final String id;
+  final String label;
 }
