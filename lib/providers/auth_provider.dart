@@ -1140,6 +1140,12 @@ class AuthProvider {
     required String description,
     List<String> unitPlanFilePaths = const <String>[],
     List<String> creativeFilePaths = const <String>[],
+    List<String> paymentPlanFilePaths = const <String>[],
+    List<String> videoFilePaths = const <String>[],
+    String brochureUrl = '',
+    String videoUrl = '',
+    String paymentPlanUrl = '',
+    String homeLoanInfo = '',
     String? token,
   }) {
     return _authService.createProject(
@@ -1158,6 +1164,12 @@ class AuthProvider {
       description: description,
       unitPlanFilePaths: unitPlanFilePaths,
       creativeFilePaths: creativeFilePaths,
+      paymentPlanFilePaths: paymentPlanFilePaths,
+      videoFilePaths: videoFilePaths,
+      brochureUrl: brochureUrl,
+      videoUrl: videoUrl,
+      paymentPlanUrl: paymentPlanUrl,
+      homeLoanInfo: homeLoanInfo,
       token: token,
     );
   }
@@ -1252,6 +1264,12 @@ class AuthProvider {
     required String description,
     List<String> unitPlanFilePaths = const <String>[],
     List<String> creativeFilePaths = const <String>[],
+    List<String> paymentPlanFilePaths = const <String>[],
+    List<String> videoFilePaths = const <String>[],
+    String brochureUrl = '',
+    String videoUrl = '',
+    String paymentPlanUrl = '',
+    String homeLoanInfo = '',
     String? token,
   }) {
     return _authService.editProject(
@@ -1271,6 +1289,12 @@ class AuthProvider {
       description: description,
       unitPlanFilePaths: unitPlanFilePaths,
       creativeFilePaths: creativeFilePaths,
+      paymentPlanFilePaths: paymentPlanFilePaths,
+      videoFilePaths: videoFilePaths,
+      brochureUrl: brochureUrl,
+      videoUrl: videoUrl,
+      paymentPlanUrl: paymentPlanUrl,
+      homeLoanInfo: homeLoanInfo,
       token: token,
     );
   }

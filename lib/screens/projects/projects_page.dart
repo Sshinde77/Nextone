@@ -205,6 +205,15 @@ class _ProjectsPageState extends State<ProjectsPage> {
       brochureUrl: payload['brochure_url'] == null
           ? null
           : readString(payload['brochure_url']),
+      videoUrl: payload['video_url'] == null
+          ? null
+          : readString(payload['video_url']),
+      paymentPlanUrl: payload['payment_plan_url'] == null
+          ? null
+          : readString(payload['payment_plan_url']),
+      homeLoanInfo: payload['home_loan_info'] == null
+          ? null
+          : readString(payload['home_loan_info']),
       description: readString(payload['description']),
       createdBy: readString(payload['created_by']),
       totalLeads: readString(payload['total_leads']),
@@ -1146,6 +1155,9 @@ class _Project {
   final List<String> amenities;
   final String status;
   final String? brochureUrl;
+  final String? videoUrl;
+  final String? paymentPlanUrl;
+  final String? homeLoanInfo;
   final String description;
   final String createdBy;
   final String totalLeads;
@@ -1166,6 +1178,9 @@ class _Project {
     required this.amenities,
     required this.status,
     required this.brochureUrl,
+    required this.videoUrl,
+    required this.paymentPlanUrl,
+    required this.homeLoanInfo,
     required this.description,
     required this.createdBy,
     required this.totalLeads,
@@ -1191,6 +1206,9 @@ class _Project {
       'amenities': amenities,
       'status': status,
       'brochure_url': brochureUrl,
+      'video_url': videoUrl,
+      'payment_plan_url': paymentPlanUrl,
+      'home_loan_info': homeLoanInfo,
       'description': description,
       'created_by': createdBy,
       'total_leads': totalLeads,

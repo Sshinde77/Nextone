@@ -4709,6 +4709,12 @@ class AuthService {
     required String description,
     List<String> unitPlanFilePaths = const <String>[],
     List<String> creativeFilePaths = const <String>[],
+    List<String> paymentPlanFilePaths = const <String>[],
+    List<String> videoFilePaths = const <String>[],
+    String brochureUrl = '',
+    String videoUrl = '',
+    String paymentPlanUrl = '',
+    String homeLoanInfo = '',
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
@@ -4734,6 +4740,10 @@ class AuthService {
       amenities: amenities,
       status: status,
       description: description,
+      brochureUrl: brochureUrl,
+      videoUrl: videoUrl,
+      paymentPlanUrl: paymentPlanUrl,
+      homeLoanInfo: homeLoanInfo,
     );
     await _addProjectFiles(
       request,
@@ -4744,6 +4754,16 @@ class AuthService {
       request,
       fieldName: 'creatives',
       filePaths: creativeFilePaths,
+    );
+    await _addProjectFiles(
+      request,
+      fieldName: 'payment_plans',
+      filePaths: paymentPlanFilePaths,
+    );
+    await _addProjectFiles(
+      request,
+      fieldName: 'videos',
+      filePaths: videoFilePaths,
     );
 
     _logRequest(
@@ -4788,6 +4808,10 @@ class AuthService {
       'amenities': amenities,
       'status': status.trim(),
       'description': description.trim(),
+      'brochure_url': brochureUrl.trim(),
+      'video_url': videoUrl.trim(),
+      'payment_plan_url': paymentPlanUrl.trim(),
+      'home_loan_info': homeLoanInfo.trim(),
     };
   }
 
@@ -4806,6 +4830,10 @@ class AuthService {
     required List<String> amenities,
     required String status,
     required String description,
+    required String brochureUrl,
+    required String videoUrl,
+    required String paymentPlanUrl,
+    required String homeLoanInfo,
   }) {
     request.fields.addAll({
       'name': name.trim(),
@@ -4819,6 +4847,10 @@ class AuthService {
       'rera_number': reraNumber.trim(),
       'status': status.trim(),
       'description': description.trim(),
+      'brochure_url': brochureUrl.trim(),
+      'video_url': videoUrl.trim(),
+      'payment_plan_url': paymentPlanUrl.trim(),
+      'home_loan_info': homeLoanInfo.trim(),
     });
 
     for (final configuration in configurations) {
@@ -5305,6 +5337,12 @@ class AuthService {
     required String description,
     List<String> unitPlanFilePaths = const <String>[],
     List<String> creativeFilePaths = const <String>[],
+    List<String> paymentPlanFilePaths = const <String>[],
+    List<String> videoFilePaths = const <String>[],
+    String brochureUrl = '',
+    String videoUrl = '',
+    String paymentPlanUrl = '',
+    String homeLoanInfo = '',
     String? token,
   }) async {
     final normalizedId = id.trim();
@@ -5336,6 +5374,10 @@ class AuthService {
       amenities: amenities,
       status: status,
       description: description,
+      brochureUrl: brochureUrl,
+      videoUrl: videoUrl,
+      paymentPlanUrl: paymentPlanUrl,
+      homeLoanInfo: homeLoanInfo,
     );
     await _addProjectFiles(
       request,
@@ -5346,6 +5388,16 @@ class AuthService {
       request,
       fieldName: 'creatives',
       filePaths: creativeFilePaths,
+    );
+    await _addProjectFiles(
+      request,
+      fieldName: 'payment_plans',
+      filePaths: paymentPlanFilePaths,
+    );
+    await _addProjectFiles(
+      request,
+      fieldName: 'videos',
+      filePaths: videoFilePaths,
     );
 
     _logRequest(

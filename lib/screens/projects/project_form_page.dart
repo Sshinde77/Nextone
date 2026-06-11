@@ -39,14 +39,21 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   final _developerController = TextEditingController();
   final _cityController = TextEditingController();
   final _localityController = TextEditingController();
+  final _addressController = TextEditingController();
   final _priceRangeController = TextEditingController();
   final _totalUnitsController = TextEditingController();
   final _reraNumberController = TextEditingController();
+  final _brochureUrlController = TextEditingController();
+  final _videoUrlController = TextEditingController();
+  final _paymentPlanUrlController = TextEditingController();
+  final _homeLoanInfoController = TextEditingController();
   final _descriptionController = TextEditingController();
 
   String _status = 'active';
   List<PlatformFile> _unitPlanFiles = const <PlatformFile>[];
   List<PlatformFile> _creativeFiles = const <PlatformFile>[];
+  List<PlatformFile> _paymentPlanFiles = const <PlatformFile>[];
+  List<PlatformFile> _videoFiles = const <PlatformFile>[];
   bool _isSubmitting = false;
 
   static const _statuses = <_SelectOption>[
@@ -66,9 +73,14 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     _developerController.dispose();
     _cityController.dispose();
     _localityController.dispose();
+    _addressController.dispose();
     _priceRangeController.dispose();
     _totalUnitsController.dispose();
     _reraNumberController.dispose();
+    _brochureUrlController.dispose();
+    _videoUrlController.dispose();
+    _paymentPlanUrlController.dispose();
+    _homeLoanInfoController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -83,16 +95,20 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     _developerController.text = _readString(data['developer']);
     _cityController.text = _readString(data['city']);
     _localityController.text = _readString(data['locality']);
+    _addressController.text = _readString(data['address']);
     _priceRangeController.text = _readString(data['price_range']);
     _totalUnitsController.text = _readString(data['total_units']);
     _reraNumberController.text = _readString(data['rera_number']);
+    _brochureUrlController.text = _readString(data['brochure_url']);
+    _videoUrlController.text = _readString(data['video_url']);
+    _paymentPlanUrlController.text = _readString(data['payment_plan_url']);
+    _homeLoanInfoController.text = _readString(data['home_loan_info']);
     _descriptionController.text = _readString(data['description']);
 
     final status = _readString(data['status']).toLowerCase();
     if (_statuses.any((option) => option.value == status)) {
       _status = status;
     }
-
   }
 
   String _readString(dynamic value) {
@@ -120,15 +136,21 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       final developer = _developerController.text.trim();
       final city = _cityController.text.trim();
       final locality = _localityController.text.trim();
+      final address = _addressController.text.trim();
       final priceRange = _priceRangeController.text.trim();
       final totalUnits = int.tryParse(_totalUnitsController.text.trim()) ?? 0;
       final reraNumber = _reraNumberController.text.trim();
+      final brochureUrl = _brochureUrlController.text.trim();
+      final videoUrl = _videoUrlController.text.trim();
+      final paymentPlanUrl = _paymentPlanUrlController.text.trim();
+      final homeLoanInfo = _homeLoanInfoController.text.trim();
       final description = _descriptionController.text.trim();
       final existingAddress = _readString(widget.projectData?['address']);
       final derivedAddress =
           [locality, city].where((item) => item.isNotEmpty).join(', ');
-      final address =
-          existingAddress.isNotEmpty ? existingAddress : derivedAddress;
+      final resolvedAddress = address.isNotEmpty
+          ? address
+          : (existingAddress.isNotEmpty ? existingAddress : derivedAddress);
 
       if (widget.isEditMode) {
         final id = _readString(widget.projectData?['id']);
@@ -142,7 +164,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           developer: developer,
           city: city,
           locality: locality,
-          address: address,
+          address: resolvedAddress,
           configurations: const <String>[],
           priceRange: priceRange,
           totalUnits: totalUnits,
@@ -153,6 +175,12 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           description: description,
           unitPlanFilePaths: _filePaths(_unitPlanFiles),
           creativeFilePaths: _filePaths(_creativeFiles),
+          paymentPlanFilePaths: _filePaths(_paymentPlanFiles),
+          videoFilePaths: _filePaths(_videoFiles),
+          brochureUrl: brochureUrl,
+          videoUrl: videoUrl,
+          paymentPlanUrl: paymentPlanUrl,
+          homeLoanInfo: homeLoanInfo,
           token: _authProvider.currentAuthToken,
         );
       } else {
@@ -161,7 +189,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           developer: developer,
           city: city,
           locality: locality,
-          address: address,
+          address: resolvedAddress,
           configurations: const <String>[],
           priceRange: priceRange,
           totalUnits: totalUnits,
@@ -172,6 +200,12 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           description: description,
           unitPlanFilePaths: _filePaths(_unitPlanFiles),
           creativeFilePaths: _filePaths(_creativeFiles),
+          paymentPlanFilePaths: _filePaths(_paymentPlanFiles),
+          videoFilePaths: _filePaths(_videoFiles),
+          brochureUrl: brochureUrl,
+          videoUrl: videoUrl,
+          paymentPlanUrl: paymentPlanUrl,
+          homeLoanInfo: homeLoanInfo,
           token: _authProvider.currentAuthToken,
         );
       }
@@ -201,7 +235,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
         .toList();
   }
 
-  Future<void> _pickDocuments({required bool unitPlans}) async {
+  Future<void> _pickDocuments({
+    required List<PlatformFile> currentFiles,
+    required ValueChanged<List<PlatformFile>> onChanged,
+  }) async {
     if (_isSubmitting) {
       return;
     }
@@ -210,7 +247,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       return;
     }
 
-    final currentFiles = unitPlans ? _unitPlanFiles : _creativeFiles;
     final remainingSlots = _maxDocumentCount - currentFiles.length;
     if (remainingSlots <= 0) {
       _showSnackBar('You can attach up to 10 files.');
@@ -252,11 +288,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     }
 
     setState(() {
-      if (unitPlans) {
-        _unitPlanFiles = <PlatformFile>[..._unitPlanFiles, ...accepted];
-      } else {
-        _creativeFiles = <PlatformFile>[..._creativeFiles, ...accepted];
-      }
+      onChanged(<PlatformFile>[...currentFiles, ...accepted]);
     });
 
     final skipped = picked.files.length - accepted.length;
@@ -265,15 +297,13 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     }
   }
 
-  void _removeDocument({required bool unitPlans, required PlatformFile file}) {
+  void _removeDocument({
+    required List<PlatformFile> currentFiles,
+    required ValueChanged<List<PlatformFile>> onChanged,
+    required PlatformFile file,
+  }) {
     setState(() {
-      if (unitPlans) {
-        _unitPlanFiles =
-            _unitPlanFiles.where((item) => !identical(item, file)).toList();
-      } else {
-        _creativeFiles =
-            _creativeFiles.where((item) => !identical(item, file)).toList();
-      }
+      onChanged(currentFiles.where((item) => !identical(item, file)).toList());
     });
   }
 
@@ -400,6 +430,12 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                             ],
                           ),
                           const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _addressController,
+                            label: 'Address',
+                            hintText: 'Plot 14, Veera Desai Road',
+                          ),
+                          const SizedBox(height: 12),
                           _buildResponsiveRow(
                             isNarrow: isNarrow,
                             children: [
@@ -447,6 +483,32 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                             minLines: 3,
                             maxLines: 3,
                           ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _brochureUrlController,
+                            label: 'Brochure URL',
+                            hintText: '/uploads/projects/brochure.pdf',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _videoUrlController,
+                            label: 'Video URL',
+                            hintText: 'https://youtube.com/watch?v=abc',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _paymentPlanUrlController,
+                            label: 'Payment Plan URL',
+                            hintText: '/uploads/projects/payment_plan.pdf',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _homeLoanInfoController,
+                            label: 'Home Loan Info',
+                            hintText: 'Available through HDFC, SBI, ICICI',
+                            minLines: 3,
+                            maxLines: 3,
+                          ),
                           const SizedBox(height: 20),
                           _buildDocumentSection(),
                           const SizedBox(height: 26),
@@ -463,6 +525,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       ),
     );
   }
+
   Widget _buildHeader(String title) {
     return Container(
       height: 54,
@@ -539,8 +602,15 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           title: 'Click to upload unit plans',
           files: _unitPlanFiles,
           highlighted: _unitPlanFiles.isNotEmpty,
-          onTap: () => _pickDocuments(unitPlans: true),
-          onRemove: (file) => _removeDocument(unitPlans: true, file: file),
+          onTap: () => _pickDocuments(
+            currentFiles: _unitPlanFiles,
+            onChanged: (files) => _unitPlanFiles = files,
+          ),
+          onRemove: (file) => _removeDocument(
+            currentFiles: _unitPlanFiles,
+            onChanged: (files) => _unitPlanFiles = files,
+            file: file,
+          ),
         ),
         const SizedBox(height: 16),
         _buildDocumentPicker(
@@ -548,8 +618,47 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           title: 'Click to upload creatives',
           files: _creativeFiles,
           highlighted: _creativeFiles.isNotEmpty,
-          onTap: () => _pickDocuments(unitPlans: false),
-          onRemove: (file) => _removeDocument(unitPlans: false, file: file),
+          onTap: () => _pickDocuments(
+            currentFiles: _creativeFiles,
+            onChanged: (files) => _creativeFiles = files,
+          ),
+          onRemove: (file) => _removeDocument(
+            currentFiles: _creativeFiles,
+            onChanged: (files) => _creativeFiles = files,
+            file: file,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildDocumentPicker(
+          label: 'Payment Plan Files',
+          title: 'Click to upload payment plans',
+          files: _paymentPlanFiles,
+          highlighted: _paymentPlanFiles.isNotEmpty,
+          onTap: () => _pickDocuments(
+            currentFiles: _paymentPlanFiles,
+            onChanged: (files) => _paymentPlanFiles = files,
+          ),
+          onRemove: (file) => _removeDocument(
+            currentFiles: _paymentPlanFiles,
+            onChanged: (files) => _paymentPlanFiles = files,
+            file: file,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildDocumentPicker(
+          label: 'Video Files',
+          title: 'Click to upload videos',
+          files: _videoFiles,
+          highlighted: _videoFiles.isNotEmpty,
+          onTap: () => _pickDocuments(
+            currentFiles: _videoFiles,
+            onChanged: (files) => _videoFiles = files,
+          ),
+          onRemove: (file) => _removeDocument(
+            currentFiles: _videoFiles,
+            onChanged: (files) => _videoFiles = files,
+            file: file,
+          ),
         ),
       ],
     );
@@ -567,8 +676,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
         highlighted ? AppColors.primary : const Color(0xFFDCE3ED);
     final background =
         highlighted ? const Color(0xFFEFF8FF) : const Color(0xFFFCFCFD);
-    final iconColor =
-        highlighted ? AppColors.primary : const Color(0xFF98A4B4);
+    final iconColor = highlighted ? AppColors.primary : const Color(0xFF98A4B4);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
