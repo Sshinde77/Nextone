@@ -53,6 +53,7 @@ class _LeadsPageState extends State<LeadsPage> {
   bool _isSubmittingReassign = false;
   bool _isLoadingLeadSources = false;
   String? _activeShareLeadId;
+  String? _visiblePhoneLeadId;
   String? _selectedAssigneeId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_LeadSourceOption> _leadSources = const <_LeadSourceOption>[];
@@ -279,6 +280,7 @@ class _LeadsPageState extends State<LeadsPage> {
         _totalPages = result.totalPages <= 0 ? 1 : result.totalPages;
         _totalItems = result.totalItems;
         _selectedLeadIds.removeWhere((id) => !pageLeadIds.contains(id));
+        _visiblePhoneLeadId = null;
         _isLoadingLeads = false;
       });
       await _loadPhoneAccessForCurrentPage(pageLeads);
@@ -292,6 +294,7 @@ class _LeadsPageState extends State<LeadsPage> {
         _totalPages = 1;
         _isLoadingLeads = false;
         _selectedLeadIds.clear();
+        _visiblePhoneLeadId = null;
         _leadPhoneAccessById.clear();
         _loadError = AppErrorHandler.friendlyMessage(error);
       });
@@ -656,9 +659,9 @@ class _LeadsPageState extends State<LeadsPage> {
                                   'Lead source updated successfully.');
                             } catch (error) {
                               if (!mounted) return;
-                                _showSnackBar(
-                                  AppErrorHandler.friendlyMessage(error),
-                                );
+                              _showSnackBar(
+                                AppErrorHandler.friendlyMessage(error),
+                              );
                               if (context.mounted) {
                                 setEditState(() {
                                   isSaving = false;
@@ -2494,6 +2497,7 @@ class _LeadsPageState extends State<LeadsPage> {
                       rightMetaLabel: 'Next Follow-up',
                       budget: lead.budget,
                       phone: _displayPhoneForLead(lead),
+                      phoneAction: _phoneRevealAction(lead),
                       profileImageUrl: lead.profileImageUrl,
                       assigneeName: lead.assignee.name,
                       assigneeImageUrl: lead.assignee.imageUrl,
@@ -2746,10 +2750,10 @@ class _LeadsPageState extends State<LeadsPage> {
   String _displayPhoneForLead(_LeadModel lead) {
     final access = _leadPhoneAccessById[lead.id];
     final rawPhone = lead.phone;
-    if (RoleAccess.hasFullAccess(_currentRole)) {
+    if (_canSeeFullLeadPhone) {
       return rawPhone;
     }
-    if (access?.hasAccess == true) {
+    if (_visiblePhoneLeadId == lead.id) {
       final grantedPhone = _readString(access?.phone);
       return grantedPhone.isNotEmpty ? grantedPhone : rawPhone;
     }
@@ -2758,7 +2762,7 @@ class _LeadsPageState extends State<LeadsPage> {
 
   String _callPhoneForLead(_LeadModel lead) {
     final access = _leadPhoneAccessById[lead.id];
-    if (RoleAccess.hasFullAccess(_currentRole)) {
+    if (_canSeeFullLeadPhone || _visiblePhoneLeadId == lead.id) {
       return lead.phone;
     }
     final grantedPhone = _readString(access?.phone);
@@ -2773,12 +2777,43 @@ class _LeadsPageState extends State<LeadsPage> {
     if (value.isEmpty || value.toUpperCase() == 'N/A') {
       return 'N/A';
     }
-    final keepCount = (value.length / 2).ceil();
+    final keepCount = value.length < 5 ? value.length : 5;
     final hiddenCount = value.length - keepCount;
     if (hiddenCount <= 0) {
       return value;
     }
-    return '${value.substring(0, keepCount)}${'x' * hiddenCount}';
+    return '${'*' * hiddenCount}${value.substring(value.length - keepCount)}';
+  }
+
+  bool get _canSeeFullLeadPhone {
+    final role = RoleAccess.normalize(_currentRole);
+    return role == RoleAccess.superAdmin || role == RoleAccess.admin;
+  }
+
+  Widget? _phoneRevealAction(_LeadModel lead) {
+    if (_canSeeFullLeadPhone || lead.phone.trim().isEmpty) {
+      return null;
+    }
+    final isVisible = _visiblePhoneLeadId == lead.id;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _visiblePhoneLeadId = isVisible ? null : lead.id;
+        });
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Text(
+          isVisible ? 'Hide' : 'View',
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
   }
 
   bool _isPendingRequest(dynamic value) {

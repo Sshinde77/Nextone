@@ -30,6 +30,7 @@ class DataCard extends StatelessWidget {
     required this.actions,
     this.bulkSelectionMode = false,
     this.isSelected = false,
+    this.phoneAction,
     this.onLongPress,
     this.onTap,
     this.onSelectionChanged,
@@ -49,6 +50,7 @@ class DataCard extends StatelessWidget {
   final String assigneeName;
   final String assigneeImageUrl;
   final List<DataCardAction> actions;
+  final Widget? phoneAction;
 
   final bool bulkSelectionMode;
   final bool isSelected;
@@ -164,6 +166,7 @@ class DataCard extends StatelessWidget {
                       'Phone',
                       phone,
                       icon: Icons.phone_outlined,
+                      trailing: phoneAction,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -244,6 +247,7 @@ class DataCard extends StatelessWidget {
     Color? valueColor,
     Color? dotColor,
     IconData? icon,
+    Widget? trailing,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -285,6 +289,10 @@ class DataCard extends StatelessWidget {
                 ),
               ),
             ),
+            if (trailing != null) ...[
+              const SizedBox(width: 6),
+              trailing,
+            ],
           ],
         ),
       ],
