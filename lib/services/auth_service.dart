@@ -3248,7 +3248,7 @@ class AuthService {
     String? loanBank,
     required num commissionPercent,
     required bool commissionPaid,
-    String? closedByManager,
+    List<String>? closedByManagerIds,
     required String closureNotes,
     String? token,
   }) async {
@@ -3274,9 +3274,13 @@ class AuthService {
       'loan_bank': loanBank?.trim().isEmpty ?? true ? null : loanBank!.trim(),
       'commission_percent': commissionPercent,
       'commission_paid': commissionPaid,
-      'closed_by_manager': closedByManager?.trim().isEmpty ?? true
+      'closed_by_manager': closedByManagerIds == null ||
+              closedByManagerIds.where((id) => id.trim().isNotEmpty).isEmpty
           ? null
-          : closedByManager!.trim(),
+          : closedByManagerIds
+              .map((id) => id.trim())
+              .where((id) => id.isNotEmpty)
+              .toList(growable: false),
       'closure_notes': closureNotes.trim(),
     };
     final body = jsonEncode(payload);
@@ -3330,7 +3334,7 @@ class AuthService {
     required num commissionPercent,
     required bool commissionPaid,
     String? commissionPaidDate,
-    String? closedByManager,
+    List<String>? closedByManagerIds,
     required String closureNotes,
     String? token,
   }) async {
@@ -3362,9 +3366,13 @@ class AuthService {
       'commission_paid_date': commissionPaidDate?.trim().isEmpty ?? true
           ? null
           : commissionPaidDate!.trim(),
-      'closed_by_manager': closedByManager?.trim().isEmpty ?? true
+      'closed_by_manager': closedByManagerIds == null ||
+              closedByManagerIds.where((id) => id.trim().isNotEmpty).isEmpty
           ? null
-          : closedByManager!.trim(),
+          : closedByManagerIds
+              .map((id) => id.trim())
+              .where((id) => id.isNotEmpty)
+              .toList(growable: false),
       'closure_notes': closureNotes.trim(),
     };
     final body = jsonEncode(payload);

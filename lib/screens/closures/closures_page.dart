@@ -6,6 +6,16 @@ import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/widgets/closure_data_card.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
+class _SelectionOption {
+  const _SelectionOption({
+    required this.id,
+    required this.label,
+  });
+
+  final String id;
+  final String label;
+}
+
 class ClosuresPage extends StatefulWidget {
   const ClosuresPage({super.key, this.showBackButton = false});
 
@@ -181,7 +191,18 @@ class _ClosuresPageState extends State<ClosuresPage> {
     final commissionPercentController = TextEditingController();
     commissionPercentController.text = '2';
     bool commissionPaid = false;
-    String? selectedManagerId;
+    List<String> selectedManagerIds = <String>[];
+    final managerOptions = users
+        .map(
+          (e) => _SelectionOption(
+            id: _readString(e['id'], fallback: ''),
+            label:
+                '${_readString(e['first_name'], fallback: '').trim()} ${_readString(e['last_name'], fallback: '').trim()}'
+                    .trim(),
+          ),
+        )
+        .where((option) => option.id.isNotEmpty)
+        .toList(growable: false);
     final notesController = TextEditingController();
 
     final created = await showDialog<bool>(
@@ -237,7 +258,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           commissionPercentController.text.trim()) ??
                       0,
                   commissionPaid: commissionPaid,
-                  closedByManager: selectedManagerId,
+                  closedByManagerIds: selectedManagerIds,
                   closureNotes: notesController.text.trim(),
                   token: _authProvider.currentAuthToken,
                 );
@@ -247,9 +268,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 setLocalState(() => isSubmitting = false);
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content:
-                          Text(AppErrorHandler.friendlyMessage(e))),
+                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
                 );
               }
             }
@@ -486,25 +505,26 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        _dropdownField(
+                        _selectionField(
                           label: 'Reporting Manager',
-                          value: selectedManagerId,
-                          hint: 'Select manager...',
-                          items: users
-                              .map(
-                                (e) => DropdownMenuItem<String>(
-                                  value: _readString(e['id'], fallback: ''),
-                                  child: Text(
-                                    '${_readString(e['first_name'], fallback: '').trim()} ${_readString(e['last_name'], fallback: '').trim()}'
-                                        .trim(),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              )
-                              .where((e) => (e.value ?? '').isNotEmpty)
-                              .toList(),
-                          onChanged: (v) =>
-                              setLocalState(() => selectedManagerId = v),
+                          hint: 'Select one or more managers...',
+                          value: _formatSelectionSummary(
+                            managerOptions,
+                            selectedManagerIds,
+                          ),
+                          onTap: isSubmitting
+                              ? null
+                              : () async {
+                                  final selected = await _openMultiSelectSheet(
+                                    title: 'Reporting Manager',
+                                    options: managerOptions,
+                                    initialSelectedIds: selectedManagerIds,
+                                  );
+                                  if (selected == null) return;
+                                  setLocalState(
+                                    () => selectedManagerIds = selected,
+                                  );
+                                },
                         ),
                         const SizedBox(height: 10),
                         CheckboxListTile(
@@ -652,6 +672,203 @@ class _ClosuresPageState extends State<ClosuresPage> {
           onChanged: onChanged,
         ),
       ],
+    );
+  }
+
+  Widget _selectionField({
+    required String label,
+    required String hint,
+    required String value,
+    required VoidCallback? onTap,
+  }) {
+    final hasValue = value.trim().isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: _fieldDecoration(hint: hint),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    hasValue ? value : hint,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: hasValue
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.arrow_drop_down),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<List<String>?> _openMultiSelectSheet({
+    required String title,
+    required List<_SelectionOption> options,
+    required List<String> initialSelectedIds,
+  }) async {
+    final initial = List<String>.from(initialSelectedIds);
+    return showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final selectedIds = List<String>.from(initial);
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 14,
+                  bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+                ),
+                child: SizedBox(
+                  height: 420,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.border,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        options.isEmpty
+                            ? 'No managers available.'
+                            : 'Select one or more managers.',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: options.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Nothing available to select.',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: options.length,
+                                separatorBuilder: (_, __) =>
+                                    const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final option = options[index];
+                                  final selected =
+                                      selectedIds.contains(option.id);
+                                  return CheckboxListTile(
+                                    value: selected,
+                                    dense: true,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                    activeColor: AppColors.primary,
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(
+                                      option.label,
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    onChanged: (value) {
+                                      setSheetState(() {
+                                        if (value == true) {
+                                          if (!selectedIds
+                                              .contains(option.id)) {
+                                            selectedIds.add(option.id);
+                                          }
+                                        } else {
+                                          selectedIds.remove(option.id);
+                                        }
+                                      });
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(sheetContext).pop(),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(46),
+                                side: const BorderSide(color: AppColors.border),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.of(sheetContext)
+                                  .pop(List<String>.from(selectedIds)),
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(46),
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Apply'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -942,10 +1159,19 @@ class _ClosuresPageState extends State<ClosuresPage> {
     bool commissionPaid = item['commission_paid'] == true;
     DateTime? commissionPaidDate = DateTime.tryParse(
         _readString(item['commission_paid_date'], fallback: ''));
-    String? selectedManagerId =
-        _readString(item['closed_by_manager'], fallback: '').isEmpty
-            ? null
-            : _readString(item['closed_by_manager'], fallback: '');
+    List<String> selectedManagerIds =
+        _extractStringList(item['closed_by_manager']);
+    final managerOptions = users
+        .map(
+          (e) => _SelectionOption(
+            id: _readString(e['id'], fallback: ''),
+            label:
+                '${_readString(e['first_name'], fallback: '').trim()} ${_readString(e['last_name'], fallback: '').trim()}'
+                    .trim(),
+          ),
+        )
+        .where((option) => option.id.isNotEmpty)
+        .toList(growable: false);
     final notesController = TextEditingController(
       text: _readString(item['closure_notes'], fallback: ''),
     );
@@ -1003,7 +1229,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                       commissionPaid && commissionPaidDate != null
                           ? _toYmd(commissionPaidDate!)
                           : null,
-                  closedByManager: selectedManagerId,
+                  closedByManagerIds: selectedManagerIds,
                   closureNotes: notesController.text.trim(),
                   token: _authProvider.currentAuthToken,
                 );
@@ -1013,9 +1239,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 setLocalState(() => isSubmitting = false);
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content:
-                          Text(AppErrorHandler.friendlyMessage(e))),
+                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
                 );
               }
             }
@@ -1210,25 +1434,26 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        _dropdownField(
+                        _selectionField(
                           label: 'Reporting Manager',
-                          value: selectedManagerId,
-                          hint: 'Select manager...',
-                          items: users
-                              .map(
-                                (e) => DropdownMenuItem<String>(
-                                  value: _readString(e['id'], fallback: ''),
-                                  child: Text(
-                                    '${_readString(e['first_name'], fallback: '').trim()} ${_readString(e['last_name'], fallback: '').trim()}'
-                                        .trim(),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              )
-                              .where((e) => (e.value ?? '').isNotEmpty)
-                              .toList(),
-                          onChanged: (v) =>
-                              setLocalState(() => selectedManagerId = v),
+                          hint: 'Select one or more managers...',
+                          value: _formatSelectionSummary(
+                            managerOptions,
+                            selectedManagerIds,
+                          ),
+                          onTap: isSubmitting
+                              ? null
+                              : () async {
+                                  final selected = await _openMultiSelectSheet(
+                                    title: 'Reporting Manager',
+                                    options: managerOptions,
+                                    initialSelectedIds: selectedManagerIds,
+                                  );
+                                  if (selected == null) return;
+                                  setLocalState(
+                                    () => selectedManagerIds = selected,
+                                  );
+                                },
                         ),
                         const SizedBox(height: 10),
                         if (commissionPaid) ...[
@@ -1381,9 +1606,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 if (!context.mounted) return;
                 setLocalState(() => isSubmitting = false);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content:
-                          Text(AppErrorHandler.friendlyMessage(e))),
+                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
                 );
               }
             }
@@ -1677,6 +1900,51 @@ class _ClosuresPageState extends State<ClosuresPage> {
     return text.isEmpty || text.toLowerCase() == 'null' ? fallback : text;
   }
 
+  List<String> _extractStringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map((entry) => entry?.toString().trim() ?? '')
+          .where((entry) => entry.isNotEmpty && entry.toLowerCase() != 'null')
+          .toList(growable: false);
+    }
+    final text = _readString(value, fallback: '');
+    if (text.isEmpty) return <String>[];
+    if (text.startsWith('[') && text.endsWith(']')) {
+      final stripped = text.substring(1, text.length - 1).trim();
+      if (stripped.isEmpty) return <String>[];
+      return stripped
+          .split(',')
+          .map((entry) => entry.trim().replaceAll('"', '').replaceAll("'", ''))
+          .where((entry) => entry.isNotEmpty)
+          .toList(growable: false);
+    }
+    return <String>[text];
+  }
+
+  String _formatSelectionSummary(
+    List<_SelectionOption> options,
+    List<String> selectedIds,
+  ) {
+    if (selectedIds.isEmpty) {
+      return '';
+    }
+
+    final labelsById = {
+      for (final option in options) option.id: option.label,
+    };
+    final selectedLabels = selectedIds
+        .map((id) => labelsById[id] ?? id)
+        .where((label) => label.trim().isNotEmpty)
+        .toList(growable: false);
+    if (selectedLabels.isEmpty) {
+      return '';
+    }
+    if (selectedLabels.length <= 2) {
+      return selectedLabels.join(', ');
+    }
+    return '${selectedLabels.take(2).join(', ')} +${selectedLabels.length - 2} more';
+  }
+
   double _toDouble(dynamic value) {
     if (value == null) return 0;
     if (value is num) return value.toDouble();
@@ -1728,4 +1996,3 @@ class _ClosuresPageState extends State<ClosuresPage> {
     }
   }
 }
-

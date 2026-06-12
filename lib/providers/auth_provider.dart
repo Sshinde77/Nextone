@@ -822,7 +822,7 @@ class AuthProvider {
     String? loanBank,
     required num commissionPercent,
     required bool commissionPaid,
-    String? closedByManager,
+    List<String>? closedByManagerIds,
     required String closureNotes,
     String? token,
   }) {
@@ -844,7 +844,7 @@ class AuthProvider {
       loanBank: loanBank,
       commissionPercent: commissionPercent,
       commissionPaid: commissionPaid,
-      closedByManager: closedByManager,
+      closedByManagerIds: closedByManagerIds,
       closureNotes: closureNotes,
       token: token,
     );
@@ -867,7 +867,7 @@ class AuthProvider {
     required num commissionPercent,
     required bool commissionPaid,
     String? commissionPaidDate,
-    String? closedByManager,
+    List<String>? closedByManagerIds,
     required String closureNotes,
     String? token,
   }) {
@@ -888,7 +888,7 @@ class AuthProvider {
       commissionPercent: commissionPercent,
       commissionPaid: commissionPaid,
       commissionPaidDate: commissionPaidDate,
-      closedByManager: closedByManager,
+      closedByManagerIds: closedByManagerIds,
       closureNotes: closureNotes,
       token: token,
     );
