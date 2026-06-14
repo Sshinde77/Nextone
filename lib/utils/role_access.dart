@@ -69,11 +69,6 @@ class RoleAccess {
     return hasFullAccess(normalized) || normalized == salesManager;
   }
 
-  static bool canViewPhoneRequests(String role) {
-    final _ = role;
-    return true;
-  }
-
   static bool canViewLeadPhones(String role) {
     final normalized = normalize(role);
     return hasFullAccess(normalized);
@@ -111,8 +106,8 @@ class RoleAccess {
       case 3:
       case 4:
       case 7:
+      case 9:
       case 10:
-      case 11:
         return true;
       case 5:
         return canViewProjects(role);
@@ -120,8 +115,6 @@ class RoleAccess {
         return canViewTeam(role);
       case 8:
         return canViewUsers(role);
-      case 9:
-        return true;
       default:
         return false;
     }

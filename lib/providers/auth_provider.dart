@@ -124,6 +124,24 @@ class AuthProvider {
     );
   }
 
+  Future<SalarySetResult> salaryAppraisal({
+    required String userId,
+    required double newSalary,
+    required String effectiveFrom,
+    required String appraisalNote,
+    required int workingDaysInMonth,
+    String? token,
+  }) {
+    return _authService.salaryAppraisal(
+      userId: userId,
+      newSalary: newSalary,
+      effectiveFrom: effectiveFrom,
+      appraisalNote: appraisalNote,
+      workingDaysInMonth: workingDaysInMonth,
+      token: token,
+    );
+  }
+
   Future<SalaryGenerateResult> salaryGenerate({
     required String userId,
     required int month,
@@ -149,6 +167,16 @@ class AuthProvider {
     String? token,
   }) {
     return _authService.salaryHistory(
+      userId: userId,
+      token: token,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> salaryIncentives({
+    required String userId,
+    String? token,
+  }) {
+    return _authService.salaryIncentives(
       userId: userId,
       token: token,
     );
@@ -1221,6 +1249,20 @@ class AuthProvider {
     String? token,
   }) {
     return _authService.downloadAllProjectDocuments(id: id, token: token);
+  }
+
+  Future<ExportFileResult> downloadAllProjectPaymentPlans({
+    required String id,
+    String? token,
+  }) {
+    return _authService.downloadAllProjectPaymentPlans(id: id, token: token);
+  }
+
+  Future<ExportFileResult> downloadAllProjectVideos({
+    required String id,
+    String? token,
+  }) {
+    return _authService.downloadAllProjectVideos(id: id, token: token);
   }
 
   Future<ExportFileResult> downloadProjectDocument({

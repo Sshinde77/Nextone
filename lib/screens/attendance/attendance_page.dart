@@ -248,7 +248,8 @@ class _AttendancePageState extends State<AttendancePage> {
       }
 
       if (!await Geolocator.isLocationServiceEnabled()) {
-        _showSnackBar('Location services are disabled. Please enable location.');
+        _showSnackBar(
+            'Location services are disabled. Please enable location.');
         return;
       }
 
@@ -257,7 +258,8 @@ class _AttendancePageState extends State<AttendancePage> {
           accuracy: LocationAccuracy.high,
         ),
       );
-      final address = await _resolveAddress(position.latitude, position.longitude);
+      final address =
+          await _resolveAddress(position.latitude, position.longitude);
       final device = _deviceDescription();
 
       final uploadRes = await _authProvider.uploadAttendancePhoto(
@@ -408,8 +410,7 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   String _extractPhotoUrl(Map<String, dynamic> response) {
-    String read(dynamic value) =>
-        value is String ? value.trim() : '';
+    String read(dynamic value) => value is String ? value.trim() : '';
 
     final direct = read(response['photo_url']);
     if (direct.isNotEmpty) return direct;
@@ -450,12 +451,8 @@ class _AttendancePageState extends State<AttendancePage> {
       if (!mounted) return;
       setState(() {
         _todayAttendance = data;
-        _isCheckedIn = _readBool(data, const [
-          'is_checked_in',
-          'isCheckedIn',
-          'checked_in',
-          'checkedIn'
-        ]);
+        _isCheckedIn = _readBool(data,
+            const ['is_checked_in', 'isCheckedIn', 'checked_in', 'checkedIn']);
       });
     } catch (e) {
       if (!mounted) return;
@@ -552,7 +549,8 @@ class _AttendancePageState extends State<AttendancePage> {
       final paginationRaw = firstPage['pagination'];
       final pagination = paginationRaw is Map
           ? Map<String, dynamic>.from(
-              paginationRaw.map((key, value) => MapEntry(key.toString(), value)),
+              paginationRaw
+                  .map((key, value) => MapEntry(key.toString(), value)),
             )
           : const <String, dynamic>{};
       final totalPages = _readIntValue(pagination['total_pages'], 1);
@@ -635,7 +633,8 @@ class _AttendancePageState extends State<AttendancePage> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    final apiMonth = _readIntValue(_calendarData['month'], _calendarMonth.month);
+    final apiMonth =
+        _readIntValue(_calendarData['month'], _calendarMonth.month);
     final apiYear = _readIntValue(_calendarData['year'], _calendarMonth.year);
     final monthStart = DateTime(apiYear, apiMonth, 1);
     final monthEnd = DateTime(apiYear, apiMonth + 1, 0);
@@ -858,7 +857,9 @@ class _AttendancePageState extends State<AttendancePage> {
       fallback: '',
     ).trim().toLowerCase();
     if (rawStatus == 'on_leave' || rawStatus == 'on leave') return 'leave';
-    if (rawStatus == 'checked_in' || rawStatus == 'checked in') return 'present';
+    if (rawStatus == 'checked_in' || rawStatus == 'checked in') {
+      return 'present';
+    }
     if (rawStatus.isNotEmpty) return rawStatus;
     final hasCheckIn = _readStringFromMap(
       day,
@@ -953,17 +954,14 @@ class _AttendancePageState extends State<AttendancePage> {
   List<Map<String, dynamic>> _monthGridDays() {
     final allDaysRaw = _monthGridData['all_days'];
     if (allDaysRaw is List) {
-      return allDaysRaw
-          .whereType<String>()
-          .map((date) {
-            final parsed = _parseApiDate(date);
-            return <String, dynamic>{
-              'date': date,
-              'day': parsed == null ? '' : _shortWeekday(parsed),
-              'status': parsed != null && parsed.weekday >= 6 ? 'weekend' : '',
-            };
-          })
-          .toList();
+      return allDaysRaw.whereType<String>().map((date) {
+        final parsed = _parseApiDate(date);
+        return <String, dynamic>{
+          'date': date,
+          'day': parsed == null ? '' : _shortWeekday(parsed),
+          'status': parsed != null && parsed.weekday >= 6 ? 'weekend' : '',
+        };
+      }).toList();
     }
 
     final rows = _monthGridRows();
@@ -1372,7 +1370,14 @@ class _AttendancePageState extends State<AttendancePage> {
   String _approvalId(Map<String, dynamic> row) {
     return _readStringFromMap(
       row,
-      const ['id', '_id', 'attendance_id', 'attendanceId', 'pending_id', 'pendingId'],
+      const [
+        'id',
+        '_id',
+        'attendance_id',
+        'attendanceId',
+        'pending_id',
+        'pendingId'
+      ],
       fallback: '',
     );
   }
@@ -1430,16 +1435,33 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   String _todayDateLabel() {
-    final dateRaw = _readStringFromMap(_todayAttendance, const [
-      'date',
-      'today',
-      'attendance_date',
-      'attendanceDate'
-    ]);
+    final dateRaw = _readStringFromMap(_todayAttendance,
+        const ['date', 'today', 'attendance_date', 'attendanceDate']);
     final parsed = DateTime.tryParse(dateRaw);
     final date = parsed ?? DateTime.now();
-    const week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const week = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return '${week[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
   }
 
@@ -1508,12 +1530,8 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   bool _isCheckedOutToday() {
-    return _readBool(_todayAttendance, const [
-      'is_checked_out',
-      'isCheckedOut',
-      'checked_out',
-      'checkedOut'
-    ]);
+    return _readBool(_todayAttendance,
+        const ['is_checked_out', 'isCheckedOut', 'checked_out', 'checkedOut']);
   }
 
   String _formatTimeValue(String value) {
@@ -1572,8 +1590,9 @@ class _AttendancePageState extends State<AttendancePage> {
               });
             }
 
-            final isValidRange =
-                fromDate != null && toDate != null && !toDate!.isBefore(fromDate!);
+            final isValidRange = fromDate != null &&
+                toDate != null &&
+                !toDate!.isBefore(fromDate!);
 
             return AlertDialog(
               title: const Text('Export Attendance'),
@@ -1669,22 +1688,22 @@ class _AttendancePageState extends State<AttendancePage> {
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
-                    onTap: () {
-                      setState(() => _selectedTabIndex = index);
-                      if (index == 1) {
-                        _loadCalendarAttendance();
-                      } else if (index == 2) {
-                        _loadMyHistoryAttendance();
-                      } else if (index == 3) {
-                        _loadMonthGridAttendance();
-                      } else if (index == 4) {
-                        _loadDailyViewAttendance();
-                      } else if (index == 5) {
-                        _loadSummaryAttendance();
-                      } else if (index == 6) {
-                        _loadApprovalPending();
-                      }
-                    },
+                  onTap: () {
+                    setState(() => _selectedTabIndex = index);
+                    if (index == 1) {
+                      _loadCalendarAttendance();
+                    } else if (index == 2) {
+                      _loadMyHistoryAttendance();
+                    } else if (index == 3) {
+                      _loadMonthGridAttendance();
+                    } else if (index == 4) {
+                      _loadDailyViewAttendance();
+                    } else if (index == 5) {
+                      _loadSummaryAttendance();
+                    } else if (index == 6) {
+                      _loadApprovalPending();
+                    }
+                  },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     curve: Curves.easeOut,
@@ -1785,7 +1804,8 @@ class _AttendancePageState extends State<AttendancePage> {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: _buildRightMetrics(width: constraints.maxWidth * 0.675 - 12),
+              child:
+                  _buildRightMetrics(width: constraints.maxWidth * 0.675 - 12),
             ),
           ],
         );
@@ -2440,10 +2460,9 @@ class _AttendancePageState extends State<AttendancePage> {
     );
 
     return Container(
-      color: statusLower == 'absent'
-          ? const Color(0xFFFBFCFE)
-          : Colors.white,
-      padding: EdgeInsets.fromLTRB(16, compact ? 14 : 16, 16, compact ? 14 : 16),
+      color: statusLower == 'absent' ? const Color(0xFFFBFCFE) : Colors.white,
+      padding:
+          EdgeInsets.fromLTRB(16, compact ? 14 : 16, 16, compact ? 14 : 16),
       child: compact
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2457,7 +2476,9 @@ class _AttendancePageState extends State<AttendancePage> {
             )
           : Row(
               children: [
-                Expanded(child: _buildDailyEmployeeMain(row, status, accent, bubble)),
+                Expanded(
+                    child:
+                        _buildDailyEmployeeMain(row, status, accent, bubble)),
                 if (details.children.isNotEmpty) details,
               ],
             ),
@@ -2597,7 +2618,8 @@ class _AttendancePageState extends State<AttendancePage> {
               DateTime(parsedFrom.year, parsedFrom.month, parsedFrom.day);
         }
         if (parsedTo != null) {
-          _summaryToDate = DateTime(parsedTo.year, parsedTo.month, parsedTo.day);
+          _summaryToDate =
+              DateTime(parsedTo.year, parsedTo.month, parsedTo.day);
         }
       });
     } catch (e) {
@@ -2787,7 +2809,8 @@ class _AttendancePageState extends State<AttendancePage> {
                 final leave = _readIntValue(row['on_leave'], 0);
                 final hours = _readDoubleValue(row['total_working_hours'], 0.0)
                     .toStringAsFixed(1);
-                final percent = _readDoubleValue(row['attendance_percent'], 0.0);
+                final percent =
+                    _readDoubleValue(row['attendance_percent'], 0.0);
 
                 return Container(
                   decoration: BoxDecoration(
@@ -3021,7 +3044,9 @@ class _AttendancePageState extends State<AttendancePage> {
                   ),
                   _LegendChip(
                     label:
-                        "${_readStringFromMap(_calendarData['summary'] is Map<String, dynamic> ? _calendarData['summary'] as Map<String, dynamic> : const <String, dynamic>{}, const ['total_working_hours'], fallback: '0')}h worked",
+                        "${_readStringFromMap(_calendarData['summary'] is Map<String, dynamic> ? _calendarData['summary'] as Map<String, dynamic> : const <String, dynamic>{}, const [
+                              'total_working_hours'
+                            ], fallback: '0')}h worked",
                     textColor: Color(0xFF1E74D8),
                     bgColor: Color(0xFFE3EEFF),
                   ),
@@ -3063,7 +3088,8 @@ class _AttendancePageState extends State<AttendancePage> {
                     mainAxisSpacing: 4,
                     childAspectRatio: 0.95,
                   ),
-                  itemBuilder: (context, index) => _CalendarDayCell(cell: items[index]),
+                  itemBuilder: (context, index) =>
+                      _CalendarDayCell(cell: items[index]),
                 ),
               ],
             ),
@@ -3105,7 +3131,8 @@ class _AttendancePageState extends State<AttendancePage> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFDE3E3),
                       borderRadius: BorderRadius.circular(999),
@@ -3233,7 +3260,7 @@ class _AttendancePageState extends State<AttendancePage> {
                             _userName(),
                             style: const TextStyle(
                               color: Color(0xFF0D203E),
-                            fontSize: 16,
+                              fontSize: 16,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -3314,15 +3341,18 @@ class _AttendancePageState extends State<AttendancePage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed:
-                        _isAttendanceSubmitting ? null : _handleAttendanceAction,
+                    onPressed: _isAttendanceSubmitting
+                        ? null
+                        : _handleAttendanceAction,
                     icon: Icon(
                       _isCheckedIn ? Icons.logout_rounded : Icons.login_rounded,
                       size: 20,
                     ),
                     label: Text(
                       _isAttendanceSubmitting
-                          ? (_isCheckedIn ? 'Checking Out...' : 'Checking In...')
+                          ? (_isCheckedIn
+                              ? 'Checking Out...'
+                              : 'Checking In...')
                           : (_isCheckedIn ? 'Check Out' : 'Check In'),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -3382,15 +3412,16 @@ class _AttendancePageState extends State<AttendancePage> {
                   ? const Color(0xFFE8F6EE)
                   : const Color(0xFFF9EAEC),
             ),
-            _StatusCard(
-              title: 'Working Hours',
-              subtitle: 'Today so far',
-              caption: '',
-              value: _todayWorkingHours(),
-              icon: Icons.timer_outlined,
-              iconColor: AppColors.primary,
-              bubbleColor: const Color(0xFFE8EEF7),
-            ),
+            if (RoleAccess.hasFullAccess(_currentRole))
+              _StatusCard(
+                title: 'Working Hours',
+                subtitle: 'Today so far',
+                caption: '',
+                value: _todayWorkingHours(),
+                icon: Icons.timer_outlined,
+                iconColor: AppColors.primary,
+                bubbleColor: const Color(0xFFE8EEF7),
+              ),
             _StatusCard(
               title: 'Check In',
               subtitle: '',
@@ -3716,7 +3747,8 @@ class _AttendancePageState extends State<AttendancePage> {
                         children: [
                           _ApprovalCountChip(
                             icon: Icons.logout_rounded,
-                            label: '${_approvalNotCheckedOutCount(rows)} not checked out',
+                            label:
+                                '${_approvalNotCheckedOutCount(rows)} not checked out',
                             textColor: Color(0xFFF97316),
                             bgColor: Color(0xFFFFF1E8),
                           ),
@@ -3749,7 +3781,8 @@ class _AttendancePageState extends State<AttendancePage> {
                         children: [
                           _ApprovalCountChip(
                             icon: Icons.logout_rounded,
-                            label: '${_approvalNotCheckedOutCount(rows)} not checked out',
+                            label:
+                                '${_approvalNotCheckedOutCount(rows)} not checked out',
                             textColor: Color(0xFFF97316),
                             bgColor: Color(0xFFFFF1E8),
                           ),
@@ -3883,7 +3916,13 @@ class _AttendancePageState extends State<AttendancePage> {
     final currentStatus = _approvalStatus(row);
 
     final reasonController = TextEditingController();
-    final options = <String>['present', 'late', 'absent', 'on_leave', 'half_day'];
+    final options = <String>[
+      'present',
+      'late',
+      'absent',
+      'on_leave',
+      'half_day'
+    ];
     var selectedStatus = options.contains(currentStatus.toLowerCase())
         ? currentStatus.toLowerCase()
         : 'present';
@@ -3895,7 +3934,8 @@ class _AttendancePageState extends State<AttendancePage> {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return Dialog(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -3904,244 +3944,275 @@ class _AttendancePageState extends State<AttendancePage> {
                   final compactDialog = constraints.maxWidth < 430;
                   return Container(
                     padding: EdgeInsets.all(compactDialog ? 12 : 14),
-                    constraints: const BoxConstraints(maxWidth: 760, maxHeight: 640),
+                    constraints:
+                        const BoxConstraints(maxWidth: 760, maxHeight: 640),
                     child: SingleChildScrollView(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Change Status for ${name.toUpperCase()}',
-                            style: const TextStyle(
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Change Status for ${name.toUpperCase()}',
+                                  style: const TextStyle(
+                                    color: Color(0xFF475569),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.25,
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(false),
+                                icon: const Icon(Icons.link_off_rounded,
+                                    size: 14),
+                                label: const Text('Cancel'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFF4F46E5),
+                                  backgroundColor: const Color(0xFFEEF2FF),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border:
+                                  Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Wrap(
+                              spacing: 10,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    color: Color(0xFF0F172A),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    role,
+                                    style: const TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                _statusPreviewChip(selectedStatus),
+                                _ApprovalMetaText(
+                                  icon: Icons.login_rounded,
+                                  color: const Color(0xFF10B981),
+                                  text: checkIn,
+                                ),
+                                _ApprovalMetaText(
+                                  icon: Icons.logout_rounded,
+                                  color: const Color(0xFFEF4444),
+                                  text: checkOut == '--:--'
+                                      ? 'Not checked out'
+                                      : checkOut,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'New Status',
+                            style: TextStyle(
                               color: Color(0xFF475569),
                               fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.25,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ),
-                        TextButton.icon(
-                          onPressed: () => Navigator.of(dialogContext).pop(false),
-                          icon: const Icon(Icons.link_off_rounded, size: 14),
-                          label: const Text('Cancel'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFF4F46E5),
-                            backgroundColor: const Color(0xFFEEF2FF),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Wrap(
-                        spacing: 10,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Text(
-                            name,
-                            style: const TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              role,
-                              style: const TextStyle(
-                                color: Color(0xFF64748B),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          _statusPreviewChip(selectedStatus),
-                          _ApprovalMetaText(
-                            icon: Icons.login_rounded,
-                            color: const Color(0xFF10B981),
-                            text: checkIn,
-                          ),
-                          _ApprovalMetaText(
-                            icon: Icons.logout_rounded,
-                            color: const Color(0xFFEF4444),
-                            text: checkOut == '--:--' ? 'Not checked out' : checkOut,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'New Status',
-                      style: TextStyle(
-                        color: Color(0xFF475569),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: options.map((status) {
-                        final selected = selectedStatus == status;
-                        return ChoiceChip(
-                          selected: selected,
-                          onSelected: (_) => setStateDialog(() => selectedStatus = status),
-                          label: Text(_approvalStatusLabel(status)),
-                          selectedColor: const Color(0xFFDDF7E9),
-                          side: BorderSide(
-                            color: selected
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFFD1D5DB),
-                          ),
-                          labelStyle: TextStyle(
-                            color: selected
-                                ? const Color(0xFF0E9A6E)
-                                : const Color(0xFF475569),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Reason (optional)',
-                      style: TextStyle(
-                        color: Color(0xFF475569),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: reasonController,
-                      decoration: InputDecoration(
-                        hintText: 'e.g. Employee was on field visit...',
-                        hintStyle: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF94A3B8),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    compactDialog
-                        ? Column(
-                            children: [
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton(
-                                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                                  style: OutlinedButton.styleFrom(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    side: const BorderSide(color: Color(0xFFD1D5DB)),
-                                    padding: const EdgeInsets.symmetric(vertical: 13),
-                                    textStyle: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  child: const Text('Cancel'),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: options.map((status) {
+                              final selected = selectedStatus == status;
+                              return ChoiceChip(
+                                selected: selected,
+                                onSelected: (_) => setStateDialog(
+                                    () => selectedStatus = status),
+                                label: Text(_approvalStatusLabel(status)),
+                                selectedColor: const Color(0xFFDDF7E9),
+                                side: BorderSide(
+                                  color: selected
+                                      ? const Color(0xFF10B981)
+                                      : const Color(0xFFD1D5DB),
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: _isApprovingStatus
-                                      ? null
-                                      : () => Navigator.of(dialogContext).pop(true),
-                                  style: ElevatedButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 13),
-                                    backgroundColor: const Color(0xFF6D28D9),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    textStyle: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _isApprovingStatus ? 'Updating...' : 'Confirm Change',
-                                  ),
+                                labelStyle: TextStyle(
+                                  color: selected
+                                      ? const Color(0xFF0E9A6E)
+                                      : const Color(0xFF475569),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
                                 ),
-                              ),
-                            ],
-                          )
-                        : Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                                  style: OutlinedButton.styleFrom(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    side: const BorderSide(color: Color(0xFFD1D5DB)),
-                                    padding: const EdgeInsets.symmetric(vertical: 13),
-                                    textStyle: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  child: const Text('Cancel'),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: _isApprovingStatus
-                                      ? null
-                                      : () => Navigator.of(dialogContext).pop(true),
-                                  style: ElevatedButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 13),
-                                    backgroundColor: const Color(0xFF6D28D9),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    textStyle: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _isApprovingStatus ? 'Updating...' : 'Confirm Change',
-                                  ),
-                                ),
-                              ),
-                            ],
+                              );
+                            }).toList(),
                           ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Reason (optional)',
+                            style: TextStyle(
+                              color: Color(0xFF475569),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: reasonController,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. Employee was on field visit...',
+                              hintStyle: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF94A3B8),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          compactDialog
+                              ? Column(
+                                  children: [
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton(
+                                        onPressed: () =>
+                                            Navigator.of(dialogContext)
+                                                .pop(false),
+                                        style: OutlinedButton.styleFrom(
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          side: const BorderSide(
+                                              color: Color(0xFFD1D5DB)),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 13),
+                                          textStyle: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        child: const Text('Cancel'),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed: _isApprovingStatus
+                                            ? null
+                                            : () => Navigator.of(dialogContext)
+                                                .pop(true),
+                                        style: ElevatedButton.styleFrom(
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 13),
+                                          backgroundColor:
+                                              const Color(0xFF6D28D9),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          textStyle: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          _isApprovingStatus
+                                              ? 'Updating...'
+                                              : 'Confirm Change',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () =>
+                                            Navigator.of(dialogContext)
+                                                .pop(false),
+                                        style: OutlinedButton.styleFrom(
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          side: const BorderSide(
+                                              color: Color(0xFFD1D5DB)),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 13),
+                                          textStyle: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        child: const Text('Cancel'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: _isApprovingStatus
+                                            ? null
+                                            : () => Navigator.of(dialogContext)
+                                                .pop(true),
+                                        style: ElevatedButton.styleFrom(
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 13),
+                                          backgroundColor:
+                                              const Color(0xFF6D28D9),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          textStyle: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          _isApprovingStatus
+                                              ? 'Updating...'
+                                              : 'Confirm Change',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ],
                       ),
                     ),
@@ -4191,7 +4262,8 @@ class _AttendancePageState extends State<AttendancePage> {
     final fg = isPresent ? const Color(0xFF0E9A6E) : const Color(0xFFDC2626);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -4218,7 +4290,6 @@ class _AttendancePageState extends State<AttendancePage> {
         .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
         .join(' ');
   }
-
 }
 
 class _MiniTimeCard extends StatelessWidget {
@@ -4397,7 +4468,6 @@ class _StatusCard extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _DailySummaryTile extends StatelessWidget {
@@ -4486,7 +4556,8 @@ class _DailyStatusChip extends StatelessWidget {
         .replaceAll('_', ' ')
         .split(' ')
         .where((part) => part.isNotEmpty)
-        .map((part) => '${part.substring(0, 1).toUpperCase()}${part.substring(1)}')
+        .map((part) =>
+            '${part.substring(0, 1).toUpperCase()}${part.substring(1)}')
         .join(' ');
 
     return Container(
@@ -5007,8 +5078,10 @@ class _ApprovalEmployeeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusLower = status.trim().toLowerCase();
     final isPresent = statusLower == 'present' || statusLower == 'checked in';
-    final statusBg = isPresent ? const Color(0xFFDDF7E9) : const Color(0xFFFFE7E7);
-    final statusFg = isPresent ? const Color(0xFF0E9A6E) : const Color(0xFFDC2626);
+    final statusBg =
+        isPresent ? const Color(0xFFDDF7E9) : const Color(0xFFFFE7E7);
+    final statusFg =
+        isPresent ? const Color(0xFF0E9A6E) : const Color(0xFFDC2626);
     final statusLabel = status
         .replaceAll('_', ' ')
         .split(' ')
@@ -5106,10 +5179,13 @@ class _ApprovalEmployeeCard extends StatelessWidget {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.circle, size: 7, color: statusFg),
+                                        Icon(Icons.circle,
+                                            size: 7, color: statusFg),
                                         const SizedBox(width: 6),
                                         Text(
-                                          statusLabel.isEmpty ? 'Absent' : statusLabel,
+                                          statusLabel.isEmpty
+                                              ? 'Absent'
+                                              : statusLabel,
                                           style: TextStyle(
                                             color: statusFg,
                                             fontSize: 12,
@@ -5139,7 +5215,9 @@ class _ApprovalEmployeeCard extends StatelessWidget {
                         _ApprovalMetaText(
                           icon: Icons.logout_rounded,
                           color: const Color(0xFFEF4444),
-                          text: checkOut == '--:--' ? 'Not checked out' : checkOut,
+                          text: checkOut == '--:--'
+                              ? 'Not checked out'
+                              : checkOut,
                         ),
                       ],
                     ),
@@ -5171,118 +5249,128 @@ class _ApprovalEmployeeCard extends StatelessWidget {
                 )
               : Row(
                   children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF5EF),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.person_outline_rounded,
-              color: Color(0xFF0E9A6E),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF0F172A),
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF5EF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.person_outline_rounded,
+                        color: Color(0xFF0E9A6E),
+                        size: 20,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        role,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: statusBg,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.circle, size: 7, color: statusFg),
-                          const SizedBox(width: 6),
-                          Text(
-                            statusLabel.isEmpty ? 'Absent' : statusLabel,
-                            style: TextStyle(
-                              color: statusFg,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  role,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF64748B),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: statusBg,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.circle,
+                                        size: 7, color: statusFg),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      statusLabel.isEmpty
+                                          ? 'Absent'
+                                          : statusLabel,
+                                      style: TextStyle(
+                                        color: statusFg,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 6,
+                            children: [
+                              _ApprovalMetaText(
+                                icon: Icons.login_rounded,
+                                color: const Color(0xFF10B981),
+                                text: checkIn == '--:--'
+                                    ? 'Not checked in'
+                                    : checkIn,
+                              ),
+                              _ApprovalMetaText(
+                                icon: Icons.logout_rounded,
+                                color: const Color(0xFFEF4444),
+                                text: checkOut == '--:--'
+                                    ? 'Not checked out'
+                                    : checkOut,
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 6,
-                  children: [
-                    _ApprovalMetaText(
-                      icon: Icons.login_rounded,
-                      color: const Color(0xFF10B981),
-                      text: checkIn == '--:--' ? 'Not checked in' : checkIn,
+                    const SizedBox(width: 10),
+                    TextButton.icon(
+                      onPressed: onChange,
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Change'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF4F46E5),
+                        backgroundColor: const Color(0xFFEEF2FF),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                    _ApprovalMetaText(
-                      icon: Icons.logout_rounded,
-                      color: const Color(0xFFEF4444),
-                      text: checkOut == '--:--' ? 'Not checked out' : checkOut,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          TextButton.icon(
-            onPressed: onChange,
-            icon: const Icon(Icons.edit_outlined, size: 16),
-            label: const Text('Change'),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF4F46E5),
-              backgroundColor: const Color(0xFFEEF2FF),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              textStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
                   ],
                 ),
         );
@@ -5472,7 +5560,8 @@ class _CalendarDayCell extends StatelessWidget {
               Container(
                 width: 6,
                 height: 6,
-                decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                decoration:
+                    BoxDecoration(color: dotColor, shape: BoxShape.circle),
               ),
             ],
           ],

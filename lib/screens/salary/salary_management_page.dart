@@ -1858,9 +1858,15 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     onPressed: () => _openSalaryDetail(row),
                   ),
                   _ActionIcon(
-                    icon: Icons.currency_rupee,
-                    color: const Color(0xFF2563EB),
-                    onPressed: () => _showSetSalaryDialog(row),
+                    icon: row.isNotSet
+                        ? Icons.currency_rupee
+                        : Icons.trending_up_rounded,
+                    color: row.isNotSet
+                        ? const Color(0xFF2563EB)
+                        : const Color(0xFFF59E0B),
+                    onPressed: row.isNotSet
+                        ? () => _showSetSalaryDialog(row)
+                        : () => _showAppraisalDialog(row),
                   ),
                   _ActionIcon(
                     icon: Icons.receipt_long_outlined,
@@ -2767,6 +2773,372 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     workingDaysController.dispose();
     monthlyController.dispose();
     perDayController.dispose();
+    notesController.dispose();
+  }
+
+  Future<void> _showAppraisalDialog(_EmployeeSalaryRow row) async {
+    final currentSalary = row.monthlySalaryAmount ?? 0;
+    final monthlyController = TextEditingController(
+      text: currentSalary.toStringAsFixed(0),
+    );
+    final notesController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+    bool isSaving = false;
+
+    double difference() {
+      final monthly = double.tryParse(monthlyController.text.trim()) ?? 0;
+      return monthly - currentSalary;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final salaryDifference = difference();
+            final initials = row.name
+                .split(RegExp(r'\s+'))
+                .where((part) => part.isNotEmpty)
+                .take(2)
+                .map((part) => part[0].toUpperCase())
+                .join();
+
+            Widget fieldLabel(String text) {
+              return Text(
+                text,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              );
+            }
+
+            InputDecoration fieldDecoration({
+              String? hintText,
+              String? prefixText,
+            }) {
+              return InputDecoration(
+                hintText: hintText,
+                prefixText: prefixText,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.primary),
+                ),
+                isDense: true,
+              );
+            }
+
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(30, 20, 24, 18),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Appraisal - ${row.name}',
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: isSaving
+                                ? null
+                                : () => Navigator.of(dialogContext).pop(),
+                            icon: const Icon(Icons.close),
+                            color: AppColors.textSecondary,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(30, 24, 30, 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF8E6),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 21,
+                                    backgroundColor: const Color(0xFF1684F8),
+                                    child: Text(
+                                      initials.isEmpty ? 'U' : initials,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          row.name,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          'Current: ${_formatCurrency(currentSalary)}',
+                                          style: const TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            fieldLabel('New Monthly Salary (Rs.)'),
+                            const SizedBox(height: 7),
+                            TextField(
+                              controller: monthlyController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              onChanged: (_) => setModalState(() {}),
+                              decoration: fieldDecoration(prefixText: 'Rs.  '),
+                            ),
+                            const SizedBox(height: 16),
+                            fieldLabel('Effective From'),
+                            const SizedBox(height: 7),
+                            InkWell(
+                              onTap: isSaving
+                                  ? null
+                                  : () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate: selectedDate,
+                                        firstDate: DateTime(2020),
+                                        lastDate: DateTime(2100),
+                                      );
+                                      if (picked == null) return;
+                                      setModalState(() {
+                                        selectedDate = picked;
+                                      });
+                                    },
+                              borderRadius: BorderRadius.circular(14),
+                              child: InputDecorator(
+                                decoration: fieldDecoration(),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        DateFormat('dd-MM-yyyy')
+                                            .format(selectedDate),
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          color: AppColors.textPrimary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    const Icon(Icons.calendar_today, size: 18),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            fieldLabel('Notes (Optional)'),
+                            const SizedBox(height: 7),
+                            TextField(
+                              controller: notesController,
+                              decoration: fieldDecoration(
+                                hintText: 'Reason for appraisal',
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      'Difference',
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatCurrency(salaryDifference),
+                                    style: TextStyle(
+                                      color: salaryDifference > 0
+                                          ? const Color(0xFF16A34A)
+                                          : const Color(0xFFEF4444),
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(30, 0, 30, 24),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: isSaving
+                                ? null
+                                : () => Navigator.of(dialogContext).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 12),
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFF59E0B),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 13,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    final monthly = double.tryParse(
+                                          monthlyController.text.trim(),
+                                        ) ??
+                                        0;
+                                    if (monthly <= 0) {
+                                      ScaffoldMessenger.of(context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Enter a valid monthly salary.',
+                                            ),
+                                          ),
+                                        );
+                                      return;
+                                    }
+                                    setModalState(() => isSaving = true);
+                                    try {
+                                      final result =
+                                          await _authProvider.salaryAppraisal(
+                                        userId: row.userId,
+                                        newSalary: monthly,
+                                        effectiveFrom: DateFormat('yyyy-MM-dd')
+                                            .format(selectedDate),
+                                        appraisalNote:
+                                            notesController.text.trim(),
+                                        workingDaysInMonth: 26,
+                                        token: _authProvider.currentAuthToken,
+                                      );
+                                      if (!mounted) return;
+                                      Navigator.of(dialogContext).pop();
+                                      await _loadEmployees();
+                                      ScaffoldMessenger.of(context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          SnackBar(
+                                            content: Text(result.message),
+                                          ),
+                                        );
+                                    } catch (error) {
+                                      if (!mounted) return;
+                                      setModalState(() => isSaving = false);
+                                      ScaffoldMessenger.of(context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              AppErrorHandler.friendlyMessage(
+                                                error,
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                    }
+                                  },
+                            icon: isSaving
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.trending_up_rounded, size: 17),
+                            label: Text(
+                              isSaving ? 'Saving...' : 'Save Appraisal',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    monthlyController.dispose();
     notesController.dispose();
   }
 

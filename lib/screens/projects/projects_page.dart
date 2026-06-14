@@ -665,6 +665,18 @@ class _ProjectsPageState extends State<ProjectsPage> {
                   title: const Text('All Documents'),
                   onTap: () => Navigator.of(context).pop('all'),
                 ),
+                ListTile(
+                  leading: const Icon(Icons.payments_outlined,
+                      color: AppColors.primary),
+                  title: const Text('Payment Plan'),
+                  onTap: () => Navigator.of(context).pop('payment_plans'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.video_library_outlined,
+                      color: AppColors.primary),
+                  title: const Text('Videos'),
+                  onTap: () => Navigator.of(context).pop('videos'),
+                ),
               ],
             ),
           ),
@@ -672,21 +684,57 @@ class _ProjectsPageState extends State<ProjectsPage> {
       },
     );
     if (selected == null) return;
-    if (selected == 'all') {
-      await _downloadAllProjectDocuments(project);
+    if (selected == 'all' ||
+        selected == 'payment_plans' ||
+        selected == 'videos') {
+      await _downloadProjectDocumentArchive(project, selected);
       return;
     }
     await _downloadProjectDocumentsByType(project, selected);
   }
 
-  Future<void> _downloadAllProjectDocuments(_Project project) async {
+  Future<void> _downloadProjectDocumentArchive(
+    _Project project,
+    String archiveType,
+  ) async {
     try {
-      final exported = await _authProvider.downloadAllProjectDocuments(
-        id: project.id,
-        token: _authProvider.currentAuthToken,
-      );
+      late final dynamic exported;
+      late final String fallbackFileName;
+      late final String successMessage;
+
+      switch (archiveType) {
+        case 'payment_plans':
+          exported = await _authProvider.downloadAllProjectPaymentPlans(
+            id: project.id,
+            token: _authProvider.currentAuthToken,
+          );
+          fallbackFileName =
+              '${project.name.replaceAll(' ', '_')}_payment_plans.zip';
+          successMessage = 'Downloaded all payment plans.';
+          break;
+        case 'videos':
+          exported = await _authProvider.downloadAllProjectVideos(
+            id: project.id,
+            token: _authProvider.currentAuthToken,
+          );
+          fallbackFileName = '${project.name.replaceAll(' ', '_')}_videos.zip';
+          successMessage = 'Downloaded all videos.';
+          break;
+        case 'all':
+          exported = await _authProvider.downloadAllProjectDocuments(
+            id: project.id,
+            token: _authProvider.currentAuthToken,
+          );
+          fallbackFileName =
+              '${project.name.replaceAll(' ', '_')}_documents.zip';
+          successMessage = 'Downloaded all documents.';
+          break;
+        default:
+          throw Exception('Unsupported download type.');
+      }
+
       final fileName = exported.fileName.trim().isEmpty
-          ? '${project.name.replaceAll(' ', '_')}_documents.zip'
+          ? fallbackFileName
           : exported.fileName.trim();
       if (kIsWeb) {
         _showSnackBar(
@@ -699,7 +747,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
         bytes: exported.bytes,
       );
       if (!mounted) return;
-      _showSnackBar('Downloaded all documents.');
+      _showSnackBar(successMessage);
     } catch (error) {
       if (!mounted) return;
       _showSnackBar(AppErrorHandler.friendlyMessage(error));
@@ -796,41 +844,57 @@ class _ProjectsPageState extends State<ProjectsPage> {
   List<_ProjectDocRef> _extractAllDocuments(Map<String, dynamic> payload) {
     final collected = <_ProjectDocRef>[];
     final seenIds = <String>{};
+    const categoryKeys = <String>{
+      'data',
+      'result',
+      'results',
+      'response',
+      'payload',
+      'items',
+      'unit_plans',
+      'creatives',
+      'payment_plans',
+      'videos',
+      'documents',
+    };
 
-    void addDocs(dynamic source) {
-      if (source is! List) return;
-      for (final item in source.whereType<Map>()) {
-        final doc = _ProjectDocRef.fromMap(Map<String, dynamic>.from(item));
-        if (doc.id.isEmpty || !seenIds.add(doc.id)) {
-          continue;
+    void addDoc(dynamic item) {
+      if (item is! Map) return;
+      final doc = _ProjectDocRef.fromMap(Map<String, dynamic>.from(item));
+      if (doc.id.isEmpty || !seenIds.add(doc.id)) {
+        return;
+      }
+      collected.add(doc);
+    }
+
+    void visitNode(dynamic node, {String? parentKey}) {
+      if (node is List) {
+        for (final item in node) {
+          if (item is Map || item is List) {
+            visitNode(item, parentKey: parentKey);
+          }
         }
-        collected.add(doc);
+        return;
+      }
+
+      if (node is! Map) return;
+      final map = Map<String, dynamic>.from(node);
+      if (_ProjectDocRef.fromMap(map).id.isNotEmpty) {
+        addDoc(map);
+      }
+
+      for (final entry in map.entries) {
+        final key = entry.key.trim().toLowerCase();
+        final value = entry.value;
+        if (categoryKeys.contains(key)) {
+          visitNode(value, parentKey: key);
+        } else if (parentKey != null && (value is List || value is Map)) {
+          visitNode(value, parentKey: parentKey);
+        }
       }
     }
 
-    final data = payload['data'];
-    addDocs(payload['unit_plans']);
-    addDocs(payload['creatives']);
-    addDocs(payload['payment_plans']);
-    addDocs(payload['videos']);
-    if (data is Map<String, dynamic>) {
-      addDocs(data['unit_plans']);
-      addDocs(data['creatives']);
-      addDocs(data['payment_plans']);
-      addDocs(data['videos']);
-      addDocs(data['documents']);
-    }
-
-    final docs = payload['documents'] ?? (data is List ? data : null);
-    if (docs is Map<String, dynamic>) {
-      addDocs(docs['unit_plans']);
-      addDocs(docs['creatives']);
-      addDocs(docs['payment_plans']);
-      addDocs(docs['videos']);
-    } else {
-      addDocs(docs);
-    }
-
+    visitNode(payload);
     return collected;
   }
 
@@ -916,7 +980,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                             : ListView.separated(
                                 itemCount: options.length,
                                 separatorBuilder: (_, __) =>
-                                    const Divider(height: 1),
+                                    const SizedBox.shrink(),
                                 itemBuilder: (context, index) {
                                   final option = options[index];
                                   final selected =
@@ -1619,17 +1683,60 @@ class _ProjectDocRef {
       return '';
     }
 
+    String readFirstValue(
+      Map<String, dynamic> source,
+      List<String> keys,
+    ) {
+      for (final key in keys) {
+        final value = read(source[key]);
+        if (value.isNotEmpty) {
+          return value;
+        }
+      }
+
+      for (final value in source.values) {
+        if (value is Map<String, dynamic>) {
+          final nested = readFirstValue(value, keys);
+          if (nested.isNotEmpty) {
+            return nested;
+          }
+        } else if (value is Map) {
+          final nested = readFirstValue(Map<String, dynamic>.from(value), keys);
+          if (nested.isNotEmpty) {
+            return nested;
+          }
+        }
+      }
+
+      return '';
+    }
+
     return _ProjectDocRef(
-      id: read(
-          json['id'] ?? json['_id'] ?? json['doc_id'] ?? json['document_id']),
-      name: read(
-        json['name'] ??
-            json['file_name'] ??
-            json['filename'] ??
-            json['original_name'] ??
-            json['originalName'] ??
-            'document',
-      ),
+      id: readFirstValue(json, const <String>[
+        'id',
+        '_id',
+        'doc_id',
+        'document_id',
+        'documentId',
+        'uuid',
+        'file_id',
+        'fileId',
+        'asset_id',
+        'assetId',
+        'public_id',
+        'publicId',
+      ]),
+      name: readFirstValue(json, const <String>[
+        'file_name',
+        'filename',
+        'original_name',
+        'originalName',
+        'name',
+        'document_name',
+        'documentName',
+        'title',
+        'label',
+      ]),
     );
   }
 }

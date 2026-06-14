@@ -13,7 +13,6 @@ class CRMAppBottomNav extends StatefulWidget {
   final VoidCallback onReports;
   final VoidCallback onSettings;
   final VoidCallback? onNotifications;
-  final VoidCallback? onPhoneRequests;
   final VoidCallback? onSalary;
   final VoidCallback? onClosures;
   final VoidCallback onMore;
@@ -25,7 +24,6 @@ class CRMAppBottomNav extends StatefulWidget {
   final bool showTeam;
   final bool showUsers;
   final bool showNotifications;
-  final bool showPhoneRequests;
   final bool showSalary;
 
   const CRMAppBottomNav({
@@ -41,7 +39,6 @@ class CRMAppBottomNav extends StatefulWidget {
     required this.onReports,
     required this.onSettings,
     this.onNotifications,
-    this.onPhoneRequests,
     this.onSalary,
     this.onClosures,
     required this.onMore,
@@ -53,7 +50,6 @@ class CRMAppBottomNav extends StatefulWidget {
     this.showTeam = true,
     this.showUsers = true,
     this.showNotifications = true,
-    this.showPhoneRequests = false,
     this.showSalary = false,
   });
 
@@ -112,7 +108,7 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
       ),
       if (widget.onClosures != null)
         _NavEntry(
-          index: 11,
+          index: 10,
           label: 'Closures',
           icon: Icons.verified_outlined,
           onTap: widget.onClosures!,
@@ -125,7 +121,7 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
       ),
       if (widget.showSalary && widget.onSalary != null)
         _NavEntry(
-          index: 10,
+          index: 9,
           label: 'Salary',
           icon: Icons.payments_outlined,
           onTap: widget.onSalary!,
@@ -150,13 +146,6 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           label: 'Notifications',
           icon: Icons.notifications_outlined,
           onTap: widget.onNotifications!,
-        ),
-      if (widget.showPhoneRequests && widget.onPhoneRequests != null)
-        _NavEntry(
-          index: 9,
-          label: 'Phone Requests',
-          icon: Icons.phone_callback_outlined,
-          onTap: widget.onPhoneRequests!,
         ),
     ];
   }

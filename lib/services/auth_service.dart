@@ -717,6 +717,68 @@ class AuthService {
     }
   }
 
+  Future<SalarySetResult> salaryAppraisal({
+    required String userId,
+    required double newSalary,
+    required String effectiveFrom,
+    required String appraisalNote,
+    required int workingDaysInMonth,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryAppraisal}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final bodyMap = <String, dynamic>{
+      'user_id': userId,
+      'new_salary': newSalary,
+      'effective_from': effectiveFrom,
+      'appraisal_note': appraisalNote.trim(),
+      'working_days_in_month': workingDaysInMonth,
+    };
+    final body = jsonEncode(bodyMap);
+    _logRequest(
+      endpoint: 'salaryAppraisal',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('salaryAppraisal', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to save employee appraisal.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Appraisal response format is not valid.');
+      }
+      final data = decoded['data'];
+      final salaryRaw = data is Map ? data['salary'] : null;
+      final employeeRaw = data is Map ? data['employee'] : null;
+      return SalarySetResult(
+        message: decoded['message']?.toString().trim().isNotEmpty == true
+            ? decoded['message'].toString().trim()
+            : 'Employee appraisal saved successfully',
+        salary: salaryRaw is Map ? _stringDynamicMap(salaryRaw) : const {},
+        employee:
+            employeeRaw is Map ? _stringDynamicMap(employeeRaw) : const {},
+      );
+    } catch (_) {
+      throw Exception('Appraisal response format is not valid.');
+    }
+  }
+
   Future<SalaryGenerateResult> salaryGenerate({
     required String userId,
     required int month,
@@ -848,6 +910,70 @@ class AuthService {
     } catch (_) {
       throw Exception('Salary history response format is not valid.');
     }
+  }
+
+  Future<List<Map<String, dynamic>>> salaryIncentives({
+    required String userId,
+    String? token,
+  }) async {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryIncentives}')
+        .replace(queryParameters: <String, String>{
+      'user_id': normalizedUserId,
+    });
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'salaryIncentives',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('salaryIncentives', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch salary incentives.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      dynamic source;
+      if (decoded is List) {
+        source = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is List) {
+          source = data;
+        } else if (data is Map) {
+          source = data['incentives'] ??
+              data['items'] ??
+              data['rows'] ??
+              data['data'];
+        } else {
+          source = decoded['incentives'] ?? decoded['items'] ?? decoded['rows'];
+        }
+      }
+
+      if (source is List) {
+        return source
+            .whereType<Map>()
+            .map((item) => _stringDynamicMap(item))
+            .toList();
+      }
+    } catch (_) {}
+
+    throw Exception('Salary incentives response format is not valid.');
   }
 
   Future<MySalaryResult> mySalary({
@@ -5238,6 +5364,98 @@ class AuthService {
     final disposition = response.headers['content-disposition'] ?? '';
     final fileName = _readFileNameFromDisposition(disposition) ??
         'project_${normalizedId}_documents.zip';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentTypeHeader.trim().isEmpty
+          ? 'application/zip'
+          : contentTypeHeader,
+      );
+  }
+
+  Future<ExportFileResult> downloadAllProjectPaymentPlans({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.projectPaymentPlansDownloadAll
+        .replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/zip', token: resolvedToken);
+    _logRequest(
+      endpoint: 'downloadAllProjectPaymentPlans',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('downloadAllProjectPaymentPlans', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to download project payment plans.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'project_${normalizedId}_payment_plans.zip';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentTypeHeader.trim().isEmpty
+          ? 'application/zip'
+          : contentTypeHeader,
+    );
+  }
+
+  Future<ExportFileResult> downloadAllProjectVideos({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.projectVideosDownloadAll.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/zip', token: resolvedToken);
+    _logRequest(
+      endpoint: 'downloadAllProjectVideos',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('downloadAllProjectVideos', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to download project videos.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'project_${normalizedId}_videos.zip';
     final contentTypeHeader = response.headers['content-type'] ?? '';
     return ExportFileResult(
       fileName: fileName,

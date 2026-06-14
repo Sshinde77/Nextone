@@ -67,6 +67,10 @@ class ApiConstants {
   static const String projectDocuments = '/projects/{id}/documents';
   static const String projectDocumentsDownloadAll =
       '/projects/{id}/documents/download-all';
+  static const String projectPaymentPlansDownloadAll =
+      '/projects/{id}/documents/payment-plans/download-all';
+  static const String projectVideosDownloadAll =
+      '/projects/{id}/documents/videos/download-all';
   static const String projectDocumentDownload =
       '/projects/{id}/documents/{docId}/download';
   static const String projectDocumentDelete =
@@ -136,7 +140,9 @@ class ApiConstants {
   static const String salarySlips = '/salary/slips';
   static const String salaryGenerateAll = '/salary/generate-all';
   static const String salarySet = '/salary/set';
+  static const String salaryAppraisal = '/salary/appraisal';
   static const String salaryGenerate = '/salary/generate';
   static const String salaryHistory = '/salary/history/{userId}';
+  static const String salaryIncentives = '/salary/incentives';
   static const String mySalary = '/salary/my-salary';
 }
