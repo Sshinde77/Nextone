@@ -144,5 +144,8 @@ class ApiConstants {
   static const String salaryGenerate = '/salary/generate';
   static const String salaryHistory = '/salary/history/{userId}';
   static const String salaryIncentives = '/salary/incentives';
+  static const String salaryIncentiveCreate = '/salary/incentive';
   static const String mySalary = '/salary/my-salary';
+  static const String mySalaryHistory = '/salary/my-salary-history';
+  static const String myIncentives = '/salary/my-incentives';
 }

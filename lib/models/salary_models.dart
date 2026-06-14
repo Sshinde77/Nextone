@@ -284,6 +284,16 @@ class SalaryGenerateResult {
   final Map<String, dynamic> breakdown;
 }
 
+class SalaryIncentiveCreateResult {
+  const SalaryIncentiveCreateResult({
+    required this.message,
+    required this.incentive,
+  });
+
+  final String message;
+  final Map<String, dynamic> incentive;
+}
+
 class SalaryHistoryEntry {
   const SalaryHistoryEntry({
     required this.id,

@@ -327,6 +327,314 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
     _loadAttendanceForSelectedMonth();
   }
 
+  String _employeeInitials(String name) {
+    final parts = name
+        .split(RegExp(r'\s+'))
+        .where((part) => part.trim().isNotEmpty)
+        .take(2)
+        .map((part) => part.trim()[0].toUpperCase())
+        .toList();
+    if (parts.isEmpty) {
+      return 'U';
+    }
+    return parts.join();
+  }
+
+  List<_SalaryIncentiveRow> _selectedMonthIncentives() {
+    return _incentives
+        .where(
+          (item) =>
+              item.date.year == _selectedMonth.year &&
+              item.date.month == _selectedMonth.month,
+        )
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  Future<void> _showAddIncentiveDialog() async {
+    final amountController = TextEditingController();
+    final reasonController = TextEditingController();
+    bool isSaving = false;
+
+    Widget fieldLabel(String text) {
+      return Text(
+        text,
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+    }
+
+    InputDecoration fieldDecoration({
+      String? hintText,
+      String? prefixText,
+    }) {
+      return InputDecoration(
+        hintText: hintText,
+        prefixText: prefixText,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primary),
+        ),
+        isDense: true,
+      );
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final monthLabel = DateFormat('MMMM yyyy').format(_selectedMonth);
+            final initials = _employeeInitials(widget.name);
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 12, 16),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Add Incentive',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: isSaving
+                                ? null
+                                : () => Navigator.of(dialogContext).pop(),
+                            icon: const Icon(Icons.close),
+                            color: AppColors.textSecondary,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 22, 24, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFFBF3),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: const Color(0xFF1684F8),
+                                    child: Text(
+                                      initials,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          widget.name,
+                                          style: const TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          monthLabel,
+                                          style: const TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            fieldLabel('Amount (Rs.)'),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: amountController,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              decoration: fieldDecoration(
+                                hintText: 'Enter amount',
+                                prefixText: 'Rs.  ',
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            fieldLabel('Reason'),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: reasonController,
+                              minLines: 4,
+                              maxLines: 5,
+                              decoration: fieldDecoration(
+                                hintText:
+                                    'e.g. Closed 5 deals in June - exceeded target',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: isSaving
+                                ? null
+                                : () => Navigator.of(dialogContext).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 10),
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF86E7A5),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 13,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    final amount =
+                                        double.tryParse(amountController.text.trim()) ??
+                                            0;
+                                    final reason = reasonController.text.trim();
+                                    if (amount <= 0) {
+                                      ScaffoldMessenger.of(context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Enter a valid incentive amount.',
+                                            ),
+                                          ),
+                                        );
+                                      return;
+                                    }
+                                    if (reason.isEmpty) {
+                                      ScaffoldMessenger.of(context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Enter a reason for the incentive.',
+                                            ),
+                                          ),
+                                        );
+                                      return;
+                                    }
+
+                                    setModalState(() => isSaving = true);
+                                    try {
+                                      final result =
+                                          await _authProvider.salaryAddIncentive(
+                                        userId: widget.userId,
+                                        month: _selectedMonth.month,
+                                        year: _selectedMonth.year,
+                                        amount: amount,
+                                        reason: reason,
+                                        token: _authProvider.currentAuthToken,
+                                      );
+                                      if (!mounted) return;
+                                      Navigator.of(dialogContext).pop();
+                                      await _loadSalaryInfo();
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(this.context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          SnackBar(content: Text(result.message)),
+                                        );
+                                    } catch (error) {
+                                      if (!mounted) return;
+                                      setModalState(() => isSaving = false);
+                                      ScaffoldMessenger.of(context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              AppErrorHandler.friendlyMessage(error),
+                                            ),
+                                          ),
+                                        );
+                                    }
+                                  },
+                            icon: isSaving
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.add, size: 18),
+                            label: Text(isSaving ? 'Adding...' : 'Add'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    amountController.dispose();
+    reasonController.dispose();
+  }
+
   static String _currency(double value) {
     return 'Rs. ${NumberFormat('#,##,##0.00').format(value)}';
   }
@@ -903,31 +1211,51 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
   }
 
   Widget _incentivesList(String monthLabel) {
-    if (_incentives.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(14),
-        child: Text(
-          'No incentives found.',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-      );
-    }
+    final incentives = _selectedMonthIncentives();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Incentives for $monthLabel',
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Incentives for $monthLabel',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: _showAddIncentiveDialog,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF86E7A5),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text(
+                  'Add Incentive',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
-          ..._incentives.map(_incentiveTile),
+          if (incentives.isEmpty)
+            const Text(
+              'No incentives found for selected month.',
+              style: TextStyle(color: AppColors.textSecondary),
+            )
+          else
+            ...incentives.map(_incentiveTile),
         ],
       ),
     );

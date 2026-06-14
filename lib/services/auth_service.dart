@@ -912,6 +912,58 @@ class AuthService {
     }
   }
 
+  Future<List<SalaryHistoryEntry>> mySalaryHistory({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.mySalaryHistory}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'mySalaryHistory',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('mySalaryHistory', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch your salary history.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      dynamic source;
+      if (decoded is List) {
+        source = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is List) {
+          source = data;
+        } else if (data is Map) {
+          source =
+              data['history'] ?? data['items'] ?? data['rows'] ?? data['data'];
+        } else {
+          source = decoded['history'] ?? decoded['items'] ?? decoded['rows'];
+        }
+      }
+
+      if (source is List) {
+        return source
+            .whereType<Map>()
+            .map(_stringDynamicMap)
+            .map(SalaryHistoryEntry.fromMap)
+            .toList();
+      }
+    } catch (_) {}
+
+    throw Exception('My salary history response format is not valid.');
+  }
+
   Future<List<Map<String, dynamic>>> salaryIncentives({
     required String userId,
     String? token,
@@ -974,6 +1026,142 @@ class AuthService {
     } catch (_) {}
 
     throw Exception('Salary incentives response format is not valid.');
+  }
+
+  Future<List<Map<String, dynamic>>> myIncentives({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.myIncentives}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'myIncentives',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('myIncentives', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch your incentives.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      dynamic source;
+      if (decoded is List) {
+        source = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is List) {
+          source = data;
+        } else if (data is Map) {
+          source = data['incentives'] ??
+              data['items'] ??
+              data['rows'] ??
+              data['data'];
+        } else {
+          source = decoded['incentives'] ?? decoded['items'] ?? decoded['rows'];
+        }
+      }
+
+      if (source is List) {
+        return source
+            .whereType<Map>()
+            .map((item) => _stringDynamicMap(item))
+            .toList();
+      }
+    } catch (_) {}
+
+    throw Exception('My incentives response format is not valid.');
+  }
+
+  Future<SalaryIncentiveCreateResult> salaryAddIncentive({
+    required String userId,
+    required int month,
+    required int year,
+    required double amount,
+    required String reason,
+    String? token,
+  }) async {
+    final normalizedUserId = userId.trim();
+    final normalizedReason = reason.trim();
+    if (normalizedUserId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+    if (month < 1 || month > 12) {
+      throw Exception('Valid month is required.');
+    }
+    if (year <= 0) {
+      throw Exception('Valid year is required.');
+    }
+    if (amount <= 0) {
+      throw Exception('Valid amount is required.');
+    }
+    if (normalizedReason.isEmpty) {
+      throw Exception('Reason is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryIncentiveCreate}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode(<String, dynamic>{
+      'user_id': normalizedUserId,
+      'month': month,
+      'year': year,
+      'amount': amount,
+      'reason': normalizedReason,
+    });
+    _logRequest(
+      endpoint: 'salaryAddIncentive',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('salaryAddIncentive', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to add salary incentive.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Add incentive response format is not valid.');
+      }
+      final data = decoded['data'];
+      Map<String, dynamic> incentive = const {};
+      if (data is Map<String, dynamic>) {
+        final incentiveRaw =
+            data['incentive'] ?? data['item'] ?? data['row'] ?? data;
+        if (incentiveRaw is Map) {
+          incentive = _stringDynamicMap(incentiveRaw);
+        }
+      }
+      return SalaryIncentiveCreateResult(
+        message: decoded['message']?.toString().trim().isNotEmpty == true
+            ? decoded['message'].toString().trim()
+            : 'Incentive added successfully',
+        incentive: incentive,
+      );
+    } catch (_) {
+      throw Exception('Add incentive response format is not valid.');
+    }
   }
 
   Future<MySalaryResult> mySalary({

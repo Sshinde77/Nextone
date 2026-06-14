@@ -172,12 +172,38 @@ class AuthProvider {
     );
   }
 
+  Future<List<SalaryHistoryEntry>> mySalaryHistory({String? token}) {
+    return _authService.mySalaryHistory(token: token);
+  }
+
   Future<List<Map<String, dynamic>>> salaryIncentives({
     required String userId,
     String? token,
   }) {
     return _authService.salaryIncentives(
       userId: userId,
+      token: token,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> myIncentives({String? token}) {
+    return _authService.myIncentives(token: token);
+  }
+
+  Future<SalaryIncentiveCreateResult> salaryAddIncentive({
+    required String userId,
+    required int month,
+    required int year,
+    required double amount,
+    required String reason,
+    String? token,
+  }) {
+    return _authService.salaryAddIncentive(
+      userId: userId,
+      month: month,
+      year: year,
+      amount: amount,
+      reason: reason,
       token: token,
     );
   }

@@ -32,6 +32,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   bool _isLoadingMySalary = false;
   String? _mySalaryError;
   MySalaryResult? _mySalaryResult;
+  List<SalaryHistoryEntry> _mySalaryHistory = <SalaryHistoryEntry>[];
+  List<_MySalaryIncentiveRow> _myIncentives = <_MySalaryIncentiveRow>[];
   List<_MyDailyEarningRow> _myDailyEarningRows = <_MyDailyEarningRow>[];
   int _myDailyPresentFullCount = 0;
   int _myDailyPresentHalfCount = 0;
@@ -140,24 +142,35 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     });
     try {
       final int month = _mySalarySelectedMonth;
-      late final MySalaryResult result;
-      if (month == 0) {
-        result = await _authProvider.mySalary(
-          year: _selectedYear,
-          token: _authProvider.currentAuthToken,
-        );
-      } else {
-        result = await _authProvider.mySalary(
-          month: month,
-          year: _selectedYear,
-          token: _authProvider.currentAuthToken,
-        );
-      }
+      final futures = await Future.wait<dynamic>([
+        if (month == 0)
+          _authProvider.mySalary(
+            year: _selectedYear,
+            token: _authProvider.currentAuthToken,
+          )
+        else
+          _authProvider.mySalary(
+            month: month,
+            year: _selectedYear,
+            token: _authProvider.currentAuthToken,
+          ),
+        _authProvider.mySalaryHistory(token: _authProvider.currentAuthToken),
+        _authProvider.myIncentives(token: _authProvider.currentAuthToken),
+      ]);
+      final result = futures[0] as MySalaryResult;
+      final history = (futures[1] as List<SalaryHistoryEntry>)
+        ..sort((a, b) => _historyDateOf(b).compareTo(_historyDateOf(a)));
+      final incentives = (futures[2] as List<Map<String, dynamic>>)
+          .map(_mapMyIncentiveRow)
+          .toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
 
       final dayWise = await _buildMyDailyEarnings(result);
       if (!mounted) return;
       setState(() {
         _mySalaryResult = result;
+        _mySalaryHistory = history;
+        _myIncentives = incentives;
         _myDailyEarningRows = dayWise.rows;
         _myDailyPresentFullCount = dayWise.fullDays;
         _myDailyPresentHalfCount = dayWise.halfDays;
@@ -332,6 +345,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   Widget _buildOtherRoleBody() {
     final current = _mySalaryResult?.currentMonthlySalary;
     final slips = _mySalaryResult?.salarySlips ?? const <MySalarySlip>[];
+    final history = _filteredMySalaryHistory();
+    final incentives = _filteredMyIncentives();
     final latestSlip = slips.isNotEmpty ? slips.first : null;
     final perDay = current?.perDaySalary ?? latestSlip?.perDaySalary ?? 0;
     final effectiveFrom = current?.effectiveFrom;
@@ -430,8 +445,12 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     ),
                     if (_mySalaryTab == 0)
                       _mySalarySlipsList(slips)
+                    else if (_mySalaryTab == 1)
+                      _mySalaryDayWise(slips)
+                    else if (_mySalaryTab == 2)
+                      _mySalaryHistoryList(history)
                     else
-                      _mySalaryDayWise(slips),
+                      _myIncentivesList(incentives),
                   ],
                 ],
               ),
@@ -575,11 +594,16 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         color: const Color(0xFFECEFF4),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Row(
-        children: [
-          Expanded(child: _myTabButton('Salary Slips', 0)),
-          Expanded(child: _myTabButton('Day-wise Earnings', 1)),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _myTabButton('Salary Slips', 0),
+            _myTabButton('Day-wise Earnings', 1),
+            _myTabButton('Salary History', 2),
+            _myTabButton('Incentives', 3),
+          ],
+        ),
       ),
     );
   }
@@ -590,7 +614,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       onTap: () => setState(() => _mySalaryTab = index),
       child: Container(
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(vertical: 9),
+        margin: const EdgeInsets.only(right: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
           color: selected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
@@ -605,6 +630,77 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         ),
       ),
     );
+  }
+
+  DateTime _historyDateOf(SalaryHistoryEntry item) {
+    return item.effectiveFrom ?? item.createdAt ?? item.updatedAt ?? DateTime(1970, 1, 1);
+  }
+
+  String _readStringValue(dynamic value) {
+    if (value is String) return value.trim();
+    if (value is num || value is bool) return value.toString();
+    return '';
+  }
+
+  double _readDoubleValue(dynamic value, {double fallback = 0}) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value.trim()) ?? fallback;
+    return fallback;
+  }
+
+  DateTime _parseOptionalDateValue(dynamic value) {
+    if (value is String && value.trim().isNotEmpty) {
+      final parsed = DateTime.tryParse(value.trim());
+      if (parsed != null) {
+        return DateTime(parsed.year, parsed.month, parsed.day);
+      }
+    }
+    return DateTime.now();
+  }
+
+  _MySalaryIncentiveRow _mapMyIncentiveRow(Map<String, dynamic> json) {
+    final amount = _readDoubleValue(
+      json['amount'] ?? json['incentive_amount'] ?? json['incentive'] ?? json['value'],
+    );
+    final note = _readStringValue(
+      json['note'] ??
+          json['notes'] ??
+          json['description'] ??
+          json['reason'] ??
+          json['title'],
+    );
+    final date = _parseOptionalDateValue(
+      json['date'] ??
+          json['incentive_date'] ??
+          json['created_at'] ??
+          json['updated_at'],
+    );
+
+    return _MySalaryIncentiveRow(
+      id: _readStringValue(json['id'] ?? json['_id']),
+      amount: amount,
+      note: note.isEmpty ? 'Incentive' : note,
+      date: date,
+    );
+  }
+
+  List<SalaryHistoryEntry> _filteredMySalaryHistory() {
+    return _mySalaryHistory.where((item) {
+      final date = _historyDateOf(item);
+      final matchesYear = date.year == _selectedYear;
+      final matchesMonth = _mySalarySelectedMonth == 0 || date.month == _mySalarySelectedMonth;
+      return matchesYear && matchesMonth;
+    }).toList();
+  }
+
+  List<_MySalaryIncentiveRow> _filteredMyIncentives() {
+    return _myIncentives.where((item) {
+      final matchesYear = item.date.year == _selectedYear;
+      final matchesMonth = _mySalarySelectedMonth == 0 || item.date.month == _mySalarySelectedMonth;
+      return matchesYear && matchesMonth;
+    }).toList();
   }
 
   Widget _mySalarySlipsList(List<MySalarySlip> slips) {
@@ -1004,6 +1100,171 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _mySalaryHistoryList(List<SalaryHistoryEntry> history) {
+    if (history.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Text(
+          'No salary history for selected month/year.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return Column(
+      children: history.map((item) {
+        final effectiveDate = _historyDateOf(item);
+        final setter = item.setByName.trim().isEmpty ? 'Unknown' : item.setByName.trim();
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0F111827),
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2D7CFF), Color(0xFF4E46E5)],
+                  ),
+                ),
+                child: const Icon(Icons.currency_rupee, color: Colors.white, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _formatCurrency(item.monthlySalary),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Per day: ${_formatCurrency(item.perDaySalary ?? 0)}',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if ((item.notes ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        item.notes!.trim(),
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Text(
+                      'Effective ${_formatDate(effectiveDate)}',
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Set by $setter',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _myIncentivesList(List<_MySalaryIncentiveRow> incentives) {
+    if (incentives.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Text(
+          'No incentives for selected month/year.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return Column(
+      children: incentives.map((item) {
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFFBF3),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFD3F7DF)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _formatCurrency(item.amount),
+                      style: const TextStyle(
+                        color: Color(0xFF08A651),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      item.note,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                _formatDate(item.date),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -3811,6 +4072,20 @@ class _MyDailyEarningRow {
   final String timeLabel;
   final String hoursLabel;
   final double earned;
+}
+
+class _MySalaryIncentiveRow {
+  const _MySalaryIncentiveRow({
+    required this.id,
+    required this.amount,
+    required this.note,
+    required this.date,
+  });
+
+  final String id;
+  final double amount;
+  final String note;
+  final DateTime date;
 }
 
 class _MyDailyEarningSummary {
