@@ -335,6 +335,7 @@ class _HomePageState extends State<HomePage> {
               showProjects: RoleAccess.canViewProjects(_currentRole),
               showTeam: RoleAccess.canViewTeam(_currentRole),
               showUsers: RoleAccess.canViewUsers(_currentRole),
+              showNotifications: RoleAccess.canViewModule('notifications'),
               onDashboard: () {
                 _openMainTab(0);
               },
@@ -365,8 +366,19 @@ class _HomePageState extends State<HomePage> {
               onNotifications: () {
                 Navigator.pushNamed(context, '/notifications');
               },
+              onSalary: RoleAccess.canViewSalaryManagement(_currentRole)
+                  ? () {
+                      _openMainTab(9);
+                    }
+                  : null,
               onMore: () {},
               onLess: () {},
+              showSalary: RoleAccess.canViewSalaryManagement(_currentRole),
+              onClosures: RoleAccess.canViewModule('closures')
+                  ? () {
+                      _openMainTab(10);
+                    }
+                  : null,
             )
           : null,
     );

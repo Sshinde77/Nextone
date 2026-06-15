@@ -54,6 +54,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
 
   Future<void> _loadAccess() async {
     try {
+      await RoleAccess.currentPermissionSet(_authProvider);
       final profile =
           await _authProvider.profile(token: _authProvider.currentAuthToken);
       final role = RoleAccess.readRole(profile.data);
@@ -450,33 +451,18 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
 
   String? _resolvePerformanceUserId() {
     final selectedUserId = _memberId?.trim() ?? '';
-    final currentRole = RoleAccess.normalize(_currentRole);
     final currentUserId = _currentUserId.trim();
 
-    if (selectedUserId.isEmpty || currentRole.isEmpty) {
+    if (selectedUserId.isEmpty) {
       return null;
     }
 
-    if (RoleAccess.isSuperAdmin(currentRole) || RoleAccess.isAdmin(currentRole)) {
+    if (RoleAccess.canViewTeam(_currentRole) ||
+        RoleAccess.canViewUsers(_currentRole)) {
       return selectedUserId;
     }
 
-    if (RoleAccess.isSalesManager(currentRole)) {
-      final managerId = _firstNonEmpty(<dynamic>[
-        _memberData['manager_id'],
-        _memberData['managerId'],
-      ]);
-      if (selectedUserId == currentUserId || managerId == currentUserId) {
-        return selectedUserId;
-      }
-      return null;
-    }
-
-    if (currentRole == RoleAccess.salesExecutive) {
-      return currentUserId == selectedUserId ? selectedUserId : null;
-    }
-
-    return null;
+    return currentUserId == selectedUserId ? selectedUserId : null;
   }
 
   Widget _buildErrorCard(String message) {
@@ -1751,33 +1737,18 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
 
   String? _resolveTeamHistoryUserId() {
     final selectedUserId = _memberId?.trim() ?? '';
-    final currentRole = RoleAccess.normalize(_currentRole);
     final currentUserId = _currentUserId.trim();
 
-    if (selectedUserId.isEmpty || currentRole.isEmpty) {
+    if (selectedUserId.isEmpty) {
       return null;
     }
 
-    if (RoleAccess.isSuperAdmin(currentRole) || RoleAccess.isAdmin(currentRole)) {
+    if (RoleAccess.canViewTeam(_currentRole) ||
+        RoleAccess.canViewUsers(_currentRole)) {
       return selectedUserId;
     }
 
-    if (RoleAccess.isSalesManager(currentRole)) {
-      final managerId = _firstNonEmpty(<dynamic>[
-        _memberData['manager_id'],
-        _memberData['managerId'],
-      ]);
-      if (selectedUserId == currentUserId || managerId == currentUserId) {
-        return selectedUserId;
-      }
-      return null;
-    }
-
-    if (RoleAccess.isTierFour(currentRole)) {
-      return currentUserId.isEmpty ? null : currentUserId;
-    }
-
-    return null;
+    return currentUserId == selectedUserId ? selectedUserId : null;
   }
 
   String _firstNonEmpty(List<dynamic> values) {

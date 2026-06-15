@@ -109,8 +109,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     if (_lead == null) {
       return;
     }
-    final canViewByRole = RoleAccess.canViewLeadPhones(_currentRole);
-    if (canViewByRole) {
+    final canViewByPermission = RoleAccess.canViewLeadPhones(_currentRole);
+    if (canViewByPermission) {
       if (!mounted) return;
       setState(() {
         _hasPhoneAccess = true;

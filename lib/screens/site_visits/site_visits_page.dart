@@ -102,7 +102,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     _loadSiteVisits();
   }
 
-  bool get _canExportData => RoleAccess.canExportData(_currentRole);
+  bool get _canExportData => RoleAccess.canExportModule('site_visits');
 
   Future<void> _loadAccess() async {
     try {

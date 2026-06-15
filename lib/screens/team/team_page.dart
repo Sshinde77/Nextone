@@ -35,11 +35,11 @@ class _TeamPageState extends State<TeamPage> {
 
   final List<_TeamMember> _members = [];
 
-  bool get _canManageUsers => RoleAccess.canManageUsers(_currentRole);
-  bool get _canAssignManager =>
-      RoleAccess.canManageUsers(_currentRole) ||
-      RoleAccess.isSalesManager(_currentRole);
-  bool get _canExportData => RoleAccess.canExportData(_currentRole);
+  bool get _canCreateUsers => RoleAccess.canCreateUsers(_currentRole);
+  bool get _canEditUsers => RoleAccess.canEditUsers(_currentRole);
+  bool get _canDeleteUsers => RoleAccess.canDeleteUsers(_currentRole);
+  bool get _canAssignManager => RoleAccess.canAssignManager(_currentRole);
+  bool get _canExportData => RoleAccess.canExportModule('team');
   List<_RoleOption> get _assignableRoleOptions {
     return _roleOptions
         .where((role) => RoleAccess.canChangeRole(_currentRole, role.value))
@@ -184,7 +184,7 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Future<void> _openCreateMember() async {
-    if (!_canManageUsers) {
+    if (!_canCreateUsers) {
       _showSnackBar('You do not have permission to create users.');
       return;
     }
@@ -217,7 +217,7 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Future<void> _openEditMember(_TeamMember member) async {
-    if (!_canManageUsers) {
+    if (!_canEditUsers) {
       _showSnackBar('You do not have permission to edit users.');
       return;
     }
@@ -244,7 +244,7 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   Future<void> _deleteMember(_TeamMember member) async {
-    if (!RoleAccess.canDeactivate(_currentRole, member.rawRole)) {
+    if (!_canDeleteUsers) {
       _showSnackBar('You do not have permission to deactivate this user.');
       return;
     }
@@ -603,7 +603,7 @@ class _TeamPageState extends State<TeamPage> {
             isLoading: isAssigningManager,
           ),
         ],
-        if (_canManageUsers) ...[
+        if (_canEditUsers) ...[
           const SizedBox(width: 12),
           _buildCircleActionButton(
             Icons.edit_outlined,
@@ -620,7 +620,7 @@ class _TeamPageState extends State<TeamPage> {
             isLoading: isChangingRole,
           ),
         ],
-        if (RoleAccess.canDeactivate(_currentRole, member.rawRole)) ...[
+        if (_canDeleteUsers) ...[
           const SizedBox(width: 12),
           _buildCircleActionButton(
             Icons.delete_outline,
@@ -737,7 +737,7 @@ class _TeamPageState extends State<TeamPage> {
         //   ),
         //   const SizedBox(width: 8),
         // ],
-        if (_canManageUsers)
+        if (_canCreateUsers)
           FilledButton(
             onPressed: _openCreateMember,
             style: FilledButton.styleFrom(
@@ -791,7 +791,7 @@ class _TeamPageState extends State<TeamPage> {
               icon: Icons.person_add_alt_1_outlined,
               onTap: isBusy ? () {} : () => _openAssignManagerDialog(member),
             ),
-          if (_canManageUsers)
+          if (_canEditUsers)
             DataCardAction(
               icon: Icons.edit_outlined,
               onTap: isBusy ? () {} : () => _openEditMember(member),
@@ -801,7 +801,7 @@ class _TeamPageState extends State<TeamPage> {
               icon: Icons.manage_accounts_outlined,
               onTap: isBusy ? () {} : () => _openChangeRoleSheet(member),
             ),
-          if (RoleAccess.canDeactivate(_currentRole, member.rawRole))
+          if (_canDeleteUsers)
             DataCardAction(
               icon: Icons.delete_outline,
               color: AppColors.error,

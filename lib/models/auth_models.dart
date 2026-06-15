@@ -12,6 +12,60 @@ class AuthProfileResult {
   final String message;
 }
 
+class EffectivePermissionsResult {
+  const EffectivePermissionsResult({
+    required this.role,
+    required this.permissions,
+    required this.modules,
+    required this.permissionKeys,
+    required this.message,
+  });
+
+  const EffectivePermissionsResult.empty()
+      : role = '',
+        permissions = const <String, ModulePermissionSet>{},
+        modules = const <String>[],
+        permissionKeys = const <String>[],
+        message = '';
+
+  final String role;
+  final Map<String, ModulePermissionSet> permissions;
+  final List<String> modules;
+  final List<String> permissionKeys;
+  final String message;
+
+  bool can(String module, String action) {
+    final permissionSet = permissions[module.trim().toLowerCase()];
+    if (permissionSet == null) {
+      return false;
+    }
+    return permissionSet.can(action);
+  }
+
+  bool canAny(String module, List<String> actions) {
+    for (final action in actions) {
+      if (can(module, action)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool hasModuleAccess(String module) {
+    return canAny(module, const <String>['view', 'create', 'edit', 'delete', 'approve', 'export']);
+  }
+}
+
+class ModulePermissionSet {
+  const ModulePermissionSet(this.actions);
+
+  final Map<String, bool> actions;
+
+  bool can(String action) {
+    return actions[action.trim().toLowerCase()] ?? false;
+  }
+}
+
 class AuthTokenResult {
   const AuthTokenResult({
     required this.message,

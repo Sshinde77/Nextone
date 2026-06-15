@@ -90,7 +90,7 @@ class _AttendancePageState extends State<AttendancePage> {
     super.dispose();
   }
 
-  bool get _canExportData => RoleAccess.canExportData(_currentRole);
+  bool get _canExportData => RoleAccess.canExportModule('attendance');
 
   Future<void> _loadAccess() async {
     try {
@@ -3412,7 +3412,7 @@ class _AttendancePageState extends State<AttendancePage> {
                   ? const Color(0xFFE8F6EE)
                   : const Color(0xFFF9EAEC),
             ),
-            if (RoleAccess.hasFullAccess(_currentRole))
+            if (RoleAccess.canApproveModule('attendance'))
               _StatusCard(
                 title: 'Working Hours',
                 subtitle: 'Today so far',

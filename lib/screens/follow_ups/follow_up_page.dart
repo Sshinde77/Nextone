@@ -50,7 +50,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
     _loadFollowUps();
   }
 
-  bool get _canExportData => RoleAccess.canExportData(_currentRole);
+  bool get _canExportData => RoleAccess.canExportModule('follow_ups');
 
   Future<void> _loadAccess() async {
     try {

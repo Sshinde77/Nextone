@@ -53,11 +53,11 @@ class _UsersPageState extends State<UsersPage> {
     _loadUsers();
   }
 
-  bool get _canManageUsers => RoleAccess.canManageUsers(_currentRole);
-  bool get _canExportData => RoleAccess.canExportData(_currentRole);
-  bool get _canAssignManager =>
-      RoleAccess.canManageUsers(_currentRole) ||
-      RoleAccess.isSalesManager(_currentRole);
+  bool get _canCreateUsers => RoleAccess.canCreateUsers(_currentRole);
+  bool get _canEditUsers => RoleAccess.canEditUsers(_currentRole);
+  bool get _canDeleteUsers => RoleAccess.canDeleteUsers(_currentRole);
+  bool get _canExportData => RoleAccess.canExportModule('users');
+  bool get _canAssignManager => RoleAccess.canAssignManager(_currentRole);
 
   Future<void> _loadAccess() async {
     try {
@@ -133,7 +133,7 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _openCreateUser() async {
-    if (!_canManageUsers) {
+    if (!_canCreateUsers) {
       _showSnackBar('You do not have permission to create users.');
       return;
     }
@@ -146,7 +146,7 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _openEditUser(_UserItem user) async {
-    if (!_canManageUsers) {
+    if (!_canEditUsers) {
       _showSnackBar('You do not have permission to edit users.');
       return;
     }
@@ -169,7 +169,7 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _deleteUser(_UserItem user) async {
-    if (!RoleAccess.canDeactivate(_currentRole, user.rawRole)) {
+    if (!_canDeleteUsers) {
       _showSnackBar('You do not have permission to deactivate this user.');
       return;
     }
@@ -427,7 +427,7 @@ class _UsersPageState extends State<UsersPage> {
                     //         : const Icon(Icons.download_rounded, size: 16),
                     //     label: const Text('Export'),
                     //   ),
-                    if (_canManageUsers)
+                    if (_canCreateUsers)
                       FilledButton.icon(
                         onPressed: _openCreateUser,
                         icon: const Icon(Icons.person_add_alt_1_rounded,
@@ -536,12 +536,12 @@ class _UsersPageState extends State<UsersPage> {
               icon: Icons.person_add_alt_1_outlined,
               onTap: isAssigning ? () {} : () => _openAssignManagerDialog(user),
             ),
-          if (_canManageUsers)
+          if (_canEditUsers)
             DataCardAction(
               icon: Icons.edit_outlined,
               onTap: isAssigning ? () {} : () => _openEditUser(user),
             ),
-          if (RoleAccess.canDeactivate(_currentRole, user.rawRole) &&
+          if (_canDeleteUsers &&
               user.status != 'Inactive')
             DataCardAction(
               icon: Icons.delete_outline,

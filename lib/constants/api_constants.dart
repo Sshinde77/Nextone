@@ -17,6 +17,7 @@ class ApiConstants {
   static const String edituser = '/users/{id}';
   static const String edituserrole = '/users/{id}/role';
   static const String assignUserManager = '/users/{id}/assign-manager';
+  static const String myPermissions = '/users/me/permissions';
   static const String userPerformance = '/users/{id}/performance';
   static const String teamHistoryLeads = '/team-history/{userId}/leads';
   static const String teamHistoryFollowUps =

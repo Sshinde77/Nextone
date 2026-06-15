@@ -115,8 +115,8 @@ class _LeadsPageState extends State<LeadsPage> {
     _loadLeads();
   }
 
-  bool get _canExportData => RoleAccess.canExportData(_currentRole);
-  bool get _canUseBulkLeadTools => RoleAccess.canExportData(_currentRole);
+  bool get _canExportData => RoleAccess.canExportModule('leads');
+  bool get _canUseBulkLeadTools => RoleAccess.canCreateModule('leads');
 
   Future<void> _loadAccess() async {
     try {
@@ -302,7 +302,7 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Future<void> _loadPhoneAccessForCurrentPage(List<_LeadModel> leads) async {
-    if (RoleAccess.hasFullAccess(_currentRole)) {
+    if (RoleAccess.canViewLeadPhones(_currentRole)) {
       if (!mounted) return;
       setState(() {
         _leadPhoneAccessById.clear();
@@ -1158,7 +1158,7 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Future<void> _handleCallAction(_LeadModel lead) async {
-    if (RoleAccess.hasFullAccess(_currentRole)) {
+    if (RoleAccess.canViewLeadPhones(_currentRole)) {
       await _callLead(_callPhoneForLead(lead));
       return;
     }
@@ -2786,8 +2786,7 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   bool get _canSeeFullLeadPhone {
-    final role = RoleAccess.normalize(_currentRole);
-    return role == RoleAccess.superAdmin || role == RoleAccess.admin;
+    return RoleAccess.canViewLeadPhones(_currentRole);
   }
 
   Widget? _phoneRevealAction(_LeadModel lead) {

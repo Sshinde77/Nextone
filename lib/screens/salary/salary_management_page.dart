@@ -48,8 +48,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   int _selectedYear = DateTime.now().year;
   int _selectedTab = 0;
 
-  bool get _isAdminSalaryView =>
-      RoleAccess.isAdmin(_currentRole) || RoleAccess.isSuperAdmin(_currentRole);
+  bool get _isAdminSalaryView => RoleAccess.canManageSalary(_currentRole);
 
   @override
   void initState() {
@@ -61,7 +60,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     try {
       final role = await RoleAccess.currentRole(_authProvider);
       if (!mounted) return;
-      final isAdmin = RoleAccess.isAdmin(role) || RoleAccess.isSuperAdmin(role);
+      final isAdmin = RoleAccess.canManageSalary(role);
       setState(() {
         _currentRole = role;
         _isLoadingAccess = false;

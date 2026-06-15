@@ -1,4 +1,5 @@
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/models/auth_models.dart';
 
 class RoleAccess {
   static const String superAdmin = 'super_admin';
@@ -20,6 +21,9 @@ class RoleAccess {
     salesExecutive,
     externalCaller,
   ];
+
+  static EffectivePermissionsResult _permissions =
+      const EffectivePermissionsResult.empty();
 
   static String normalize(String value) {
     return value.trim().toLowerCase().replaceAll(' ', '_');
@@ -50,80 +54,166 @@ class RoleAccess {
     return normalized == salesExecutive || normalized == externalCaller;
   }
 
-  static bool hasFullAccess(String role) {
-    final normalized = normalize(role);
-    return normalized == superAdmin || normalized == admin;
+  static EffectivePermissionsResult get currentPermissions => _permissions;
+
+  static Future<EffectivePermissionsResult> currentPermissionSet(
+    AuthProvider authProvider, {
+    bool forceRefresh = false,
+  }) async {
+    final permissions = await authProvider.myPermissions(
+      token: authProvider.currentAuthToken,
+      forceRefresh: forceRefresh,
+    );
+    _permissions = permissions;
+    return permissions;
   }
 
-  static bool canManageUsers(String role) => hasFullAccess(role);
-  static bool canManageProjects(String role) => hasFullAccess(role);
-  static bool canExportData(String role) => hasFullAccess(role);
-  static bool canViewProjects(String role) => hasFullAccess(role);
+  static bool hasFullAccess(String role) => canApprovePhoneRequests(role);
+
+  static bool canViewModule(String module) => _permissions.can(module, 'view');
+  static bool canCreateModule(String module) => _permissions.can(module, 'create');
+  static bool canEditModule(String module) => _permissions.can(module, 'edit');
+  static bool canDeleteModule(String module) => _permissions.can(module, 'delete');
+  static bool canApproveModule(String module) =>
+      _permissions.can(module, 'approve');
+  static bool canExportModule(String module) => _permissions.can(module, 'export');
+
+  static bool canManageUsers(String role) {
+    final _ = role;
+    return _permissions.canAny(
+      'users',
+      const <String>['create', 'edit', 'delete', 'approve'],
+    );
+  }
+
+  static bool canCreateUsers(String role) {
+    final _ = role;
+    return _permissions.can('users', 'create');
+  }
+
+  static bool canEditUsers(String role) {
+    final _ = role;
+    return _permissions.can('users', 'edit');
+  }
+
+  static bool canDeleteUsers(String role) {
+    final _ = role;
+    return _permissions.can('users', 'delete');
+  }
+
+  static bool canAssignManager(String role) {
+    final _ = role;
+    return _permissions.canAny(
+      'users',
+      const <String>['edit', 'approve'],
+    );
+  }
+
+  static bool canManageProjects(String role) {
+    final _ = role;
+    return _permissions.canAny(
+      'projects',
+      const <String>['create', 'edit', 'delete'],
+    );
+  }
+
+  static bool canCreateProjects(String role) {
+    final _ = role;
+    return _permissions.can('projects', 'create');
+  }
+
+  static bool canEditProjects(String role) {
+    final _ = role;
+    return _permissions.can('projects', 'edit');
+  }
+
+  static bool canDeleteProjects(String role) {
+    final _ = role;
+    return _permissions.can('projects', 'delete');
+  }
+
+  static bool canViewProjects(String role) {
+    final _ = role;
+    return _permissions.can('projects', 'view');
+  }
+
   static bool canViewUsers(String role) {
-    final normalized = normalize(role);
-    return hasFullAccess(normalized) || normalized == salesManager;
+    final _ = role;
+    return _permissions.can('users', 'view');
   }
 
   static bool canViewTeam(String role) {
-    final normalized = normalize(role);
-    return hasFullAccess(normalized) || normalized == salesManager;
+    final _ = role;
+    return _permissions.can('team', 'view');
   }
 
   static bool canViewLeadPhones(String role) {
-    final normalized = normalize(role);
-    return hasFullAccess(normalized);
+    final _ = role;
+    return canApprovePhoneRequests(role);
+  }
+
+  static bool canApprovePhoneRequests(String role) {
+    final _ = role;
+    return _permissions.can('phone_requests', 'approve');
   }
 
   static bool canViewSalaryManagement(String role) {
     final _ = role;
-    return true;
+    return _permissions.can('salary', 'view');
+  }
+
+  static bool canManageSalary(String role) {
+    final _ = role;
+    return _permissions.canAny(
+      'salary',
+      const <String>['create', 'edit', 'delete', 'approve', 'export'],
+    );
   }
 
   static bool canChangeRole(String currentRole, String targetRole) {
-    final current = normalize(currentRole);
     final target = normalize(targetRole);
-    if (target == superAdmin) {
-      return false;
-    }
-    if (current == superAdmin) {
-      return target != superAdmin;
-    }
-    if (current == admin) {
-      return adminAssignableRoles.contains(target);
-    }
-    return false;
+    final _ = currentRole;
+    return target.isNotEmpty &&
+        (canCreateUsers(currentRole) || canEditUsers(currentRole));
   }
 
   static bool canDeactivate(String currentRole, String targetRole) {
-    return hasFullAccess(currentRole) && normalize(targetRole) != superAdmin;
+    final _ = targetRole;
+    return canDeleteUsers(currentRole);
   }
 
   static bool canAccessMainTab(String role, int index) {
+    final _ = role;
     switch (index) {
       case 0:
+        return canViewModule('dashboard');
       case 1:
+        return canViewModule('leads');
       case 2:
+        return canViewModule('follow_ups');
       case 3:
+        return canViewModule('site_visits');
       case 4:
-      case 7:
-      case 9:
-      case 10:
-        return true;
+        return canViewModule('revisits');
       case 5:
         return canViewProjects(role);
       case 6:
         return canViewTeam(role);
+      case 7:
+        return canViewModule('attendance');
       case 8:
         return canViewUsers(role);
+      case 9:
+        return canViewSalaryManagement(role);
+      case 10:
+        return canViewModule('closures');
       default:
         return false;
     }
   }
 
   static Future<String> currentRole(AuthProvider authProvider) async {
-    final profile = await authProvider.profile(
-      token: authProvider.currentAuthToken,
-    );
-    return readRole(profile.data);
+    final permissions = await currentPermissionSet(authProvider);
+    return permissions.role;
   }
 }

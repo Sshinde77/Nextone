@@ -13,6 +13,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AuthService {
   static String? _authToken;
   static String? _refreshToken;
+  static EffectivePermissionsResult _currentPermissions =
+      const EffectivePermissionsResult.empty();
   static const String _authTokenStorageKey = 'auth_token';
   static const String _refreshTokenStorageKey = 'refresh_token';
   static const Duration _requestTimeout = Duration(seconds: 45);
@@ -25,6 +27,7 @@ class AuthService {
   }
 
   static String? get currentAuthToken => _authToken;
+  static EffectivePermissionsResult get currentPermissions => _currentPermissions;
 
   static Future<bool> hasPersistedSession() async {
     if (_authToken != null && _authToken!.trim().isNotEmpty) {
@@ -93,6 +96,11 @@ class AuthService {
     final error = _handleResponse(response, fallbackMessage: 'Login failed.');
     if (error == null) {
       await _storeTokensFromResponse(response.body);
+      try {
+        await myPermissions(forceRefresh: true);
+      } catch (_) {
+        // Keep login successful even if permission prefetch fails.
+      }
     }
 
     return error;
@@ -254,6 +262,58 @@ class AuthService {
     }
 
     throw Exception('Profile response is not valid JSON.');
+  }
+
+  Future<EffectivePermissionsResult> myPermissions({
+    String? token,
+    bool forceRefresh = false,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    if (!forceRefresh &&
+        resolvedToken == _authToken &&
+        (_currentPermissions.role.isNotEmpty ||
+            _currentPermissions.permissions.isNotEmpty)) {
+      return _currentPermissions;
+    }
+
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.myPermissions}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'myPermissions',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+    final response = await http
+        .get(
+          uri,
+          headers: headers,
+        )
+        .timeout(_requestTimeout);
+    _logResponse('myPermissions', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch permissions.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      if (body is! Map<String, dynamic>) {
+        throw Exception('Permissions response is not valid JSON.');
+      }
+      final result = _effectivePermissionsResultFromBody(body);
+      if (resolvedToken == _authToken) {
+        _currentPermissions = result;
+      }
+      return result;
+    } catch (_) {
+      throw Exception('Permissions response is not valid JSON.');
+    }
   }
 
   Future<AuthTokenResult> refreshToken({String? refreshToken}) async {
@@ -6309,6 +6369,7 @@ class AuthService {
       final result = _tokenResultFromBody(body);
       _authToken = result.accessToken ?? _authToken;
       _refreshToken = result.refreshToken ?? _refreshToken;
+      _currentPermissions = const EffectivePermissionsResult.empty();
       await _persistTokens();
     } catch (_) {
       return;
@@ -6360,6 +6421,58 @@ class AuthService {
   String? _readMessage(Map<String, dynamic> body) {
     final message = body['message'] ?? body['error'] ?? body['detail'];
     return message is String ? message : null;
+  }
+
+  EffectivePermissionsResult _effectivePermissionsResultFromBody(
+    Map<String, dynamic> body,
+  ) {
+    final payload = body['data'];
+    final data = payload is Map<String, dynamic> ? payload : body;
+    final permissionsMap = <String, ModulePermissionSet>{};
+    final rawPermissions = data['permissions'];
+
+    if (rawPermissions is Map) {
+      for (final entry in rawPermissions.entries) {
+        final moduleKey = entry.key.toString().trim().toLowerCase();
+        final rawModulePermissions = entry.value;
+        if (moduleKey.isEmpty || rawModulePermissions is! Map) {
+          continue;
+        }
+        final actions = <String, bool>{};
+        for (final actionEntry in rawModulePermissions.entries) {
+          final actionKey = actionEntry.key.toString().trim().toLowerCase();
+          if (actionKey.isEmpty) {
+            continue;
+          }
+          final rawValue = actionEntry.value;
+          final isAllowed = rawValue is bool
+              ? rawValue
+              : (rawValue is num
+                  ? rawValue != 0
+                  : rawValue.toString().trim().toLowerCase() == 'true');
+          actions[actionKey] = isAllowed;
+        }
+        permissionsMap[moduleKey] = ModulePermissionSet(actions);
+      }
+    }
+
+    List<String> _readStringList(dynamic value) {
+      if (value is! List) {
+        return const <String>[];
+      }
+      return value
+          .map((item) => item.toString().trim().toLowerCase())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+
+    return EffectivePermissionsResult(
+      role: (data['role'] ?? '').toString().trim().toLowerCase(),
+      permissions: permissionsMap,
+      modules: _readStringList(data['modules']),
+      permissionKeys: _readStringList(data['permission_keys']),
+      message: _readMessage(body) ?? 'Effective permissions fetched.',
+    );
   }
 
   Future<LeadsListResult> _teamHistoryList({
@@ -7420,6 +7533,7 @@ class AuthService {
   Future<void> _clearTokens() async {
     _authToken = null;
     _refreshToken = null;
+    _currentPermissions = const EffectivePermissionsResult.empty();
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_authTokenStorageKey);
     await preferences.remove(_refreshTokenStorageKey);

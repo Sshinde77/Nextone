@@ -127,6 +127,7 @@ class _MainScreenState extends State<MainScreen> {
           showTeam: RoleAccess.canViewTeam(_currentRole),
           showUsers: RoleAccess.canViewUsers(_currentRole),
           showSalary: RoleAccess.canViewSalaryManagement(_currentRole),
+          showNotifications: RoleAccess.canViewModule('notifications'),
           onDashboard: () => _setIndex(0),
           onLeads: () => _setIndex(1),
           onFollowUps: () => _setIndex(2),
@@ -140,7 +141,9 @@ class _MainScreenState extends State<MainScreen> {
           onSalary: () => _setIndex(9),
           onMore: () {},
           onLess: () {},
-          onClosures: () => _setIndex(10),
+          onClosures: RoleAccess.canViewModule('closures')
+              ? () => _setIndex(10)
+              : null,
         ),
       ),
     );

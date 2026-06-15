@@ -57,7 +57,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
   int _perPage = 10;
   int _totalItems = 0;
 
-  bool get _canManageProjects => RoleAccess.canManageProjects(_currentRole);
+  bool get _canCreateProjects => RoleAccess.canCreateProjects(_currentRole);
+  bool get _canEditProjects => RoleAccess.canEditProjects(_currentRole);
+  bool get _canDeleteProjects => RoleAccess.canDeleteProjects(_currentRole);
 
   @override
   void initState() {
@@ -422,7 +424,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
         //   ),
         //   const SizedBox(width: 8),
         // ],
-        if (_canManageProjects)
+        if (_canCreateProjects)
           FilledButton(
             onPressed: _openCreateProject,
             style: FilledButton.styleFrom(
@@ -478,12 +480,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
             icon: Icons.download_outlined,
             onTap: () => _openDownloadTypeSheet(project),
           ),
-          if (_canManageProjects)
+          if (_canEditProjects)
             DataCardAction(
               icon: Icons.edit_outlined,
               onTap: () => _openEditProject(project),
             ),
-          if (_canManageProjects)
+          if (_canDeleteProjects)
             DataCardAction(
               icon: Icons.delete_outline,
               color: AppColors.error,
@@ -528,7 +530,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Future<void> _openCreateProject() async {
-    if (!_canManageProjects) {
+    if (!_canCreateProjects) {
       _showSnackBar('You do not have permission to create projects.');
       return;
     }
@@ -541,7 +543,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Future<void> _openEditProject(_Project project) async {
-    if (!_canManageProjects) {
+    if (!_canEditProjects) {
       _showSnackBar('You do not have permission to edit projects.');
       return;
     }
@@ -565,7 +567,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Future<void> _deleteProject(_Project project) async {
-    if (!_canManageProjects) {
+    if (!_canDeleteProjects) {
       _showSnackBar('You do not have permission to delete projects.');
       return;
     }

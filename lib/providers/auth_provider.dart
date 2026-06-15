@@ -9,6 +9,8 @@ class AuthProvider {
   final AuthService _authService;
 
   String? get currentAuthToken => AuthService.currentAuthToken;
+  EffectivePermissionsResult get currentPermissions =>
+      AuthService.currentPermissions;
 
   Future<String?> login({
     required String email,
@@ -48,6 +50,10 @@ class AuthProvider {
 
   Future<AuthProfileResult> profile({String? token}) {
     return _authService.profile(token: token);
+  }
+
+  Future<EffectivePermissionsResult> myPermissions({String? token, bool forceRefresh = false}) {
+    return _authService.myPermissions(token: token, forceRefresh: forceRefresh);
   }
 
   Future<AuthTokenResult> refreshToken({String? refreshToken}) {
