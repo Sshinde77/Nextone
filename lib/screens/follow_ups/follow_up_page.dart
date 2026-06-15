@@ -9,6 +9,7 @@ import 'package:nextone/screens/follow_ups/follow_up_detail_page.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
@@ -113,6 +114,15 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   Future<void> _openCreateFollowUp() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'follow_ups',
+      action: 'create',
+      moduleLabel: 'follow-ups',
+    );
+    if (!allowed) return;
+
     final payload = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(builder: (_) => const FollowUpFormPage()),
     );
@@ -134,6 +144,15 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   Future<void> _openEditFollowUp(_FollowUpModel followUp) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'follow_ups',
+      action: 'edit',
+      moduleLabel: 'follow-ups',
+    );
+    if (!allowed) return;
+
     final due = _combineDueDateTime(followUp.dueDate, followUp.dueTime);
     final payload = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
@@ -170,6 +189,15 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   Future<void> _openBulkSiteVisitForm() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'create',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
     final selectedFollowUps = _followUps
         .where((followUp) => _selectedFollowUpIds.contains(followUp.id))
         .toList(growable: false);
@@ -214,6 +242,15 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   Future<void> _deleteFollowUp(_FollowUpModel followUp) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'follow_ups',
+      action: 'delete',
+      moduleLabel: 'follow-ups',
+    );
+    if (!allowed) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -284,6 +321,15 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   Future<void> _confirmAndCompleteFollowUp(_FollowUpModel followUp) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'follow_ups',
+      action: 'edit',
+      moduleLabel: 'follow-ups',
+    );
+    if (!allowed) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -449,7 +495,6 @@ class _FollowUpPageState extends State<FollowUpPage> {
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
-
 
   List<_FollowUpModel> get _currentPageFollowUps => _followUps;
 
@@ -1094,7 +1139,6 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 }
 
-
 class _ProfileAvatar extends StatelessWidget {
   const _ProfileAvatar({
     required this.imageUrl,
@@ -1233,4 +1277,3 @@ class _TeamOption {
   final String id;
   final String label;
 }
-

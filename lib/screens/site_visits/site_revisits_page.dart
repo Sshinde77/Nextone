@@ -3,6 +3,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/site_visits/site_revisit_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/site_revisit_data_card.dart';
 
@@ -449,6 +450,15 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   }
 
   Future<void> _openScheduleRevisit() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'revisits',
+      action: 'create',
+      moduleLabel: 're-visits',
+    );
+    if (!allowed) return;
+
     final created = await _showScheduleRevisitDialog();
     if (created != true || !mounted) return;
     await _loadRevisits();
@@ -551,8 +561,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
                   ..showSnackBar(
-                    SnackBar(
-                        content: Text(AppErrorHandler.friendlyMessage(e))),
+                    SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
                   );
               }
             }

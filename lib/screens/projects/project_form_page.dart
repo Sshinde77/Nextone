@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/permission_guard.dart';
 
 class ProjectFormPage extends StatefulWidget {
   const ProjectFormPage({
@@ -122,6 +123,15 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   }
 
   Future<void> _submit() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'projects',
+      action: widget.isEditMode ? 'edit' : 'create',
+      moduleLabel: 'projects',
+    );
+    if (!allowed) return;
+
     final form = _formKey.currentState;
     if (form == null || !form.validate()) {
       return;

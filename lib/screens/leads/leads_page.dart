@@ -12,6 +12,7 @@ import 'package:nextone/screens/leads/lead_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
@@ -1064,6 +1065,15 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Future<void> _openCreateLead() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'create',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
     final created = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const LeadFormPage()),
     );
@@ -1074,6 +1084,15 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Future<void> _openEditLead(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
     final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => LeadFormPage(
@@ -1377,6 +1396,15 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Future<void> _openBulkFollowUpForm() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'follow_ups',
+      action: 'create',
+      moduleLabel: 'follow-ups',
+    );
+    if (!allowed) return;
+
     final selectedIds = _selectedLeadIds.toList(growable: false);
     if (selectedIds.isEmpty) {
       _showSnackBar('Select at least one lead.');
@@ -1402,6 +1430,15 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Future<void> _openBulkSiteVisitForm() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'create',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
     final selectedIds = _selectedLeadIds.toList(growable: false);
     if (selectedIds.isEmpty) {
       _showSnackBar('Select at least one lead.');
@@ -1427,6 +1464,15 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Future<void> _openReassignSheet(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
     if (_assigneeOptions.isEmpty) {
       _showSnackBar('No active assignee available.');
       return;
@@ -2117,6 +2163,8 @@ class _LeadsPageState extends State<LeadsPage> {
           style: OutlinedButton.styleFrom(
             fixedSize: const Size.fromHeight(48),
             padding: const EdgeInsets.symmetric(horizontal: 10),
+            side: const BorderSide(color: AppColors.border),
+            backgroundColor: AppColors.card,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -2161,6 +2209,8 @@ class _LeadsPageState extends State<LeadsPage> {
                 style: OutlinedButton.styleFrom(
                   fixedSize: const Size.fromHeight(48),
                   padding: const EdgeInsets.symmetric(horizontal: 10),
+                  side: const BorderSide(color: AppColors.border),
+                  backgroundColor: AppColors.card,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -2183,6 +2233,8 @@ class _LeadsPageState extends State<LeadsPage> {
           style: OutlinedButton.styleFrom(
             fixedSize: const Size.fromHeight(48),
             padding: const EdgeInsets.symmetric(horizontal: 10),
+            side: const BorderSide(color: AppColors.border),
+            backgroundColor: AppColors.card,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),

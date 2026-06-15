@@ -20,11 +20,16 @@ class CRMAppBottomNav extends StatefulWidget {
   final int? leadsBadgeCount;
   final int? followUpsBadgeCount;
   final double height;
+  final bool showLeads;
+  final bool showFollowUps;
+  final bool showSiteVisits;
+  final bool showRevisits;
   final bool showProjects;
   final bool showTeam;
   final bool showUsers;
   final bool showNotifications;
   final bool showSalary;
+  final bool showAttendance;
 
   const CRMAppBottomNav({
     super.key,
@@ -46,11 +51,16 @@ class CRMAppBottomNav extends StatefulWidget {
     this.leadsBadgeCount,
     this.followUpsBadgeCount,
     this.height = 76,
+    this.showLeads = true,
+    this.showFollowUps = true,
+    this.showSiteVisits = true,
+    this.showRevisits = true,
     this.showProjects = true,
     this.showTeam = true,
     this.showUsers = true,
     this.showNotifications = true,
     this.showSalary = false,
+    this.showAttendance = true,
   });
 
   @override
@@ -73,6 +83,14 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
         icon: Icons.dashboard_outlined,
         onTap: widget.onDashboard,
       ),
+      if (widget.showLeads)
+        _NavEntry(
+          index: 1,
+          label: 'Leads',
+          icon: Icons.people_alt_outlined,
+          onTap: widget.onLeads,
+          badgeCount: widget.leadsBadgeCount,
+        ),
       if (widget.showProjects)
         _NavEntry(
           index: 5,
@@ -80,32 +98,28 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           icon: Icons.apartment_outlined,
           onTap: widget.onProjects,
         ),
-      _NavEntry(
-        index: 1,
-        label: 'Leads',
-        icon: Icons.people_alt_outlined,
-        onTap: widget.onLeads,
-        badgeCount: widget.leadsBadgeCount,
-      ),
-      _NavEntry(
-        index: 2,
-        label: 'Follow-Ups',
-        icon: Icons.check_circle_outline,
-        onTap: widget.onFollowUps,
-        badgeCount: widget.followUpsBadgeCount,
-      ),
-      _NavEntry(
-        index: 3,
-        label: 'Site Visits',
-        icon: Icons.location_on_outlined,
-        onTap: widget.onSiteVisits,
-      ),
-      _NavEntry(
-        index: 4,
-        label: 'Re-visits',
-        icon: Icons.repeat_rounded,
-        onTap: widget.onRevisits,
-      ),
+      if (widget.showFollowUps)
+        _NavEntry(
+          index: 2,
+          label: 'Follow-Ups',
+          icon: Icons.check_circle_outline,
+          onTap: widget.onFollowUps,
+          badgeCount: widget.followUpsBadgeCount,
+        ),
+      if (widget.showSiteVisits)
+        _NavEntry(
+          index: 3,
+          label: 'Site Visits',
+          icon: Icons.location_on_outlined,
+          onTap: widget.onSiteVisits,
+        ),
+      if (widget.showRevisits)
+        _NavEntry(
+          index: 4,
+          label: 'Re-visits',
+          icon: Icons.repeat_rounded,
+          onTap: widget.onRevisits,
+        ),
       if (widget.onClosures != null)
         _NavEntry(
           index: 10,
@@ -113,12 +127,13 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           icon: Icons.verified_outlined,
           onTap: widget.onClosures!,
         ),
-      _NavEntry(
-        index: 7,
-        label: 'Attendance',
-        icon: Icons.fact_check,
-        onTap: widget.onReports,
-      ),
+      if (widget.showAttendance)
+        _NavEntry(
+          index: 7,
+          label: 'Attendance',
+          icon: Icons.fact_check,
+          onTap: widget.onReports,
+        ),
       if (widget.showSalary && widget.onSalary != null)
         _NavEntry(
           index: 9,
@@ -185,10 +200,12 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
     if (moreContext == null) return null;
 
     final buttonBox = moreContext.findRenderObject() as RenderBox?;
-    final overlayBox = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final overlayBox =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (buttonBox == null || overlayBox == null) return null;
 
-    final buttonTopLeft = buttonBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final buttonTopLeft =
+        buttonBox.localToGlobal(Offset.zero, ancestor: overlayBox);
     final screenSize = MediaQuery.sizeOf(context);
     final isSmallScreen = screenSize.width < 360;
     final iconSize = isSmallScreen ? 18.0 : 21.0;
@@ -222,7 +239,8 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
       320.0,
     );
 
-    final menuLeft = (buttonTopLeft.dx + buttonBox.size.width - panelWidth).clamp(
+    final menuLeft =
+        (buttonTopLeft.dx + buttonBox.size.width - panelWidth).clamp(
       8.0,
       screenSize.width - panelWidth - 8.0,
     );
@@ -282,7 +300,8 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+              border:
+                  Border.all(color: AppColors.border.withValues(alpha: 0.7)),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x1A000000),
@@ -300,7 +319,7 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
                         currentIndex: widget.currentIndex,
                         items: _allVisibleItems,
                       )
-                      : _PrimaryNavBar(
+                    : _PrimaryNavBar(
                         currentIndex: widget.currentIndex,
                         items: _collapsedItems,
                         isExpanded: _isExpanded,

@@ -3,6 +3,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/site_visits/feedback_form_dialog.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class SiteRevisitDetailPage extends StatefulWidget {
@@ -624,6 +625,15 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
   }
 
   Future<void> _openFeedbackForm() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'revisits',
+      action: 'edit',
+      moduleLabel: 're-visits',
+    );
+    if (!allowed) return;
+
     final feedback = _feedbackData();
     final hasFeedback = _hasFeedback(feedback);
     if (hasFeedback) {

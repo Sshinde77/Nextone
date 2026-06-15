@@ -33,7 +33,8 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
   String? _historyError;
   List<Map<String, dynamic>> _historyItems = <Map<String, dynamic>>[];
 
-  DateTime _performanceFrom = DateTime(DateTime.now().year, DateTime.now().month, 1);
+  DateTime _performanceFrom =
+      DateTime(DateTime.now().year, DateTime.now().month, 1);
   DateTime _performanceTo = DateTime.now();
   bool _isPerformanceLoading = false;
   String? _performanceError;
@@ -48,9 +49,11 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
     _fetchMemberDetails();
   }
 
-  String get _memberRole => RoleAccess.normalize(_asString(_memberData['role']));
+  String get _memberRole =>
+      RoleAccess.normalize(_asString(_memberData['role']));
   bool get _canManageUsers => RoleAccess.canManageUsers(_currentRole);
-  bool get _canDeleteMember => RoleAccess.canDeactivate(_currentRole, _memberRole);
+  bool get _canDeleteMember =>
+      RoleAccess.canDeactivate(_currentRole, _memberRole);
 
   Future<void> _loadAccess() async {
     try {
@@ -607,7 +610,8 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
           _performanceData['site_visit_scheduled'],
     );
     final siteVisitsDone = _readInt(
-      _performanceData['site_visits_done'] ?? _performanceData['site_visit_done'],
+      _performanceData['site_visits_done'] ??
+          _performanceData['site_visit_done'],
     );
     final negotiation = _readInt(_performanceData['negotiation']);
     final booked = _readInt(_performanceData['booked']);
@@ -623,15 +627,18 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
         totalLeads > 0 ? (booked * 100.0 / totalLeads) : 0.0;
     final contactRate = _performanceData.containsKey('contact_rate') ||
             _performanceData.containsKey('contactRate')
-        ? _readNum(_performanceData['contact_rate'] ?? _performanceData['contactRate'])
+        ? _readNum(
+            _performanceData['contact_rate'] ?? _performanceData['contactRate'])
         : computedContactRate;
     final visitRate = _performanceData.containsKey('visit_rate') ||
             _performanceData.containsKey('visitRate')
-        ? _readNum(_performanceData['visit_rate'] ?? _performanceData['visitRate'])
+        ? _readNum(
+            _performanceData['visit_rate'] ?? _performanceData['visitRate'])
         : computedVisitRate;
     final bookingRate = _performanceData.containsKey('booking_rate') ||
             _performanceData.containsKey('bookingRate')
-        ? _readNum(_performanceData['booking_rate'] ?? _performanceData['bookingRate'])
+        ? _readNum(
+            _performanceData['booking_rate'] ?? _performanceData['bookingRate'])
         : computedBookingRate;
 
     return Container(
@@ -1168,7 +1175,8 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
       'lost': lost,
     };
     for (final seed in defaultStages) {
-      final count = fallbackMap[seed.key] ?? _readInt(_performanceData[seed.key]);
+      final count =
+          fallbackMap[seed.key] ?? _readInt(_performanceData[seed.key]);
       final percent = totalLeads > 0 ? (count * 100 / totalLeads) : 0.0;
       rows.add(_PipelineRow(seed.label, count, percent, seed.color));
     }
@@ -1460,8 +1468,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color:
-                      isActive ? AppColors.primary : AppColors.textSecondary,
+                  color: isActive ? AppColors.primary : AppColors.textSecondary,
                 ),
               ),
             ],
@@ -1516,9 +1523,11 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
       item['customer_name'],
       'Lead',
     ]);
-    final phone = _firstNonEmpty(<dynamic>[item['phone'], item['phone_number']]);
+    final phone =
+        _firstNonEmpty(<dynamic>[item['phone'], item['phone_number']]);
     final source = _firstNonEmpty(<dynamic>[item['source'], item['channel']]);
-    final budget = _firstNonEmpty(<dynamic>[item['budget'], item['budget_range']]);
+    final budget =
+        _firstNonEmpty(<dynamic>[item['budget'], item['budget_range']]);
     final status = _titleCase(_firstNonEmpty(<dynamic>[item['status'], 'New']));
 
     return _buildHistoryShell(
@@ -1538,10 +1547,13 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
       item['assignee_name'],
       item['customer_name'],
     ]);
-    final dueRaw = _firstNonEmpty(<dynamic>[item['due_date'], item['created_at']]);
+    final dueRaw =
+        _firstNonEmpty(<dynamic>[item['due_date'], item['created_at']]);
     final dueLabel = _formatDateLabel(dueRaw);
-    final priority = _titleCase(_firstNonEmpty(<dynamic>[item['priority'], 'Medium']));
-    final status = _titleCase(_firstNonEmpty(<dynamic>[item['status'], 'Pending']));
+    final priority =
+        _titleCase(_firstNonEmpty(<dynamic>[item['priority'], 'Medium']));
+    final status =
+        _titleCase(_firstNonEmpty(<dynamic>[item['status'], 'Pending']));
 
     return _buildHistoryShell(
       title: title,
@@ -1560,11 +1572,13 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
       item['title'],
       'Site Visit',
     ]);
-    final project = _firstNonEmpty(<dynamic>[item['project_name'], item['project']]);
+    final project =
+        _firstNonEmpty(<dynamic>[item['project_name'], item['project']]);
     final visitDateRaw =
         _firstNonEmpty(<dynamic>[item['visit_date'], item['scheduled_date']]);
     final visitDate = _formatDateLabel(visitDateRaw);
-    final status = _titleCase(_firstNonEmpty(<dynamic>[item['status'], 'Scheduled']));
+    final status =
+        _titleCase(_firstNonEmpty(<dynamic>[item['status'], 'Scheduled']));
 
     return _buildHistoryShell(
       title: title,
@@ -1661,7 +1675,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
   }
 
   Widget _buildActionButtons() {
-    if (!_canManageUsers && !_canDeleteMember) {
+    if (!_canManageUsers && (_memberId ?? '').isEmpty) {
       return const SizedBox.shrink();
     }
     return Container(
@@ -1683,8 +1697,8 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
                 onTap: _isDeleting ? null : _openEditMember,
               ),
             ),
-          if (_canManageUsers && _canDeleteMember) const SizedBox(width: 12),
-          if (_canDeleteMember)
+          if (_canManageUsers) const SizedBox(width: 12),
+          if ((_memberId ?? '').isNotEmpty)
             Expanded(
               child: _buildRoundedButton(
                 icon: Icons.delete_outline,
@@ -1714,7 +1728,8 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
         decoration: BoxDecoration(
           color: color.withValues(alpha: isDisabled ? 0.05 : 0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: isDisabled ? 0.12 : 0.2)),
+          border: Border.all(
+              color: color.withValues(alpha: isDisabled ? 0.12 : 0.2)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

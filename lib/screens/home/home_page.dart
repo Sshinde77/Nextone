@@ -202,7 +202,8 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      final trend = await _authProvider.dashboardRevenue(range: _leadTrendPeriod);
+      final trend =
+          await _authProvider.dashboardRevenue(range: _leadTrendPeriod);
       if (!mounted) return;
       setState(() {
         _leadTrendData = trend;
@@ -217,9 +218,40 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _openMainTab(int index) {
+  Future<void> _openMainTab(int index) async {
     if (!mounted) return;
-    if (!RoleAccess.canAccessMainTab(_currentRole, index)) return;
+    try {
+      final permissions = await RoleAccess.currentPermissionSet(
+        _authProvider,
+        forceRefresh: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _currentRole = permissions.role;
+      });
+      if (!RoleAccess.canAccessMainTab(permissions.role, index)) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                "You don't have permission to access ${RoleAccess.mainTabLabel(index)}.",
+              ),
+            ),
+          );
+        return;
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Unable to verify permissions right now.'),
+          ),
+        );
+      return;
+    }
     Navigator.pushReplacementNamed(context, AppRoutes.home, arguments: index);
   }
 
@@ -332,8 +364,13 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: widget.showBottomNav
           ? CRMAppBottomNav(
               currentIndex: _currentIndex,
+              showLeads: RoleAccess.canViewModule('leads'),
+              showFollowUps: RoleAccess.canViewModule('follow_ups'),
+              showSiteVisits: RoleAccess.canViewModule('site_visits'),
+              showRevisits: RoleAccess.canViewModule('revisits'),
               showProjects: RoleAccess.canViewProjects(_currentRole),
               showTeam: RoleAccess.canViewTeam(_currentRole),
+              showAttendance: RoleAccess.canViewModule('attendance'),
               showUsers: RoleAccess.canViewUsers(_currentRole),
               showNotifications: RoleAccess.canViewModule('notifications'),
               onDashboard: () {
@@ -455,8 +492,7 @@ class _HeaderBlockState extends State<_HeaderBlock> {
 
   ({String from, String to}) _currentMonthRange() {
     final now = DateTime.now();
-    final from =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
+    final from = '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
     final toDate = DateTime(now.year, now.month + 1, 0);
     final to =
         '${toDate.year}-${toDate.month.toString().padLeft(2, '0')}-${toDate.day.toString().padLeft(2, '0')}';
@@ -525,7 +561,9 @@ class _HeaderBlockState extends State<_HeaderBlock> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text('${moduleType.label} export downloaded: ${file.path}')),
+          SnackBar(
+              content:
+                  Text('${moduleType.label} export downloaded: ${file.path}')),
         );
     } catch (error) {
       if (!mounted) return;
@@ -914,88 +952,89 @@ class _StatCard extends StatelessWidget {
         padding: EdgeInsets.all(compact ? 10 : 11),
         child: Stack(
           children: [
-          Positioned(
-            right: -30,
-            top: -30,
-            child: Container(
-              width: 74,
-              height: 74,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: bubbleColor,
+            Positioned(
+              right: -30,
+              top: -30,
+              child: Container(
+                width: 74,
+                height: 74,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: bubbleColor,
+                ),
               ),
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: compact ? 28 : 30,
-                    height: compact ? 28 : 30,
-                    decoration: BoxDecoration(
-                      color: iconBg,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: Colors.white, size: compact ? 15 : 16),
-                  ),
-                  const Spacer(),
-                  if (tag != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
                     Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: compact ? 6 : 8,
-                        vertical: compact ? 2 : 3,
-                      ),
+                      width: compact ? 28 : 30,
+                      height: compact ? 28 : 30,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF7E8),
-                        borderRadius: BorderRadius.circular(999),
+                        color: iconBg,
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(
-                        tag!,
-                        style: TextStyle(
-                          color: Color(0xFFD97706),
-                          fontSize: compact ? 10 : 11,
-                          fontWeight: FontWeight.w700,
+                      child: Icon(icon,
+                          color: Colors.white, size: compact ? 15 : 16),
+                    ),
+                    const Spacer(),
+                    if (tag != null)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: compact ? 6 : 8,
+                          vertical: compact ? 2 : 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF7E8),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          tag!,
+                          style: TextStyle(
+                            color: Color(0xFFD97706),
+                            fontSize: compact ? 10 : 11,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-              SizedBox(height: compact ? 8 : 10),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: compact ? 10 : 11,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
+                  ],
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: compact ? 24 : 28,
-                  height: 1.0,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F1F3A),
+                SizedBox(height: compact ? 8 : 10),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: compact ? 10 : 11,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: compact ? 10 : 11,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: compact ? 24 : 28,
+                    height: 1.0,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F1F3A),
+                  ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: compact ? 10 : 11,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1226,9 +1265,10 @@ class _UpcomingVisitsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = visits.map((visit) {
-      final leadName = (visit['lead_name']?.toString().trim().isNotEmpty ?? false)
-          ? visit['lead_name'].toString()
-          : 'Unknown Lead';
+      final leadName =
+          (visit['lead_name']?.toString().trim().isNotEmpty ?? false)
+              ? visit['lead_name'].toString()
+              : 'Unknown Lead';
       final projectName =
           (visit['project_name']?.toString().trim().isNotEmpty ?? false)
               ? visit['project_name'].toString()
@@ -1559,26 +1599,22 @@ class _LeadPipelineCard extends StatelessWidget {
 
     final dynamic stagesRaw = pipeline?['stages'];
     final List<(String, int, Color, Color)> rows = stagesRaw is List
-        ? stagesRaw
-            .whereType<Map>()
-            .map((stage) {
-              final map = stage.map(
-                (key, value) => MapEntry(key.toString(), value),
-              );
-              final label = map['label']?.toString() ?? 'Unknown';
-              final key = map['key']?.toString() ?? '';
-              final value = asInt(map['value']);
-              final colors = rowColors(key, label);
-              return (label, value, colors.$1, colors.$2);
-            })
-            .toList()
+        ? stagesRaw.whereType<Map>().map((stage) {
+            final map = stage.map(
+              (key, value) => MapEntry(key.toString(), value),
+            );
+            final label = map['label']?.toString() ?? 'Unknown';
+            final key = map['key']?.toString() ?? '';
+            final value = asInt(map['value']);
+            final colors = rowColors(key, label);
+            return (label, value, colors.$1, colors.$2);
+          }).toList()
         : const <(String, int, Color, Color)>[];
 
     final int maxValue = rows.isEmpty
         ? 1
-        : rows
-            .map((r) => r.$2)
-            .fold<int>(1, (previous, current) => current > previous ? current : previous);
+        : rows.map((r) => r.$2).fold<int>(
+            1, (previous, current) => current > previous ? current : previous);
 
     return _DashCard(
       child: Column(
@@ -1635,8 +1671,8 @@ class _LeadPipelineCard extends StatelessWidget {
                   children: [
                     Container(
                       width: isNarrow ? 74 : 88,
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
                         color: r.$4,
                         borderRadius: BorderRadius.circular(8),
@@ -1720,21 +1756,18 @@ class _LeadSourcesCard extends StatelessWidget {
     final total = asInt(leadSources?['total']);
     final dynamic rawSources = leadSources?['sources'];
     final sources = rawSources is List
-        ? rawSources
-            .whereType<Map>()
-            .map((entry) {
-              final map = entry.map(
-                (key, value) => MapEntry(key.toString(), value),
-              );
-              final name = map['source']?.toString() ?? 'Unknown';
-              final count = asInt(map['count']);
-              final color = _parseHexColor(
-                map['color']?.toString(),
-                const Color(0xFF9CA3AF),
-              );
-              return (name, color, count);
-            })
-            .toList()
+        ? rawSources.whereType<Map>().map((entry) {
+            final map = entry.map(
+              (key, value) => MapEntry(key.toString(), value),
+            );
+            final name = map['source']?.toString() ?? 'Unknown';
+            final count = asInt(map['count']);
+            final color = _parseHexColor(
+              map['color']?.toString(),
+              const Color(0xFF9CA3AF),
+            );
+            return (name, color, count);
+          }).toList()
         : const <(String, Color, int)>[];
 
     return _DashCard(
@@ -1769,107 +1802,106 @@ class _LeadSourcesCard extends StatelessWidget {
                 ],
               ),
             )
-          else
-            ...[
-              Text(
-                '$total total leads · distribution',
-                style:
-                    const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 10),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isNarrow = constraints.maxWidth < 700;
+          else ...[
+            Text(
+              '$total total leads · distribution',
+              style:
+                  const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 10),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 700;
 
-                  Widget pie = PieChart(
-                    PieChartData(
-                      centerSpaceRadius: 40,
-                      sectionsSpace: 0,
-                      sections: sources.isEmpty || total == 0
-                          ? [
-                              PieChartSectionData(
-                                value: 1,
-                                color: const Color(0xFFE5E7EB),
+                Widget pie = PieChart(
+                  PieChartData(
+                    centerSpaceRadius: 40,
+                    sectionsSpace: 0,
+                    sections: sources.isEmpty || total == 0
+                        ? [
+                            PieChartSectionData(
+                              value: 1,
+                              color: const Color(0xFFE5E7EB),
+                              radius: 34,
+                              showTitle: false,
+                            ),
+                          ]
+                        : sources
+                            .where((s) => s.$3 > 0)
+                            .map(
+                              (s) => PieChartSectionData(
+                                value: s.$3.toDouble(),
+                                color: s.$2,
                                 radius: 34,
                                 showTitle: false,
                               ),
-                            ]
-                          : sources
-                              .where((s) => s.$3 > 0)
-                              .map(
-                                (s) => PieChartSectionData(
-                                  value: s.$3.toDouble(),
-                                  color: s.$2,
-                                  radius: 34,
-                                  showTitle: false,
-                                ),
-                              )
-                              .toList(),
-                    ),
-                  );
+                            )
+                            .toList(),
+                  ),
+                );
 
-                  Widget legendList = ListView.builder(
-                    itemCount: sources.length,
-                    itemBuilder: (context, index) {
-                      final s = sources[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: s.$2,
-                                shape: BoxShape.circle,
-                              ),
+                Widget legendList = ListView.builder(
+                  itemCount: sources.length,
+                  itemBuilder: (context, index) {
+                    final s = sources[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: s.$2,
+                              shape: BoxShape.circle,
                             ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                s.$1,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '${s.$3}',
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              s.$1,
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF13233E),
-                                fontWeight: FontWeight.w700,
+                                color: AppColors.textSecondary,
                               ),
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  );
-
-                  if (isNarrow) {
-                    return Column(
-                      children: [
-                        SizedBox(height: 180, child: pie),
-                        const SizedBox(height: 8),
-                        SizedBox(height: 130, child: legendList),
-                      ],
+                          ),
+                          Text(
+                            '${s.$3}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF13233E),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                     );
-                  }
+                  },
+                );
 
-                  return SizedBox(
-                    height: 200,
-                    child: Row(
-                      children: [
-                        Expanded(child: pie),
-                        Expanded(child: legendList),
-                      ],
-                    ),
+                if (isNarrow) {
+                  return Column(
+                    children: [
+                      SizedBox(height: 180, child: pie),
+                      const SizedBox(height: 8),
+                      SizedBox(height: 130, child: legendList),
+                    ],
                   );
-                },
-              ),
-            ],
+                }
+
+                return SizedBox(
+                  height: 200,
+                  child: Row(
+                    children: [
+                      Expanded(child: pie),
+                      Expanded(child: legendList),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -1986,19 +2018,16 @@ class _LeadTrendChart extends StatelessWidget {
 
     final dynamic raw = trendData['data'];
     final bars = raw is List
-        ? raw
-            .whereType<Map>()
-            .map((entry) {
-              final map = entry.map(
-                (key, value) => MapEntry(key.toString(), value),
-              );
-              return (
-                map['label']?.toString() ?? '',
-                asInt(map['total_leads']).toDouble(),
-                asInt(map['booked']).toDouble(),
-              );
-            })
-            .toList()
+        ? raw.whereType<Map>().map((entry) {
+            final map = entry.map(
+              (key, value) => MapEntry(key.toString(), value),
+            );
+            return (
+              map['label']?.toString() ?? '',
+              asInt(map['total_leads']).toDouble(),
+              asInt(map['booked']).toDouble(),
+            );
+          }).toList()
         : <(String, double, double)>[];
 
     final maxY = bars.isEmpty
@@ -2027,7 +2056,8 @@ class _LeadTrendChart extends StatelessWidget {
           ),
         ),
         titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles:
               const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: AxisTitles(
@@ -2287,8 +2317,8 @@ class _Legend extends StatelessWidget {
         Container(
           width: 10,
           height: 10,
-          decoration:
-              BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+          decoration: BoxDecoration(
+              color: color, borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 6),
         Text(
@@ -2305,7 +2335,8 @@ class _Legend extends StatelessWidget {
 }
 
 class _DashCard extends StatelessWidget {
-  const _DashCard({required this.child, this.padding = const EdgeInsets.all(14)});
+  const _DashCard(
+      {required this.child, this.padding = const EdgeInsets.all(14)});
 
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -2331,4 +2362,3 @@ class _DashCard extends StatelessWidget {
     );
   }
 }
-

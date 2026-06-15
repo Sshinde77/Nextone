@@ -3,6 +3,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/closures/closure_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/closure_data_card.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
@@ -141,6 +142,15 @@ class _ClosuresPageState extends State<ClosuresPage> {
   }
 
   Future<void> _openCreateClosureDialog() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'closures',
+      action: 'create',
+      moduleLabel: 'closures',
+    );
+    if (!allowed) return;
+
     final leadResult = await _authProvider.leads(
       token: _authProvider.currentAuthToken,
       perPage: 100,

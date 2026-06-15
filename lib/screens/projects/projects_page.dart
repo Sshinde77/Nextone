@@ -485,12 +485,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
               icon: Icons.edit_outlined,
               onTap: () => _openEditProject(project),
             ),
-          if (_canDeleteProjects)
-            DataCardAction(
-              icon: Icons.delete_outline,
-              color: AppColors.error,
-              onTap: _isDeleting ? () {} : () => _deleteProject(project),
-            ),
+          DataCardAction(
+            icon: Icons.delete_outline,
+            color: AppColors.error,
+            onTap: _isDeleting ? () {} : () => _deleteProject(project),
+          ),
         ],
       ),
     );

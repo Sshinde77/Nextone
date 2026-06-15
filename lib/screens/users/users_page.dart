@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
@@ -86,7 +85,8 @@ class _UsersPageState extends State<UsersPage> {
       _error = null;
     });
     try {
-      final data = await _authProvider.users(token: _authProvider.currentAuthToken);
+      final data =
+          await _authProvider.users(token: _authProvider.currentAuthToken);
       if (!mounted) return;
       setState(() {
         _users = data.map(_UserItem.fromApi).toList();
@@ -356,7 +356,6 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -455,9 +454,11 @@ class _UsersPageState extends State<UsersPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_error!, style: const TextStyle(color: AppColors.error)),
+                    Text(_error!,
+                        style: const TextStyle(color: AppColors.error)),
                     const SizedBox(height: 8),
-                    TextButton(onPressed: _loadUsers, child: const Text('Retry')),
+                    TextButton(
+                        onPressed: _loadUsers, child: const Text('Retry')),
                   ],
                 ),
               )
@@ -517,7 +518,9 @@ class _UsersPageState extends State<UsersPage> {
         leadId: user.lastSeen,
         status: user.role.toUpperCase(),
         priority: user.status,
-        priorityColor: user.status == 'Active' ? AppColors.success : AppColors.textSecondary,
+        priorityColor: user.status == 'Active'
+            ? AppColors.success
+            : AppColors.textSecondary,
         nextFollowUpDate: user.email,
         budget: user.phone,
         phone: user.role,
@@ -541,8 +544,7 @@ class _UsersPageState extends State<UsersPage> {
               icon: Icons.edit_outlined,
               onTap: isAssigning ? () {} : () => _openEditUser(user),
             ),
-          if (_canDeleteUsers &&
-              user.status != 'Inactive')
+          if (user.status != 'Inactive')
             DataCardAction(
               icon: Icons.delete_outline,
               color: AppColors.error,
@@ -607,7 +609,9 @@ class _UserItem {
     final lastLogin = read(json['last_login'] ?? json['lastLogin']);
     return _UserItem(
       id: read(json['id'] ?? json['user_id'] ?? json['userId'] ?? json['uuid']),
-      name: fullName.isNotEmpty ? fullName : (fallbackName.isNotEmpty ? fallbackName : 'Unknown'),
+      name: fullName.isNotEmpty
+          ? fullName
+          : (fallbackName.isNotEmpty ? fallbackName : 'Unknown'),
       email: read(json['email']),
       phone: read(json['phone_number'] ?? json['phone'] ?? json['mobile']),
       role: roleLabel(read(json['role'])),

@@ -6,6 +6,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -317,6 +318,15 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   }
 
   Future<String?> _submitStatusChange() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return null;
+
     if (_selectedNextStatus == null || _selectedNextStatus!.isEmpty) {
       _showSnackBar('Please select the next status.');
       return null;
@@ -355,6 +365,15 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   }
 
   Future<void> _submitReassignment() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
     if (_selectedAssigneeId == null || _selectedAssigneeId!.isEmpty) {
       _showSnackBar('Please select an assignee.');
       return;
@@ -527,6 +546,15 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   }
 
   Future<void> _openCreateFollowUp() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'follow_ups',
+      action: 'create',
+      moduleLabel: 'follow-ups',
+    );
+    if (!allowed) return;
+
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => FollowUpFormPage(initialLeadId: widget.leadId),
@@ -538,6 +566,15 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   }
 
   Future<void> _openCreateSiteVisit() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'create',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SiteVisitFormPage(initialLeadId: widget.leadId),
@@ -566,6 +603,15 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   }
 
   Future<void> _updatePipelineStage() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
     final next = _selectedPipelineStatusKey;
     if (next == null || next.isEmpty) {
       _showSnackBar('Please select stage.');
@@ -597,6 +643,15 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   }
 
   Future<void> _openManagePipelineStatusesDialog() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
     final labelController = TextEditingController();
     final colorController = TextEditingController(text: '#3B82F6');
     Color selectedColor = _parseHexColor(colorController.text);
@@ -2422,4 +2477,3 @@ class _PipelineStatusOption {
     );
   }
 }
-

@@ -5,6 +5,7 @@ import 'package:nextone/screens/site_visits/site_revisits_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 import '../../utils/app_error_handler.dart';
@@ -1264,6 +1265,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Future<void> _openScheduleForm() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'create',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
     if (_isCalendarView) {
       setState(() {
         _isCalendarView = false;
@@ -1287,6 +1297,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Future<void> _openRevisitsPage() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'revisits',
+      action: 'view',
+      moduleLabel: 're-visits',
+    );
+    if (!allowed) return;
+
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const SiteRevisitsPage(showBackButton: true),
@@ -1295,6 +1314,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Future<void> _openEditVisitForm(_SiteVisit visit) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'edit',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
     final visitData = <String, dynamic>{
       'lead_id': visit.leadId,
       'lead_name': visit.lead,
@@ -1369,6 +1397,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Future<void> _showAssigneePicker(_SiteVisit visit) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'edit',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
     final assignee = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.white,
@@ -1413,6 +1450,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Future<void> _showStatusPicker(_SiteVisit visit) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'edit',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
     final status = await showModalBottomSheet<_VisitStatus>(
       context: context,
       backgroundColor: Colors.white,
@@ -1481,6 +1527,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Future<void> _captureFeedback(_SiteVisit visit) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'edit',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
     final noteController = TextEditingController(text: visit.feedback);
     int selectedRating = visit.rating;
 

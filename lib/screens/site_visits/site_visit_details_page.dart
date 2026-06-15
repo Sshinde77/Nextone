@@ -3,6 +3,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/screens/site_visits/feedback_form_dialog.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -915,6 +916,15 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
   }
 
   Future<void> _openFeedbackForm() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'edit',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
     final feedbackMap = _feedbackData(_visitData);
     final hasFeedback = _hasFeedback(feedbackMap);
     if (hasFeedback) {
@@ -977,4 +987,3 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
     }
   }
 }
-

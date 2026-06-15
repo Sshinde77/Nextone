@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class FollowUpFormPage extends StatefulWidget {
@@ -194,6 +195,15 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
   }
 
   Future<void> _submit() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'follow_ups',
+      action: widget.isEditMode ? 'edit' : 'create',
+      moduleLabel: 'follow-ups',
+    );
+    if (!allowed) return;
+
     final form = _formKey.currentState;
     if (form == null || !form.validate()) {
       return;

@@ -548,8 +548,8 @@ class _TeamPageState extends State<TeamPage> {
       if (index >= 0) {
         final updatedData =
             Map<String, dynamic>.from(_members[index].originalData)
-          ..['manager_id'] = manager.id
-          ..['manager_name'] = manager.name;
+              ..['manager_id'] = manager.id
+              ..['manager_name'] = manager.name;
         setState(() {
           _members[index] = _members[index].copyWith(originalData: updatedData);
         });
@@ -572,8 +572,6 @@ class _TeamPageState extends State<TeamPage> {
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
-
-
 
   Widget _buildActionButtonsRow(_TeamMember member) {
     final isDeleting =
@@ -620,7 +618,7 @@ class _TeamPageState extends State<TeamPage> {
             isLoading: isChangingRole,
           ),
         ],
-        if (_canDeleteUsers) ...[
+        ...[
           const SizedBox(width: 12),
           _buildCircleActionButton(
             Icons.delete_outline,
@@ -647,7 +645,8 @@ class _TeamPageState extends State<TeamPage> {
       decoration: BoxDecoration(
         color: color.withValues(alpha: isDisabled ? 0.05 : 0.1),
         shape: BoxShape.circle,
-        border: Border.all(color: color.withValues(alpha: isDisabled ? 0.12 : 0.2)),
+        border:
+            Border.all(color: color.withValues(alpha: isDisabled ? 0.12 : 0.2)),
       ),
       child: isLoading
           ? Padding(
@@ -801,17 +800,15 @@ class _TeamPageState extends State<TeamPage> {
               icon: Icons.manage_accounts_outlined,
               onTap: isBusy ? () {} : () => _openChangeRoleSheet(member),
             ),
-          if (_canDeleteUsers)
-            DataCardAction(
-              icon: Icons.delete_outline,
-              color: AppColors.error,
-              onTap: isBusy ? () {} : () => _deleteMember(member),
-            ),
+          DataCardAction(
+            icon: Icons.delete_outline,
+            color: AppColors.error,
+            onTap: isBusy ? () {} : () => _deleteMember(member),
+          ),
         ],
       ),
     );
   }
-
 
   Widget _buildInfoCard({
     required String message,
@@ -1044,4 +1041,3 @@ class _RoleOption {
 
   const _RoleOption({required this.label, required this.value});
 }
-

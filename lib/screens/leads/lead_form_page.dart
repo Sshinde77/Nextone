@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class LeadFormPage extends StatefulWidget {
@@ -286,6 +287,15 @@ class _LeadFormPageState extends State<LeadFormPage> {
   }
 
   Future<void> _submit() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: widget.isEditMode ? 'edit' : 'create',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
     final form = _formKey.currentState;
     if (form == null || !form.validate()) {
       return;
@@ -665,7 +675,9 @@ class _LeadFormPageState extends State<LeadFormPage> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: selectedLabel == null ? Colors.grey : Colors.black,
+                          color: selectedLabel == null
+                              ? Colors.grey
+                              : Colors.black,
                         ),
                       ),
                     ),

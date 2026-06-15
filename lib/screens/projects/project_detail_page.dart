@@ -10,6 +10,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class ProjectDetailPage extends StatefulWidget {
@@ -182,6 +183,15 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Future<void> _uploadDocuments() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'projects',
+      action: 'edit',
+      moduleLabel: 'projects',
+    );
+    if (!allowed) return;
+
     if (_isDocumentAction) {
       return;
     }
@@ -365,6 +375,15 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Future<void> _deleteDocument(_ProjectDocument document) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'projects',
+      action: 'delete',
+      moduleLabel: 'projects',
+    );
+    if (!allowed) return;
+
     if (_isDocumentAction) {
       return;
     }

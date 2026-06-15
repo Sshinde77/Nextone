@@ -71,12 +71,15 @@ class RoleAccess {
   static bool hasFullAccess(String role) => canApprovePhoneRequests(role);
 
   static bool canViewModule(String module) => _permissions.can(module, 'view');
-  static bool canCreateModule(String module) => _permissions.can(module, 'create');
+  static bool canCreateModule(String module) =>
+      _permissions.can(module, 'create');
   static bool canEditModule(String module) => _permissions.can(module, 'edit');
-  static bool canDeleteModule(String module) => _permissions.can(module, 'delete');
+  static bool canDeleteModule(String module) =>
+      _permissions.can(module, 'delete');
   static bool canApproveModule(String module) =>
       _permissions.can(module, 'approve');
-  static bool canExportModule(String module) => _permissions.can(module, 'export');
+  static bool canExportModule(String module) =>
+      _permissions.can(module, 'export');
 
   static bool canManageUsers(String role) {
     final _ = role;
@@ -184,36 +187,73 @@ class RoleAccess {
 
   static bool canAccessMainTab(String role, int index) {
     final _ = role;
-    switch (index) {
-      case 0:
-        return canViewModule('dashboard');
-      case 1:
-        return canViewModule('leads');
-      case 2:
-        return canViewModule('follow_ups');
-      case 3:
-        return canViewModule('site_visits');
-      case 4:
-        return canViewModule('revisits');
-      case 5:
-        return canViewProjects(role);
-      case 6:
-        return canViewTeam(role);
-      case 7:
-        return canViewModule('attendance');
-      case 8:
-        return canViewUsers(role);
-      case 9:
-        return canViewSalaryManagement(role);
-      case 10:
-        return canViewModule('closures');
-      default:
-        return false;
+    final module = mainTabModule(index);
+    if (module == null) {
+      return false;
     }
+    return canViewModule(module);
   }
 
   static Future<String> currentRole(AuthProvider authProvider) async {
     final permissions = await currentPermissionSet(authProvider);
     return permissions.role;
+  }
+
+  static String? mainTabModule(int index) {
+    switch (index) {
+      case 0:
+        return 'dashboard';
+      case 1:
+        return 'leads';
+      case 2:
+        return 'follow_ups';
+      case 3:
+        return 'site_visits';
+      case 4:
+        return 'revisits';
+      case 5:
+        return 'projects';
+      case 6:
+        return 'team';
+      case 7:
+        return 'attendance';
+      case 8:
+        return 'users';
+      case 9:
+        return 'salary';
+      case 10:
+        return 'closures';
+      default:
+        return null;
+    }
+  }
+
+  static String mainTabLabel(int index) {
+    switch (index) {
+      case 0:
+        return 'Dashboard';
+      case 1:
+        return 'Leads';
+      case 2:
+        return 'Follow-Ups';
+      case 3:
+        return 'Site Visits';
+      case 4:
+        return 'Re-visits';
+      case 5:
+        return 'Projects';
+      case 6:
+        return 'Team';
+      case 7:
+        return 'Attendance';
+      case 8:
+        return 'Users';
+      case 9:
+        return 'Salary';
+      case 10:
+        return 'Closures';
+      default:
+        return 'Module';
+    }
   }
 }

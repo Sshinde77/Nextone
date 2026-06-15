@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class SiteVisitFormPage extends StatefulWidget {
@@ -221,6 +222,15 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
   }
 
   void _submitForm() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: widget.isEditMode ? 'edit' : 'create',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
