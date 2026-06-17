@@ -16,7 +16,6 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  static const String _countryCode = '+91';
   static final RegExp _emailRegex = RegExp(
     r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$',
   );
@@ -73,7 +72,7 @@ class _LoginPageState extends State<LoginPage> {
       final phoneDigits = _normalizedPhoneDigits(_phoneController.text);
       final errorMessage = await _authProvider.login(
         email: isEmailLogin ? _emailController.text.trim() : '',
-        phoneNumber: isEmailLogin ? '' : '$_countryCode$phoneDigits',
+        phoneNumber: isEmailLogin ? '' : phoneDigits,
         password: isEmailLogin
             ? _emailPasswordController.text
             : _phonePasswordController.text,

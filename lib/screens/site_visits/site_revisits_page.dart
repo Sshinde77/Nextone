@@ -4,6 +4,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/site_visits/site_revisit_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/site_revisit_data_card.dart';
 
@@ -19,12 +20,16 @@ class SiteRevisitsPage extends StatefulWidget {
   State<SiteRevisitsPage> createState() => _SiteRevisitsPageState();
 }
 
+enum _RevisitScope { myItems, team }
+
 class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   final AuthProvider _authProvider = AuthProvider();
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = false;
   String? _error;
   List<Map<String, dynamic>> _items = const <Map<String, dynamic>>[];
+  String _currentRole = '';
+  _RevisitScope _selectedScope = _RevisitScope.team;
   String _statusFilter = 'all';
   int _currentPage = 1;
   int _totalPages = 1;
@@ -34,6 +39,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   @override
   void initState() {
     super.initState();
+    _loadAccess();
     _loadRevisits();
   }
 
@@ -41,6 +47,25 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  bool get _isMyScope => _selectedScope == _RevisitScope.myItems;
+  bool get _showScopeTabs =>
+      _currentRole.isNotEmpty &&
+      !RoleAccess.isSuperAdmin(_currentRole) &&
+      !RoleAccess.isAdmin(_currentRole) &&
+      RoleAccess.normalize(_currentRole) != RoleAccess.externalCaller;
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+      });
+    } catch (_) {
+      // Keep team view visible if role lookup fails.
+    }
   }
 
   Future<void> _loadRevisits({int? page}) async {
@@ -54,12 +79,20 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     });
 
     try {
-      final result = await _authProvider.siteRevisits(
-        token: _authProvider.currentAuthToken,
-        status: apiStatus,
-        page: nextPage,
-        perPage: _perPage,
-      );
+      final result = _isMyScope
+          ? await _authProvider.myRevisits(
+              token: _authProvider.currentAuthToken,
+              from: _monthStart,
+              to: _monthEnd,
+              page: nextPage,
+              perPage: _perPage,
+            )
+          : await _authProvider.siteRevisits(
+              token: _authProvider.currentAuthToken,
+              status: apiStatus,
+              page: nextPage,
+              perPage: _perPage,
+            );
       if (!mounted) return;
       setState(() {
         _items = result.items;
@@ -99,8 +132,11 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
             //     fontWeight: FontWeight.w600,
             //   ),
             // ),
-
             const SizedBox(height: 12),
+            if (_showScopeTabs) ...[
+              _buildScopeTabs(),
+              const SizedBox(height: 12),
+            ],
             _buildKpiRow(),
             const SizedBox(height: 12),
 
@@ -133,6 +169,105 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
               _buildPagination(),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  String get _monthStart {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, 1);
+    return _formatApiDate(start);
+  }
+
+  String get _monthEnd {
+    final now = DateTime.now();
+    final end = DateTime(now.year, now.month + 1, 0);
+    return _formatApiDate(end);
+  }
+
+  String _formatApiDate(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
+  }
+
+  Widget _buildScopeTabs() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _scopeTabItem(
+              label: 'My Follow Up',
+              isActive: _isMyScope,
+              onTap: () {
+                if (_isMyScope) return;
+                setState(() {
+                  _selectedScope = _RevisitScope.myItems;
+                  _currentPage = 1;
+                });
+                _loadRevisits(page: 1);
+              },
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _scopeTabItem(
+              label: 'Team',
+              isActive: !_isMyScope,
+              onTap: () {
+                if (!_isMyScope) return;
+                setState(() {
+                  _selectedScope = _RevisitScope.team;
+                  _currentPage = 1;
+                });
+                _loadRevisits(page: 1);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _scopeTabItem({
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isActive
+              ? const [
+                  BoxShadow(
+                    color: Color(0x120F172A),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isActive ? AppColors.primary : AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
         ),
       ),
     );

@@ -26,6 +26,7 @@ class ApiConstants {
       '/team-history/{userId}/site-visits';
 
   //leads Endpoints
+  static const String myLeads = '/me/leads';
   static const String leads = '/leads';
   static const String createsleads = '/leads';
   static const String leadsdetail = '/leads/{id}';
@@ -58,6 +59,7 @@ class ApiConstants {
   static const String deletefollowups = '/tasks/{id}';
   static const String editfollowups = '/tasks/{id}';
   static const String completestatusfollowups = '/tasks/{id}/complete';
+  static const String myFollowUps = '/me/tasks';
 
   //project Endpoints
   static const String projects = '/projects';
@@ -86,7 +88,9 @@ class ApiConstants {
   static const String editsitevisits = '/site-visits/{id}';
   static const String updatestatussitevisits = '/site-visits/{id}/status';
   static const String submitfeedbacksitevisits = '/site-visits/{id}/feedback';
+  static const String mySiteVisits = '/me/site-visits';
   static const String siteRevisits = '/site-revisits';
+  static const String myRevisits = '/me/revisits';
   static const String submitfeedbacksiteRevisits =
       '/site-revisits/{id}/feedback';
   static const String closures = '/closures';
@@ -114,6 +118,7 @@ class ApiConstants {
   static const String attendanceByMonth = '/attendance/by-month';
   static const String attendanceByDate = '/attendance/by-date';
   static const String attendanceSummary = '/attendance/summary';
+  static const String attendanceTeam = '/attendance/team';
   static const String attendancePending = '/attendance/pending';
   static const String attendanceapprove = '/attendance/{id}/approve';
 
@@ -122,9 +127,12 @@ class ApiConstants {
   static const String dashboardUpcomingSiteVisits =
       '/dashboard/upcoming-site-visits';
   static const String dashboardRecentActivity = '/dashboard/recent-activity';
+  static const String dashboardMyTargets = '/targets/me';
   static const String dashboardLeadPipeline = '/dashboard/lead-pipeline';
   static const String dashboardLeadSources = '/dashboard/lead-sources';
   static const String dashboardRevenue = '/dashboard/revenue';
+  static const String targets = '/targets';
+  static const String targetSet = '/targets/{userId}';
 
   // Notifications Endpoints
   static const String notifications = '/notifications';

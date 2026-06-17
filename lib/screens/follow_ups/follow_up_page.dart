@@ -22,6 +22,8 @@ class FollowUpPage extends StatefulWidget {
   State<FollowUpPage> createState() => _FollowUpPageState();
 }
 
+enum _FollowUpScope { myFollowUp, team }
+
 class _FollowUpPageState extends State<FollowUpPage> {
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedFollowUpIds = <String>{};
@@ -37,6 +39,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
   bool _isLoadingTeams = false;
   String? _loadError;
   String _currentRole = '';
+  _FollowUpScope _selectedScope = _FollowUpScope.team;
   int _totalItems = 0;
   int _totalPages = 1;
 
@@ -52,6 +55,12 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   bool get _canExportData => RoleAccess.canExportModule('follow_ups');
+  bool get _isMyScope => _selectedScope == _FollowUpScope.myFollowUp;
+  bool get _showScopeTabs =>
+      _currentRole.isNotEmpty &&
+      !RoleAccess.isSuperAdmin(_currentRole) &&
+      !RoleAccess.isAdmin(_currentRole) &&
+      RoleAccess.normalize(_currentRole) != RoleAccess.externalCaller;
 
   Future<void> _loadAccess() async {
     try {
@@ -497,6 +506,23 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   List<_FollowUpModel> get _currentPageFollowUps => _followUps;
+  List<_FollowUpModel> get _visibleFollowUps {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) {
+      return _currentPageFollowUps;
+    }
+    return _currentPageFollowUps.where((followUp) {
+      final haystack = <String>[
+        followUp.customerName,
+        followUp.status,
+        followUp.priority,
+        followUp.notes,
+        followUp.assignee.name,
+        followUp.assignee.phone,
+      ].join(' ').toLowerCase();
+      return haystack.contains(query);
+    }).toList(growable: false);
+  }
 
   bool get _isAllCurrentPageSelected {
     final followUps = _currentPageFollowUps;
@@ -530,14 +556,21 @@ class _FollowUpPageState extends State<FollowUpPage> {
     });
 
     try {
-      final result = await _authProvider.followUps(
-        token: _authProvider.currentAuthToken,
-        assignedTo:
-            _selectedTeamId.trim().isEmpty ? null : _selectedTeamId.trim(),
-        search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
-        page: targetPage,
-        perPage: _pageSize,
-      );
+      final result = _isMyScope
+          ? await _authProvider.myFollowUps(
+              token: _authProvider.currentAuthToken,
+              page: targetPage,
+              perPage: _pageSize,
+            )
+          : await _authProvider.followUps(
+              token: _authProvider.currentAuthToken,
+              assignedTo: _selectedTeamId.trim().isEmpty
+                  ? null
+                  : _selectedTeamId.trim(),
+              search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+              page: targetPage,
+              perPage: _pageSize,
+            );
 
       final mapped = result.items
           .map(_followUpFromApi)
@@ -833,12 +866,19 @@ class _FollowUpPageState extends State<FollowUpPage> {
 
         if (isCompact) {
           return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_showScopeTabs) ...[
+                _buildScopeTabs(),
+                const SizedBox(height: 12),
+              ],
               Row(
                 children: [
                   Expanded(flex: 2, child: searchField),
-                  const SizedBox(width: 12),
-                  Expanded(flex: 1, child: teamFilter),
+                  if (!_isMyScope) ...[
+                    const SizedBox(width: 12),
+                    Expanded(flex: 1, child: teamFilter),
+                  ],
                 ],
               ),
               const SizedBox(height: 12),
@@ -855,20 +895,117 @@ class _FollowUpPageState extends State<FollowUpPage> {
           );
         }
 
-        return Row(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: searchField),
-            const SizedBox(width: 12),
-            SizedBox(width: 240, child: teamFilter),
-            const SizedBox(width: 12),
-            if (exportButton != null) ...[
-              exportButton,
-              const SizedBox(width: 8),
+            if (_showScopeTabs) ...[
+              _buildScopeTabs(),
+              const SizedBox(height: 12),
             ],
-            addButton,
+            Row(
+              children: [
+                Expanded(child: searchField),
+                if (!_isMyScope) ...[
+                  const SizedBox(width: 12),
+                  SizedBox(width: 240, child: teamFilter),
+                ],
+                const SizedBox(width: 12),
+                if (exportButton != null) ...[
+                  exportButton,
+                  const SizedBox(width: 8),
+                ],
+                addButton,
+              ],
+            ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildScopeTabs() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _scopeTabItem(
+              label: 'My Follow Up',
+              isActive: _isMyScope,
+              onTap: () {
+                if (_isMyScope) return;
+                setState(() {
+                  _selectedScope = _FollowUpScope.myFollowUp;
+                  _selectedTeamId = '';
+                  _selectedFollowUpIds.clear();
+                  _isBulkSelectionMode = false;
+                  _currentPage = 1;
+                });
+                _loadFollowUps(page: 1);
+              },
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _scopeTabItem(
+              label: 'Team',
+              isActive: !_isMyScope,
+              onTap: () {
+                if (!_isMyScope) return;
+                setState(() {
+                  _selectedScope = _FollowUpScope.team;
+                  _selectedFollowUpIds.clear();
+                  _isBulkSelectionMode = false;
+                  _currentPage = 1;
+                });
+                _loadFollowUps(page: 1);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _scopeTabItem({
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isActive
+              ? const [
+                  BoxShadow(
+                    color: Color(0x120F172A),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isActive ? AppColors.primary : AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ),
     );
   }
 
@@ -950,7 +1087,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   Widget _buildFollowUpSection() {
-    final followUps = _currentPageFollowUps;
+    final followUps = _visibleFollowUps;
 
     return Container(
       width: double.infinity,

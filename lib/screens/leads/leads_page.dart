@@ -45,6 +45,9 @@ class _LeadsPageState extends State<LeadsPage> {
     'Referral',
   ];
 
+  static const int _myLeadsTabIndex = 0;
+  static const int _teamLeadsTabIndex = 1;
+
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _reassignNoteController = TextEditingController();
   final Set<String> _selectedLeadIds = <String>{};
@@ -63,6 +66,7 @@ class _LeadsPageState extends State<LeadsPage> {
   bool _isLoadingLeads = true;
   String? _loadError;
   String _currentRole = '';
+  int _activeLeadsTabIndex = _myLeadsTabIndex;
 
   int _currentPage = 1;
   final int _pageSize = 10;
@@ -258,15 +262,24 @@ class _LeadsPageState extends State<LeadsPage> {
     });
 
     try {
-      final result = await _authProvider.leads(
-        token: _authProvider.currentAuthToken,
-        status: _selectedStatus,
-        source: _selectedSource,
-        assignedTo: _selectedTeamId,
-        search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
-        page: _currentPage,
-        perPage: _pageSize,
-      );
+      final result = _isMyLeadsTab
+          ? await _authProvider.myLeads(
+              token: _authProvider.currentAuthToken,
+              status: _selectedStatus,
+              source: _selectedSource,
+              search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+              page: _currentPage,
+              perPage: _pageSize,
+            )
+          : await _authProvider.leads(
+              token: _authProvider.currentAuthToken,
+              status: _selectedStatus,
+              source: _selectedSource,
+              assignedTo: _selectedTeamId,
+              search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+              page: _currentPage,
+              perPage: _pageSize,
+            );
 
       if (!mounted) {
         return;
@@ -300,6 +313,23 @@ class _LeadsPageState extends State<LeadsPage> {
         _loadError = AppErrorHandler.friendlyMessage(error);
       });
     }
+  }
+
+  bool get _isMyLeadsTab => _activeLeadsTabIndex == _myLeadsTabIndex;
+
+  void _switchLeadsTab(int tabIndex) {
+    if (_activeLeadsTabIndex == tabIndex) {
+      return;
+    }
+    setState(() {
+      _activeLeadsTabIndex = tabIndex;
+      _currentPage = 1;
+      _selectedLeadIds.clear();
+      _isBulkSelectionMode = false;
+      _selectedTeamId = null;
+      _visiblePhoneLeadId = null;
+    });
+    _loadLeads();
   }
 
   Future<void> _loadPhoneAccessForCurrentPage(List<_LeadModel> leads) async {
@@ -379,7 +409,7 @@ class _LeadsPageState extends State<LeadsPage> {
   Future<void> _openFiltersSheet() async {
     String? tempStatus = _selectedStatus;
     String? tempSource = _selectedSource;
-    String? tempTeamId = _selectedTeamId;
+    String? tempTeamId = _isMyLeadsTab ? null : _selectedTeamId;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -437,28 +467,30 @@ class _LeadsPageState extends State<LeadsPage> {
                       });
                     },
                   ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String?>(
-                    initialValue: tempTeamId,
-                    decoration: _sheetFieldDecoration('Select team member'),
-                    items: <DropdownMenuItem<String?>>[
-                      const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('All'),
-                      ),
-                      ..._assigneeOptions.map(
-                        (assignee) => DropdownMenuItem<String?>(
-                          value: assignee.id,
-                          child: Text(assignee.name),
+                  if (!_isMyLeadsTab) ...[
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String?>(
+                      initialValue: tempTeamId,
+                      decoration: _sheetFieldDecoration('Select team member'),
+                      items: <DropdownMenuItem<String?>>[
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('All'),
                         ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      setSheetState(() {
-                        tempTeamId = value;
-                      });
-                    },
-                  ),
+                        ..._assigneeOptions.map(
+                          (assignee) => DropdownMenuItem<String?>(
+                            value: assignee.id,
+                            child: Text(assignee.name),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setSheetState(() {
+                          tempTeamId = value;
+                        });
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   Row(
                     children: [
@@ -486,7 +518,7 @@ class _LeadsPageState extends State<LeadsPage> {
                             setState(() {
                               _selectedStatus = tempStatus;
                               _selectedSource = tempSource;
-                              _selectedTeamId = tempTeamId;
+                              _selectedTeamId = _isMyLeadsTab ? null : tempTeamId;
                               _currentPage = 1;
                               _selectedLeadIds.clear();
                               _isBulkSelectionMode = false;
@@ -1104,6 +1136,72 @@ class _LeadsPageState extends State<LeadsPage> {
 
     if (updated == true && mounted) {
       _loadLeads();
+    }
+  }
+
+  Future<void> _deleteLead(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'delete',
+      moduleLabel: 'leads',
+    );
+    if (!allowed || !mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Lead'),
+          content: Text(
+            'Are you sure you want to delete "${lead.name}"?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.error,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    try {
+      await _authProvider.deleteLead(
+        id: lead.id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+
+      setState(() {
+        _currentPageLeads.removeWhere((item) => item.id == lead.id);
+        _selectedLeadIds.remove(lead.id);
+        _leadPhoneAccessById.remove(lead.id);
+        _visiblePhoneLeadId =
+            _visiblePhoneLeadId == lead.id ? null : _visiblePhoneLeadId;
+        if (_totalItems > 0) {
+          _totalItems -= 1;
+        }
+        _syncBulkSelectionMode();
+      });
+
+      _showSnackBar('Lead deleted successfully.');
+      await _loadLeads();
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
     }
   }
 
@@ -2100,6 +2198,8 @@ class _LeadsPageState extends State<LeadsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildLeadTabs(),
+              const SizedBox(height: 16),
               _buildToolbar(),
               const SizedBox(height: 16),
               if (selectedCount > 0) ...[
@@ -2111,6 +2211,68 @@ class _LeadsPageState extends State<LeadsPage> {
               _buildPagination(),
               const SizedBox(height: 100),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLeadTabs() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildLeadTabButton(
+              label: 'My Leads',
+              tabIndex: _myLeadsTabIndex,
+            ),
+          ),
+          Expanded(
+            child: _buildLeadTabButton(
+              label: 'Team Leads',
+              tabIndex: _teamLeadsTabIndex,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeadTabButton({
+    required String label,
+    required int tabIndex,
+  }) {
+    final isActive = _activeLeadsTabIndex == tabIndex;
+    return GestureDetector(
+      onTap: () => _switchLeadsTab(tabIndex),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: isActive ? Colors.white : AppColors.textSecondary,
           ),
         ),
       ),
@@ -2580,7 +2742,7 @@ class _LeadsPageState extends State<LeadsPage> {
                         DataCardAction(
                           icon: Icons.delete_outline,
                           color: const Color(0xFFD32F2F),
-                          onTap: () {},
+                          onTap: () => _deleteLead(lead),
                         ),
                       ],
                       bulkSelectionMode: _isBulkSelectionMode,
@@ -2697,7 +2859,7 @@ class _LeadsPageState extends State<LeadsPage> {
           ],
           const Spacer(),
           Text(
-            '$_totalItems total leads',
+            '$_totalItems total ${_isMyLeadsTab ? 'my leads' : 'team leads'}',
             style: const TextStyle(
               fontWeight: FontWeight.w600,
               color: AppColors.textSecondary,

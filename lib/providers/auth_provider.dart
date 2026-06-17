@@ -365,6 +365,35 @@ class AuthProvider {
     );
   }
 
+  Future<LeadsListResult> myLeads({
+    String? token,
+    String? status,
+    String? source,
+    String? from,
+    String? to,
+    String? search,
+    int page = 1,
+    int perPage = 20,
+  }) {
+    return _authService.myLeads(
+      token: token,
+      status: status,
+      source: source,
+      from: from,
+      to: to,
+      search: search,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
+  Future<void> deleteLead({
+    required String id,
+    String? token,
+  }) {
+    return _authService.deleteLead(id: id, token: token);
+  }
+
   Future<ExportFileResult> exportLeads({
     required String from,
     required String to,
@@ -567,6 +596,22 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> attendanceTeam({
+    String? from,
+    String? to,
+    int page = 1,
+    int perPage = 100,
+    String? token,
+  }) {
+    return _authService.attendanceTeam(
+      from: from,
+      to: to,
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> attendancePending({
     String? date,
     String? token,
@@ -705,6 +750,18 @@ class AuthProvider {
     );
   }
 
+  Future<LeadsListResult> myFollowUps({
+    String? token,
+    int page = 1,
+    int perPage = 20,
+  }) {
+    return _authService.myFollowUps(
+      token: token,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
   Future<void> deleteFollowUp({required String id, String? token}) {
     return _authService.deleteFollowUp(id: id, token: token);
   }
@@ -780,6 +837,18 @@ class AuthProvider {
     );
   }
 
+  Future<LeadsListResult> mySiteVisits({
+    String? token,
+    int page = 1,
+    int perPage = 20,
+  }) {
+    return _authService.mySiteVisits(
+      token: token,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
   Future<LeadsListResult> siteRevisits({
     String? token,
     String? status,
@@ -789,6 +858,22 @@ class AuthProvider {
     return _authService.siteRevisits(
       token: token,
       status: status,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
+  Future<LeadsListResult> myRevisits({
+    required String from,
+    required String to,
+    String? token,
+    int page = 1,
+    int perPage = 20,
+  }) {
+    return _authService.myRevisits(
+      from: from,
+      to: to,
+      token: token,
       page: page,
       perPage: perPage,
     );
@@ -1469,6 +1554,42 @@ class AuthProvider {
   }) {
     return _authService.dashboardRecentActivity(
       limit: limit,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> dashboardMyTargets({
+    required String month,
+    String? token,
+  }) {
+    return _authService.dashboardMyTargets(
+      month: month,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> targets({
+    required String month,
+    String? token,
+  }) {
+    return _authService.targets(
+      month: month,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> setTarget({
+    required String userId,
+    required String month,
+    required int siteVisitTarget,
+    required int closureTarget,
+    String? token,
+  }) {
+    return _authService.setTarget(
+      userId: userId,
+      month: month,
+      siteVisitTarget: siteVisitTarget,
+      closureTarget: closureTarget,
       token: token,
     );
   }

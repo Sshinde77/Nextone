@@ -12,6 +12,7 @@ class CRMAppBottomNav extends StatefulWidget {
   final VoidCallback onTeam;
   final VoidCallback onReports;
   final VoidCallback onSettings;
+  final VoidCallback? onTargets;
   final VoidCallback? onNotifications;
   final VoidCallback? onSalary;
   final VoidCallback? onClosures;
@@ -30,6 +31,7 @@ class CRMAppBottomNav extends StatefulWidget {
   final bool showNotifications;
   final bool showSalary;
   final bool showAttendance;
+  final bool showTargets;
 
   const CRMAppBottomNav({
     super.key,
@@ -43,6 +45,7 @@ class CRMAppBottomNav extends StatefulWidget {
     required this.onTeam,
     required this.onReports,
     required this.onSettings,
+    this.onTargets,
     this.onNotifications,
     this.onSalary,
     this.onClosures,
@@ -61,6 +64,7 @@ class CRMAppBottomNav extends StatefulWidget {
     this.showNotifications = true,
     this.showSalary = false,
     this.showAttendance = true,
+    this.showTargets = false,
   });
 
   @override
@@ -133,6 +137,13 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           label: 'Attendance',
           icon: Icons.fact_check,
           onTap: widget.onReports,
+        ),
+      if (widget.showTargets && widget.onTargets != null)
+        _NavEntry(
+          index: 11,
+          label: 'Targets',
+          icon: Icons.track_changes_outlined,
+          onTap: widget.onTargets!,
         ),
       if (widget.showSalary && widget.onSalary != null)
         _NavEntry(

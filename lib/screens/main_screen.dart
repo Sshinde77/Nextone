@@ -10,6 +10,7 @@ import 'package:nextone/screens/salary/salary_management_page.dart';
 import 'package:nextone/screens/site_visits/site_visits_page.dart';
 import 'package:nextone/screens/site_visits/site_revisits_page.dart';
 import 'package:nextone/screens/team/team_page.dart';
+import 'package:nextone/screens/targets/targets_page.dart';
 import 'package:nextone/screens/users/users_page.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/role_access.dart';
@@ -36,7 +37,7 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     final index = widget.initialIndex;
-    _currentIndex = index < 0 ? 0 : (index >= 11 ? 10 : index);
+    _currentIndex = index < 0 ? 0 : (index >= 12 ? 11 : index);
     _loadAccess();
   }
 
@@ -141,6 +142,8 @@ class _MainScreenState extends State<MainScreen> {
         return const SalaryManagementPage();
       case 10:
         return const ClosuresPage();
+      case 11:
+        return const TargetsPage();
       default:
         return const HomePage(showBottomNav: false);
     }
@@ -202,6 +205,7 @@ class _MainScreenState extends State<MainScreen> {
           showProjects: RoleAccess.canViewProjects(_currentRole),
           showTeam: RoleAccess.canViewTeam(_currentRole),
           showAttendance: RoleAccess.canViewModule('attendance'),
+          showTargets: RoleAccess.canViewModule('targets'),
           showUsers: RoleAccess.canViewUsers(_currentRole),
           showSalary: RoleAccess.canViewSalaryManagement(_currentRole),
           showNotifications: RoleAccess.canViewModule('notifications'),
@@ -214,6 +218,7 @@ class _MainScreenState extends State<MainScreen> {
           onTeam: () => _setIndex(6),
           onReports: () => _setIndex(7),
           onSettings: () => _setIndex(8),
+          onTargets: () => _setIndex(11),
           onNotifications: () => Navigator.pushNamed(context, '/notifications'),
           onSalary: () => _setIndex(9),
           onMore: () {},

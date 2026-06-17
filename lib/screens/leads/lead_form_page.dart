@@ -3,6 +3,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class LeadFormPage extends StatefulWidget {
@@ -22,7 +23,6 @@ class LeadFormPage extends StatefulWidget {
 }
 
 class _LeadFormPageState extends State<LeadFormPage> {
-  final _formKey = GlobalKey<FormState>();
   final _authProvider = AuthProvider();
 
   final _nameController = TextEditingController();
@@ -41,6 +41,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
   bool _isLoadingLeadDetails = false;
   String? _assigneeLoadError;
   String? _selectedAssigneeId;
+  String _currentUserRole = '';
+  String? _currentUserId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
 
   @override
@@ -48,6 +50,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
     super.initState();
     _prefillLeadData();
     _loadLeadDetails();
+    _loadCurrentUserContext();
     _loadAssigneeOptions();
   }
 
@@ -183,19 +186,19 @@ class _LeadFormPageState extends State<LeadFormPage> {
       final uniqueOptions = uniqueById.values.toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
-      final validSelection = _selectedAssigneeId != null &&
-              uniqueOptions.any((option) => option.id == _selectedAssigneeId)
-          ? _selectedAssigneeId
-          : null;
+      final resolvedSelection = _resolveAssigneeSelection(uniqueOptions);
 
       if (!mounted) {
         return;
       }
       setState(() {
         _assigneeOptions = uniqueOptions;
-        _selectedAssigneeId = validSelection;
+        _selectedAssigneeId = resolvedSelection;
         _isLoadingAssignees = false;
       });
+      if (uniqueOptions.isEmpty) {
+        _showSnackBar('No assignee options available.');
+      }
     } catch (error) {
       if (!mounted) {
         return;
@@ -206,6 +209,70 @@ class _LeadFormPageState extends State<LeadFormPage> {
         _assigneeLoadError = AppErrorHandler.friendlyMessage(error);
       });
     }
+  }
+
+  Future<void> _loadCurrentUserContext() async {
+    try {
+      final permissions = await _authProvider.myPermissions(
+        token: _authProvider.currentAuthToken,
+      );
+      final profile =
+          await _authProvider.profile(token: _authProvider.currentAuthToken);
+      final currentUserId = _extractUserId(profile.data);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currentUserRole = permissions.role;
+        _currentUserId = currentUserId;
+        _selectedAssigneeId = _resolveAssigneeSelection(_assigneeOptions);
+      });
+    } catch (_) {
+      // Keep the manual assignee flow when current user context cannot be resolved.
+    }
+  }
+
+  String? _resolveAssigneeSelection(List<_AssigneeOption> options) {
+    final currentSelection = _selectedAssigneeId;
+    if (currentSelection != null &&
+        options.any((option) => option.id == currentSelection)) {
+      return currentSelection;
+    }
+
+    final shouldAssignToSelf = !widget.isEditMode &&
+        RoleAccess.isSalesManager(_currentUserRole) &&
+        (_currentUserId?.isNotEmpty ?? false);
+    if (shouldAssignToSelf) {
+      for (final option in options) {
+        if (option.id == _currentUserId) {
+          return option.id;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  String _resolveAssignedToForCreate() {
+    final selectedAssigneeId = _selectedAssigneeId?.trim() ?? '';
+    if (selectedAssigneeId.isNotEmpty) {
+      return selectedAssigneeId;
+    }
+
+    final normalizedRole = RoleAccess.normalize(_currentUserRole);
+    final shouldAssignToSelf =
+        normalizedRole.isNotEmpty &&
+        normalizedRole != RoleAccess.admin &&
+        normalizedRole != RoleAccess.superAdmin &&
+        (_currentUserId?.trim().isNotEmpty ?? false);
+
+    if (shouldAssignToSelf) {
+      return _currentUserId!.trim();
+    }
+
+    return '';
   }
 
   _AssigneeOption? _assigneeFromApi(Map<String, dynamic> user) {
@@ -262,6 +329,16 @@ class _LeadFormPageState extends State<LeadFormPage> {
     return normalized;
   }
 
+  String? _extractUserId(Map<String, dynamic> source) {
+    for (final key in const ['id', 'user_id', 'userId', 'uuid']) {
+      final value = _readString(source[key]);
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+    return null;
+  }
+
   String _readString(dynamic value) {
     if (value is String) {
       return value.trim();
@@ -296,10 +373,6 @@ class _LeadFormPageState extends State<LeadFormPage> {
     );
     if (!allowed) return;
 
-    final form = _formKey.currentState;
-    if (form == null || !form.validate()) {
-      return;
-    }
     if (_isLoadingLeadDetails) {
       _showSnackBar('Please wait while lead details are loading.');
       return;
@@ -335,7 +408,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           source: _sourceController.text.trim(),
           callbackTime: _callbackTimeController.text.trim(),
           nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
-          assignedTo: _selectedAssigneeId?.trim() ?? '',
+          assignedTo: _resolveAssignedToForCreate(),
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           notes: _notesController.text.trim(),
@@ -427,7 +500,11 @@ class _LeadFormPageState extends State<LeadFormPage> {
   }
 
   Future<void> _openAssigneeMenu(BuildContext context) async {
-    if (_isSubmitting || _isLoadingAssignees || _assigneeOptions.isEmpty) {
+    if (_isSubmitting || _isLoadingAssignees) {
+      return;
+    }
+    if (_assigneeOptions.isEmpty) {
+      _showSnackBar('No assignee options available.');
       return;
     }
 
@@ -487,131 +564,104 @@ class _LeadFormPageState extends State<LeadFormPage> {
         showBackButton: true,
       ),
       body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildCard(
-                  child: Column(
-                    children: [
-                      _buildTextField(
-                        controller: _nameController,
-                        label: 'Name',
-                        hintText: 'Suresh Patel',
-                        validator: (value) {
-                          if ((value?.trim().isEmpty ?? true)) {
-                            return 'Name is required.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        controller: _phoneController,
-                        label: 'Phone',
-                        hintText: '+919876543210',
-                        keyboardType: TextInputType.phone,
-                        validator: (value) {
-                          if ((value?.trim().isEmpty ?? true)) {
-                            return 'Phone is required.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        controller: _alternatePhoneController,
-                        label: 'Alternate Phone Number',
-                        hintText: '+919876543211',
-                        keyboardType: TextInputType.phone,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        controller: _emailController,
-                        label: 'Email',
-                        hintText: 'suresh.patel@gmail.com',
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (value) {
-                          final text = value?.trim() ?? '';
-                          if (text.isEmpty) {
-                            return 'Email is required.';
-                          }
-                          final emailRegex =
-                              RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                          if (!emailRegex.hasMatch(text)) {
-                            return 'Enter a valid email address.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        controller: _sourceController,
-                        label: 'Source',
-                        hintText: 'Facebook',
-                      ),
-                      const SizedBox(height: 12),
-                      _buildDateTimeField(
-                        controller: _callbackTimeController,
-                        label: 'Callback Time',
-                        hintText: 'Select callback date & time',
-                      ),
-                      const SizedBox(height: 12),
-                      _buildDateTimeField(
-                        controller: _nextFollowUpTimeController,
-                        label: 'Next Follow-up Time',
-                        hintText: 'Select next follow-up date & time',
-                      ),
-                      const SizedBox(height: 12),
-                      _buildAssigneeDropdown(),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        controller: _budgetController,
-                        label: 'Budget',
-                        hintText: '80-100L',
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        controller: _locationPreferenceController,
-                        label: 'Location Preference',
-                        hintText: 'Andheri West',
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        controller: _notesController,
-                        label: 'Notes',
-                        hintText: 'Interested in 2BHK, wants sea view',
-                        minLines: 3,
-                        maxLines: 5,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _isSubmitting ? null : _submit,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 48),
-                      backgroundColor: AppColors.primary,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildCard(
+                child: Column(
+                  children: [
+                    _buildTextField(
+                      controller: _nameController,
+                      label: 'Name',
+                      hintText: 'Suresh Patel',
                     ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(
-                            widget.isEditMode ? 'Update Lead' : 'Create Lead'),
-                  ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _phoneController,
+                      label: 'Phone',
+                      hintText: '+919876543210',
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _alternatePhoneController,
+                      label: 'Alternate Phone Number',
+                      hintText: '+919876543211',
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _emailController,
+                      label: 'Email',
+                      hintText: 'suresh.patel@gmail.com',
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _sourceController,
+                      label: 'Source',
+                      hintText: 'Facebook',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDateTimeField(
+                      controller: _callbackTimeController,
+                      label: 'Callback Time',
+                      hintText: 'Select callback date & time',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDateTimeField(
+                      controller: _nextFollowUpTimeController,
+                      label: 'Next Follow-up Time',
+                      hintText: 'Select next follow-up date & time',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildAssigneeDropdown(),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _budgetController,
+                      label: 'Budget',
+                      hintText: '80-100L',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _locationPreferenceController,
+                      label: 'Location Preference',
+                      hintText: 'Andheri West',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _notesController,
+                      label: 'Notes',
+                      hintText: 'Interested in 2BHK, wants sea view',
+                      minLines: 3,
+                      maxLines: 5,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
-              ],
-            ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _isSubmitting ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    backgroundColor: AppColors.primary,
+                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          widget.isEditMode ? 'Update Lead' : 'Create Lead'),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
           ),
         ),
       ),
@@ -655,7 +705,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
         Builder(
           builder: (fieldContext) {
             return GestureDetector(
-              onTap: (_isSubmitting || _isLoadingAssignees)
+              onTap: _isSubmitting
                   ? null
                   : () => _openAssigneeMenu(fieldContext),
               child: Container(
@@ -671,7 +721,12 @@ class _LeadFormPageState extends State<LeadFormPage> {
                   children: [
                     Expanded(
                       child: Text(
-                        selectedLabel ?? 'Select assignee',
+                        selectedLabel ??
+                            (_isLoadingAssignees
+                                ? 'Loading assignees...'
+                                : _assigneeOptions.isEmpty
+                                    ? 'No assignee options available'
+                                    : 'Select assignee'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -706,6 +761,15 @@ class _LeadFormPageState extends State<LeadFormPage> {
           TextButton(
             onPressed: _loadAssigneeOptions,
             child: const Text('Retry'),
+          ),
+        ],
+        if (!_isLoadingAssignees &&
+            _assigneeLoadError == null &&
+            _assigneeOptions.isEmpty) ...[
+          const SizedBox(height: 8),
+          const Text(
+            'No assignee options available.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
       ],

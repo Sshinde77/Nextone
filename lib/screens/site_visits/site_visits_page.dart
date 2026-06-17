@@ -26,6 +26,8 @@ enum _VisitStatus {
   noShow,
 }
 
+enum _VisitScope { myItems, team }
+
 class _SiteVisit {
   _SiteVisit({
     required this.id,
@@ -83,6 +85,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   bool _isLoadingVisits = false;
   String? _loadError;
   String _currentRole = '';
+  _VisitScope _selectedScope = _VisitScope.team;
   String _selectedStatus = '';
   int _currentPage = 1;
   final int _perPage = 10;
@@ -104,6 +107,20 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   bool get _canExportData => RoleAccess.canExportModule('site_visits');
+  bool get _isMyScope => _selectedScope == _VisitScope.myItems;
+  bool get _showScopeTabs =>
+      _currentRole.isNotEmpty &&
+      !RoleAccess.isSuperAdmin(_currentRole) &&
+      !RoleAccess.isAdmin(_currentRole) &&
+      RoleAccess.normalize(_currentRole) != RoleAccess.externalCaller;
+
+  Iterable<_SiteVisit> get _statusFilteredVisits {
+    if (!_isMyScope || _selectedStatus.trim().isEmpty) {
+      return _visits;
+    }
+    final filterStatus = _statusFromApi(_selectedStatus);
+    return _visits.where((visit) => visit.status == filterStatus);
+  }
 
   Future<void> _loadAccess() async {
     try {
@@ -118,7 +135,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   List<_SiteVisit> get _selectedDayVisits {
-    final list = _visits
+    final list = _statusFilteredVisits
         .where((visit) => _isSameDate(visit.dateTime, _selectedDate))
         .toList()
       ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
@@ -126,7 +143,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   List<_SiteVisit> get _allVisitsSorted {
-    final list = List<_SiteVisit>.from(_visits)
+    final list = List<_SiteVisit>.from(_statusFilteredVisits)
       ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
     return list;
   }
@@ -223,6 +240,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                       _buildExportButton(),
                     ],
                   ),
+                  if (_showScopeTabs) ...[
+                    SizedBox(height: _s(10)),
+                    _buildScopeTabs(),
+                  ],
                   SizedBox(height: _s(10)),
                   _buildQuickActions(),
                   SizedBox(height: _s(12)),
@@ -642,6 +663,87 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
             () => setState(() => _isCalendarView = true),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildScopeTabs() {
+    return Container(
+      padding: EdgeInsets.all(_s(4)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(_s(12)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _scopeTabItem(
+              label: 'My Follow Up',
+              isActive: _isMyScope,
+              onTap: () {
+                if (_isMyScope) return;
+                setState(() {
+                  _selectedScope = _VisitScope.myItems;
+                  _currentPage = 1;
+                });
+                _loadSiteVisits(page: 1);
+              },
+            ),
+          ),
+          SizedBox(width: _s(6)),
+          Expanded(
+            child: _scopeTabItem(
+              label: 'Team',
+              isActive: !_isMyScope,
+              onTap: () {
+                if (!_isMyScope) return;
+                setState(() {
+                  _selectedScope = _VisitScope.team;
+                  _currentPage = 1;
+                });
+                _loadSiteVisits(page: 1);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _scopeTabItem({
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(_s(9)),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.symmetric(horizontal: _s(10), vertical: _s(10)),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(_s(9)),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: _s(10),
+                    offset: Offset(0, _s(4)),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isActive ? AppColors.primary : AppColors.textSecondary,
+            fontSize: _fs(12),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
@@ -1727,12 +1829,19 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     });
 
     try {
-      final result = await _authProvider.siteVisits(
-        token: _authProvider.currentAuthToken,
-        status: _selectedStatus.trim().isEmpty ? null : _selectedStatus.trim(),
-        page: targetPage,
-        perPage: _perPage,
-      );
+      final result = _isMyScope
+          ? await _authProvider.mySiteVisits(
+              token: _authProvider.currentAuthToken,
+              page: targetPage,
+              perPage: _perPage,
+            )
+          : await _authProvider.siteVisits(
+              token: _authProvider.currentAuthToken,
+              status:
+                  _selectedStatus.trim().isEmpty ? null : _selectedStatus.trim(),
+              page: targetPage,
+              perPage: _perPage,
+            );
       final mapped = result.items
           .map(_visitFromApi)
           .whereType<_SiteVisit>()

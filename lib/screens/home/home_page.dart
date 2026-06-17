@@ -26,6 +26,9 @@ class _HomePageState extends State<HomePage> {
   bool _statsLoading = true;
   String? _statsError;
   Map<String, dynamic>? _dashboardStats;
+  bool _targetsLoading = true;
+  String? _targetsError;
+  Map<String, dynamic>? _targetStats;
   bool _upcomingVisitsLoading = true;
   String? _upcomingVisitsError;
   List<Map<String, dynamic>> _upcomingVisits = const <Map<String, dynamic>>[];
@@ -63,6 +66,11 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _currentRole = role;
       });
+      if (!RoleAccess.isAdmin(role) &&
+          !RoleAccess.isSuperAdmin(role) &&
+          RoleAccess.canViewModule('targets')) {
+        _loadTargetStats();
+      }
     } catch (_) {
       // Keep the lowest-privilege UI fallback if profile cannot be read.
     }
@@ -94,6 +102,31 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _statsError = error.toString();
         _statsLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadTargetStats() async {
+    setState(() {
+      _targetsLoading = true;
+      _targetsError = null;
+    });
+
+    final now = DateTime.now();
+    final month = '${now.year}-${_twoDigits(now.month)}';
+
+    try {
+      final targets = await _authProvider.dashboardMyTargets(month: month);
+      if (!mounted) return;
+      setState(() {
+        _targetStats = targets;
+        _targetsLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _targetsError = error.toString();
+        _targetsLoading = false;
       });
     }
   }
@@ -280,6 +313,21 @@ class _HomePageState extends State<HomePage> {
               children: [
                 const _HeaderBlock(),
                 const SizedBox(height: 12),
+                if (_currentRole.isNotEmpty &&
+                    !RoleAccess.isAdmin(_currentRole) &&
+                    !RoleAccess.isSuperAdmin(_currentRole))
+                  _MonthlyTargetSection(
+                    stats: _targetStats,
+                    isLoading: _targetsLoading,
+                    hasError: _targetsError != null,
+                    onTap: RoleAccess.canViewModule('targets')
+                        ? () => _openMainTab(11)
+                        : null,
+                  ),
+                if (_currentRole.isNotEmpty &&
+                    !RoleAccess.isAdmin(_currentRole) &&
+                    !RoleAccess.isSuperAdmin(_currentRole))
+                  const SizedBox(height: 12),
                 _StatsGrid(
                   stats: _dashboardStats,
                   isLoading: _statsLoading,
@@ -371,6 +419,7 @@ class _HomePageState extends State<HomePage> {
               showProjects: RoleAccess.canViewProjects(_currentRole),
               showTeam: RoleAccess.canViewTeam(_currentRole),
               showAttendance: RoleAccess.canViewModule('attendance'),
+              showTargets: RoleAccess.canViewModule('targets'),
               showUsers: RoleAccess.canViewUsers(_currentRole),
               showNotifications: RoleAccess.canViewModule('notifications'),
               onDashboard: () {
@@ -400,6 +449,11 @@ class _HomePageState extends State<HomePage> {
               onSettings: () {
                 _openMainTab(8);
               },
+              onTargets: RoleAccess.canViewModule('targets')
+                  ? () {
+                      _openMainTab(11);
+                    }
+                  : null,
               onNotifications: () {
                 Navigator.pushNamed(context, '/notifications');
               },
@@ -916,6 +970,310 @@ class _StatsGrid extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _MonthlyTargetSection extends StatelessWidget {
+  const _MonthlyTargetSection({
+    required this.stats,
+    required this.isLoading,
+    required this.hasError,
+    this.onTap,
+  });
+
+  final Map<String, dynamic>? stats;
+  final bool isLoading;
+  final bool hasError;
+  final VoidCallback? onTap;
+
+  int _readInt(Map<String, dynamic> map, List<String> keys) {
+    for (final key in keys) {
+      final dynamic value = map[key];
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) {
+        final parsed = int.tryParse(value);
+        if (parsed != null) return parsed;
+      }
+    }
+    return 0;
+  }
+
+  String _monthLabel(DateTime now) {
+    const months = <String>[
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${months[now.month - 1]} ${now.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final normalizedStats = stats ?? const <String, dynamic>{};
+
+    final doneSiteVisits = isLoading || hasError
+        ? 0
+        : _readInt(
+            normalizedStats,
+            const ['site_visits_done', 'siteVisitsDone'],
+          );
+    final totalSiteVisits = isLoading || hasError
+        ? 0
+        : _readInt(
+            normalizedStats,
+            const ['site_visit_target', 'siteVisitTarget'],
+          );
+    final siteVisitsRemaining = (totalSiteVisits - doneSiteVisits).clamp(
+      0,
+      999999,
+    );
+
+    final closuresDone = isLoading || hasError
+        ? 0
+        : _readInt(
+            normalizedStats,
+            const ['closures_done', 'closuresDone'],
+          );
+    final closuresTarget = isLoading || hasError
+        ? 0
+        : _readInt(
+            normalizedStats,
+            const ['closure_target', 'closureTarget'],
+          );
+    final closuresRemaining = (closuresTarget - closuresDone).clamp(0, 999999);
+
+    final cardChild = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E88F7), Color(0xFF2159E7)],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x2A1E5DE6),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -36,
+            right: -48,
+            child: Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.track_changes_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'My Target',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _monthLabel(now),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (onTap != null)
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final stackCards = constraints.maxWidth < 560;
+                  final siteVisitsCard = _TargetMetricCard(
+                    title: 'Site Visits',
+                    valueText: '$doneSiteVisits / $totalSiteVisits',
+                    remainingText: '$siteVisitsRemaining remaining',
+                    progress: totalSiteVisits <= 0
+                        ? 0
+                        : doneSiteVisits / totalSiteVisits,
+                  );
+                  final closuresCard = _TargetMetricCard(
+                    title: 'Closures',
+                    valueText: '$closuresDone / $closuresTarget',
+                    remainingText: '$closuresRemaining remaining',
+                    progress: closuresTarget <= 0
+                        ? 0
+                        : closuresDone / closuresTarget,
+                  );
+
+                  if (stackCards) {
+                    return Column(
+                      children: [
+                        siteVisitsCard,
+                        const SizedBox(height: 12),
+                        closuresCard,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(child: siteVisitsCard),
+                      const SizedBox(width: 12),
+                      Expanded(child: closuresCard),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (onTap == null) {
+      return cardChild;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: cardChild,
+      ),
+    );
+  }
+}
+
+class _TargetMetricCard extends StatelessWidget {
+  const _TargetMetricCard({
+    required this.title,
+    required this.valueText,
+    required this.remainingText,
+    required this.progress,
+  });
+
+  final String title;
+  final String valueText;
+  final String remainingText;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final safeProgress = progress.clamp(0.0, 1.0).toDouble();
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                valueText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: safeProgress,
+              minHeight: 8,
+              backgroundColor: Colors.white.withValues(alpha: 0.16),
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            remainingText,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.90),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

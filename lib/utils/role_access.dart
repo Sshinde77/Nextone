@@ -223,6 +223,8 @@ class RoleAccess {
         return 'salary';
       case 10:
         return 'closures';
+      case 11:
+        return 'targets';
       default:
         return null;
     }
@@ -252,6 +254,8 @@ class RoleAccess {
         return 'Salary';
       case 10:
         return 'Closures';
+      case 11:
+        return 'Targets';
       default:
         return 'Module';
     }
