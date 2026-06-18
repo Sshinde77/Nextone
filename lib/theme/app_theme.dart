@@ -154,6 +154,14 @@ abstract final class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          backgroundColor: AppColors.primary.withValues(alpha: 0.06),
+          side: BorderSide(
+            color: AppColors.primary.withValues(alpha: 0.22),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           textStyle: TextStyle(
             fontFamily: appFontFamily,
             fontWeight: FontWeight.w600,

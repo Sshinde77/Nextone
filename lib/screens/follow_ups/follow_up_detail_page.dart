@@ -351,6 +351,14 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
                     completed ? 'Completed' : 'Complete Follow Up',
                   ),
                   style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.06),
+                    side: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.22),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     minimumSize: const Size(double.infinity, 44),
                   ),
                 ),
