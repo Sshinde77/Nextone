@@ -4751,6 +4751,7 @@ class AuthService {
     String callbackTime = '',
     String nextFollowUpTime = '',
     required String assignedTo,
+    String projectId = '',
     required String budget,
     required String locationPreference,
     required String notes,
@@ -4769,6 +4770,7 @@ class AuthService {
       'callback_time': callbackTime.trim(),
       'next_followup_time': nextFollowUpTime.trim(),
       'assigned_to': assignedTo.trim(),
+      'project_id': projectId.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
       'notes': notes.trim(),
@@ -4814,6 +4816,7 @@ class AuthService {
       'callback_time': callbackTime.trim(),
       'next_followup_time': nextFollowUpTime.trim(),
       'assigned_to': assignedTo.trim(),
+      'project_id': projectId.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
       'notes': notes.trim(),
@@ -4823,8 +4826,11 @@ class AuthService {
   Future<Map<String, dynamic>> editLead({
     required String id,
     required String phone,
+    String source = '',
     String callbackTime = '',
     String nextFollowUpTime = '',
+    String assignedTo = '',
+    String projectId = '',
     required String budget,
     required String locationPreference,
     String? token,
@@ -4840,8 +4846,11 @@ class AuthService {
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode({
       'phone': phone.trim(),
+      'source': source.trim(),
       'callback_time': callbackTime.trim(),
       'next_followup_time': nextFollowUpTime.trim(),
+      'assigned_to': assignedTo.trim(),
+      'project_id': projectId.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
     });

@@ -39,6 +39,18 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     'doc',
     'docx',
   ];
+  static const List<_ShareFieldOption> _shareFieldOptions = <_ShareFieldOption>[
+    _ShareFieldOption(key: 'name', label: 'Project Name'),
+    _ShareFieldOption(key: 'developer', label: 'Developer'),
+    _ShareFieldOption(key: 'city', label: 'City'),
+    _ShareFieldOption(key: 'locality', label: 'Locality'),
+    _ShareFieldOption(key: 'price_range', label: 'Price Range'),
+    _ShareFieldOption(key: 'total_units', label: 'Total Units'),
+    _ShareFieldOption(key: 'rera_number', label: 'RERA Number'),
+    _ShareFieldOption(key: 'configurations', label: 'Configurations'),
+    _ShareFieldOption(key: 'status', label: 'Status'),
+    _ShareFieldOption(key: 'description', label: 'Description'),
+  ];
 
   final _authProvider = AuthProvider();
   final RegExp _emailPattern =
@@ -461,17 +473,240 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  List<_ProjectDocRef> _extractAllDocuments(Map<String, dynamic> payload) {
+    final collected = <_ProjectDocRef>[];
+    final seenIds = <String>{};
+    const categoryKeys = <String>{
+      'unit_plans',
+      'creatives',
+      'documents',
+      'payment_plans',
+      'videos',
+    };
+
+    void addDoc(Map<String, dynamic> node) {
+      final doc = _ProjectDocRef.fromMap(node);
+      if (doc.id.isEmpty || seenIds.contains(doc.id)) {
+        return;
+      }
+      seenIds.add(doc.id);
+      collected.add(doc);
+    }
+
+    void visitNode(dynamic node, {String? parentKey}) {
+      if (node is List) {
+        for (final item in node) {
+          visitNode(item, parentKey: parentKey);
+        }
+        return;
+      }
+      if (node is! Map) return;
+      final map = Map<String, dynamic>.from(node);
+      if (_ProjectDocRef.fromMap(map).id.isNotEmpty) {
+        addDoc(map);
+      }
+
+      for (final entry in map.entries) {
+        final key = entry.key.trim().toLowerCase();
+        final value = entry.value;
+        if (categoryKeys.contains(key)) {
+          visitNode(value, parentKey: key);
+        } else if (parentKey != null && (value is List || value is Map)) {
+          visitNode(value, parentKey: parentKey);
+        }
+      }
+    }
+
+    visitNode(payload);
+    return collected;
+  }
+
+  Future<List<String>?> _openMultiSelectSheet({
+    required String title,
+    required List<_ShareOptionItem> options,
+    required List<String> initialSelectedIds,
+  }) async {
+    final initial = List<String>.from(initialSelectedIds);
+    return showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final selectedIds = List<String>.from(initial);
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 14,
+                  bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+                ),
+                child: SizedBox(
+                  height: 420,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.border,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        options.isEmpty
+                            ? 'No options available.'
+                            : 'Select one or more options.',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: options.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Nothing available to select.',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: options.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox.shrink(),
+                                itemBuilder: (context, index) {
+                                  final option = options[index];
+                                  final selected =
+                                      selectedIds.contains(option.id);
+                                  return CheckboxListTile(
+                                    value: selected,
+                                    dense: true,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                    activeColor: AppColors.primary,
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(
+                                      option.label,
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    onChanged: (value) {
+                                      setSheetState(() {
+                                        if (value == true) {
+                                          if (!selectedIds.contains(option.id)) {
+                                            selectedIds.add(option.id);
+                                          }
+                                        } else {
+                                          selectedIds.remove(option.id);
+                                        }
+                                      });
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(sheetContext).pop(),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(46),
+                                side: const BorderSide(color: AppColors.border),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.of(sheetContext)
+                                  .pop(List<String>.from(selectedIds)),
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(46),
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Apply'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _shareProjectFromDetail() async {
     final data = _data ?? const <String, dynamic>{};
     final projectName = _readString(data['name']).isEmpty
         ? 'Project'
         : _readString(data['name']);
+    List<_ProjectDocRef> availableDocuments = const <_ProjectDocRef>[];
+    try {
+      final payload = await _authProvider.projectDocuments(
+        id: widget.projectId,
+        token: _authProvider.currentAuthToken,
+      );
+      availableDocuments = _extractAllDocuments(payload);
+    } catch (error) {
+      if (mounted) {
+        _showSnackBar(
+          'Could not load project documents. You can still share the project details.',
+        );
+      }
+    }
+    if (!mounted) {
+      return;
+    }
 
     final emailController = TextEditingController();
     final messageController = TextEditingController(
-      text: 'Hi, please find the project details as discussed.',
+      text: 'Hi, here are the project details!',
     );
     final emails = <String>[];
+    final selectedFieldKeys = <String>['name'];
+    final selectedDocumentIds = <String>[];
     var isSharing = false;
 
     bool isValidEmail(String value) => _emailPattern.hasMatch(value.trim());
@@ -524,6 +759,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   id: widget.projectId,
                   emails: emails,
                   message: messageController.text.trim(),
+                  fields: selectedFieldKeys,
+                  documentIds: selectedDocumentIds,
                   token: _authProvider.currentAuthToken,
                 );
                 if (!mounted) return;
@@ -725,6 +962,184 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       ),
                     ),
                     const SizedBox(height: 14),
+                    const Text(
+                      'Fields to include',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: isSharing
+                          ? null
+                          : () async {
+                              final result = await _openMultiSelectSheet(
+                                title: 'Select fields',
+                                options: _shareFieldOptions
+                                    .map(
+                                      (option) => _ShareOptionItem(
+                                        id: option.key,
+                                        label: option.label,
+                                      ),
+                                    )
+                                    .toList(),
+                                initialSelectedIds: selectedFieldKeys,
+                              );
+                              if (result == null || !dialogContext.mounted) {
+                                return;
+                              }
+                              setDialogState(() {
+                                selectedFieldKeys
+                                  ..clear()
+                                  ..addAll(result);
+                              });
+                            },
+                      borderRadius: BorderRadius.circular(14),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.primary),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                selectedFieldKeys.isEmpty
+                                    ? 'Select fields'
+                                    : _shareFieldOptions
+                                        .where((option) =>
+                                            selectedFieldKeys.contains(option.key))
+                                        .map((option) => option.label)
+                                        .join(', '),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: selectedFieldKeys.isEmpty
+                                      ? AppColors.textSecondary
+                                      : AppColors.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: AppColors.textSecondary,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Documents to include',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: isSharing
+                          ? null
+                          : () async {
+                              final result = await _openMultiSelectSheet(
+                                title: 'Select documents',
+                                options: availableDocuments
+                                    .map(
+                                      (document) => _ShareOptionItem(
+                                        id: document.id,
+                                        label: document.name,
+                                      ),
+                                    )
+                                    .toList(),
+                                initialSelectedIds: selectedDocumentIds,
+                              );
+                              if (result == null || !dialogContext.mounted) {
+                                return;
+                              }
+                              setDialogState(() {
+                                selectedDocumentIds
+                                  ..clear()
+                                  ..addAll(result);
+                              });
+                            },
+                      borderRadius: BorderRadius.circular(14),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: AppColors.primary),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                selectedDocumentIds.isEmpty
+                                    ? 'Select documents'
+                                    : availableDocuments
+                                        .where((document) => selectedDocumentIds
+                                            .contains(document.id))
+                                        .map((document) => document.name)
+                                        .join(', '),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: selectedDocumentIds.isEmpty
+                                      ? AppColors.textSecondary
+                                      : AppColors.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: AppColors.textSecondary,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -734,10 +1149,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         border: Border.all(color: AppColors.border),
                       ),
                       child: const Text(
-                        'Email will include:\n'
-                        '- Full project details (location, price, RERA, configurations)\n'
-                        '- All unit plans + creatives attached as a ZIP file\n'
-                        '- Your personal message (if provided)',
+                        'Email will include the selected project fields, selected documents, and your personal message.',
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 13,
@@ -1834,6 +2246,100 @@ class _ProjectDocument {
     if (parsed == null) return raw;
     return DateFormat('dd MMM yyyy').format(parsed.toLocal());
   }
+}
+
+class _ProjectDocRef {
+  const _ProjectDocRef({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
+
+  factory _ProjectDocRef.fromMap(Map<String, dynamic> json) {
+    String read(dynamic value) {
+      if (value is String) return value.trim();
+      if (value is num || value is bool) return value.toString();
+      return '';
+    }
+
+    String readFirstValue(
+      Map<String, dynamic> source,
+      List<String> keys,
+    ) {
+      for (final key in keys) {
+        final value = read(source[key]);
+        if (value.isNotEmpty) {
+          return value;
+        }
+      }
+
+      for (final value in source.values) {
+        if (value is Map<String, dynamic>) {
+          final nested = readFirstValue(value, keys);
+          if (nested.isNotEmpty) {
+            return nested;
+          }
+        } else if (value is Map) {
+          final nested = readFirstValue(Map<String, dynamic>.from(value), keys);
+          if (nested.isNotEmpty) {
+            return nested;
+          }
+        }
+      }
+
+      return '';
+    }
+
+    return _ProjectDocRef(
+      id: readFirstValue(json, const <String>[
+        'id',
+        '_id',
+        'doc_id',
+        'document_id',
+        'documentId',
+        'uuid',
+        'file_id',
+        'fileId',
+        'asset_id',
+        'assetId',
+        'public_id',
+        'publicId',
+      ]),
+      name: readFirstValue(json, const <String>[
+        'file_name',
+        'filename',
+        'original_name',
+        'originalName',
+        'name',
+        'document_name',
+        'documentName',
+        'title',
+        'label',
+      ]),
+    );
+  }
+}
+
+class _ShareFieldOption {
+  const _ShareFieldOption({
+    required this.key,
+    required this.label,
+  });
+
+  final String key;
+  final String label;
+}
+
+class _ShareOptionItem {
+  const _ShareOptionItem({
+    required this.id,
+    required this.label,
+  });
+
+  final String id;
+  final String label;
 }
 
 class _ProjectLead {

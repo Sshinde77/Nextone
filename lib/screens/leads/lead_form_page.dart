@@ -29,7 +29,6 @@ class _LeadFormPageState extends State<LeadFormPage> {
   final _phoneController = TextEditingController();
   final _alternatePhoneController = TextEditingController();
   final _emailController = TextEditingController();
-  final _sourceController = TextEditingController();
   final _callbackTimeController = TextEditingController();
   final _nextFollowUpTimeController = TextEditingController();
   final _budgetController = TextEditingController();
@@ -38,12 +37,20 @@ class _LeadFormPageState extends State<LeadFormPage> {
 
   bool _isSubmitting = false;
   bool _isLoadingAssignees = true;
+  bool _isLoadingLeadSources = true;
+  bool _isLoadingProjects = true;
   bool _isLoadingLeadDetails = false;
   String? _assigneeLoadError;
+  String? _leadSourceLoadError;
+  String? _projectLoadError;
   String? _selectedAssigneeId;
+  String? _selectedLeadSource;
+  String? _selectedProjectId;
   String _currentUserRole = '';
   String? _currentUserId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
+  List<_LeadSourceOption> _leadSourceOptions = const <_LeadSourceOption>[];
+  List<_ProjectOption> _projectOptions = const <_ProjectOption>[];
 
   @override
   void initState() {
@@ -52,6 +59,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
     _loadLeadDetails();
     _loadCurrentUserContext();
     _loadAssigneeOptions();
+    _loadLeadSourceOptions();
+    _loadProjectOptions();
   }
 
   @override
@@ -60,7 +69,6 @@ class _LeadFormPageState extends State<LeadFormPage> {
     _phoneController.dispose();
     _alternatePhoneController.dispose();
     _emailController.dispose();
-    _sourceController.dispose();
     _callbackTimeController.dispose();
     _nextFollowUpTimeController.dispose();
     _budgetController.dispose();
@@ -96,7 +104,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           data['alternate_phone'],
     );
     _emailController.text = _readString(data['email']);
-    _sourceController.text = _readString(data['source']);
+    _selectedLeadSource = _readString(data['source']);
     _callbackTimeController.text = _readString(
       data['callback_time'] ?? data['callbackTime'],
     );
@@ -112,6 +120,23 @@ class _LeadFormPageState extends State<LeadFormPage> {
       data['location_preference'] ?? data['locationPreference'],
     );
     _notesController.text = _readString(data['notes']);
+
+    final project = data['project'];
+    if (project is Map<String, dynamic>) {
+      _selectedProjectId = _readString(
+        project['id'] ??
+            project['project_id'] ??
+            project['projectId'] ??
+            project['uuid'],
+      );
+    } else {
+      _selectedProjectId = _readString(
+        data['project_id'] ?? data['projectId'] ?? data['project_uuid'],
+      );
+    }
+    if (_selectedProjectId != null && _selectedProjectId!.isEmpty) {
+      _selectedProjectId = null;
+    }
 
     final assigned = data['assigned_to'] ?? data['assignee'];
     if (assigned is Map<String, dynamic>) {
@@ -211,6 +236,91 @@ class _LeadFormPageState extends State<LeadFormPage> {
     }
   }
 
+  Future<void> _loadLeadSourceOptions() async {
+    setState(() {
+      _isLoadingLeadSources = true;
+      _leadSourceLoadError = null;
+    });
+
+    try {
+      final items = await _authProvider.leadSourcesConfig(
+        token: _authProvider.currentAuthToken,
+      );
+      final options = items
+          .map(_LeadSourceOption.fromApi)
+          .where((option) => option.isActive && option.name.isNotEmpty)
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _leadSourceOptions = options;
+        _isLoadingLeadSources = false;
+        if (_selectedLeadSource != null &&
+            _selectedLeadSource!.isNotEmpty &&
+            !options.any((option) => option.name == _selectedLeadSource)) {
+          _selectedLeadSource = null;
+        }
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingLeadSources = false;
+        _leadSourceOptions = const <_LeadSourceOption>[];
+        _leadSourceLoadError = AppErrorHandler.friendlyMessage(error);
+      });
+    }
+  }
+
+  Future<void> _loadProjectOptions() async {
+    setState(() {
+      _isLoadingProjects = true;
+      _projectLoadError = null;
+    });
+
+    try {
+      final result = await _authProvider.projects(
+        token: _authProvider.currentAuthToken,
+        page: 1,
+        perPage: 200,
+      );
+      final options = result.items
+          .map(_ProjectOption.tryFromApi)
+          .where((option) => option != null)
+          .cast<_ProjectOption>()
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _projectOptions = options;
+        _isLoadingProjects = false;
+        if (_selectedProjectId != null &&
+            _selectedProjectId!.isNotEmpty &&
+            !options.any((option) => option.id == _selectedProjectId)) {
+          _selectedProjectId = null;
+        }
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingProjects = false;
+        _projectOptions = const <_ProjectOption>[];
+        _projectLoadError = AppErrorHandler.friendlyMessage(error);
+      });
+    }
+  }
+
   Future<void> _loadCurrentUserContext() async {
     try {
       final permissions = await _authProvider.myPermissions(
@@ -273,6 +383,14 @@ class _LeadFormPageState extends State<LeadFormPage> {
     }
 
     return '';
+  }
+
+  String _resolveSelectedLeadSource() {
+    return _selectedLeadSource?.trim() ?? '';
+  }
+
+  String _resolveSelectedProjectId() {
+    return _selectedProjectId?.trim() ?? '';
   }
 
   _AssigneeOption? _assigneeFromApi(Map<String, dynamic> user) {
@@ -393,8 +511,11 @@ class _LeadFormPageState extends State<LeadFormPage> {
         await _authProvider.editLead(
           id: leadId,
           phone: _phoneController.text.trim(),
+          source: _resolveSelectedLeadSource(),
           callbackTime: _callbackTimeController.text.trim(),
           nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
+          assignedTo: _selectedAssigneeId?.trim() ?? '',
+          projectId: _resolveSelectedProjectId(),
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           token: _authProvider.currentAuthToken,
@@ -405,10 +526,11 @@ class _LeadFormPageState extends State<LeadFormPage> {
           phone: _phoneController.text.trim(),
           alternatePhoneNumber: _alternatePhoneController.text.trim(),
           email: _emailController.text.trim(),
-          source: _sourceController.text.trim(),
+          source: _resolveSelectedLeadSource(),
           callbackTime: _callbackTimeController.text.trim(),
           nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
           assignedTo: _resolveAssignedToForCreate(),
+          projectId: _resolveSelectedProjectId(),
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           notes: _notesController.text.trim(),
@@ -499,62 +621,6 @@ class _LeadFormPageState extends State<LeadFormPage> {
     return value.toUtc().toIso8601String();
   }
 
-  Future<void> _openAssigneeMenu(BuildContext context) async {
-    if (_isSubmitting || _isLoadingAssignees) {
-      return;
-    }
-    if (_assigneeOptions.isEmpty) {
-      _showSnackBar('No assignee options available.');
-      return;
-    }
-
-    final fieldContext = context;
-    final renderBox = fieldContext.findRenderObject() as RenderBox?;
-    if (renderBox == null) {
-      return;
-    }
-
-    final overlay =
-        Overlay.of(fieldContext).context.findRenderObject() as RenderBox;
-    final topLeft = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
-    final bottomLeft = renderBox.localToGlobal(
-      Offset(0, renderBox.size.height),
-      ancestor: overlay,
-    );
-
-    final selected = await showMenu<String>(
-      context: fieldContext,
-      color: Colors.white,
-      elevation: 4,
-      constraints: BoxConstraints.tightFor(width: renderBox.size.width),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      position: RelativeRect.fromLTRB(
-        topLeft.dx,
-        bottomLeft.dy + 6,
-        overlay.size.width - topLeft.dx - renderBox.size.width,
-        overlay.size.height - bottomLeft.dy,
-      ),
-      items: _assigneeOptions
-          .map(
-            (user) => PopupMenuItem<String>(
-              value: user.id,
-              child: Text(user.name),
-            ),
-          )
-          .toList(),
-    );
-
-    if (!mounted || selected == null) {
-      return;
-    }
-    setState(() {
-      _selectedAssigneeId = selected;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -599,10 +665,33 @@ class _LeadFormPageState extends State<LeadFormPage> {
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 12),
-                    _buildTextField(
-                      controller: _sourceController,
-                      label: 'Source',
-                      hintText: 'Facebook',
+                    _buildProjectDropdown(),
+                    const SizedBox(height: 12),
+                    _buildSelectionDropdown<String>(
+                      label: 'Lead Source',
+                      selectedValue: _selectedLeadSource,
+                      selectedLabel: _selectedLeadSource,
+                      placeholder: _isLoadingLeadSources
+                          ? 'Loading lead sources...'
+                          : _leadSourceOptions.isEmpty
+                              ? 'No lead sources available'
+                              : 'Select lead source',
+                      options: _leadSourceOptions
+                          .map(
+                            (option) => _DropdownOption<String>(
+                              value: option.name,
+                              label: option.name,
+                            ),
+                          )
+                          .toList(),
+                      isLoading: _isLoadingLeadSources,
+                      errorText: _leadSourceLoadError,
+                      onRetry: _loadLeadSourceOptions,
+                      onSelected: (value) {
+                        setState(() {
+                          _selectedLeadSource = value;
+                        });
+                      },
                     ),
                     const SizedBox(height: 12),
                     _buildDateTimeField(
@@ -690,87 +779,153 @@ class _LeadFormPageState extends State<LeadFormPage> {
       }
     }
 
+    return _buildSelectionDropdown<String>(
+      label: 'Assigned To',
+      selectedValue: _selectedAssigneeId,
+      selectedLabel: selectedLabel,
+      placeholder: _isLoadingAssignees
+          ? 'Loading assignees...'
+          : _assigneeOptions.isEmpty
+              ? 'No assignee options available'
+              : 'Select assignee',
+      options: _assigneeOptions
+          .map(
+            (user) => _DropdownOption<String>(
+              value: user.id,
+              label: user.name,
+            ),
+          )
+          .toList(),
+      isLoading: _isLoadingAssignees,
+      errorText: _assigneeLoadError,
+      helperText: _isLoadingAssignees
+          ? 'Loading sale_executive, sales_manager and external_caller users...'
+          : null,
+      onRetry: _loadAssigneeOptions,
+      onSelected: (value) {
+        setState(() {
+          _selectedAssigneeId = value;
+        });
+      },
+    );
+  }
+
+  Widget _buildProjectDropdown() {
+    String? selectedLabel;
+    for (final option in _projectOptions) {
+      if (option.id == _selectedProjectId) {
+        selectedLabel = option.name;
+        break;
+      }
+    }
+
+    return _buildSelectionDropdown<String>(
+      label: 'Project Name',
+      selectedValue: _selectedProjectId,
+      selectedLabel: selectedLabel,
+      placeholder: _isLoadingProjects
+          ? 'Loading projects...'
+          : _projectOptions.isEmpty
+              ? 'No projects available'
+              : 'Select project',
+      options: _projectOptions
+          .map(
+            (project) => _DropdownOption<String>(
+              value: project.id,
+              label: project.name,
+            ),
+          )
+          .toList(),
+      isLoading: _isLoadingProjects,
+      errorText: _projectLoadError,
+      onRetry: _loadProjectOptions,
+      onSelected: (value) {
+        setState(() {
+          _selectedProjectId = value;
+        });
+      },
+    );
+  }
+
+  Widget _buildSelectionDropdown<T>({
+    required String label,
+    required T? selectedValue,
+    required String? selectedLabel,
+    required String placeholder,
+    required List<_DropdownOption<T>> options,
+    required ValueChanged<T?> onSelected,
+    bool isLoading = false,
+    String? errorText,
+    String? helperText,
+    Future<void> Function()? onRetry,
+  }) {
+    final hasSelectedValue =
+        selectedValue != null && options.any((option) => option.value == selectedValue);
+    T? dropdownValue;
+    if (hasSelectedValue) {
+      dropdownValue = selectedValue;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Assigned To',
-          style: TextStyle(
+        Text(
+          label,
+          style: const TextStyle(
             color: AppColors.textSecondary,
             fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
         ),
         const SizedBox(height: 6),
-        Builder(
-          builder: (fieldContext) {
-            return GestureDetector(
-              onTap: _isSubmitting
-                  ? null
-                  : () => _openAssigneeMenu(fieldContext),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white,
+        DropdownButtonFormField<T>(
+          value: dropdownValue,
+          isExpanded: true,
+          decoration: _fieldDecoration(hintText: placeholder),
+          items: options
+              .map(
+                (option) => DropdownMenuItem<T>(
+                  value: option.value,
+                  child: Text(
+                    option.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        selectedLabel ??
-                            (_isLoadingAssignees
-                                ? 'Loading assignees...'
-                                : _assigneeOptions.isEmpty
-                                    ? 'No assignee options available'
-                                    : 'Select assignee'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: selectedLabel == null
-                              ? Colors.grey
-                              : Colors.black,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.keyboard_arrow_down),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-        if (_isLoadingAssignees) ...[
-          const SizedBox(height: 8),
-          const Text(
-            'Loading sale_executive and sales_manager users...',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              )
+              .toList(),
+          onChanged: (_isSubmitting || isLoading || options.isEmpty)
+              ? null
+              : onSelected,
+          hint: Text(
+            selectedLabel?.isNotEmpty == true ? selectedLabel! : placeholder,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: selectedLabel?.isNotEmpty == true ? Colors.black : Colors.grey,
+            ),
           ),
-        ],
-        if (_assigneeLoadError != null) ...[
+        ),
+        if (helperText != null && helperText.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
-            _assigneeLoadError!,
-            style: const TextStyle(fontSize: 12, color: AppColors.error),
-          ),
-          const SizedBox(height: 4),
-          TextButton(
-            onPressed: _loadAssigneeOptions,
-            child: const Text('Retry'),
+            helperText,
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
-        if (!_isLoadingAssignees &&
-            _assigneeLoadError == null &&
-            _assigneeOptions.isEmpty) ...[
+        if (errorText != null) ...[
           const SizedBox(height: 8),
-          const Text(
-            'No assignee options available.',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          Text(
+            errorText,
+            style: const TextStyle(fontSize: 12, color: AppColors.error),
           ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('Retry'),
+            ),
+          ],
         ],
       ],
     );
@@ -872,4 +1027,92 @@ class _AssigneeOption {
 
   final String id;
   final String name;
+}
+
+class _LeadSourceOption {
+  const _LeadSourceOption({
+    required this.id,
+    required this.name,
+    required this.isActive,
+  });
+
+  final String id;
+  final String name;
+  final bool isActive;
+
+  factory _LeadSourceOption.fromApi(Map<String, dynamic> json) {
+    String readString(dynamic value) {
+      if (value is String) {
+        return value.trim();
+      }
+      if (value is num || value is bool) {
+        return value.toString().trim();
+      }
+      return '';
+    }
+
+    bool readBool(dynamic value) {
+      if (value is bool) {
+        return value;
+      }
+      if (value is num) {
+        return value != 0;
+      }
+      if (value is String) {
+        final normalized = value.trim().toLowerCase();
+        return normalized == 'true' || normalized == '1' || normalized == 'yes';
+      }
+      return false;
+    }
+
+    return _LeadSourceOption(
+      id: readString(json['id'] ?? json['source_id'] ?? json['sourceId']),
+      name: readString(json['name'] ?? json['source']),
+      isActive: readBool(
+        json['is_active'] ?? json['isActive'] ?? json['active'] ?? true,
+      ),
+    );
+  }
+}
+
+class _ProjectOption {
+  const _ProjectOption({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
+
+  static _ProjectOption? tryFromApi(Map<String, dynamic> json) {
+    String readString(dynamic value) {
+      if (value is String) {
+        return value.trim();
+      }
+      if (value is num || value is bool) {
+        return value.toString().trim();
+      }
+      return '';
+    }
+
+    final id = readString(
+      json['id'] ?? json['project_id'] ?? json['projectId'] ?? json['uuid'],
+    );
+    final name = readString(json['name'] ?? json['project_name']);
+    if (id.isEmpty || name.isEmpty) {
+      return null;
+    }
+
+    return _ProjectOption(id: id, name: name);
+  }
+}
+
+class _DropdownOption<T> {
+  const _DropdownOption({
+    required this.value,
+    required this.label,
+  });
+
+  final T value;
+  final String label;
 }
