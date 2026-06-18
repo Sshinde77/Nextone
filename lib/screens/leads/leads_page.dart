@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously, unused_element, unused_local_variable
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';

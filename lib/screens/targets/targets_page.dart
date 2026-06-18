@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously, unused_field
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -1070,7 +1072,7 @@ class _MonthDropdown extends StatelessWidget {
       MapEntry(12, 'December'),
     ];
     return DropdownButtonFormField<int>(
-      value: value,
+      initialValue: value,
       onChanged: onChanged,
       decoration: _dropdownDecoration(),
       items: months
@@ -1099,7 +1101,7 @@ class _YearDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<int>(
-      value: value,
+      initialValue: value,
       onChanged: onChanged,
       decoration: _dropdownDecoration(),
       items: years

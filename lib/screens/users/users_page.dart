@@ -1,11 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/team/add_team_member_page.dart';
 import 'package:nextone/screens/team/team_member_details_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
-import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/assign_manager_dialog.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -55,7 +53,6 @@ class _UsersPageState extends State<UsersPage> {
   bool get _canCreateUsers => RoleAccess.canCreateUsers(_currentRole);
   bool get _canEditUsers => RoleAccess.canEditUsers(_currentRole);
   bool get _canDeleteUsers => RoleAccess.canDeleteUsers(_currentRole);
-  bool get _canExportData => RoleAccess.canExportModule('users');
   bool get _canAssignManager => RoleAccess.canAssignManager(_currentRole);
 
   Future<void> _loadAccess() async {

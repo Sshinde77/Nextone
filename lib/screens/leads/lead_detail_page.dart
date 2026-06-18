@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously, unused_element
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nextone/constants/app_colors.dart';
@@ -1163,7 +1165,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   }
 
   String _toHexColor(Color color) {
-    final value = color.value.toRadixString(16).padLeft(8, '0').toUpperCase();
+    final value = color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase();
     return '#${value.substring(2)}';
   }
 

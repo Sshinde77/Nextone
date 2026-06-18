@@ -6831,7 +6831,7 @@ class AuthService {
       }
     }
 
-    List<String> _readStringList(dynamic value) {
+    List<String> readStringList(dynamic value) {
       if (value is! List) {
         return const <String>[];
       }
@@ -6844,8 +6844,8 @@ class AuthService {
     return EffectivePermissionsResult(
       role: (data['role'] ?? '').toString().trim().toLowerCase(),
       permissions: permissionsMap,
-      modules: _readStringList(data['modules']),
-      permissionKeys: _readStringList(data['permission_keys']),
+      modules: readStringList(data['modules']),
+      permissionKeys: readStringList(data['permission_keys']),
       message: _readMessage(body) ?? 'Effective permissions fetched.',
     );
   }

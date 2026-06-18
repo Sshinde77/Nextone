@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable, unused_field, unused_element
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';

@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
@@ -879,7 +881,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
         ),
         const SizedBox(height: 6),
         DropdownButtonFormField<T>(
-          value: dropdownValue,
+          initialValue: dropdownValue,
           isExpanded: true,
           decoration: _fieldDecoration(hintText: placeholder),
           items: options

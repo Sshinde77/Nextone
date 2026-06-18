@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously, unused_element, unused_element_parameter
+
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -54,7 +56,6 @@ class _FollowUpPageState extends State<FollowUpPage> {
     _loadFollowUps();
   }
 
-  bool get _canExportData => RoleAccess.canExportModule('follow_ups');
   bool get _isMyScope => _selectedScope == _FollowUpScope.myFollowUp;
   bool get _showScopeTabs =>
       _currentRole.isNotEmpty &&
