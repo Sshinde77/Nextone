@@ -41,6 +41,18 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     'doc',
     'docx',
   ];
+  static const List<String> _videoExtensions = <String>[
+    'mp4',
+    'mov',
+    'avi',
+    'mkv',
+    'webm',
+    'mp3',
+    'wav',
+    'm4a',
+    'aac',
+    'ogg',
+  ];
   static const List<_ShareFieldOption> _shareFieldOptions = <_ShareFieldOption>[
     _ShareFieldOption(key: 'name', label: 'Project Name'),
     _ShareFieldOption(key: 'developer', label: 'Developer'),
@@ -62,6 +74,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   Map<String, dynamic>? _data;
   List<_ProjectDocument> _unitPlans = const <_ProjectDocument>[];
   List<_ProjectDocument> _creatives = const <_ProjectDocument>[];
+  List<_ProjectDocument> _paymentPlans = const <_ProjectDocument>[];
+  List<_ProjectDocument> _videos = const <_ProjectDocument>[];
   bool _isLoading = true;
   bool _isLoadingDocuments = true;
   bool _isLoadingLeads = true;
@@ -137,6 +151,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       setState(() {
         _unitPlans = _readDocuments(payload, 'unit_plans');
         _creatives = _readDocuments(payload, 'creatives');
+        _paymentPlans = _readDocuments(payload, 'payment_plans');
+        _videos = _readDocuments(payload, 'videos');
         _isLoadingDocuments = false;
       });
     } catch (error) {
@@ -209,8 +225,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     if (_isDocumentAction) {
       return;
     }
-    final uploadAsUnitPlans = await _chooseDocumentUploadType();
-    if (uploadAsUnitPlans == null) {
+    final uploadCategory = await _chooseDocumentUploadType();
+    if (uploadCategory == null) {
       return;
     }
     if (kIsWeb) {
@@ -220,7 +236,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: _documentExtensions,
+      allowedExtensions: uploadCategory == 'videos'
+          ? _videoExtensions
+          : _documentExtensions,
       allowMultiple: true,
     );
     if (!mounted || picked == null || picked.files.isEmpty) {
@@ -228,9 +246,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     }
 
     final acceptedPaths = <String>[];
+    final allowedExtensions = uploadCategory == 'videos'
+        ? _videoExtensions
+        : _documentExtensions;
     for (final file in picked.files.take(_maxDocumentCount)) {
       final extension = (file.extension ?? '').toLowerCase();
-      if (!_documentExtensions.contains(extension)) {
+      if (!allowedExtensions.contains(extension)) {
         _showSnackBar('Unsupported file skipped: ${file.name}');
         continue;
       }
@@ -254,8 +275,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     try {
       await _authProvider.uploadProjectDocuments(
         id: widget.projectId,
-        unitPlanFilePaths: uploadAsUnitPlans ? acceptedPaths : const <String>[],
-        creativeFilePaths: uploadAsUnitPlans ? const <String>[] : acceptedPaths,
+        unitPlanFilePaths:
+            uploadCategory == 'unit_plans' ? acceptedPaths : const <String>[],
+        creativeFilePaths:
+            uploadCategory == 'creatives' ? acceptedPaths : const <String>[],
+        paymentPlanFilePaths:
+            uploadCategory == 'payment_plans' ? acceptedPaths : const <String>[],
+        videoFilePaths:
+            uploadCategory == 'videos' ? acceptedPaths : const <String>[],
         token: _authProvider.currentAuthToken,
       );
       await _loadDocuments(showLoading: false);
@@ -273,8 +300,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     }
   }
 
-  Future<bool?> _chooseDocumentUploadType() {
-    return showModalBottomSheet<bool>(
+  Future<String?> _chooseDocumentUploadType() {
+    return showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
@@ -309,13 +336,25 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   leading: const Icon(Icons.home_work_outlined,
                       color: AppColors.primary),
                   title: const Text('Unit Plans'),
-                  onTap: () => Navigator.of(context).pop(true),
+                  onTap: () => Navigator.of(context).pop('unit_plans'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.collections_outlined,
                       color: AppColors.primary),
                   title: const Text('Creatives'),
-                  onTap: () => Navigator.of(context).pop(false),
+                  onTap: () => Navigator.of(context).pop('creatives'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.receipt_long_outlined,
+                      color: AppColors.primary),
+                  title: const Text('Payment Plans'),
+                  onTap: () => Navigator.of(context).pop('payment_plans'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.video_library_outlined,
+                      color: AppColors.primary),
+                  title: const Text('Videos'),
+                  onTap: () => Navigator.of(context).pop('videos'),
                 ),
               ],
             ),
@@ -339,6 +378,58 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       );
       if (!mounted) return;
       await _saveExportedFile(exported, 'Documents ZIP');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDocumentAction = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _downloadAllPaymentPlans() async {
+    if (_isDocumentAction) {
+      return;
+    }
+    setState(() {
+      _isDocumentAction = true;
+    });
+    try {
+      final exported = await _authProvider.downloadAllProjectPaymentPlans(
+        id: widget.projectId,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      await _saveExportedFile(exported, 'Payment Plans ZIP');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDocumentAction = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _downloadAllVideos() async {
+    if (_isDocumentAction) {
+      return;
+    }
+    setState(() {
+      _isDocumentAction = true;
+    });
+    try {
+      final exported = await _authProvider.downloadAllProjectVideos(
+        id: widget.projectId,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      await _saveExportedFile(exported, 'Videos ZIP');
     } catch (error) {
       if (!mounted) return;
       _showSnackBar(AppErrorHandler.friendlyMessage(error));
@@ -1266,8 +1357,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       _buildSectionCard(
                         title: 'Overview',
                         children: [
-                          _kv('Project ID', _readString(data['id']),
-                              icon: Icons.fingerprint),
                           _kv('Developer', _readString(data['developer']),
                               icon: Icons.business_outlined),
                           _kv('City', _readString(data['city']),
@@ -1288,39 +1377,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         ],
                       ),
                       const SizedBox(height: 14),
-                      _buildDocumentsSection(),
-                      const SizedBox(height: 14),
-                      _buildProjectLeadsSection(),
-                      const SizedBox(height: 14),
-                      // _buildSectionCard(
-                      //   title: 'Configurations',
-                      //   children: [
-                      //     _chipWrap(_readList(data['configurations']))
-                      //   ],
-                      // ),
-                      // const SizedBox(height: 14),
-                      // _buildSectionCard(
-                      //   title: 'Amenities',
-                      //   children: [_chipWrap(_readList(data['amenities']))],
-                      // ),
-                      const SizedBox(height: 14),
-                      _buildSectionCard(
-                        title: 'Meta',
-                        children: [
-                          _kv('Total Leads', _readString(data['total_leads']),
-                              icon: Icons.groups_outlined),
-                          _kv('Created By', _readString(data['created_by']),
-                              icon: Icons.person_outline),
-                          _kv(
-                            'Brochure URL',
-                            _readString(data['brochure_url']).isEmpty
-                                ? 'Not available'
-                                : _readString(data['brochure_url']),
-                            icon: Icons.picture_as_pdf_outlined,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
                       _buildSectionCard(
                         title: 'Description',
                         children: [
@@ -1336,6 +1392,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 14),
+                      _buildDocumentsSection(),
+                      const SizedBox(height: 14),
+                      _buildProjectLeadsSection(),
                     ],
                   ),
                 ),
@@ -1343,7 +1403,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Widget _buildDocumentsSection() {
-    final totalDocuments = _unitPlans.length + _creatives.length;
+    final totalDocuments = _unitPlans.length +
+        _creatives.length +
+        _paymentPlans.length +
+        _videos.length;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1386,7 +1449,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '$totalDocuments documents - Unit Plans & Creatives',
+                      '$totalDocuments documents - Unit Plans, Creatives, Payment Plans & Videos',
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12,
@@ -1481,12 +1544,28 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               title: 'UNIT PLANS',
               documents: _unitPlans,
               accentColor: AppColors.primary,
+              onDownloadAll: _downloadAllDocuments,
             ),
             const SizedBox(height: 18),
             _buildDocumentGroup(
               title: 'CREATIVES',
               documents: _creatives,
               accentColor: const Color(0xFF7C3AED),
+              onDownloadAll: _downloadAllDocuments,
+            ),
+            const SizedBox(height: 18),
+            _buildDocumentGroup(
+              title: 'PAYMENT PLANS',
+              documents: _paymentPlans,
+              accentColor: const Color(0xFF0F9D58),
+              onDownloadAll: _downloadAllPaymentPlans,
+            ),
+            const SizedBox(height: 18),
+            _buildDocumentGroup(
+              title: 'VIDEOS',
+              documents: _videos,
+              accentColor: const Color(0xFFE67E22),
+              onDownloadAll: _downloadAllVideos,
             ),
           ],
         ],
@@ -1769,6 +1848,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     required String title,
     required List<_ProjectDocument> documents,
     required Color accentColor,
+    required VoidCallback onDownloadAll,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1804,7 +1884,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             TextButton.icon(
               onPressed: documents.isEmpty || _isDocumentAction
                   ? null
-                  : _downloadAllDocuments,
+                  : onDownloadAll,
               icon: Icon(Icons.download_outlined, size: 15, color: accentColor),
               label: Text(
                 'Download all',
@@ -2125,6 +2205,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ).toLowerCase();
         if (category == 'unit_plans') {
           return type.contains('unit') || type.contains('plan');
+        }
+        if (category == 'payment_plans') {
+          return type.contains('payment');
+        }
+        if (category == 'videos') {
+          return type.contains('video');
         }
         return type.contains('creative');
       }).toList();

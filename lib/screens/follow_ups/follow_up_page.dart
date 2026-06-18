@@ -401,11 +401,15 @@ class _FollowUpPageState extends State<FollowUpPage> {
     final due = DateTime.tryParse(dueRaw)?.toLocal() ?? DateTime.now();
     final priority = _readString(payload['priority']).toLowerCase();
     final title = _readString(payload['title']);
+    final leadName = _readString(payload['lead_name'] ?? payload['leadName']);
+    final leadPhone = _readString(payload['lead_phone'] ?? payload['leadPhone']);
 
     return _FollowUpModel(
       id: id,
       leadId: _readString(payload['lead_id']),
-      customerName: title.isEmpty ? 'Follow Up' : title,
+      customerName: leadName.isEmpty ? (title.isEmpty ? 'Follow Up' : title) : leadName,
+      title: title.isEmpty ? 'Follow Up' : title,
+      leadPhone: leadPhone,
       status: 'Pending',
       statusColor: const Color(0xFFFB8C00),
       priority: _labelPriority(priority),
@@ -610,6 +614,8 @@ class _FollowUpPageState extends State<FollowUpPage> {
 
     final title = _readString(json['title']);
     final leadId = _readString(json['lead_id'] ?? json['leadId']);
+    final leadName = _readString(json['lead_name'] ?? json['leadName']);
+    final leadPhone = _readString(json['lead_phone'] ?? json['leadPhone']);
     final priorityRaw = _readString(json['priority']).toLowerCase();
     final statusRaw = _readString(json['status']).toLowerCase();
     final notes = _readString(json['notes']);
@@ -648,7 +654,9 @@ class _FollowUpPageState extends State<FollowUpPage> {
     return _FollowUpModel(
       id: id,
       leadId: leadId.isEmpty ? 'N/A' : leadId,
-      customerName: title.isEmpty ? 'Follow Up' : title,
+      customerName: leadName.isEmpty ? 'Follow Up' : leadName,
+      title: title.isEmpty ? 'Follow Up' : title,
+      leadPhone: leadPhone,
       status: _labelStatus(statusRaw),
       statusColor: _statusColor(statusRaw),
       priority: _labelPriority(priorityRaw),
@@ -1116,15 +1124,13 @@ class _FollowUpPageState extends State<FollowUpPage> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: DataCard(
                   name: followUp.customerName,
-                  leadId: '',
+                  leadId: followUp.title,
                   status: followUp.status,
                   priority: followUp.priority,
                   priorityColor: followUp.priorityColor,
                   nextFollowUpDate: '${followUp.dueDate} - ${followUp.dueTime}',
                   budget: followUp.channel,
-                  phone: followUp.assignee.phone.isEmpty
-                      ? 'N/A'
-                      : followUp.assignee.phone,
+                  phone: followUp.leadPhone.isEmpty ? 'N/A' : followUp.leadPhone,
                   profileImageUrl: followUp.assignee.imageUrl,
                   assigneeName: followUp.assignee.name,
                   assigneeImageUrl: followUp.assignee.imageUrl,
@@ -1339,6 +1345,8 @@ class _FollowUpModel {
     required this.id,
     required this.leadId,
     required this.customerName,
+    required this.title,
+    required this.leadPhone,
     required this.status,
     required this.statusColor,
     required this.priority,
@@ -1353,6 +1361,8 @@ class _FollowUpModel {
   final String id;
   final String leadId;
   final String customerName;
+  final String title;
+  final String leadPhone;
   final String status;
   final Color statusColor;
   final String priority;
@@ -1367,6 +1377,8 @@ class _FollowUpModel {
     String? id,
     String? leadId,
     String? customerName,
+    String? title,
+    String? leadPhone,
     String? status,
     Color? statusColor,
     String? priority,
@@ -1381,6 +1393,8 @@ class _FollowUpModel {
       id: id ?? this.id,
       leadId: leadId ?? this.leadId,
       customerName: customerName ?? this.customerName,
+      title: title ?? this.title,
+      leadPhone: leadPhone ?? this.leadPhone,
       status: status ?? this.status,
       statusColor: statusColor ?? this.statusColor,
       priority: priority ?? this.priority,

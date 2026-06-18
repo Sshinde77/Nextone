@@ -6256,13 +6256,18 @@ class AuthService {
     required String id,
     List<String> unitPlanFilePaths = const <String>[],
     List<String> creativeFilePaths = const <String>[],
+    List<String> paymentPlanFilePaths = const <String>[],
+    List<String> videoFilePaths = const <String>[],
     String? token,
   }) async {
     final normalizedId = id.trim();
     if (normalizedId.isEmpty) {
       throw Exception('Project id is required.');
     }
-    if (unitPlanFilePaths.isEmpty && creativeFilePaths.isEmpty) {
+    if (unitPlanFilePaths.isEmpty &&
+        creativeFilePaths.isEmpty &&
+        paymentPlanFilePaths.isEmpty &&
+        videoFilePaths.isEmpty) {
       throw Exception('Select at least one document to upload.');
     }
 
@@ -6284,6 +6289,16 @@ class AuthService {
       request,
       fieldName: 'creatives',
       filePaths: creativeFilePaths,
+    );
+    await _addProjectFiles(
+      request,
+      fieldName: 'payment_plans',
+      filePaths: paymentPlanFilePaths,
+    );
+    await _addProjectFiles(
+      request,
+      fieldName: 'videos',
+      filePaths: videoFilePaths,
     );
 
     _logRequest(

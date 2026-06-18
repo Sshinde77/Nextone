@@ -1431,12 +1431,16 @@ class AuthProvider {
     required String id,
     List<String> unitPlanFilePaths = const <String>[],
     List<String> creativeFilePaths = const <String>[],
+    List<String> paymentPlanFilePaths = const <String>[],
+    List<String> videoFilePaths = const <String>[],
     String? token,
   }) {
     return _authService.uploadProjectDocuments(
       id: id,
       unitPlanFilePaths: unitPlanFilePaths,
       creativeFilePaths: creativeFilePaths,
+      paymentPlanFilePaths: paymentPlanFilePaths,
+      videoFilePaths: videoFilePaths,
       token: token,
     );
   }
