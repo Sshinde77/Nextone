@@ -4742,6 +4742,371 @@ class AuthService {
     throw Exception('Lead details response format is not valid.');
   }
 
+  Future<List<Map<String, dynamic>>> leadActivity({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}/leads/$normalizedId/activity',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'leadActivity',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('leadActivity', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch lead activity.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      return _extractLeadsItems(body);
+    } catch (_) {
+      throw Exception('Lead activity response format is not valid.');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> leadCallRecordings({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}/leads/$normalizedId/call-recordings',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'leadCallRecordings',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('leadCallRecordings', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch lead call recordings.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      if (body is Map<String, dynamic>) {
+        final data = body['data'];
+        if (data is Map<String, dynamic>) {
+          final recordings = data['recordings'];
+          if (recordings is List) {
+            return recordings
+                .whereType<Map>()
+                .map((item) => item.map(
+                      (key, value) => MapEntry(key.toString(), value),
+                    ))
+                .toList();
+          }
+        }
+      }
+      return _extractLeadsItems(body);
+    } catch (_) {
+      throw Exception('Lead call recordings response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> uploadLeadCallRecording({
+    required String id,
+    required String filePath,
+    String phoneNumber = '',
+    String name = '',
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final normalizedPath = filePath.trim();
+    if (normalizedPath.isEmpty) {
+      throw Exception('Select an audio file to upload.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}/leads/$normalizedId/call-recordings',
+    );
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['accept'] = 'application/json';
+    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    if (phoneNumber.trim().isNotEmpty) {
+      request.fields['phone_number'] = phoneNumber.trim();
+    }
+    if (name.trim().isNotEmpty) {
+      request.fields['name'] = name.trim();
+    }
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'voice_recording',
+        normalizedPath,
+        contentType: _audioMediaType(normalizedPath),
+      ),
+    );
+
+    _logRequest(
+      endpoint: 'uploadLeadCallRecording',
+      method: 'POST',
+      uri: uri,
+      headers: request.headers,
+      body: 'multipart/form-data',
+    );
+
+    http.StreamedResponse streamedResponse;
+    try {
+      streamedResponse = await request.send().timeout(_requestTimeout);
+    } on TimeoutException {
+      throw Exception(
+        'Server is taking too long to respond. Please try again.',
+      );
+    }
+
+    final response = await http.Response.fromStream(streamedResponse);
+    _logResponse('uploadLeadCallRecording', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to upload call recording.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final leadMap = _extractLeadMap(decoded);
+      if (leadMap != null) {
+        return leadMap;
+      }
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // Fall through to fallback payload.
+    }
+
+    return <String, dynamic>{
+      'lead_id': normalizedId,
+      'url': normalizedPath,
+      'phone_number': phoneNumber.trim(),
+      'name': name.trim(),
+    };
+  }
+
+  Future<Map<String, dynamic>> updateLeadCallRecording({
+    required String leadId,
+    required String recordingId,
+    String name = '',
+    String phoneNumber = '',
+    String? token,
+  }) async {
+    final normalizedLeadId = leadId.trim();
+    final normalizedRecordingId = recordingId.trim();
+    if (normalizedLeadId.isEmpty || normalizedRecordingId.isEmpty) {
+      throw Exception('Lead id and recording id are required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}/leads/$normalizedLeadId/call-recordings/$normalizedRecordingId',
+    );
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    final body = jsonEncode({
+      'name': name.trim(),
+      'phone_number': phoneNumber.trim(),
+    });
+
+    _logRequest(
+      endpoint: 'updateLeadCallRecording',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('updateLeadCallRecording', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update call recording.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final leadMap = _extractLeadMap(decoded);
+      if (leadMap != null) {
+        return leadMap;
+      }
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // Fall through to fallback payload.
+    }
+
+    return <String, dynamic>{
+      'id': normalizedRecordingId,
+      'lead_id': normalizedLeadId,
+      'name': name.trim(),
+      'phone_number': phoneNumber.trim(),
+    };
+  }
+
+  Future<void> deleteLeadCallRecording({
+    required String leadId,
+    required String recordingId,
+    String? token,
+  }) async {
+    final normalizedLeadId = leadId.trim();
+    final normalizedRecordingId = recordingId.trim();
+    if (normalizedLeadId.isEmpty || normalizedRecordingId.isEmpty) {
+      throw Exception('Lead id and recording id are required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}/leads/$normalizedLeadId/call-recordings/$normalizedRecordingId',
+    );
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteLeadCallRecording',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteLeadCallRecording', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete call recording.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
+  Future<LeadsListResult> leadReassignmentHistory({
+    required String id,
+    String? token,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}/leads/$normalizedId/reassignment-history',
+    ).replace(
+      queryParameters: <String, String>{
+        'page': page.toString(),
+        'per_page': perPage.toString(),
+      },
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'leadReassignmentHistory',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('leadReassignmentHistory', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch lead reassignment history.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+
+      final resolvedCurrentPage =
+          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
+              page;
+      final resolvedPerPage = _readIntFromMap(
+            pagination,
+            ['per_page', 'perPage', 'page_size', 'limit'],
+          ) ??
+          perPage;
+      final resolvedTotalItems = _readIntFromMap(
+            pagination,
+            ['total', 'total_items', 'totalItems', 'count'],
+          ) ??
+          items.length;
+      final resolvedTotalPages = _readIntFromMap(
+            pagination,
+            ['total_pages', 'totalPages', 'last_page', 'lastPage'],
+          ) ??
+          _deriveTotalPages(
+            total: resolvedTotalItems,
+            perPage: resolvedPerPage,
+          );
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Lead reassignment history response format is not valid.');
+    }
+  }
+
   Future<Map<String, dynamic>> createLead({
     required String name,
     required String phone,
@@ -7193,6 +7558,26 @@ class AuthService {
       return MediaType('image', 'webp');
     }
     return MediaType('image', 'jpeg');
+  }
+
+  MediaType _audioMediaType(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.mp3')) {
+      return MediaType('audio', 'mpeg');
+    }
+    if (lower.endsWith('.wav')) {
+      return MediaType('audio', 'wav');
+    }
+    if (lower.endsWith('.m4a')) {
+      return MediaType('audio', 'mp4');
+    }
+    if (lower.endsWith('.aac')) {
+      return MediaType('audio', 'aac');
+    }
+    if (lower.endsWith('.ogg')) {
+      return MediaType('audio', 'ogg');
+    }
+    return MediaType('application', 'octet-stream');
   }
 
   MediaType _documentMediaType(String path) {

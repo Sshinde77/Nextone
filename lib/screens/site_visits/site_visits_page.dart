@@ -1728,7 +1728,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         return;
       }
       _showSnackBar(AppErrorHandler.friendlyMessage(e));
-    }
+    } 
   }
 
   int _countByStatus(_VisitStatus status) {

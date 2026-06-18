@@ -457,13 +457,16 @@ class _ProjectsPageState extends State<ProjectsPage> {
         leadId: project.location,
         status:
             normalizedStatus.isEmpty ? 'N/A' : normalizedStatus.toUpperCase(),
-        priority: normalizedStatus == 'active' ? 'Active' : 'Planned',
+        priority: project.developer.isEmpty ? 'N/A' : project.developer,
         priorityColor: priorityColor,
         nextFollowUpDate:
-            project.possessionDate.isEmpty ? 'N/A' : project.possessionDate,
+            project.reraNumber.isEmpty ? 'N/A' : project.reraNumber,
         budget: project.priceRange.isEmpty ? 'N/A' : project.priceRange,
-        phone: '${project.mappedLeads} leads',
+        phone: project.totalLeads.isEmpty ? '0' : project.totalLeads,
         profileImageUrl: '',
+        leftMetaLabel: 'Developer',
+        rightMetaLabel: 'RERA Number',
+        bottomRightLabel: 'Total Leads',
         assigneeName:
             project.developer.isEmpty ? 'Unknown Developer' : project.developer,
         assigneeImageUrl: '',

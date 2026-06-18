@@ -1,5 +1,6 @@
 // ignore_for_file: use_build_context_synchronously, unused_element
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nextone/constants/app_colors.dart';
@@ -21,6 +22,8 @@ class LeadDetailPage extends StatefulWidget {
   @override
   State<LeadDetailPage> createState() => _LeadDetailPageState();
 }
+
+enum _LeadTimelineTab { activity, recordings, reassignHistory }
 
 class _LeadDetailPageState extends State<LeadDetailPage> {
   final AuthProvider _authProvider = AuthProvider();
@@ -52,9 +55,19 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   bool _hasPendingPhoneRequest = false;
   String _accessiblePhone = '';
   bool _isCheckingPhoneAccess = false;
+  bool _isLoadingTimeline = false;
+  bool _isUploadingRecording = false;
+  String? _timelineError;
+  _LeadTimelineTab _selectedTimelineTab = _LeadTimelineTab.activity;
+  final Set<String> _updatingRecordingIds = <String>{};
+  final Set<String> _deletingRecordingIds = <String>{};
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_PipelineStatusOption> _pipelineStatuses =
       const <_PipelineStatusOption>[];
+  List<_LeadActivityItem> _activityItems = const <_LeadActivityItem>[];
+  List<_LeadRecordingItem> _recordingItems = const <_LeadRecordingItem>[];
+  List<_LeadReassignmentItem> _reassignmentItems =
+      const <_LeadReassignmentItem>[];
   String? _selectedPipelineStatusKey;
 
   @override
@@ -64,6 +77,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     _fetchLeadDetails();
     _loadAssigneeOptions();
     _loadPipelineStatuses();
+    _loadLeadTimelineData();
   }
 
   @override
@@ -95,6 +109,11 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         _errorMessage = AppErrorHandler.friendlyMessage(e);
       });
     }
+  }
+
+  Future<void> _refreshPage() async {
+    await _fetchLeadDetails();
+    await _loadLeadTimelineData();
   }
 
   Future<void> _loadAccess() async {
@@ -160,6 +179,68 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       if (mounted) {
         setState(() => _isCheckingPhoneAccess = false);
       }
+    }
+  }
+
+  Future<void> _loadLeadTimelineData() async {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isLoadingTimeline = true;
+      _timelineError = null;
+    });
+
+    try {
+      final activityFuture = _authProvider.leadActivity(
+        id: widget.leadId,
+        token: _authProvider.currentAuthToken,
+      );
+      final recordingsFuture = _authProvider.leadCallRecordings(
+        id: widget.leadId,
+        token: _authProvider.currentAuthToken,
+      );
+      final reassignmentFuture = _authProvider.leadReassignmentHistory(
+        id: widget.leadId,
+        token: _authProvider.currentAuthToken,
+        page: 1,
+        perPage: 20,
+      );
+
+      final activityResponse = await activityFuture;
+      final recordingsResponse = await recordingsFuture;
+      final reassignmentResult = await reassignmentFuture;
+
+      final List<_LeadActivityItem> activity = activityResponse
+          .map((item) => Map<String, dynamic>.from(item))
+          .map(_LeadActivityItem.fromJson)
+          .toList(growable: false);
+      final List<_LeadRecordingItem> recordings = recordingsResponse
+          .map((item) => Map<String, dynamic>.from(item))
+          .map(_LeadRecordingItem.fromJson)
+          .toList(growable: false);
+      final List<_LeadReassignmentItem> reassignments = reassignmentResult.items
+          .map((item) => Map<String, dynamic>.from(item))
+          .map(_LeadReassignmentItem.fromJson)
+          .toList(growable: false);
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _activityItems = activity;
+        _recordingItems = recordings;
+        _reassignmentItems = reassignments;
+        _isLoadingTimeline = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingTimeline = false;
+        _timelineError = AppErrorHandler.friendlyMessage(error);
+      });
     }
   }
 
@@ -300,6 +381,260 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     );
     final mailto = Uri.parse('mailto:$email?subject=$subject&body=$body');
     await launchUrl(mailto, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _playRecording(_LeadRecordingItem item) async {
+    final url = item.audioUrl.trim();
+    if (url.isEmpty) {
+      _showSnackBar('Recording file is not available.');
+      return;
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      _showSnackBar('Recording link is not valid.');
+      return;
+    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _uploadRecording() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed || _isUploadingRecording) {
+      return;
+    }
+
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowMultiple: false,
+      allowedExtensions: const <String>['mp3', 'wav', 'm4a', 'aac', 'ogg'],
+    );
+    if (!mounted || picked == null || picked.files.isEmpty) {
+      return;
+    }
+
+    final file = picked.files.first;
+    final path = file.path?.trim() ?? '';
+    if (path.isEmpty) {
+      _showSnackBar('Unable to access the selected audio file.');
+      return;
+    }
+
+    final defaultPhone = _lead?.phone.trim() ?? '';
+    final defaultName = file.name.trim().isEmpty ? 'Call recording' : file.name.trim();
+
+    setState(() {
+      _isUploadingRecording = true;
+    });
+
+    try {
+      await _authProvider.uploadLeadCallRecording(
+        id: widget.leadId,
+        filePath: path,
+        phoneNumber: defaultPhone,
+        name: defaultName,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Recording uploaded successfully.');
+      await _loadLeadTimelineData();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingRecording = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openEditRecordingSheet(_LeadRecordingItem item) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) {
+      return;
+    }
+
+    final nameController = TextEditingController(text: item.title);
+    final phoneController = TextEditingController(text: item.phoneNumber);
+    var isSaving = false;
+    var shouldRefresh = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return _buildSheetContainer(
+              title: 'Edit recording details',
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: _fieldDecoration('Recording name'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: _fieldDecoration('Phone e.g. +919876543210'),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed:
+                              isSaving ? null : () => Navigator.of(sheetContext).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  FocusScope.of(sheetContext).unfocus();
+                                  setSheetState(() {
+                                    isSaving = true;
+                                  });
+                                  try {
+                                    await _authProvider.updateLeadCallRecording(
+                                      leadId: widget.leadId,
+                                      recordingId: item.id,
+                                      name: nameController.text.trim(),
+                                      phoneNumber: phoneController.text.trim(),
+                                      token: _authProvider.currentAuthToken,
+                                    );
+                                    if (!mounted) {
+                                      return;
+                                    }
+                                    shouldRefresh = true;
+                                    Navigator.of(sheetContext).pop();
+                                  } catch (error) {
+                                    if (!mounted) {
+                                      return;
+                                    }
+                                    _showSnackBar(
+                                      AppErrorHandler.friendlyMessage(error),
+                                    );
+                                    if (sheetContext.mounted) {
+                                      setSheetState(() {
+                                        isSaving = false;
+                                      });
+                                    }
+                                  } finally {
+                                  }
+                                },
+                          child: Text(isSaving ? 'Saving...' : 'Save'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    phoneController.dispose();
+
+    if (!mounted || !shouldRefresh) {
+      return;
+    }
+
+    _showSnackBar('Recording updated successfully.');
+    await _loadLeadTimelineData();
+  }
+
+  Future<void> _deleteRecording(_LeadRecordingItem item) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Recording'),
+          content: Text('Delete "${item.title}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _deletingRecordingIds.add(item.id);
+    });
+
+    try {
+      await _authProvider.deleteLeadCallRecording(
+        leadId: widget.leadId,
+        recordingId: item.id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Recording deleted successfully.');
+      await _loadLeadTimelineData();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _deletingRecordingIds.remove(item.id);
+        });
+      }
+    }
   }
 
   Future<void> _shareProjectDetails() async {
@@ -1344,6 +1679,14 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                         icon: const Icon(Icons.location_on_outlined, size: 18),
                         label: const Text('Site Visit'),
                         style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          backgroundColor: AppColors.primary.withValues(alpha: 0.04),
+                          side: BorderSide(
+                            color: AppColors.primary.withValues(alpha: 0.22),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
                           minimumSize: const Size.fromHeight(46),
                         ),
                       ),
@@ -1355,6 +1698,14 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                         icon: const Icon(Icons.event_note_outlined, size: 18),
                         label: const Text('Follow Up'),
                         style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          backgroundColor: AppColors.primary.withValues(alpha: 0.04),
+                          side: BorderSide(
+                            color: AppColors.primary.withValues(alpha: 0.22),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
                           minimumSize: const Size.fromHeight(46),
                         ),
                       ),
@@ -1401,7 +1752,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
               : _lead == null
                   ? const Center(child: Text('No data found'))
                   : RefreshIndicator(
-                      onRefresh: _fetchLeadDetails,
+                      onRefresh: _refreshPage,
                       child: SingleChildScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
@@ -1415,6 +1766,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                             _buildPipelineStatusCard(),
                             const SizedBox(height: 14),
                             _buildAssignCard(),
+                            const SizedBox(height: 14),
+                            _buildLeadHistorySection(),
                           ],
                         ),
                       ),
@@ -1464,32 +1817,6 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildIconActionButton(
-                tooltip: 'Send via WhatsApp',
-                icon: Icons.chat_outlined,
-                color: const Color(0xFF25D366),
-                onTap: _sendDetailsViaWhatsApp,
-              ),
-              const SizedBox(width: 6),
-              _buildIconActionButton(
-                tooltip: 'Send via Email',
-                icon: Icons.email_outlined,
-                color: const Color(0xFF1976D2),
-                onTap: _sendDetailsViaEmail,
-              ),
-              const SizedBox(width: 6),
-              _buildIconActionButton(
-                tooltip: 'Share Project',
-                icon: Icons.share_outlined,
-                color: const Color(0xFF7B1FA2),
-                onTap: _shareProjectDetails,
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -1503,7 +1830,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
             ? (_accessiblePhone.isEmpty ? _lead!.phone : _accessiblePhone)
             : _maskedPhone(_lead!.phone),
       ),
+      _LeadInfoItem('Alternate Phone', _lead!.alternatePhoneNumber),
       _LeadInfoItem('Email', _lead!.email),
+      _LeadInfoItem('Project', _lead!.projectName),
       _LeadInfoItem('Source', _lead!.source),
       _LeadInfoItem('Callback', _formatDateTimeValue(_lead!.callbackTime)),
       _LeadInfoItem(
@@ -1616,6 +1945,14 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                   _isSubmittingReassign ? 'Reassigning...' : 'Reassign',
                 ),
                 style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.06),
+                  side: BorderSide(
+                    color: AppColors.primary.withValues(alpha: 0.22),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                   minimumSize: const Size(120, 40),
                 ),
               ),
@@ -1630,6 +1967,628 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                 color: AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeadHistorySection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildTimelineTabChip(
+                        tab: _LeadTimelineTab.activity,
+                        label: 'Activity',
+                        icon: Icons.access_time_rounded,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildTimelineTabChip(
+                        tab: _LeadTimelineTab.recordings,
+                        label: 'Recordings',
+                        icon: Icons.mic_none_rounded,
+                        count: _recordingItems.length,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildTimelineTabChip(
+                        tab: _LeadTimelineTab.reassignHistory,
+                        label: 'Reassign History',
+                        icon: Icons.history_toggle_off_rounded,
+                        count: _reassignmentItems.length,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_selectedTimelineTab == _LeadTimelineTab.reassignHistory) ...[
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _isSubmittingReassign ? null : _openReassignSheet,
+                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                  label: const Text('Reassign Lead'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.06),
+                    side: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.22),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    minimumSize: const Size(0, 42),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (_timelineError != null)
+            _buildHistoryErrorState()
+          else if (_isLoadingTimeline)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            )
+          else
+            _buildSelectedTimelineBody(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineTabChip({
+    required _LeadTimelineTab tab,
+    required String label,
+    required IconData icon,
+    int? count,
+  }) {
+    final isSelected = _selectedTimelineTab == tab;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedTimelineTab = tab;
+        });
+      },
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : const Color(0xFFF3F5F9),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? const Color(0xFFD9E7FF) : Colors.transparent,
+          ),
+          boxShadow: isSelected
+              ? const [
+                  BoxShadow(
+                    color: Color(0x12000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
+                  ),
+                ]
+              : const [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+            if (count != null && count > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.primary.withValues(alpha: 0.1)
+                      : const Color(0xFFE8F0FF),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryErrorState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFD),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Text(
+            _timelineError ?? 'Unable to load lead history.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton(
+            onPressed: _loadLeadTimelineData,
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedTimelineBody() {
+    switch (_selectedTimelineTab) {
+      case _LeadTimelineTab.activity:
+        return _buildActivityTabBody();
+      case _LeadTimelineTab.recordings:
+        return _buildRecordingsTabBody();
+      case _LeadTimelineTab.reassignHistory:
+        return _buildReassignHistoryTabBody();
+    }
+  }
+
+  Widget _buildActivityTabBody() {
+    return Column(
+      children: [
+        if (_activityItems.isEmpty)
+          _buildEmptyTimelineState(
+            icon: Icons.history_rounded,
+            message: 'No lead activity found yet.',
+          )
+        else
+          Column(
+            children: _activityItems
+                .map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildActivityTimelineCard(item),
+                    ))
+                .toList(),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildActivityTimelineCard(_LeadActivityItem item) {
+    final initials = _initialsFor(item.actorName);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+            ),
+            Container(
+              width: 2,
+              height: 108,
+              color: const Color(0xFFE5EAF2),
+            ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Text(
+                    _formatTimelineDate(item.createdAt),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: const Color(0xFF9AA4B2)),
+                    ),
+                    child: Text(
+                      item.typeLabel.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDFEFF),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    if (item.description.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        item.description,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.18),
+                          child: Text(
+                            initials,
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(
+                              text: 'Added by ',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: item.actorName,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecordingsTabBody() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: _isUploadingRecording ? null : _uploadRecording,
+            icon: _isUploadingRecording
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.upload_file_rounded),
+            label: Text(
+              _isUploadingRecording ? 'Uploading...' : 'Upload Recording',
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textPrimary,
+              side: const BorderSide(color: AppColors.border),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_recordingItems.isEmpty)
+          _buildEmptyTimelineState(
+            icon: Icons.mic_none_rounded,
+            message: 'No call recordings found for this lead.',
+          )
+        else
+          ..._recordingItems.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildRecordingCard(item),
+              )),
+      ],
+    );
+  }
+
+  Widget _buildRecordingCard(_LeadRecordingItem item) {
+    final isUpdating = _updatingRecordingIds.contains(item.id);
+    final isDeleting = _deletingRecordingIds.contains(item.id);
+    final isBusy = isUpdating || isDeleting;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDFEFF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: () => _playRecording(item),
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.border),
+                color: Colors.white,
+              ),
+              child: const Icon(
+                Icons.play_arrow_rounded,
+                color: AppColors.textSecondary,
+                size: 24,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${_formatTimelineDate(item.createdAt)}${item.createdBy.isEmpty ? '' : '  |  ${item.createdBy}'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (isBusy)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: () => _openEditRecordingSheet(item),
+                  icon: const Icon(Icons.edit_outlined),
+                  color: AppColors.textSecondary,
+                  tooltip: 'Edit',
+                ),
+                IconButton(
+                  onPressed: () => _deleteRecording(item),
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  color: AppColors.error,
+                  tooltip: 'Delete',
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReassignHistoryTabBody() {
+    if (_reassignmentItems.isEmpty) {
+      return _buildEmptyTimelineState(
+        icon: Icons.sync_alt_rounded,
+        message: 'This lead has never been reassigned.',
+        actionLabel: 'Reassign now',
+        onAction: _openReassignSheet,
+      );
+    }
+
+    return Column(
+      children: _reassignmentItems
+          .map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildReassignHistoryCard(item),
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _buildReassignHistoryCard(_LeadReassignmentItem item) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDFEFF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${item.fromUser} -> ${item.toUser}',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              Text(
+                _formatTimelineDate(item.createdAt),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          if (item.note.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              item.note,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+          ],
+          if (item.changedBy.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Changed by ${item.changedBy}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyTimelineState({
+    required IconData icon,
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 28),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFD),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 28),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 14),
+            FilledButton.tonalIcon(
+              onPressed: onAction,
+              icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+              label: Text(actionLabel),
             ),
           ],
         ],
@@ -1953,29 +2912,31 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         16,
         16 + MediaQuery.of(context).viewInsets.bottom,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(10),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          child,
-        ],
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
       ),
     );
   }
@@ -2043,7 +3004,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         ),
       ),
       style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: AppColors.border),
+        backgroundColor: AppColors.primary.withValues(alpha: 0.06),
+        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.22)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         visualDensity: VisualDensity.compact,
@@ -2066,6 +3028,49 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
     return '${local.year}-$month-$day $hour:$minute';
+  }
+
+  String _formatTimelineDate(DateTime? value) {
+    if (value == null) {
+      return 'Unknown time';
+    }
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final local = value.toLocal();
+    final month = months[local.month - 1];
+    final minute = local.minute.toString().padLeft(2, '0');
+    final hour24 = local.hour;
+    final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+    final meridiem = hour24 >= 12 ? 'pm' : 'am';
+    return '${local.day} $month, $hour12:$minute $meridiem';
+  }
+
+  String _initialsFor(String value) {
+    final parts = value
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) {
+      return '?';
+    }
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
+        .toUpperCase();
   }
 
   Widget _buildPhoneInfoTile() {
@@ -2476,6 +3481,240 @@ class _PipelineStatusOption {
       color: read(json['color']),
       sortOrder: readInt(json['sort_order'] ?? json['sortOrder']),
       isActive: readBool(json['is_active'] ?? json['isActive'] ?? true),
+    );
+  }
+}
+
+class _LeadActivityItem {
+  const _LeadActivityItem({
+    required this.title,
+    required this.description,
+    required this.typeLabel,
+    required this.actorName,
+    required this.createdAt,
+  });
+
+  final String title;
+  final String description;
+  final String typeLabel;
+  final String actorName;
+  final DateTime? createdAt;
+
+  factory _LeadActivityItem.fromJson(Map<String, dynamic> json) {
+    String read(dynamic value) {
+      if (value is String) return value.trim();
+      if (value is num || value is bool) return value.toString().trim();
+      return '';
+    }
+
+    Map<String, dynamic>? mapValue(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        return value;
+      }
+      if (value is Map) {
+        return value.map((key, value) => MapEntry(key.toString(), value));
+      }
+      return null;
+    }
+
+    final actor = mapValue(
+      json['created_by'] ??
+          json['user'] ??
+          json['actor'] ??
+          json['added_by'] ??
+          json['assigned_to'],
+    );
+
+    final title = read(
+      json['title'] ??
+          json['message'] ??
+          json['activity'] ??
+          json['event'] ??
+          json['action'],
+    );
+    final description = read(
+      json['description'] ?? json['note'] ?? json['details'] ?? json['remarks'],
+    );
+    final type = read(
+      json['type'] ?? json['category'] ?? json['action_type'] ?? json['event_type'],
+    );
+    final actorName = read(
+      json['added_by_name'] ??
+          json['created_by_name'] ??
+          json['user_name'] ??
+          actor?['full_name'] ??
+          actor?['name'] ??
+          actor?['email'],
+    );
+
+    return _LeadActivityItem(
+      title: title.isEmpty ? 'Lead update' : title,
+      description: description,
+      typeLabel: type.isEmpty ? 'Note' : type.replaceAll('_', ' '),
+      actorName: actorName.isEmpty ? 'System' : actorName,
+      createdAt: DateTime.tryParse(
+        read(json['created_at'] ?? json['updated_at'] ?? json['timestamp']),
+      ),
+    );
+  }
+}
+
+class _LeadRecordingItem {
+  static const String _recordingBaseUrl = 'https://api.nextonerealty.in/';
+
+  const _LeadRecordingItem({
+    required this.id,
+    required this.title,
+    required this.audioUrl,
+    required this.phoneNumber,
+    required this.createdBy,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String title;
+  final String audioUrl;
+  final String phoneNumber;
+  final String createdBy;
+  final DateTime? createdAt;
+
+  factory _LeadRecordingItem.fromJson(Map<String, dynamic> json) {
+    String read(dynamic value) {
+      if (value is String) return value.trim();
+      if (value is num || value is bool) return value.toString().trim();
+      return '';
+    }
+
+    Map<String, dynamic>? mapValue(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        return value;
+      }
+      if (value is Map) {
+        return value.map((key, value) => MapEntry(key.toString(), value));
+      }
+      return null;
+    }
+
+    final createdByMap =
+        mapValue(json['created_by'] ?? json['user'] ?? json['uploaded_by']);
+    final relativeUrl = read(
+      json['audio_url'] ??
+          json['recording_url'] ??
+          json['url'] ??
+          json['file_url'] ??
+          json['path'] ??
+          json['file_path'],
+    );
+
+    return _LeadRecordingItem(
+      id: read(json['id'] ?? json['recording_id']),
+      title: read(
+        json['title'] ??
+            json['name'] ??
+            json['file_name'] ??
+            json['recording_name'],
+      ).isEmpty
+          ? 'Call recording'
+          : read(
+              json['title'] ??
+                  json['name'] ??
+                  json['file_name'] ??
+                  json['recording_name'],
+            ),
+      audioUrl: _resolveRecordingUrl(relativeUrl),
+      phoneNumber: read(json['phone_number'] ?? json['phone']),
+      createdBy: read(
+        json['created_by_name'] ??
+            json['uploaded_by_name'] ??
+            createdByMap?['full_name'] ??
+            createdByMap?['name'] ??
+            createdByMap?['email'],
+      ),
+      createdAt: DateTime.tryParse(
+        read(json['created_at'] ?? json['updated_at'] ?? json['timestamp']),
+      ),
+    );
+  }
+
+  static String _resolveRecordingUrl(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    final parsed = Uri.tryParse(trimmed);
+    if (parsed != null && parsed.hasScheme) {
+      return trimmed;
+    }
+    final normalizedPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+    return '$_recordingBaseUrl$normalizedPath';
+  }
+}
+
+class _LeadReassignmentItem {
+  const _LeadReassignmentItem({
+    required this.fromUser,
+    required this.toUser,
+    required this.changedBy,
+    required this.note,
+    required this.createdAt,
+  });
+
+  final String fromUser;
+  final String toUser;
+  final String changedBy;
+  final String note;
+  final DateTime? createdAt;
+
+  factory _LeadReassignmentItem.fromJson(Map<String, dynamic> json) {
+    String read(dynamic value) {
+      if (value is String) return value.trim();
+      if (value is num || value is bool) return value.toString().trim();
+      return '';
+    }
+
+    Map<String, dynamic>? mapValue(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        return value;
+      }
+      if (value is Map) {
+        return value.map((key, value) => MapEntry(key.toString(), value));
+      }
+      return null;
+    }
+
+    final fromMap =
+        mapValue(json['from_user'] ?? json['previous_assignee'] ?? json['from']);
+    final toMap = mapValue(json['to_user'] ?? json['assigned_to'] ?? json['to']);
+    final changedByMap =
+        mapValue(json['changed_by'] ?? json['updated_by'] ?? json['actor']);
+
+    final fromUser = read(
+      json['from_user_name'] ??
+          fromMap?['full_name'] ??
+          fromMap?['name'] ??
+          json['from_name'],
+    );
+    final toUser = read(
+      json['to_user_name'] ??
+          toMap?['full_name'] ??
+          toMap?['name'] ??
+          json['to_name'],
+    );
+    final changedBy = read(
+      json['changed_by_name'] ??
+          changedByMap?['full_name'] ??
+          changedByMap?['name'] ??
+          changedByMap?['email'],
+    );
+
+    return _LeadReassignmentItem(
+      fromUser: fromUser.isEmpty ? 'Unassigned' : fromUser,
+      toUser: toUser.isEmpty ? 'Unassigned' : toUser,
+      changedBy: changedBy,
+      note: read(json['note'] ?? json['remarks'] ?? json['reason']),
+      createdAt: DateTime.tryParse(
+        read(json['created_at'] ?? json['updated_at'] ?? json['timestamp']),
+      ),
     );
   }
 }

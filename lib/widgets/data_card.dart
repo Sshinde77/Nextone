@@ -36,6 +36,7 @@ class DataCard extends StatelessWidget {
     this.onSelectionChanged,
     this.leftMetaLabel = 'Priority',
     this.rightMetaLabel = 'Next Follow-up',
+    this.bottomRightLabel = 'Phone',
   });
 
   final String name;
@@ -59,6 +60,7 @@ class DataCard extends StatelessWidget {
   final ValueChanged<bool>? onSelectionChanged;
   final String leftMetaLabel;
   final String rightMetaLabel;
+  final String bottomRightLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +165,7 @@ class DataCard extends StatelessWidget {
                       icon: Icons.account_balance_wallet_outlined,
                     ),
                     right: _metaItem(
-                      'Phone',
+                      bottomRightLabel,
                       phone,
                       icon: Icons.phone_outlined,
                       trailing: phoneAction,

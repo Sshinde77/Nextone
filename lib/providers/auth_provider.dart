@@ -1173,6 +1173,78 @@ class AuthProvider {
     return _authService.leadDetail(id: id, token: token);
   }
 
+  Future<List<Map<String, dynamic>>> leadActivity({
+    required String id,
+    String? token,
+  }) {
+    return _authService.leadActivity(id: id, token: token);
+  }
+
+  Future<List<Map<String, dynamic>>> leadCallRecordings({
+    required String id,
+    String? token,
+  }) {
+    return _authService.leadCallRecordings(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> uploadLeadCallRecording({
+    required String id,
+    required String filePath,
+    String phoneNumber = '',
+    String name = '',
+    String? token,
+  }) {
+    return _authService.uploadLeadCallRecording(
+      id: id,
+      filePath: filePath,
+      phoneNumber: phoneNumber,
+      name: name,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> updateLeadCallRecording({
+    required String leadId,
+    required String recordingId,
+    String name = '',
+    String phoneNumber = '',
+    String? token,
+  }) {
+    return _authService.updateLeadCallRecording(
+      leadId: leadId,
+      recordingId: recordingId,
+      name: name,
+      phoneNumber: phoneNumber,
+      token: token,
+    );
+  }
+
+  Future<void> deleteLeadCallRecording({
+    required String leadId,
+    required String recordingId,
+    String? token,
+  }) {
+    return _authService.deleteLeadCallRecording(
+      leadId: leadId,
+      recordingId: recordingId,
+      token: token,
+    );
+  }
+
+  Future<LeadsListResult> leadReassignmentHistory({
+    required String id,
+    String? token,
+    int page = 1,
+    int perPage = 20,
+  }) {
+    return _authService.leadReassignmentHistory(
+      id: id,
+      token: token,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
   Future<Map<String, dynamic>> createLead({
     required String name,
     required String phone,

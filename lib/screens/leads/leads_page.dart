@@ -2712,130 +2712,62 @@ class _LeadsPageState extends State<LeadsPage> {
             )
           else
             ...leads.map((lead) {
-              final isShareOpen = _activeShareLeadId == lead.id;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: Column(
-                  children: [
-                    DataCard(
-                      name: lead.name,
-                      leadId: '',
-                      status: lead.status,
-                      priority: lead.priority,
-                      priorityColor: lead.priorityColor,
-                      nextFollowUpDate: lead.nextFollowUpDate,
-                      leftMetaLabel: 'Callback Time',
-                      rightMetaLabel: 'Next Follow-up',
-                      budget: lead.budget,
-                      phone: _displayPhoneForLead(lead),
-                      phoneAction: _phoneRevealAction(lead),
-                      profileImageUrl: lead.profileImageUrl,
-                      assigneeName: lead.assignee.name,
-                      assigneeImageUrl: lead.assignee.imageUrl,
-                      onTap: () => _viewLeadDetail(lead.id),
-                      actions: [
-                        DataCardAction(
-                          icon: Icons.call_outlined,
-                          onTap: () => _handleCallAction(lead),
-                        ),
-                        DataCardAction(
-                          icon: Icons.share_outlined,
-                          color: const Color(0xFF7B1FA2),
-                          onTap: () {
-                            setState(() {
-                              _activeShareLeadId = isShareOpen ? null : lead.id;
-                            });
-                          },
-                        ),
-                        DataCardAction(
-                          icon: Icons.person_add_alt_1_outlined,
-                          color: AppColors.primary,
-                          onTap: () => _openReassignSheet(lead),
-                        ),
-                        DataCardAction(
-                          icon: Icons.edit_outlined,
-                          onTap: () => _openEditLead(lead),
-                        ),
-                        DataCardAction(
-                          icon: Icons.delete_outline,
-                          color: const Color(0xFFD32F2F),
-                          onTap: () => _deleteLead(lead),
-                        ),
-                      ],
-                      bulkSelectionMode: _isBulkSelectionMode,
-                      isSelected: _selectedLeadIds.contains(lead.id),
-                      onLongPress: () {
-                        setState(() {
-                          _isBulkSelectionMode = true;
-                          _selectedLeadIds.add(lead.id);
-                        });
-                      },
-                      onSelectionChanged: (selected) {
-                        setState(() {
-                          if (selected) {
-                            _selectedLeadIds.add(lead.id);
-                          } else {
-                            _selectedLeadIds.remove(lead.id);
-                          }
-                          _syncBulkSelectionMode();
-                        });
-                      },
+                child: DataCard(
+                  name: lead.name,
+                  leadId: '',
+                  status: lead.status,
+                  priority: lead.priority,
+                  priorityColor: lead.priorityColor,
+                  nextFollowUpDate: lead.nextFollowUpDate,
+                  leftMetaLabel: 'Callback Time',
+                  rightMetaLabel: 'Next Follow-up',
+                  budget: lead.budget,
+                  phone: _displayPhoneForLead(lead),
+                  phoneAction: _phoneRevealAction(lead),
+                  profileImageUrl: lead.profileImageUrl,
+                  assigneeName: lead.assignee.name,
+                  assigneeImageUrl: lead.assignee.imageUrl,
+                  onTap: () => _viewLeadDetail(lead.id),
+                  actions: [
+                    DataCardAction(
+                      icon: Icons.call_outlined,
+                      onTap: () => _handleCallAction(lead),
                     ),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      child: !isShareOpen
-                          ? const SizedBox.shrink()
-                          : Container(
-                              key: ValueKey<String>('share-${lead.id}'),
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(top: 6),
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFFF9FAFF),
-                                    Color(0xFFF3F6FF),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                border:
-                                    Border.all(color: const Color(0xFFDCE3F7)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildInlineShareOption(
-                                      label: 'WhatsApp',
-                                      icon: Icons.chat_outlined,
-                                      color: const Color(0xFF25D366),
-                                      onTap: () =>
-                                          _sendLeadDetailsViaWhatsApp(lead),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: _buildInlineShareOption(
-                                      label: 'Email',
-                                      icon: Icons.email_outlined,
-                                      color: const Color(0xFF1976D2),
-                                      onTap: () =>
-                                          _sendLeadDetailsViaEmail(lead),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: _buildInlineShareOption(
-                                      label: 'Share',
-                                      icon: Icons.share_outlined,
-                                      color: const Color(0xFF7B1FA2),
-                                      onTap: () => _shareProjectDetails(lead),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                    DataCardAction(
+                      icon: Icons.person_add_alt_1_outlined,
+                      color: AppColors.primary,
+                      onTap: () => _openReassignSheet(lead),
+                    ),
+                    DataCardAction(
+                      icon: Icons.edit_outlined,
+                      onTap: () => _openEditLead(lead),
+                    ),
+                    DataCardAction(
+                      icon: Icons.delete_outline,
+                      color: const Color(0xFFD32F2F),
+                      onTap: () => _deleteLead(lead),
                     ),
                   ],
+                  bulkSelectionMode: _isBulkSelectionMode,
+                  isSelected: _selectedLeadIds.contains(lead.id),
+                  onLongPress: () {
+                    setState(() {
+                      _isBulkSelectionMode = true;
+                      _selectedLeadIds.add(lead.id);
+                    });
+                  },
+                  onSelectionChanged: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedLeadIds.add(lead.id);
+                      } else {
+                        _selectedLeadIds.remove(lead.id);
+                      }
+                      _syncBulkSelectionMode();
+                    });
+                  },
                 ),
               );
             }),
