@@ -649,6 +649,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 ),
                 const SizedBox(height: 10),
                 ListTile(
+                  leading: const Icon(Icons.folder_zip_outlined,
+                      color: AppColors.primary),
+                  title: const Text('All Documents'),
+                  onTap: () => Navigator.of(context).pop('all'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.home_work_outlined,
                       color: AppColors.primary),
                   title: const Text('Unit Plan'),
@@ -659,12 +665,6 @@ class _ProjectsPageState extends State<ProjectsPage> {
                       color: AppColors.primary),
                   title: const Text('Creative'),
                   onTap: () => Navigator.of(context).pop('creatives'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.folder_zip_outlined,
-                      color: AppColors.primary),
-                  title: const Text('All Documents'),
-                  onTap: () => Navigator.of(context).pop('all'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.payments_outlined,

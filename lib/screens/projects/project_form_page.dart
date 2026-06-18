@@ -40,14 +40,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   final _developerController = TextEditingController();
   final _cityController = TextEditingController();
   final _localityController = TextEditingController();
-  final _addressController = TextEditingController();
   final _priceRangeController = TextEditingController();
   final _totalUnitsController = TextEditingController();
   final _reraNumberController = TextEditingController();
-  final _brochureUrlController = TextEditingController();
-  final _videoUrlController = TextEditingController();
-  final _paymentPlanUrlController = TextEditingController();
-  final _homeLoanInfoController = TextEditingController();
+  final _paymentPlanTextController = TextEditingController();
   final _descriptionController = TextEditingController();
 
   String _status = 'active';
@@ -74,14 +70,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     _developerController.dispose();
     _cityController.dispose();
     _localityController.dispose();
-    _addressController.dispose();
     _priceRangeController.dispose();
     _totalUnitsController.dispose();
     _reraNumberController.dispose();
-    _brochureUrlController.dispose();
-    _videoUrlController.dispose();
-    _paymentPlanUrlController.dispose();
-    _homeLoanInfoController.dispose();
+    _paymentPlanTextController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -96,14 +88,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     _developerController.text = _readString(data['developer']);
     _cityController.text = _readString(data['city']);
     _localityController.text = _readString(data['locality']);
-    _addressController.text = _readString(data['address']);
     _priceRangeController.text = _readString(data['price_range']);
     _totalUnitsController.text = _readString(data['total_units']);
     _reraNumberController.text = _readString(data['rera_number']);
-    _brochureUrlController.text = _readString(data['brochure_url']);
-    _videoUrlController.text = _readString(data['video_url']);
-    _paymentPlanUrlController.text = _readString(data['payment_plan_url']);
-    _homeLoanInfoController.text = _readString(data['home_loan_info']);
+    _paymentPlanTextController.text = _readString(data['home_loan_info']);
     _descriptionController.text = _readString(data['description']);
 
     final status = _readString(data['status']).toLowerCase();
@@ -146,21 +134,14 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       final developer = _developerController.text.trim();
       final city = _cityController.text.trim();
       final locality = _localityController.text.trim();
-      final address = _addressController.text.trim();
       final priceRange = _priceRangeController.text.trim();
       final totalUnits = int.tryParse(_totalUnitsController.text.trim()) ?? 0;
       final reraNumber = _reraNumberController.text.trim();
-      final brochureUrl = _brochureUrlController.text.trim();
-      final videoUrl = _videoUrlController.text.trim();
-      final paymentPlanUrl = _paymentPlanUrlController.text.trim();
-      final homeLoanInfo = _homeLoanInfoController.text.trim();
+      final paymentPlanText = _paymentPlanTextController.text.trim();
       final description = _descriptionController.text.trim();
-      final existingAddress = _readString(widget.projectData?['address']);
       final derivedAddress =
           [locality, city].where((item) => item.isNotEmpty).join(', ');
-      final resolvedAddress = address.isNotEmpty
-          ? address
-          : (existingAddress.isNotEmpty ? existingAddress : derivedAddress);
+      final resolvedAddress = derivedAddress;
 
       if (widget.isEditMode) {
         final id = _readString(widget.projectData?['id']);
@@ -187,10 +168,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           creativeFilePaths: _filePaths(_creativeFiles),
           paymentPlanFilePaths: _filePaths(_paymentPlanFiles),
           videoFilePaths: _filePaths(_videoFiles),
-          brochureUrl: brochureUrl,
-          videoUrl: videoUrl,
-          paymentPlanUrl: paymentPlanUrl,
-          homeLoanInfo: homeLoanInfo,
+          brochureUrl: '',
+          videoUrl: '',
+          paymentPlanUrl: '',
+          homeLoanInfo: paymentPlanText,
           token: _authProvider.currentAuthToken,
         );
       } else {
@@ -212,10 +193,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           creativeFilePaths: _filePaths(_creativeFiles),
           paymentPlanFilePaths: _filePaths(_paymentPlanFiles),
           videoFilePaths: _filePaths(_videoFiles),
-          brochureUrl: brochureUrl,
-          videoUrl: videoUrl,
-          paymentPlanUrl: paymentPlanUrl,
-          homeLoanInfo: homeLoanInfo,
+          brochureUrl: '',
+          videoUrl: '',
+          paymentPlanUrl: '',
+          homeLoanInfo: paymentPlanText,
           token: _authProvider.currentAuthToken,
         );
       }
@@ -440,12 +421,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          _buildTextField(
-                            controller: _addressController,
-                            label: 'Address',
-                            hintText: 'Plot 14, Veera Desai Road',
-                          ),
-                          const SizedBox(height: 12),
                           _buildResponsiveRow(
                             isNarrow: isNarrow,
                             children: [
@@ -495,27 +470,9 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                           ),
                           const SizedBox(height: 12),
                           _buildTextField(
-                            controller: _brochureUrlController,
-                            label: 'Brochure URL',
-                            hintText: '/uploads/projects/brochure.pdf',
-                          ),
-                          const SizedBox(height: 12),
-                          _buildTextField(
-                            controller: _videoUrlController,
-                            label: 'Video URL',
-                            hintText: 'https://youtube.com/watch?v=abc',
-                          ),
-                          const SizedBox(height: 12),
-                          _buildTextField(
-                            controller: _paymentPlanUrlController,
-                            label: 'Payment Plan URL',
-                            hintText: '/uploads/projects/payment_plan.pdf',
-                          ),
-                          const SizedBox(height: 12),
-                          _buildTextField(
-                            controller: _homeLoanInfoController,
-                            label: 'Home Loan Info',
-                            hintText: 'Available through HDFC, SBI, ICICI',
+                            controller: _paymentPlanTextController,
+                            label: 'Payment Plan Text',
+                            hintText: 'Enter payment plan details',
                             minLines: 3,
                             maxLines: 3,
                           ),

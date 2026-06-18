@@ -122,14 +122,27 @@ class _LeadsPageState extends State<LeadsPage> {
 
   bool get _canExportData => RoleAccess.canExportModule('leads');
   bool get _canUseBulkLeadTools => RoleAccess.canCreateModule('leads');
+  bool get _showLeadTabs =>
+      _currentRole.isNotEmpty &&
+      !RoleAccess.isAdmin(_currentRole) &&
+      !RoleAccess.isSuperAdmin(_currentRole);
 
   Future<void> _loadAccess() async {
     try {
       final role = await RoleAccess.currentRole(_authProvider);
       if (!mounted) return;
+      final isAdminRole =
+          RoleAccess.isAdmin(role) || RoleAccess.isSuperAdmin(role);
       setState(() {
         _currentRole = role;
+        if (isAdminRole) {
+          _activeLeadsTabIndex = _teamLeadsTabIndex;
+          _selectedTeamId = null;
+        }
       });
+      if (isAdminRole) {
+        _loadLeads();
+      }
     } catch (_) {
       // Export actions stay hidden if access cannot be resolved.
     }
@@ -2195,14 +2208,16 @@ class _LeadsPageState extends State<LeadsPage> {
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildLeadTabs(),
-              const SizedBox(height: 16),
-              _buildToolbar(),
-              const SizedBox(height: 16),
-              if (selectedCount > 0) ...[
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_showLeadTabs) ...[
+                  _buildLeadTabs(),
+                  const SizedBox(height: 16),
+                ],
+                _buildToolbar(),
+                const SizedBox(height: 16),
+                if (selectedCount > 0) ...[
                 _buildBulkActionBar(selectedCount),
                 const SizedBox(height: 16),
               ],

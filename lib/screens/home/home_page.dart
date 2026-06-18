@@ -2061,12 +2061,17 @@ class _LeadPipelineCard extends StatelessWidget {
                     ),
                     SizedBox(width: isNarrow ? 6 : 10),
                     SizedBox(
-                      width: isNarrow ? 14 : 16,
-                      child: Text(
-                        '${r.$2}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF13233E),
+                      width: isNarrow ? 30 : 36,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          '${r.$2}',
+                          maxLines: 1,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF13233E),
+                          ),
                         ),
                       ),
                     ),
