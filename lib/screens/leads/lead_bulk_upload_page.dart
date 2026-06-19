@@ -91,13 +91,7 @@ class _LeadBulkUploadPageState extends State<LeadBulkUploadPage> {
           user['userRole'] ??
           user['designation'],
     );
-    final normalizedRole = _normalizeRole(roleRaw);
-    if (normalizedRole != 'sale_executive' &&
-        normalizedRole != 'sales_manager' &&
-        normalizedRole != 'external_caller') {
-      return null;
-    }
-    final group = _roleGroup(normalizedRole);
+    final group = _roleGroup(_normalizeRole(roleRaw));
 
     final id = _readString(
       user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid'],
@@ -121,10 +115,16 @@ class _LeadBulkUploadPageState extends State<LeadBulkUploadPage> {
                 user['fullName'] ??
                 user['email'],
           );
+    final roleLabel = roleRaw
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .join(' ');
+    final baseName = displayName.isEmpty ? 'User $id' : displayName;
 
     return _AssigneeOption(
       id: id,
-      name: displayName.isEmpty ? 'User $id' : displayName,
+      name: roleLabel.isEmpty ? baseName : '$baseName ($roleLabel)',
       group: group,
     );
   }
@@ -611,10 +611,19 @@ class _LeadBulkUploadPageState extends State<LeadBulkUploadPage> {
     switch (normalizedRole) {
       case 'sales_manager':
         return 'Sales Managers';
+      case 'super_admin':
+      case 'admin':
+        return 'Admins';
+      case 'associate':
+      case 'associate_partner':
+        return 'Associates';
       case 'external_caller':
         return 'External Callers';
-      default:
+      case 'sale_executive':
+      case 'sales_executive':
         return 'Sales Executives';
+      default:
+        return 'Team Members';
     }
   }
 

@@ -323,7 +323,7 @@ class _UsersPageState extends State<UsersPage> {
             .map(
               (manager) => AssignManagerOption(
                 id: manager.id,
-                name: manager.name,
+                name: '${manager.name} (${manager.role})',
               ),
             )
             .toList(),

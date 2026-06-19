@@ -179,7 +179,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
     final normalizedRaw = (raw ?? '').trim();
     if (normalizedRaw.isNotEmpty) {
       for (final member in _teamMembers) {
-        if (member['id']?.toString() == normalizedRaw) {
+        if (_readUserId(member) == normalizedRaw) {
           return normalizedRaw;
         }
       }
@@ -189,14 +189,93 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       return null;
     }
     for (final member in _teamMembers) {
-      final first = (member['first_name'] ?? '').toString().trim();
-      final last = (member['last_name'] ?? '').toString().trim();
-      final fullName = '$first $last'.trim().toLowerCase();
-      if (fullName == candidateName) {
-        return member['id']?.toString();
+      final fullName = _readUserName(member).toLowerCase();
+      final directName =
+          ((member['name'] ?? member['full_name'] ?? member['fullName']) ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
+      if (fullName == candidateName || directName == candidateName) {
+        return _readUserId(member);
       }
     }
     return null;
+  }
+
+  String _readUserId(Map<String, dynamic> user) {
+    return (user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid'] ?? '')
+        .toString()
+        .trim();
+  }
+
+  String _readUserName(Map<String, dynamic> user) {
+    final first = (user['first_name'] ?? user['firstName'] ?? '').toString().trim();
+    final last = (user['last_name'] ?? user['lastName'] ?? '').toString().trim();
+    final combined = [if (first.isNotEmpty) first, if (last.isNotEmpty) last]
+        .join(' ')
+        .trim();
+    if (combined.isNotEmpty) {
+      return combined;
+    }
+    return (user['full_name'] ?? user['fullName'] ?? user['name'] ?? user['email'] ?? '')
+        .toString()
+        .trim();
+  }
+
+  bool _readUserActive(Map<String, dynamic> user) {
+    final value =
+        user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'];
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    final normalized = value?.toString().trim().toLowerCase() ?? '';
+    return normalized == 'true' ||
+        normalized == '1' ||
+        normalized == 'yes' ||
+        normalized == 'active';
+  }
+
+  String _readUserRoleLabel(Map<String, dynamic> user) {
+    final rawRole =
+        (user['role'] ?? user['user_role'] ?? user['userRole'] ?? user['designation'] ?? '')
+            .toString()
+            .trim();
+    if (rawRole.isEmpty) {
+      return '';
+    }
+    return rawRole
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  List<_DropdownOption> _buildAssigneeOptions() {
+    final unique = <String, _DropdownOption>{};
+    for (final member in _teamMembers) {
+      if (!_readUserActive(member)) {
+        continue;
+      }
+      final id = _readUserId(member);
+      if (id.isEmpty) {
+        continue;
+      }
+      final name = _readUserName(member);
+      if (name.isEmpty) {
+        continue;
+      }
+      final roleLabel = _readUserRoleLabel(member);
+      unique[id] = _DropdownOption(
+        value: id,
+        label: roleLabel.isEmpty ? name : '$name ($roleLabel)',
+      );
+    }
+    final options = unique.values.toList()
+      ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+    return options;
   }
 
   Future<void> _selectDate() async {
@@ -397,16 +476,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                         _buildDropdown(
                           value: _selectedAssigneeId,
                           hint: 'Select team member...',
-                          items: _teamMembers
-                              .map(
-                                (e) => _DropdownOption(
-                                  value: e['id'].toString(),
-                                  label:
-                                      '${e['first_name'] ?? ''} ${e['last_name'] ?? ''}'
-                                          .trim(),
-                                ),
-                              )
-                              .toList(),
+                          items: _buildAssigneeOptions(),
                           onChanged: (val) =>
                               setState(() => _selectedAssigneeId = val),
                         ),

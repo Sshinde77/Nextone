@@ -483,7 +483,48 @@ class _FollowUpPageState extends State<FollowUpPage> {
     return '';
   }
 
+  bool _readBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' ||
+          normalized == '1' ||
+          normalized == 'yes' ||
+          normalized == 'active';
+    }
+    return false;
+  }
+
+  String _readRoleLabel(Map<String, dynamic> user) {
+    final rawRole = _readString(
+      user['role'] ??
+          user['user_role'] ??
+          user['userRole'] ??
+          user['designation'],
+    );
+    if (rawRole.isEmpty) {
+      return '';
+    }
+    return rawRole
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
   _TeamOption? _teamOptionFromUser(Map<String, dynamic> user) {
+    final isActive = _readBool(
+      user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'],
+    );
+    if (!isActive) {
+      return null;
+    }
+
     final id = _readString(user['id'] ?? user['user_id'] ?? user['userId']);
     if (id.isEmpty) {
       return null;
@@ -495,13 +536,16 @@ class _FollowUpPageState extends State<FollowUpPage> {
       user['full_name'] ?? user['fullName'] ?? user['name'],
     );
 
-    final label = fullName.isNotEmpty
+    final name = fullName.isNotEmpty
         ? fullName
         : [firstName, lastName].where((part) => part.isNotEmpty).join(' ');
+    final baseName = name.isEmpty ? id : name;
+    final roleLabel = _readRoleLabel(user);
+    final label = roleLabel.isEmpty ? baseName : '$baseName ($roleLabel)';
 
     return _TeamOption(
       id: id,
-      label: label.isEmpty ? id : label,
+      label: label,
     );
   }
 

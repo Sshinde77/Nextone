@@ -281,19 +281,6 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       return null;
     }
 
-    final roleRaw = _readString(
-      user['role'] ??
-          user['user_role'] ??
-          user['userRole'] ??
-          user['designation'],
-    );
-    final normalizedRole = _normalizeRole(roleRaw);
-    if (normalizedRole != 'sale_executive' &&
-        normalizedRole != 'sales_manager' &&
-        normalizedRole != 'external_caller') {
-      return null;
-    }
-
     final id = _readString(
         user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid']);
     if (id.isEmpty) {
@@ -313,9 +300,30 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
             user['full_name'] ??
             user['fullName'] ??
             user['email']);
+    final roleLabel = _readRoleLabel(user);
 
+    final baseName = displayName.isEmpty ? 'User $id' : displayName;
     return _AssigneeOption(
-        id: id, name: displayName.isEmpty ? 'User $id' : displayName);
+      id: id,
+      name: roleLabel.isEmpty ? baseName : '$baseName ($roleLabel)',
+    );
+  }
+
+  String _readRoleLabel(Map<String, dynamic> user) {
+    final rawRole = _readString(
+      user['role'] ??
+          user['user_role'] ??
+          user['userRole'] ??
+          user['designation'],
+    );
+    if (rawRole.isEmpty) {
+      return '';
+    }
+    return rawRole
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .join(' ');
   }
 
   Future<void> _makeCall(String phoneNumber) async {
@@ -3339,15 +3347,6 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         borderSide: const BorderSide(color: AppColors.primary),
       ),
     );
-  }
-
-  String _normalizeRole(String value) {
-    final normalized =
-        value.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
-    if (normalized == 'sales_executive') {
-      return 'sale_executive';
-    }
-    return normalized;
   }
 
   String _normalizeStatus(String value) {

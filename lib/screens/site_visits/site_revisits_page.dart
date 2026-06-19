@@ -970,18 +970,66 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     final usersRaw = await _authProvider.assignmentUsers(
       token: _authProvider.currentAuthToken,
     );
-    final members = usersRaw
-        .map((u) => _TeamMemberOption(
-              id: _readString(u['id'], fallback: ''),
-              name: _readString(
-                u['full_name'] ??
-                    u['name'] ??
-                    '${u['first_name'] ?? ''} ${u['last_name'] ?? ''}',
-                fallback: 'Unknown',
-              ),
-            ))
-        .where((m) => m.id.isNotEmpty)
-        .toList();
+    bool isActiveUser(Map<String, dynamic> user) {
+      final value =
+          user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'];
+      if (value is bool) {
+        return value;
+      }
+      if (value is num) {
+        return value != 0;
+      }
+      final normalized = _readString(value, fallback: '').toLowerCase();
+      return normalized == 'true' ||
+          normalized == '1' ||
+          normalized == 'yes' ||
+          normalized == 'active';
+    }
+
+    String roleLabel(Map<String, dynamic> user) {
+      final rawRole = _readString(
+        user['role'] ??
+            user['user_role'] ??
+            user['userRole'] ??
+            user['designation'],
+        fallback: '',
+      );
+      if (rawRole.isEmpty) {
+        return '';
+      }
+      return rawRole
+          .split('_')
+          .where((part) => part.trim().isNotEmpty)
+          .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+          .join(' ');
+    }
+
+    final membersById = <String, _TeamMemberOption>{};
+    for (final raw in usersRaw) {
+      if (!isActiveUser(raw)) {
+        continue;
+      }
+      final id = _readString(
+        raw['id'] ?? raw['user_id'] ?? raw['userId'] ?? raw['uuid'],
+        fallback: '',
+      );
+      if (id.isEmpty) {
+        continue;
+      }
+      final baseName = _readString(
+        raw['full_name'] ??
+            raw['name'] ??
+            '${raw['first_name'] ?? ''} ${raw['last_name'] ?? ''}',
+        fallback: 'Unknown',
+      );
+      final readableRole = roleLabel(raw);
+      membersById[id] = _TeamMemberOption(
+        id: id,
+        name: readableRole.isEmpty ? baseName : '$baseName ($readableRole)',
+      );
+    }
+    final members = membersById.values.toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
     _TeamMemberOption? selectedMember;
     final assignedToId = _readString(item['assigned_to'], fallback: '');

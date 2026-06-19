@@ -541,7 +541,7 @@ class _TeamPageState extends State<TeamPage> {
             .map(
               (manager) => AssignManagerOption(
                 id: manager.id,
-                name: manager.name,
+                name: '${manager.name} (${manager.role})',
               ),
             )
             .toList(),

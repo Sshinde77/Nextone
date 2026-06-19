@@ -58,7 +58,6 @@ class _LeadsPageState extends State<LeadsPage> {
   bool _isExporting = false;
   bool _isSubmittingReassign = false;
   bool _isLoadingLeadSources = false;
-  String? _activeShareLeadId;
   String? _visiblePhoneLeadId;
   String? _selectedAssigneeId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
@@ -229,19 +228,6 @@ class _LeadsPageState extends State<LeadsPage> {
       return null;
     }
 
-    final roleRaw = _readString(
-      user['role'] ??
-          user['user_role'] ??
-          user['userRole'] ??
-          user['designation'],
-    );
-    final normalizedRole = _normalizeRole(roleRaw);
-    if (normalizedRole != 'sale_executive' &&
-        normalizedRole != 'sales_manager' &&
-        normalizedRole != 'external_caller') {
-      return null;
-    }
-
     final id = _readString(
       user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid'],
     );
@@ -264,11 +250,31 @@ class _LeadsPageState extends State<LeadsPage> {
                 user['fullName'] ??
                 user['email'],
           );
+    final roleLabel = _readRoleLabel(user);
 
     return _AssigneeOption(
       id: id,
-      name: displayName.isEmpty ? 'User $id' : displayName,
+      name: roleLabel.isEmpty
+          ? (displayName.isEmpty ? 'User $id' : displayName)
+          : '${displayName.isEmpty ? 'User $id' : displayName} ($roleLabel)',
     );
+  }
+
+  String _readRoleLabel(Map<String, dynamic> user) {
+    final rawRole = _readString(
+      user['role'] ??
+          user['user_role'] ??
+          user['userRole'] ??
+          user['designation'],
+    );
+    if (rawRole.isEmpty) {
+      return '';
+    }
+    return rawRole
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .join(' ');
   }
 
   Future<void> _loadLeads() async {
@@ -2157,15 +2163,6 @@ class _LeadsPageState extends State<LeadsPage> {
         borderSide: const BorderSide(color: AppColors.primary),
       ),
     );
-  }
-
-  String _normalizeRole(String value) {
-    final normalized =
-        value.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
-    if (normalized == 'sales_executive') {
-      return 'sale_executive';
-    }
-    return normalized;
   }
 
   String _readString(dynamic value) {

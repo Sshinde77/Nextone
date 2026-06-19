@@ -404,19 +404,6 @@ class _LeadFormPageState extends State<LeadFormPage> {
       return null;
     }
 
-    final roleRaw = _readString(
-      user['role'] ??
-          user['user_role'] ??
-          user['userRole'] ??
-          user['designation'],
-    );
-    final normalizedRole = _normalizeRole(roleRaw);
-    if (normalizedRole != 'sale_executive' &&
-        normalizedRole != 'sales_manager' &&
-        normalizedRole != 'external_caller') {
-      return null;
-    }
-
     final id = _readString(
         user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid']);
     if (id.isEmpty) {
@@ -436,18 +423,30 @@ class _LeadFormPageState extends State<LeadFormPage> {
             user['full_name'] ??
             user['fullName'] ??
             user['email']);
+    final roleLabel = _readRoleLabel(user);
 
+    final baseName = displayName.isEmpty ? 'User $id' : displayName;
     return _AssigneeOption(
-        id: id, name: displayName.isEmpty ? 'User $id' : displayName);
+      id: id,
+      name: roleLabel.isEmpty ? baseName : '$baseName ($roleLabel)',
+    );
   }
 
-  String _normalizeRole(String value) {
-    final normalized =
-        value.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
-    if (normalized == 'sales_executive') {
-      return 'sale_executive';
+  String _readRoleLabel(Map<String, dynamic> user) {
+    final rawRole = _readString(
+      user['role'] ??
+          user['user_role'] ??
+          user['userRole'] ??
+          user['designation'],
+    );
+    if (rawRole.isEmpty) {
+      return '';
     }
-    return normalized;
+    return rawRole
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .join(' ');
   }
 
   String? _extractUserId(Map<String, dynamic> source) {
@@ -802,7 +801,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
       isLoading: _isLoadingAssignees,
       errorText: _assigneeLoadError,
       helperText: _isLoadingAssignees
-          ? 'Loading sale_executive, sales_manager and external_caller users...'
+          ? 'Loading team members...'
           : null,
       onRetry: _loadAssigneeOptions,
       onSelected: (value) {

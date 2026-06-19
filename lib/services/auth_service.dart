@@ -478,7 +478,11 @@ class AuthService {
       final dynamic body = jsonDecode(response.body);
       final userList = _extractTeamTreeUsers(body);
       if (userList != null) {
-        return userList;
+        return await _ensureCurrentUserInAssignmentUsers(
+          users: userList,
+          currentUserId: currentUserId,
+          token: resolvedToken,
+        );
       }
     } catch (_) {
       // Fall through to generic error below.
@@ -7424,6 +7428,68 @@ class AuthService {
     }
 
     return uniqueUsers.values.toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> _ensureCurrentUserInAssignmentUsers({
+    required List<Map<String, dynamic>> users,
+    required String currentUserId,
+    String? token,
+  }) async {
+    if (currentUserId.isEmpty) {
+      return users;
+    }
+
+    final uniqueUsers = <String, Map<String, dynamic>>{
+      for (final user in users)
+        if (_readId(user).isNotEmpty) _readId(user): Map<String, dynamic>.from(user),
+    };
+
+    if (uniqueUsers.containsKey(currentUserId)) {
+      return uniqueUsers.values.toList(growable: false);
+    }
+
+    try {
+      final profileResult = await profile(token: token);
+      final profileData = profileResult.data;
+      final profileId = _readId(profileData);
+      if (profileId.isNotEmpty) {
+        uniqueUsers[profileId] = <String, dynamic>{
+          ...profileData,
+          if (!profileData.containsKey('full_name'))
+            'full_name': _buildUserFullName(profileData),
+          if (!profileData.containsKey('is_active')) 'is_active': true,
+        };
+      }
+    } catch (_) {
+      // Keep the team tree result usable even if the profile lookup fails.
+    }
+
+    return uniqueUsers.values.toList(growable: false);
+  }
+
+  String _buildUserFullName(Map<String, dynamic> user) {
+    String read(dynamic value) {
+      if (value is String) {
+        return value.trim();
+      }
+      if (value is num || value is bool) {
+        return value.toString().trim();
+      }
+      return '';
+    }
+
+    final firstName = read(user['first_name'] ?? user['firstName']);
+    final lastName = read(user['last_name'] ?? user['lastName']);
+    final combined = <String>[
+      if (firstName.isNotEmpty) firstName,
+      if (lastName.isNotEmpty) lastName,
+    ].join(' ').trim();
+    if (combined.isNotEmpty) {
+      return combined;
+    }
+    return read(
+      user['full_name'] ?? user['fullName'] ?? user['name'] ?? user['email'],
+    );
   }
 
   List<Map<String, dynamic>>? _extractRoleList(dynamic source) {

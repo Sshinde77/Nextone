@@ -204,15 +204,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
     bool commissionPaid = false;
     List<String> selectedManagerIds = <String>[];
     final managerOptions = users
-        .map(
-          (e) => _SelectionOption(
-            id: _readString(e['id'], fallback: ''),
-            label:
-                '${_readString(e['first_name'], fallback: '').trim()} ${_readString(e['last_name'], fallback: '').trim()}'
-                    .trim(),
-          ),
-        )
-        .where((option) => option.id.isNotEmpty)
+        .map(_teamTreeSelectionOption)
+        .whereType<_SelectionOption>()
         .toList(growable: false);
     final notesController = TextEditingController();
 
@@ -1174,15 +1167,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
     List<String> selectedManagerIds =
         _extractStringList(item['closed_by_manager']);
     final managerOptions = users
-        .map(
-          (e) => _SelectionOption(
-            id: _readString(e['id'], fallback: ''),
-            label:
-                '${_readString(e['first_name'], fallback: '').trim()} ${_readString(e['last_name'], fallback: '').trim()}'
-                    .trim(),
-          ),
-        )
-        .where((option) => option.id.isNotEmpty)
+        .map(_teamTreeSelectionOption)
+        .whereType<_SelectionOption>()
         .toList(growable: false);
     final notesController = TextEditingController(
       text: _readString(item['closure_notes'], fallback: ''),
@@ -1910,6 +1896,68 @@ class _ClosuresPageState extends State<ClosuresPage> {
   String _readString(dynamic value, {required String fallback}) {
     final text = value?.toString().trim() ?? '';
     return text.isEmpty || text.toLowerCase() == 'null' ? fallback : text;
+  }
+
+  bool _readBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    final normalized = _readString(value, fallback: '').toLowerCase();
+    return normalized == 'true' ||
+        normalized == '1' ||
+        normalized == 'yes' ||
+        normalized == 'active';
+  }
+
+  String _readRoleLabel(Map<String, dynamic> user) {
+    final rawRole = _readString(
+      user['role'] ??
+          user['user_role'] ??
+          user['userRole'] ??
+          user['designation'],
+      fallback: '',
+    );
+    if (rawRole.isEmpty) {
+      return '';
+    }
+    return rawRole
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  _SelectionOption? _teamTreeSelectionOption(Map<String, dynamic> user) {
+    if (!_readBool(
+      user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'],
+    )) {
+      return null;
+    }
+    final id = _readString(
+      user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid'],
+      fallback: '',
+    );
+    if (id.isEmpty) {
+      return null;
+    }
+    final name = _readString(
+      user['full_name'] ??
+          user['fullName'] ??
+          user['name'] ??
+          '${_readString(user['first_name'], fallback: '')} ${_readString(user['last_name'], fallback: '')}',
+      fallback: '',
+    );
+    if (name.isEmpty) {
+      return null;
+    }
+    final roleLabel = _readRoleLabel(user);
+    return _SelectionOption(
+      id: id,
+      label: roleLabel.isEmpty ? name : '$name ($roleLabel)',
+    );
   }
 
   List<String> _extractStringList(dynamic value) {
