@@ -1184,11 +1184,6 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                   ),
                 ),
                 _cardActionButton(
-                  icon: Icons.call_outlined,
-                  onTap: () => _handleVisitAction('assign', visit),
-                ),
-                SizedBox(width: _s(6)),
-                _cardActionButton(
                   icon: Icons.check_circle_outline,
                   onTap: () => _handleVisitAction('status', visit),
                 ),
