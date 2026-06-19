@@ -199,8 +199,9 @@ class _LeadFormPageState extends State<LeadFormPage> {
     });
 
     try {
-      final users =
-          await _authProvider.users(token: _authProvider.currentAuthToken);
+      final users = await _authProvider.assignmentUsers(
+        token: _authProvider.currentAuthToken,
+      );
       final filtered = users
           .map(_assigneeFromApi)
           .where((user) => user != null)

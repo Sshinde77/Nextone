@@ -68,6 +68,10 @@ class AuthProvider {
     return _authService.users(token: token);
   }
 
+  Future<List<Map<String, dynamic>>> assignmentUsers({String? token}) {
+    return _authService.assignmentUsers(token: token);
+  }
+
   Future<List<Map<String, dynamic>>> usersRoles({String? token}) {
     return _authService.usersRoles(token: token);
   }

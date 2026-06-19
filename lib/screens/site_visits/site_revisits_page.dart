@@ -967,8 +967,9 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     bool transportArranged = item['transport_arranged'] == true;
     bool isSubmitting = false;
 
-    final usersRaw =
-        await _authProvider.users(token: _authProvider.currentAuthToken);
+    final usersRaw = await _authProvider.assignmentUsers(
+      token: _authProvider.currentAuthToken,
+    );
     final members = usersRaw
         .map((u) => _TeamMemberOption(
               id: _readString(u['id'], fallback: ''),

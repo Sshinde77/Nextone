@@ -159,8 +159,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
       token: _authProvider.currentAuthToken,
       perPage: 100,
     );
-    final users =
-        await _authProvider.users(token: _authProvider.currentAuthToken);
+    final users = await _authProvider.assignmentUsers(
+      token: _authProvider.currentAuthToken,
+    );
 
     if (!mounted) return;
     final leads = leadResult.items;
@@ -1121,8 +1122,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
   Future<void> _openEditClosureDialog(Map<String, dynamic> item) async {
     final id = _readString(item['id'], fallback: '');
     if (id.isEmpty) return;
-    final users =
-        await _authProvider.users(token: _authProvider.currentAuthToken);
+    final users = await _authProvider.assignmentUsers(
+      token: _authProvider.currentAuthToken,
+    );
     if (!mounted) return;
 
     String step = 'booking';

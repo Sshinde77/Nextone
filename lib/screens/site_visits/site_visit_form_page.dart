@@ -63,7 +63,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       final leadsResult = await _authProvider.leads(token: token, perPage: 100);
       final projectsResult =
           await _authProvider.projects(token: token, perPage: 100);
-      final usersList = await _authProvider.users(token: token);
+      final usersList = await _authProvider.assignmentUsers(token: token);
 
       setState(() {
         _leads = leadsResult.items;

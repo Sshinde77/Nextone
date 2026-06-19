@@ -444,6 +444,49 @@ class AuthService {
     throw Exception('Users response format is not valid.');
   }
 
+  Future<List<Map<String, dynamic>>> assignmentUsers({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final currentUserId = await _resolveCurrentUserId(token: resolvedToken);
+    if (currentUserId.isEmpty) {
+      throw Exception('Unable to resolve current user for assignment options.');
+    }
+
+    final endpoint =
+        ApiConstants.userTeamTree.replaceFirst('{id}', currentUserId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'assignmentUsers',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('assignmentUsers', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch assignment users.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final userList = _extractTeamTreeUsers(body);
+      if (userList != null) {
+        return userList;
+      }
+    } catch (_) {
+      // Fall through to generic error below.
+    }
+
+    throw Exception('Assignment users response format is not valid.');
+  }
+
   Future<List<Map<String, dynamic>>> usersRoles({String? token}) async {
     final resolvedToken = token ?? _authToken;
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.usersRoles}');
@@ -7344,6 +7387,45 @@ class AuthService {
     return null;
   }
 
+  List<Map<String, dynamic>>? _extractTeamTreeUsers(dynamic source) {
+    if (source is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final data = source['data'];
+    if (data is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final uniqueUsers = <String, Map<String, dynamic>>{};
+
+    void addUser(dynamic rawUser) {
+      if (rawUser is! Map) {
+        return;
+      }
+      final user = _stringDynamicMap(rawUser);
+      final id = _readId(user);
+      if (id.isEmpty) {
+        return;
+      }
+      uniqueUsers[id] = <String, dynamic>{
+        ...user,
+        if (!user.containsKey('is_active')) 'is_active': true,
+      };
+    }
+
+    addUser(data['manager']);
+
+    final team = data['team'];
+    if (team is List) {
+      for (final member in team) {
+        addUser(member);
+      }
+    }
+
+    return uniqueUsers.values.toList(growable: false);
+  }
+
   List<Map<String, dynamic>>? _extractRoleList(dynamic source) {
     if (source is List) {
       return source.whereType<Map>().map(_stringDynamicMap).toList();
@@ -7383,6 +7465,60 @@ class AuthService {
     return source.map(
       (key, value) => MapEntry(key.toString(), value),
     );
+  }
+
+  Future<String> _resolveCurrentUserId({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final fromToken = _extractUserIdFromToken(resolvedToken);
+    if (fromToken.isNotEmpty) {
+      return fromToken;
+    }
+
+    try {
+      final profileResult = await profile(token: resolvedToken);
+      return _readId(profileResult.data);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _extractUserIdFromToken(String? token) {
+    final value = token?.trim() ?? '';
+    if (value.isEmpty) {
+      return '';
+    }
+
+    final parts = value.split('.');
+    if (parts.length < 2) {
+      return '';
+    }
+
+    try {
+      final normalized = base64Url.normalize(parts[1]);
+      final decoded = utf8.decode(base64Url.decode(normalized));
+      final payload = jsonDecode(decoded);
+      if (payload is Map<String, dynamic>) {
+        return _readId(payload);
+      }
+    } catch (_) {
+      return '';
+    }
+
+    return '';
+  }
+
+  String _readId(Map<String, dynamic> source) {
+    for (final key in const ['id', 'user_id', 'userId', 'uuid']) {
+      final value = source[key];
+      if (value == null) {
+        continue;
+      }
+      final normalized = value.toString().trim();
+      if (normalized.isNotEmpty) {
+        return normalized;
+      }
+    }
+    return '';
   }
 
   List<Map<String, dynamic>> _extractLeadsItems(dynamic source) {

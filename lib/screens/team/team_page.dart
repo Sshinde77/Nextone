@@ -35,6 +35,7 @@ class _TeamPageState extends State<TeamPage> {
   ];
 
   final List<_TeamMember> _members = [];
+  List<_TeamMember> _assignmentMembers = [];
 
   bool get _canCreateUsers => RoleAccess.canCreateUsers(_currentRole);
   bool get _canEditUsers => RoleAccess.canEditUsers(_currentRole);
@@ -74,6 +75,7 @@ class _TeamPageState extends State<TeamPage> {
     super.initState();
     _loadAccess();
     _loadMembers();
+    _loadAssignmentMembers();
   }
 
   @override
@@ -172,6 +174,7 @@ class _TeamPageState extends State<TeamPage> {
           ..addAll(members);
         _isLoadingMembers = false;
       });
+      _loadAssignmentMembers();
     } catch (error) {
       if (!mounted) {
         return;
@@ -181,6 +184,25 @@ class _TeamPageState extends State<TeamPage> {
         _isLoadingMembers = false;
         _membersLoadError = AppErrorHandler.friendlyMessage(error);
       });
+    }
+  }
+
+  Future<void> _loadAssignmentMembers() async {
+    try {
+      final users = await _authProvider.assignmentUsers(
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _assignmentMembers = users
+            .where(_TeamMember.isActiveUser)
+            .map(_TeamMember.fromApi)
+            .toList();
+      });
+    } catch (_) {
+      // Keep manager assignment usable through the team list as fallback.
     }
   }
 
@@ -433,7 +455,8 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   List<_TeamMember> get _managerOptions {
-    return _members.where((member) {
+    final source = _assignmentMembers.isNotEmpty ? _assignmentMembers : _members;
+    return source.where((member) {
       return member.rawRole == RoleAccess.salesManager;
     }).toList();
   }

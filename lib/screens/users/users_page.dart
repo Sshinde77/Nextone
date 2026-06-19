@@ -24,6 +24,7 @@ class _UsersPageState extends State<UsersPage> {
   final Set<String> _assigningManagerUserIds = <String>{};
   String? _error;
   List<_UserItem> _users = <_UserItem>[];
+  List<_UserItem> _assignmentUsers = <_UserItem>[];
   String _currentRole = '';
 
   static const List<String> _fallbackRoleFilters = <String>[
@@ -48,6 +49,7 @@ class _UsersPageState extends State<UsersPage> {
     _loadAccess();
     _loadRoles();
     _loadUsers();
+    _loadAssignmentUsers();
   }
 
   bool get _canCreateUsers => RoleAccess.canCreateUsers(_currentRole);
@@ -89,12 +91,27 @@ class _UsersPageState extends State<UsersPage> {
         _users = data.map(_UserItem.fromApi).toList();
         _isLoading = false;
       });
+      _loadAssignmentUsers();
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
         _error = AppErrorHandler.friendlyMessage(error);
       });
+    }
+  }
+
+  Future<void> _loadAssignmentUsers() async {
+    try {
+      final data = await _authProvider.assignmentUsers(
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      setState(() {
+        _assignmentUsers = data.map(_UserItem.fromApi).toList();
+      });
+    } catch (_) {
+      // Keep manager assignment usable through the main users list as fallback.
     }
   }
 
@@ -228,7 +245,8 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   List<_UserItem> get _managerOptions {
-    return _users.where((u) {
+    final source = _assignmentUsers.isNotEmpty ? _assignmentUsers : _users;
+    return source.where((u) {
       return u.rawRole == RoleAccess.salesManager && u.status == 'Active';
     }).toList();
   }

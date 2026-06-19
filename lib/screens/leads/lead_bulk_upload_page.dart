@@ -44,8 +44,9 @@ class _LeadBulkUploadPageState extends State<LeadBulkUploadPage> {
 
   Future<void> _loadAssigneeOptions() async {
     try {
-      final users =
-          await _authProvider.users(token: _authProvider.currentAuthToken);
+      final users = await _authProvider.assignmentUsers(
+        token: _authProvider.currentAuthToken,
+      );
       final options = users
           .map(_assigneeFromApi)
           .where((user) => user != null)
