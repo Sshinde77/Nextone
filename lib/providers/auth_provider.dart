@@ -600,6 +600,10 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> attendanceLate({String? token}) {
+    return _authService.attendanceLate(token: token);
+  }
+
   Future<Map<String, dynamic>> attendanceTeam({
     String? from,
     String? to,

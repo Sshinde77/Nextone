@@ -120,6 +120,7 @@ class ApiConstants {
   static const String attendanceByDate = '/attendance/by-date';
   static const String attendanceSummary = '/attendance/summary';
   static const String attendanceTeam = '/attendance/team';
+  static const String attendanceLate = '/attendance/late';
   static const String attendancePending = '/attendance/pending';
   static const String attendanceapprove = '/attendance/{id}/approve';
 

@@ -202,6 +202,35 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
     return null;
   }
 
+  List<_DropdownOption> _buildAssigneeOptions() {
+    final unique = <String, _DropdownOption>{};
+    for (final member in _teamMembers) {
+      if (!_readUserActive(member)) {
+        continue;
+      }
+
+      final id = _readUserId(member);
+      if (id.isEmpty) {
+        continue;
+      }
+
+      final name = _readUserName(member);
+      if (name.isEmpty) {
+        continue;
+      }
+
+      final roleLabel = _readUserRoleLabel(member);
+      unique[id] = _DropdownOption(
+        value: id,
+        label: roleLabel.isEmpty ? name : '$name ($roleLabel)',
+      );
+    }
+
+    final options = unique.values.toList()
+      ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+    return options;
+  }
+
   String _readUserId(Map<String, dynamic> user) {
     return (user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid'] ?? '')
         .toString()
@@ -251,31 +280,6 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
         .where((part) => part.trim().isNotEmpty)
         .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
-  }
-
-  List<_DropdownOption> _buildAssigneeOptions() {
-    final unique = <String, _DropdownOption>{};
-    for (final member in _teamMembers) {
-      if (!_readUserActive(member)) {
-        continue;
-      }
-      final id = _readUserId(member);
-      if (id.isEmpty) {
-        continue;
-      }
-      final name = _readUserName(member);
-      if (name.isEmpty) {
-        continue;
-      }
-      final roleLabel = _readUserRoleLabel(member);
-      unique[id] = _DropdownOption(
-        value: id,
-        label: roleLabel.isEmpty ? name : '$name ($roleLabel)',
-      );
-    }
-    final options = unique.values.toList()
-      ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
-    return options;
   }
 
   Future<void> _selectDate() async {

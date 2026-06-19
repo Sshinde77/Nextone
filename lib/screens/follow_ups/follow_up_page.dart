@@ -314,7 +314,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   Future<void> _callFollowUp(_FollowUpModel followUp) async {
-    final phone = followUp.assignee.phone.trim();
+    final phone = followUp.leadPhone.trim();
     if (phone.isEmpty) {
       _showSnackBar('Phone number is not available for this follow-up.');
       return;
@@ -324,7 +324,19 @@ class _FollowUpPageState extends State<FollowUpPage> {
       scheme: 'tel',
       path: phone,
     );
-    await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+    try {
+      final launched = await launchUrl(
+        launchUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        _showSnackBar('No calling app is available on this device.');
+      }
+    } catch (_) {
+      if (mounted) {
+        _showSnackBar('Unable to open the calling app.');
+      }
+    }
   }
 
   void _markFollowUpComplete(_FollowUpModel followUp) {

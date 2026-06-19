@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
@@ -47,6 +48,11 @@ class _AttendancePageState extends State<AttendancePage> {
   bool _isLoadingSummary = false;
   String? _summaryError;
   Map<String, dynamic> _summaryData = <String, dynamic>{};
+  bool _isLoadingLateReports = false;
+  String? _lateReportsError;
+  Map<String, dynamic> _lateReportsData = <String, dynamic>{};
+  late DateTime _lateReportsFromDate;
+  late DateTime _lateReportsToDate;
   bool _isLoadingApprovals = false;
   bool _isApprovingStatus = false;
   String? _approvalsError;
@@ -72,6 +78,8 @@ class _AttendancePageState extends State<AttendancePage> {
     _TabData('Team Daily', Icons.person_search_outlined),
     _TabData('Team Summary', Icons.trending_up_rounded),
   ];
+  static const _TabData _lateReportsTab =
+      _TabData('Late Reports', Icons.watch_later_rounded);
   static const _TabData _approvalTab =
       _TabData('Approvals', Icons.how_to_reg_outlined);
 
@@ -83,6 +91,8 @@ class _AttendancePageState extends State<AttendancePage> {
     _dailyViewDate = DateTime(now.year, now.month, now.day);
     _summaryFromDate = DateTime(now.year, now.month, now.day - 4);
     _summaryToDate = DateTime(now.year, now.month, now.day);
+    _lateReportsFromDate = DateTime(now.year, now.month, 1);
+    _lateReportsToDate = DateTime(now.year, now.month, now.day);
     _approvalDate = DateTime(now.year, now.month, now.day);
     _loadAccess();
     _loadTodayAttendance();
@@ -102,11 +112,21 @@ class _AttendancePageState extends State<AttendancePage> {
   bool get _canExportData => RoleAccess.canExportModule('attendance');
   bool get _canViewWorkingHours =>
       RoleAccess.isAdmin(_currentRole) || RoleAccess.isSuperAdmin(_currentRole);
+  bool get _canViewLateReports =>
+      RoleAccess.isAdmin(_currentRole) || RoleAccess.isSuperAdmin(_currentRole);
   bool get _isSalesManager => RoleAccess.isSalesManager(_currentRole);
   List<_TabData> get _tabs =>
       _isSalesManager
           ? _salesManagerTabs
-          : <_TabData>[..._baseTabs, _approvalTab];
+          : <_TabData>[
+              ..._baseTabs,
+              if (_canViewLateReports) _lateReportsTab,
+              _approvalTab,
+            ];
+
+  int get _lateReportsTabIndex => _canViewLateReports ? _baseTabs.length : -1;
+  int get _approvalsTabIndex =>
+      _isSalesManager ? -1 : _baseTabs.length + (_canViewLateReports ? 1 : 0);
 
   Future<void> _loadAccess() async {
     try {
@@ -125,6 +145,9 @@ class _AttendancePageState extends State<AttendancePage> {
       _loadMonthGridAttendance();
       _loadDailyViewAttendance();
       _loadSummaryAttendance();
+      if (_canViewLateReports) {
+        _loadLateReports();
+      }
       if (!RoleAccess.isSalesManager(role)) {
         _loadApprovalPending();
       }
@@ -134,9 +157,15 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   List<_TabData> _tabsForRole(String role) {
-    return RoleAccess.isSalesManager(role)
-        ? _salesManagerTabs
-        : <_TabData>[..._baseTabs, _approvalTab];
+    if (RoleAccess.isSalesManager(role)) {
+      return _salesManagerTabs;
+    }
+    return <_TabData>[
+      ..._baseTabs,
+      if (RoleAccess.isAdmin(role) || RoleAccess.isSuperAdmin(role))
+        _lateReportsTab,
+      _approvalTab,
+    ];
   }
 
   @override
@@ -1807,7 +1836,9 @@ class _AttendancePageState extends State<AttendancePage> {
                       _loadDailyViewAttendance();
                     } else if (index == 5) {
                       _loadSummaryAttendance();
-                    } else if (index == 6 && !_isSalesManager) {
+                    } else if (index == _lateReportsTabIndex) {
+                      _loadLateReports();
+                    } else if (index == _approvalsTabIndex) {
                       _loadApprovalPending();
                     }
                   },
@@ -1887,7 +1918,10 @@ class _AttendancePageState extends State<AttendancePage> {
         if (_selectedTabIndex == 5) {
           return _buildSummaryTabContent(constraints.maxWidth);
         }
-        if (_selectedTabIndex == 6 && !_isSalesManager) {
+        if (_selectedTabIndex == _lateReportsTabIndex) {
+          return _buildLateReportsTabContent(constraints.maxWidth);
+        }
+        if (_selectedTabIndex == _approvalsTabIndex) {
           return _buildApprovalsTabContent(constraints.maxWidth);
         }
 
@@ -2760,6 +2794,43 @@ class _AttendancePageState extends State<AttendancePage> {
     }
   }
 
+  Future<void> _loadLateReports() async {
+    setState(() {
+      _isLoadingLateReports = true;
+      _lateReportsError = null;
+    });
+    try {
+      final data = await _authProvider.attendanceLate(
+        token: _authProvider.currentAuthToken,
+      );
+      final rows = _extractLateReportRows(data);
+      final period = _lateReportsPeriod(data);
+      if (!mounted) return;
+      final normalized = Map<String, dynamic>.from(data);
+      normalized['data'] = rows;
+      setState(() {
+        _lateReportsData = normalized;
+        if (period != null) {
+          _lateReportsFromDate =
+              DateTime(period.start.year, period.start.month, period.start.day);
+          _lateReportsToDate =
+              DateTime(period.end.year, period.end.month, period.end.day);
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _lateReportsError = AppErrorHandler.friendlyMessage(e);
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingLateReports = false;
+        });
+      }
+    }
+  }
+
   List<Map<String, dynamic>> _summaryRows() {
     final dataRaw = _summaryData['data'];
     if (dataRaw is! List) return const <Map<String, dynamic>>[];
@@ -2769,6 +2840,141 @@ class _AttendancePageState extends State<AttendancePage> {
               entry.map((key, value) => MapEntry(key.toString(), value)),
             ))
         .toList();
+  }
+
+  List<Map<String, dynamic>> _extractLateReportRows(Map<String, dynamic> source) {
+    dynamic data = source['data'];
+    if (data is Map<String, dynamic>) {
+      data = data['data'] ?? data['items'] ?? data['rows'] ?? data['records'];
+    }
+    if (data is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+    return data
+        .whereType<Map>()
+        .map((entry) => Map<String, dynamic>.from(
+              entry.map((key, value) => MapEntry(key.toString(), value)),
+            ))
+        .toList(growable: false);
+  }
+
+  _LateReportsPeriod? _lateReportsPeriod(Map<String, dynamic> source) {
+    final periodRaw = source['period'];
+    if (periodRaw is! Map<String, dynamic>) {
+      final data = source['data'];
+      if (data is Map<String, dynamic>) {
+        final nested = data['period'];
+        if (nested is Map<String, dynamic>) {
+          return _lateReportsPeriodFromMap(nested);
+        }
+      }
+      return null;
+    }
+    return _lateReportsPeriodFromMap(periodRaw);
+  }
+
+  _LateReportsPeriod? _lateReportsPeriodFromMap(Map<String, dynamic> period) {
+    final from = _parseApiDate(period['from']);
+    final to = _parseApiDate(period['to']);
+    if (from == null || to == null) {
+      return null;
+    }
+    return _LateReportsPeriod(start: from, end: to);
+  }
+
+  List<Map<String, dynamic>> _lateReportsRows() {
+    final dataRaw = _lateReportsData['data'];
+    if (dataRaw is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+    return dataRaw
+        .whereType<Map>()
+        .map((entry) => Map<String, dynamic>.from(
+              entry.map((key, value) => MapEntry(key.toString(), value)),
+            ))
+        .where((row) {
+          final date = _parseApiDate(row['date']);
+          if (date == null) {
+            return true;
+          }
+          final normalized = DateTime(date.year, date.month, date.day);
+          final from = DateTime(
+            _lateReportsFromDate.year,
+            _lateReportsFromDate.month,
+            _lateReportsFromDate.day,
+          );
+          final to = DateTime(
+            _lateReportsToDate.year,
+            _lateReportsToDate.month,
+            _lateReportsToDate.day,
+          );
+          return !normalized.isBefore(from) && !normalized.isAfter(to);
+        })
+        .toList(growable: false);
+  }
+
+  String _lateReportsTitleRange() {
+    return '${_displayDate(_lateReportsFromDate)} to ${_displayDate(_lateReportsToDate)}';
+  }
+
+  String _lateReportsDisplayDate(dynamic value) {
+    final date = _parseApiDate(value);
+    if (date == null) {
+      return '--';
+    }
+    return DateFormat('dd MMM yyyy').format(date);
+  }
+
+  String _lateReportsDisplayTime(dynamic value) {
+    final date = _parseApiDate(value);
+    if (date == null) {
+      return '--';
+    }
+    return DateFormat('hh:mm a').format(date.toLocal()).toLowerCase();
+  }
+
+  String _lateReportsRoleLabel(dynamic value) {
+    final raw = value?.toString().trim() ?? '';
+    if (raw.isEmpty) {
+      return 'N/A';
+    }
+    return raw
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  Future<void> _pickLateReportsFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _lateReportsFromDate,
+      firstDate: DateTime(2000, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() {
+      _lateReportsFromDate = DateTime(picked.year, picked.month, picked.day);
+      if (_lateReportsToDate.isBefore(_lateReportsFromDate)) {
+        _lateReportsToDate = _lateReportsFromDate;
+      }
+    });
+  }
+
+  Future<void> _pickLateReportsToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _lateReportsToDate,
+      firstDate: DateTime(2000, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() {
+      _lateReportsToDate = DateTime(picked.year, picked.month, picked.day);
+      if (_lateReportsToDate.isBefore(_lateReportsFromDate)) {
+        _lateReportsFromDate = _lateReportsToDate;
+      }
+    });
   }
 
   Map<String, dynamic> _buildSalesManagerMonthGridData({
@@ -2787,6 +2993,379 @@ class _AttendancePageState extends State<AttendancePage> {
       ),
       'all_days': _dateRangeStrings(from, to),
     };
+  }
+
+  Widget _buildLateReportsTabContent(double maxWidth) {
+    final compact = maxWidth < 760;
+    final rows = _lateReportsRows();
+    final total = rows.length;
+    final rangeLabel = _lateReportsTitleRange();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD8E0EE)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x140A2548),
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = constraints.maxWidth < 740;
+                final titleBlock = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Late Arrivals Report',
+                      style: TextStyle(
+                        color: Color(0xFF071A3A),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$total records found',
+                      style: const TextStyle(
+                        color: Color(0xFF6B7B91),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      rangeLabel,
+                      style: const TextStyle(
+                        color: Color(0xFF8B96A8),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                );
+
+                final controls = Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _LateReportDateButton(
+                      value: _displayDate(_lateReportsFromDate),
+                      onTap: _pickLateReportsFromDate,
+                    ),
+                    const Text(
+                      'to',
+                      style: TextStyle(
+                        color: Color(0xFF8C97AA),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    _LateReportDateButton(
+                      value: _displayDate(_lateReportsToDate),
+                      onTap: _pickLateReportsToDate,
+                    ),
+                    _RoundActionButton(
+                      icon: Icons.refresh_rounded,
+                      onTap: _loadLateReports,
+                    ),
+                  ],
+                );
+
+                if (stacked) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      titleBlock,
+                      const SizedBox(height: 12),
+                      Align(alignment: Alignment.centerLeft, child: controls),
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: titleBlock),
+                    const SizedBox(width: 12),
+                    controls,
+                  ],
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE8EDF5)),
+          if (_isLoadingLateReports)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_lateReportsError != null)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _lateReportsError!,
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _loadLateReports,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+          else if (rows.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(18),
+              child: Text(
+                'No late arrivals found.',
+                style: TextStyle(
+                  color: Color(0xFF7C8DA6),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
+          else if (compact)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: List.generate(rows.length, (index) {
+                  final row = rows[index];
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: index == rows.length - 1 ? 0 : 12,
+                    ),
+                    child: _LateReportCard(
+                      name: _readStringFromMap(
+                        row,
+                        const ['full_name', 'fullName', 'name'],
+                        fallback: 'N/A',
+                      ),
+                      role: _lateReportsRoleLabel(
+                        _readStringFromMap(
+                          row,
+                          const ['role', 'designation'],
+                          fallback: 'N/A',
+                        ),
+                      ),
+                      dateLabel: _lateReportsDisplayDate(
+                        row['date'] ?? row['late_date'],
+                      ),
+                      checkInLabel: _lateReportsDisplayTime(
+                        row['check_in_time'] ?? row['checkInTime'],
+                      ),
+                      location: _readStringFromMap(
+                        row,
+                        const ['checkin_address', 'checkinAddress', 'location'],
+                        fallback: '-',
+                      ),
+                      email: _readStringFromMap(
+                        row,
+                        const ['email'],
+                        fallback: '',
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+              child: Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 14,
+                      horizontal: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF7F9FC),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Employee',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Date',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Check In',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Location',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ...rows.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final row = entry.value;
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 18,
+                        horizontal: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: index == rows.length - 1
+                                ? Colors.transparent
+                                : const Color(0xFFF0F3F8),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: _LateReportEmployeeCell(
+                              name: _readStringFromMap(
+                                row,
+                                const ['full_name', 'fullName', 'name'],
+                                fallback: 'N/A',
+                              ),
+                              role: _lateReportsRoleLabel(
+                                _readStringFromMap(
+                                  row,
+                                  const ['role', 'designation'],
+                                  fallback: 'N/A',
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                _lateReportsDisplayDate(
+                                  row['date'] ?? row['late_date'],
+                                ),
+                                style: const TextStyle(
+                                  color: Color(0xFF44546A),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.login_rounded,
+                                    size: 16,
+                                    color: Color(0xFFE07A00),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      _lateReportsDisplayTime(
+                                        row['check_in_time'] ??
+                                            row['checkInTime'],
+                                      ),
+                                      style: const TextStyle(
+                                        color: Color(0xFFE07A00),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 2),
+                                  child: Icon(
+                                    Icons.location_on_outlined,
+                                    size: 16,
+                                    color: Color(0xFF8B96A8),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _readStringFromMap(
+                                      row,
+                                      const [
+                                        'checkin_address',
+                                        'checkinAddress',
+                                        'location'
+                                      ],
+                                      fallback: '-',
+                                    ),
+                                    style: const TextStyle(
+                                      color: Color(0xFF52657D),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Map<String, dynamic> _buildSalesManagerDailyViewData({
@@ -5541,6 +6120,221 @@ class _SummaryMetricPill extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LateReportDateButton extends StatelessWidget {
+  const _LateReportDateButton({
+    required this.value,
+    required this.onTap,
+  });
+
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.calendar_today_rounded, size: 15),
+      label: Text(value),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: const Color(0xFF334155),
+        backgroundColor: Colors.white,
+        side: const BorderSide(color: Color(0xFFD6DEEA)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+class _LateReportEmployeeCell extends StatelessWidget {
+  const _LateReportEmployeeCell({
+    required this.name,
+    required this.role,
+  });
+
+  final String name;
+  final String role;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF0B1F3A),
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          role,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF8A97A8),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LateReportCard extends StatelessWidget {
+  const _LateReportCard({
+    required this.name,
+    required this.role,
+    required this.dateLabel,
+    required this.checkInLabel,
+    required this.location,
+    required this.email,
+  });
+
+  final String name;
+  final String role;
+  final String dateLabel;
+  final String checkInLabel;
+  final String location;
+  final String email;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FBFF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2EAF5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4EBDD),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.person_rounded,
+                  color: Color(0xFFE07A00),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _LateReportEmployeeCell(name: name, role: role),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_month_rounded,
+                          size: 14,
+                          color: Color(0xFF7F8CA1),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          dateLabel,
+                          style: const TextStyle(
+                            color: Color(0xFF55677F),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(
+                Icons.login_rounded,
+                size: 16,
+                color: Color(0xFFE07A00),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                checkInLabel,
+                style: const TextStyle(
+                  color: Color(0xFFE07A00),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 1),
+                child: Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: Color(0xFF8B96A8),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  location,
+                  style: const TextStyle(
+                    color: Color(0xFF52657D),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (email.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              email,
+              style: const TextStyle(
+                color: Color(0xFF8A97A8),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LateReportsPeriod {
+  const _LateReportsPeriod({
+    required this.start,
+    required this.end,
+  });
+
+  final DateTime start;
+  final DateTime end;
 }
 
 class _ApprovalDateButton extends StatelessWidget {

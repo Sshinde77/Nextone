@@ -2516,6 +2516,45 @@ class AuthService {
     throw Exception('Attendance summary response is not valid JSON.');
   }
 
+  Future<Map<String, dynamic>> attendanceLate({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceLate}');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'attendanceLate',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('attendanceLate', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch late attendance reports.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Late attendance response is not valid JSON.');
+  }
+
   Future<Map<String, dynamic>> attendanceTeam({
     String? from,
     String? to,

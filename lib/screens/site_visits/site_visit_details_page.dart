@@ -982,10 +982,29 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
   }
 
   Future<void> _launchEmail(String? email) async {
-    if (email == null) return;
-    final Uri url = Uri.parse('mailto:$email');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
+    final normalizedEmail = (email ?? '').trim();
+    if (normalizedEmail.isEmpty) {
+      _showSnackBar('Email address is not available.');
+      return;
+    }
+
+    final uri = Uri(
+      scheme: 'mailto',
+      path: normalizedEmail,
+    );
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        _showSnackBar('No email app is available on this device.');
+      }
+    } catch (_) {
+      if (mounted) {
+        _showSnackBar('Unable to open the email app.');
+      }
     }
   }
 }

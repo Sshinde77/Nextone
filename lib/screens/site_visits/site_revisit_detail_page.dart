@@ -261,7 +261,7 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
     return _entityCard(
       title: 'Coordinator',
       primary: _nestedString('assigned_to', 'full_name', fallback: 'N/A'),
-      secondary: _nestedString('assigned_to', 'id', fallback: '-'),
+      secondary: '',
       tertiary: '',
       icon: Icons.groups_outlined,
     );
@@ -466,13 +466,15 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
                 Text(primary,
                     style: const TextStyle(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 2),
-                Text(
-                  secondary,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
+                if (secondary.trim().isNotEmpty) ...[
+                  Text(
+                    secondary,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
+                ],
                 if (tertiary.trim().isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
