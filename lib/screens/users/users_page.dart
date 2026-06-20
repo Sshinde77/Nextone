@@ -58,7 +58,6 @@ class _UsersPageState extends State<UsersPage> {
   bool get _canCreateUsers => RoleAccess.canCreateUsers(_currentRole);
   bool get _canEditUsers => RoleAccess.canEditUsers(_currentRole);
   bool get _canDeleteUsers => RoleAccess.canDeleteUsers(_currentRole);
-  bool get _canAssignManager => RoleAccess.canAssignManager(_currentRole);
 
   Future<void> _loadAccess() async {
     try {
@@ -239,60 +238,44 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _openAssignManagerDialog(_UserItem user) async {
-    if (!_canAssignManager) {
-      _showSnackBar('You do not have permission to assign manager.');
-      return;
-    }
     if (user.id.trim().isEmpty) {
       _showSnackBar('Unable to assign manager: missing user id.');
       return;
     }
-    if (user.rawRole != RoleAccess.salesExecutive &&
-        user.rawRole != RoleAccess.externalCaller) {
-      _showSnackBar(
-          'Manager can only be assigned to sales executives or external callers.');
-      return;
-    }
-
-    final managers = await _loadEligibleManagers(forRole: user.rawRole);
-    if (managers.isEmpty) {
-      _showSnackBar('No sales manager available to assign.');
-      return;
-    }
-
-    final assignedId = await showDialog<String>(
-      context: context,
-      builder: (context) => AssignManagerDialog(
-        memberName: user.name,
-        memberRole: user.role,
-        memberEmail: user.email,
-        currentManagerName: _currentManagerName(user),
-        managers: managers
-            .map(
-              (manager) => AssignManagerOption(
-                id: manager.id,
-                name: manager.name,
-                roleLabel: manager.role.isNotEmpty ? manager.role : '',
-                email: manager.email,
-              ),
-            )
-            .toList(),
-        initialManagerId: _currentManagerId(user, managers),
-      ),
-    );
-
-    if (!mounted || assignedId == null || assignedId.trim().isEmpty) {
-      return;
-    }
-    final manager = managers.firstWhere(
-      (m) => m.id == assignedId,
-      orElse: () => managers.first,
-    );
-
-    setState(() {
-      _assigningManagerUserIds.add(user.id);
-    });
     try {
+      final managers = await _loadEligibleManagers(forRole: user.rawRole);
+      final assignedId = await showDialog<String>(
+        context: context,
+        builder: (context) => AssignManagerDialog(
+          memberName: user.name,
+          memberRole: user.role,
+          memberEmail: user.email,
+          currentManagerName: _currentManagerName(user),
+          managers: managers
+              .map(
+                (manager) => AssignManagerOption(
+                  id: manager.id,
+                  name: manager.name,
+                  roleLabel: manager.role.isNotEmpty ? manager.role : '',
+                  email: manager.email,
+                ),
+              )
+              .toList(),
+          initialManagerId: _currentManagerId(user, managers),
+        ),
+      );
+
+      if (!mounted || assignedId == null || assignedId.trim().isEmpty) {
+        return;
+      }
+      final manager = managers.firstWhere(
+        (m) => m.id == assignedId,
+        orElse: () => managers.first,
+      );
+
+      setState(() {
+        _assigningManagerUserIds.add(user.id);
+      });
       await _authProvider.assignUserManager(
         id: user.id,
         managerId: manager.id,
@@ -322,21 +305,11 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<List<_UserItem>> _loadEligibleManagers({required String forRole}) async {
-    try {
-      final data = await _authProvider.eligibleManagers(
-        forRole: forRole,
-        token: _authProvider.currentAuthToken,
-      );
-      return data
-          .map(_UserItem.fromApi)
-          .where((user) {
-            return user.rawRole == RoleAccess.salesManager &&
-                user.status == 'Active';
-          })
-          .toList();
-    } catch (_) {
-      return <_UserItem>[];
-    }
+    final data = await _authProvider.eligibleManagers(
+      forRole: forRole,
+      token: _authProvider.currentAuthToken,
+    );
+    return data.map(_UserItem.fromApi).toList();
   }
 
   String _currentManagerId(_UserItem user, List<_UserItem> managers) {
@@ -558,13 +531,10 @@ class _UsersPageState extends State<UsersPage> {
             icon: Icons.visibility_outlined,
             onTap: isAssigning ? () {} : () => _viewUser(user),
           ),
-          if (_canAssignManager &&
-              (user.rawRole == RoleAccess.salesExecutive ||
-                  user.rawRole == RoleAccess.externalCaller))
-            DataCardAction(
-              icon: Icons.person_add_alt_1_outlined,
-              onTap: isAssigning ? () {} : () => _openAssignManagerDialog(user),
-            ),
+          DataCardAction(
+            icon: Icons.person_add_alt_1_outlined,
+            onTap: isAssigning ? () {} : () => _openAssignManagerDialog(user),
+          ),
           if (_canEditUsers)
             DataCardAction(
               icon: Icons.edit_outlined,
@@ -626,7 +596,8 @@ class _UserItem {
 
     final first = read(json['first_name'] ?? json['firstName']);
     final last = read(json['last_name'] ?? json['lastName']);
-    final fallbackName = read(json['name']);
+    final fallbackName =
+        read(json['name'] ?? json['full_name'] ?? json['fullName']);
     final fullName = [if (first.isNotEmpty) first, if (last.isNotEmpty) last]
         .join(' ')
         .trim();

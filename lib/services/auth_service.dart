@@ -587,20 +587,26 @@ class AuthService {
       throw Exception(error);
     }
 
-    try {
-      final dynamic body = jsonDecode(response.body);
-      if (body is List) {
-        return body.whereType<Map<String, dynamic>>().toList();
-      }
-      if (body is Map<String, dynamic>) {
-        final data = body['data'];
-        if (data is List) {
-          return data.whereType<Map<String, dynamic>>().toList();
+      try {
+        final dynamic body = jsonDecode(response.body);
+        if (body is List) {
+          return body.whereType<Map<String, dynamic>>().toList();
         }
+        if (body is Map<String, dynamic>) {
+          final data = body['data'];
+          if (data is List) {
+            return data.whereType<Map<String, dynamic>>().toList();
+          }
+          if (data is Map<String, dynamic>) {
+            final managers = data['managers'];
+            if (managers is List) {
+              return managers.whereType<Map<String, dynamic>>().toList();
+            }
+          }
+        }
+      } catch (_) {
+        // Fall through to generic error below.
       }
-    } catch (_) {
-      // Fall through to generic error below.
-    }
 
     throw Exception('Eligible managers response format is not valid.');
   }

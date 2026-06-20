@@ -17,7 +17,7 @@ assign drop down to be changed in all ✔️
 
 in the follow ups show lead name  and task below also show phone number ✔️
 
-add pagination in salary page , target page , follow up
-
-in the team page only show view deatil action button and
- in the team detail page show the data which is there in the image 
+add pagination in all screeen ✔️
+ 
+in the team page only show view deatil action button ✔️
+ in the team detail page show the data which is there in the image ✔️
