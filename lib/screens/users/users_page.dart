@@ -8,6 +8,7 @@ import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/assign_manager_dialog.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
+import 'package:nextone/widgets/pagination_widget.dart';
 
 class UsersPage extends StatefulWidget {
   const UsersPage({super.key});
@@ -21,10 +22,13 @@ class _UsersPageState extends State<UsersPage> {
   String _selectedRole = 'All Roles';
   String _selectedStatus = 'All Status';
   bool _isLoading = true;
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalItems = 0;
+  final int _pageSize = 10;
   final Set<String> _assigningManagerUserIds = <String>{};
   String? _error;
   List<_UserItem> _users = <_UserItem>[];
-  List<_UserItem> _assignmentUsers = <_UserItem>[];
   String _currentRole = '';
 
   static const List<String> _fallbackRoleFilters = <String>[
@@ -48,8 +52,7 @@ class _UsersPageState extends State<UsersPage> {
     super.initState();
     _loadAccess();
     _loadRoles();
-    _loadUsers();
-    _loadAssignmentUsers();
+    _loadUsers(page: 1);
   }
 
   bool get _canCreateUsers => RoleAccess.canCreateUsers(_currentRole);
@@ -78,40 +81,31 @@ class _UsersPageState extends State<UsersPage> {
     }).toList();
   }
 
-  Future<void> _loadUsers() async {
+  Future<void> _loadUsers({int page = 1}) async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
-      final data =
-          await _authProvider.users(token: _authProvider.currentAuthToken);
+      final result = await _authProvider.usersPaged(
+        token: _authProvider.currentAuthToken,
+        page: page,
+        perPage: _pageSize,
+      );
       if (!mounted) return;
       setState(() {
-        _users = data.map(_UserItem.fromApi).toList();
+        _users = result.items.map(_UserItem.fromApi).toList();
+        _currentPage = result.currentPage <= 0 ? page : result.currentPage;
+        _totalPages = result.totalPages <= 0 ? 1 : result.totalPages;
+        _totalItems = result.totalItems < 0 ? 0 : result.totalItems;
         _isLoading = false;
       });
-      _loadAssignmentUsers();
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
         _error = AppErrorHandler.friendlyMessage(error);
       });
-    }
-  }
-
-  Future<void> _loadAssignmentUsers() async {
-    try {
-      final data = await _authProvider.assignmentUsers(
-        token: _authProvider.currentAuthToken,
-      );
-      if (!mounted) return;
-      setState(() {
-        _assignmentUsers = data.map(_UserItem.fromApi).toList();
-      });
-    } catch (_) {
-      // Keep manager assignment usable through the main users list as fallback.
     }
   }
 
@@ -155,7 +149,7 @@ class _UsersPageState extends State<UsersPage> {
       MaterialPageRoute(builder: (_) => const AddTeamMemberPage()),
     );
     if (created != null && mounted) {
-      _loadUsers();
+      _loadUsers(page: _currentPage);
     }
   }
 
@@ -178,7 +172,7 @@ class _UsersPageState extends State<UsersPage> {
       ),
     );
     if (updated != null && mounted) {
-      _loadUsers();
+      _loadUsers(page: _currentPage);
     }
   }
 
@@ -225,7 +219,7 @@ class _UsersPageState extends State<UsersPage> {
       );
       if (!mounted) return;
       _showSnackBar('User deleted successfully.');
-      await _loadUsers();
+      await _loadUsers(page: _currentPage);
     } catch (error) {
       if (!mounted) return;
       _showSnackBar(AppErrorHandler.friendlyMessage(error));
@@ -240,48 +234,8 @@ class _UsersPageState extends State<UsersPage> {
     );
     if (!mounted) return;
     if (action == true || action == 'updated' || action == 'deleted') {
-      await _loadUsers();
+      await _loadUsers(page: _currentPage);
     }
-  }
-
-  List<_UserItem> get _managerOptions {
-    final source = _assignmentUsers.isNotEmpty ? _assignmentUsers : _users;
-    return source.where((u) {
-      return u.rawRole == RoleAccess.salesManager && u.status == 'Active';
-    }).toList();
-  }
-
-  String _userManagerId(_UserItem user) {
-    final raw = user.rawData;
-    final direct = raw['manager_id'] ?? raw['managerId'];
-    final directId = direct?.toString().trim() ?? '';
-    if (directId.isNotEmpty) return directId;
-    final nested = raw['manager'];
-    if (nested is Map<String, dynamic>) {
-      final nestedId = nested['id'] ?? nested['user_id'] ?? nested['userId'];
-      final nestedValue = nestedId?.toString().trim() ?? '';
-      if (nestedValue.isNotEmpty) {
-        return nestedValue;
-      }
-    }
-    return '';
-  }
-
-  String _userManagerName(_UserItem user) {
-    final raw = user.rawData;
-    final byName = raw['manager_name'] ?? raw['managerName'];
-    if (byName is String && byName.trim().isNotEmpty) return byName.trim();
-    final nested = raw['manager'];
-    if (nested is Map<String, dynamic>) {
-      final nestedName =
-          nested['name'] ?? nested['full_name'] ?? nested['fullName'];
-      if (nestedName is String && nestedName.trim().isNotEmpty) {
-        return nestedName.trim();
-      }
-    }
-    final managerId = _userManagerId(user);
-    final manager = _managerOptions.where((m) => m.id == managerId);
-    return manager.isNotEmpty ? manager.first.name : 'Not assigned';
   }
 
   Future<void> _openAssignManagerDialog(_UserItem user) async {
@@ -300,16 +254,10 @@ class _UsersPageState extends State<UsersPage> {
       return;
     }
 
-    final managers = _managerOptions;
+    final managers = await _loadEligibleManagers(forRole: user.rawRole);
     if (managers.isEmpty) {
       _showSnackBar('No sales manager available to assign.');
       return;
-    }
-
-    String selectedManagerId = _userManagerId(user);
-    if (selectedManagerId.isEmpty ||
-        managers.every((m) => m.id != selectedManagerId)) {
-      selectedManagerId = managers.first.id;
     }
 
     final assignedId = await showDialog<String>(
@@ -318,16 +266,18 @@ class _UsersPageState extends State<UsersPage> {
         memberName: user.name,
         memberRole: user.role,
         memberEmail: user.email,
-        currentManagerName: _userManagerName(user),
+        currentManagerName: _currentManagerName(user),
         managers: managers
             .map(
               (manager) => AssignManagerOption(
                 id: manager.id,
-                name: '${manager.name} (${manager.role})',
+                name: manager.name,
+                roleLabel: manager.role.isNotEmpty ? manager.role : '',
+                email: manager.email,
               ),
             )
             .toList(),
-        initialManagerId: selectedManagerId,
+        initialManagerId: _currentManagerId(user, managers),
       ),
     );
 
@@ -371,6 +321,55 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
+  Future<List<_UserItem>> _loadEligibleManagers({required String forRole}) async {
+    try {
+      final data = await _authProvider.eligibleManagers(
+        forRole: forRole,
+        token: _authProvider.currentAuthToken,
+      );
+      return data
+          .map(_UserItem.fromApi)
+          .where((user) {
+            return user.rawRole == RoleAccess.salesManager &&
+                user.status == 'Active';
+          })
+          .toList();
+    } catch (_) {
+      return <_UserItem>[];
+    }
+  }
+
+  String _currentManagerId(_UserItem user, List<_UserItem> managers) {
+    final raw = user.rawData;
+    final direct = raw['manager_id'] ?? raw['managerId'];
+    final directId = direct?.toString().trim() ?? '';
+    if (directId.isNotEmpty) return directId;
+    final nested = raw['manager'];
+    if (nested is Map<String, dynamic>) {
+      final nestedId = nested['id'] ?? nested['user_id'] ?? nested['userId'];
+      final nestedValue = nestedId?.toString().trim() ?? '';
+      if (nestedValue.isNotEmpty) {
+        return nestedValue;
+      }
+    }
+    return managers.isNotEmpty ? managers.first.id : '';
+  }
+
+  String _currentManagerName(_UserItem user) {
+    final raw = user.rawData;
+    final byName = raw['manager_name'] ?? raw['managerName'];
+    if (byName is String && byName.trim().isNotEmpty) return byName.trim();
+    final nested = raw['manager'];
+    if (nested is Map<String, dynamic>) {
+      final nestedName =
+          nested['name'] ?? nested['full_name'] ?? nested['fullName'];
+      if (nestedName is String && nestedName.trim().isNotEmpty) {
+        return nestedName.trim();
+      }
+    }
+    return 'Not assigned';
+  }
+
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -384,7 +383,7 @@ class _UsersPageState extends State<UsersPage> {
       backgroundColor: AppColors.background,
       appBar: const CrmAppBar(title: 'Users'),
       body: RefreshIndicator(
-        onRefresh: _loadUsers,
+        onRefresh: () => _loadUsers(page: _currentPage),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 120),
           children: [
@@ -413,7 +412,7 @@ class _UsersPageState extends State<UsersPage> {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  onPressed: _loadUsers,
+                  onPressed: () => _loadUsers(page: _currentPage),
                   icon: const Icon(Icons.refresh_rounded),
                 ),
               ],
@@ -473,7 +472,9 @@ class _UsersPageState extends State<UsersPage> {
                         style: const TextStyle(color: AppColors.error)),
                     const SizedBox(height: 8),
                     TextButton(
-                        onPressed: _loadUsers, child: const Text('Retry')),
+                      onPressed: () => _loadUsers(page: _currentPage),
+                      child: const Text('Retry'),
+                    ),
                   ],
                 ),
               )
@@ -489,6 +490,16 @@ class _UsersPageState extends State<UsersPage> {
               )
             else
               ...users.map(_buildUserCard),
+            if (_totalPages > 1) ...[
+              const SizedBox(height: 14),
+              PaginationWidget(
+                currentPage: _currentPage,
+                totalPages: _totalPages,
+                totalItems: _totalItems,
+                itemLabel: 'users',
+                onPageChanged: (page) => _loadUsers(page: page),
+              ),
+            ],
           ],
         ),
       ),

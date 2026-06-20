@@ -5,10 +5,14 @@ class AssignManagerOption {
   const AssignManagerOption({
     required this.id,
     required this.name,
+    this.roleLabel = '',
+    this.email = '',
   });
 
   final String id;
   final String name;
+  final String roleLabel;
+  final String email;
 }
 
 class AssignManagerDialog extends StatefulWidget {
@@ -20,6 +24,8 @@ class AssignManagerDialog extends StatefulWidget {
     required this.currentManagerName,
     required this.managers,
     required this.initialManagerId,
+    this.title = 'Assign Manager',
+    this.actionLabel = 'Assign Manager',
   });
 
   final String memberName;
@@ -28,6 +34,8 @@ class AssignManagerDialog extends StatefulWidget {
   final String currentManagerName;
   final List<AssignManagerOption> managers;
   final String initialManagerId;
+  final String title;
+  final String actionLabel;
 
   @override
   State<AssignManagerDialog> createState() => _AssignManagerDialogState();
@@ -59,10 +67,10 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
               padding: const EdgeInsets.fromLTRB(24, 18, 18, 16),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Assign Manager',
-                      style: TextStyle(
+                      widget.title,
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
@@ -123,7 +131,7 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'Assign to Sales Manager *',
+                    'Assign Manager *',
                     style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
@@ -155,9 +163,33 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
                             .map(
                               (manager) => DropdownMenuItem<String>(
                                 value: manager.id,
-                                child: Text(
-                                  manager.name,
-                                  overflow: TextOverflow.ellipsis,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      manager.name,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (manager.roleLabel.isNotEmpty)
+                                      Text(
+                                        manager.roleLabel,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    if (manager.email.isNotEmpty)
+                                      Text(
+                                        manager.email,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             )
@@ -199,8 +231,8 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
-                            'Assign Manager',
+                          child: Text(
+                            widget.actionLabel,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),

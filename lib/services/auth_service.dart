@@ -444,6 +444,69 @@ class AuthService {
     throw Exception('Users response format is not valid.');
   }
 
+  Future<LeadsListResult> usersPaged({
+    String? token,
+    int page = 1,
+    int perPage = 10,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.users}')
+        .replace(queryParameters: <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    });
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'usersPaged',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('usersPaged', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch team members.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractUserList(body) ?? const <Map<String, dynamic>>[];
+      final pagination = _extractPaginationMap(body);
+      final resolvedCurrentPage =
+          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
+              page;
+      final resolvedPerPage =
+          _readIntFromMap(pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
+              perPage;
+      final resolvedTotalItems = _readIntFromMap(
+            pagination,
+            ['total', 'total_items', 'totalItems', 'count'],
+          ) ??
+          items.length;
+      final resolvedTotalPages = _readIntFromMap(
+            pagination,
+            ['total_pages', 'totalPages', 'last_page', 'lastPage'],
+          ) ??
+          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Users response format is not valid.');
+    }
+  }
+
   Future<List<Map<String, dynamic>>> assignmentUsers({String? token}) async {
     final resolvedToken = token ?? _authToken;
     final currentUserId = await _resolveCurrentUserId(token: resolvedToken);
@@ -491,6 +554,57 @@ class AuthService {
     throw Exception('Assignment users response format is not valid.');
   }
 
+  Future<List<Map<String, dynamic>>> eligibleManagers({
+    required String forRole,
+    String? token,
+  }) async {
+    final normalizedRole = forRole.trim();
+    if (normalizedRole.isEmpty) {
+      throw Exception('Role is required to fetch eligible managers.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.eligibleManagers}?for_role=${Uri.encodeQueryComponent(normalizedRole)}',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'eligibleManagers',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('eligibleManagers', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch eligible managers.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      if (body is List) {
+        return body.whereType<Map<String, dynamic>>().toList();
+      }
+      if (body is Map<String, dynamic>) {
+        final data = body['data'];
+        if (data is List) {
+          return data.whereType<Map<String, dynamic>>().toList();
+        }
+      }
+    } catch (_) {
+      // Fall through to generic error below.
+    }
+
+    throw Exception('Eligible managers response format is not valid.');
+  }
+
   Future<List<Map<String, dynamic>>> usersRoles({String? token}) async {
     final resolvedToken = token ?? _authToken;
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.usersRoles}');
@@ -527,10 +641,17 @@ class AuthService {
     throw Exception('Roles response format is not valid.');
   }
 
-  Future<SalaryEmployeesResult> salaryEmployees({String? token}) async {
+  Future<SalaryEmployeesResult> salaryEmployees({
+    String? token,
+    int page = 1,
+    int perPage = 10,
+  }) async {
     final resolvedToken = token ?? _authToken;
-    final uri =
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryEmployees}');
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryEmployees}')
+        .replace(queryParameters: <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    });
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'salaryEmployees',
@@ -558,6 +679,7 @@ class AuthService {
         throw Exception('Employee salaries response format is not valid.');
       }
 
+      final pagination = _extractPaginationMap(body);
       final totalRaw = payload['total'];
       final total = totalRaw is num
           ? totalRaw.toInt()
@@ -573,8 +695,27 @@ class AuthService {
           .map(SalaryEmployee.fromMap)
           .toList();
 
+      final resolvedCurrentPage = _readIntFromMap(
+            pagination,
+            ['page', 'current_page', 'currentPage'],
+          ) ??
+          1;
+      final resolvedPerPage = _readIntFromMap(
+            pagination,
+            ['per_page', 'perPage', 'page_size', 'limit'],
+          ) ??
+          employees.length;
+      final resolvedTotalPages = _readIntFromMap(
+            pagination,
+            ['total_pages', 'totalPages', 'last_page', 'lastPage'],
+          ) ??
+          _deriveTotalPages(total: total > 0 ? total : employees.length, perPage: resolvedPerPage);
+
       return SalaryEmployeesResult(
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
         total: total > 0 ? total : employees.length,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
         employees: employees,
       );
     } catch (_) {
@@ -6885,6 +7026,84 @@ class AuthService {
     }
   }
 
+  Future<LeadsListResult> notificationsPaged({
+    String? token,
+    String? type,
+    bool? unreadOnly,
+    int page = 1,
+    int perPage = 10,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    if (type != null && type.trim().isNotEmpty) {
+      query['type'] = type.trim();
+    }
+    if (unreadOnly != null) {
+      query['unread'] = unreadOnly.toString();
+    }
+
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.notifications}')
+            .replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'notificationsPaged',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('notificationsPaged', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch notifications.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final items = _extractLeadsItems(decoded);
+      final pagination = _extractPaginationMap(decoded);
+      final resolvedCurrentPage = _readIntFromMap(
+            pagination,
+            ['page', 'current_page', 'currentPage'],
+          ) ??
+          page;
+      final resolvedPerPage = _readIntFromMap(
+            pagination,
+            ['per_page', 'perPage', 'page_size', 'limit'],
+          ) ??
+          perPage;
+      final resolvedTotalItems = _readIntFromMap(
+            pagination,
+            ['total', 'total_items', 'totalItems', 'count'],
+          ) ??
+          items.length;
+      final resolvedTotalPages = _readIntFromMap(
+            pagination,
+            ['total_pages', 'totalPages', 'last_page', 'lastPage'],
+          ) ??
+          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Notifications response format is not valid.');
+    }
+  }
+
   Future<void> deleteAllNotifications({String? token}) async {
     final resolvedToken = token ?? _authToken;
     final uri = Uri.parse(
@@ -8077,11 +8296,17 @@ class AuthService {
 
   Future<Map<String, dynamic>> targets({
     required String month,
+    int page = 1,
+    int perPage = 10,
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.targets}')
-        .replace(queryParameters: <String, String>{'month': month.trim()});
+        .replace(queryParameters: <String, String>{
+      'month': month.trim(),
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    });
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'targets',

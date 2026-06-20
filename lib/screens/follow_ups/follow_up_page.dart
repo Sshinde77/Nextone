@@ -1,7 +1,7 @@
 // ignore_for_file: use_build_context_synchronously, unused_element, unused_element_parameter
 
 import 'dart:async';
-import 'dart:math' as math;
+// import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -15,6 +15,7 @@ import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
+import 'package:nextone/widgets/pagination_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class FollowUpPage extends StatefulWidget {
@@ -34,7 +35,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
   Timer? _searchDebounce;
 
   int _currentPage = 1;
-  final int _pageSize = 20;
+  final int _pageSize = 10;
   String _searchQuery = '';
   String _selectedTeamId = '';
   bool _isLoadingFollowUps = false;
@@ -1279,63 +1280,16 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   Widget _buildPagination() {
-    final totalItems = _totalItems;
-    final totalPages = _totalPages;
-    final currentPage = _currentPage.clamp(1, totalPages);
-    final start = totalItems == 0 ? 0 : ((currentPage - 1) * _pageSize) + 1;
-    final end =
-        totalItems == 0 ? 0 : math.min(currentPage * _pageSize, totalItems);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        runSpacing: 8,
-        children: [
-          Text(
-            'Showing $start-$end of $totalItems',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                onPressed: currentPage > 1
-                    ? () {
-                        _selectedFollowUpIds.clear();
-                        _isBulkSelectionMode = false;
-                        _loadFollowUps(page: currentPage - 1);
-                      }
-                    : null,
-                icon: const Icon(Icons.chevron_left),
-              ),
-              Text(
-                'Page $currentPage of $totalPages',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              IconButton(
-                onPressed: currentPage < totalPages
-                    ? () {
-                        _selectedFollowUpIds.clear();
-                        _isBulkSelectionMode = false;
-                        _loadFollowUps(page: currentPage + 1);
-                      }
-                    : null,
-                icon: const Icon(Icons.chevron_right),
-              ),
-            ],
-          ),
-        ],
-      ),
+    return PaginationWidget(
+      currentPage: _currentPage,
+      totalPages: _totalPages,
+      totalItems: _totalItems,
+      itemLabel: 'records',
+      onPageChanged: (page) {
+        _selectedFollowUpIds.clear();
+        _isBulkSelectionMode = false;
+        _loadFollowUps(page: page);
+      },
     );
   }
 }

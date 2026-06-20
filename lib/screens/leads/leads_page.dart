@@ -2899,6 +2899,8 @@ class _LeadsPageState extends State<LeadsPage> {
               PaginationWidget(
                 currentPage: currentPage,
                 totalPages: totalPages,
+                totalItems: totalItems,
+                itemLabel: 'leads',
                 onPageChanged: _isLoadingLeads ? (_) {} : _changePage,
               ),
             ],

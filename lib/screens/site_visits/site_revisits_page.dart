@@ -9,6 +9,7 @@ import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/site_revisit_data_card.dart';
+import 'package:nextone/widgets/pagination_widget.dart';
 
 class SiteRevisitsPage extends StatefulWidget {
   const SiteRevisitsPage({
@@ -375,46 +376,12 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   }
 
   Widget _buildPagination() {
-    if (_totalPages <= 1) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          OutlinedButton(
-            onPressed: _isLoading || _currentPage <= 1
-                ? null
-                : () => _loadRevisits(page: _currentPage - 1),
-            child: const Text('Previous'),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Page $_currentPage of $_totalPages - $_totalItems total',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          OutlinedButton(
-            onPressed: _isLoading || _currentPage >= _totalPages
-                ? null
-                : () => _loadRevisits(page: _currentPage + 1),
-            child: const Text('Next'),
-          ),
-        ],
-      ),
+    return PaginationWidget(
+      currentPage: _currentPage,
+      totalPages: _totalPages,
+      totalItems: _totalItems,
+      itemLabel: 'records',
+      onPageChanged: (page) => _loadRevisits(page: page),
     );
   }
 

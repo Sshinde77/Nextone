@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/models/auth_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/pagination_widget.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 class NotificationsPage extends StatefulWidget {
@@ -26,6 +28,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
   String _selectedType = 'all';
   int _unreadCount = 0;
   String? _errorText;
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalItems = 0;
+  final int _pageSize = 10;
 
   static const List<String> _socketEvents = <String>[
     'notification:new',
@@ -45,7 +51,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   void initState() {
     super.initState();
-    _refreshData(showLoader: true);
+    _refreshData(showLoader: true, page: 1);
     _connectSocket();
   }
 
@@ -55,7 +61,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     super.dispose();
   }
 
-  Future<void> _refreshData({required bool showLoader}) async {
+  Future<void> _refreshData({required bool showLoader, int page = 1}) async {
     if (showLoader) {
       setState(() {
         _isLoading = true;
@@ -64,11 +70,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
 
     try {
-      final notificationsFuture = _safeNotificationsFetch();
+      final notificationsFuture = _safeNotificationsFetch(page: page);
       final unreadCountFuture = _safeUnreadCountFetch();
       final typeListFuture = _safeTypeListFetch();
 
-      final notifications = (await notificationsFuture)
+      final notificationsResult = await notificationsFuture;
+      final notifications = notificationsResult.items
           .map(_normalizeNotification)
           .toList();
       final unreadCount = await unreadCountFuture;
@@ -79,6 +86,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
         _notifications
           ..clear()
           ..addAll(notifications);
+        _currentPage =
+            notificationsResult.currentPage <= 0 ? page : notificationsResult.currentPage;
+        _totalPages = notificationsResult.totalPages <= 0 ? 1 : notificationsResult.totalPages;
+        _totalItems =
+            notificationsResult.totalItems < 0 ? 0 : notificationsResult.totalItems;
         _unreadCount = unreadCount;
         _notificationTypes
           ..clear()
@@ -96,29 +108,41 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _safeNotificationsFetch() async {
+  Future<LeadsListResult> _safeNotificationsFetch({required int page}) async {
     try {
-      return await _authProvider.notifications(
+      return await _authProvider.notificationsPaged(
         type: _selectedType == 'all' ? null : _selectedType,
         unreadOnly: _onlyUnread ? true : null,
-        page: 1,
-        perPage: 50,
+        page: page,
+        perPage: _pageSize,
       );
     } catch (error) {
       if (_isTimeoutError(error)) {
         try {
           await Future<void>.delayed(const Duration(milliseconds: 700));
-          return await _authProvider.notifications(
+          return await _authProvider.notificationsPaged(
             type: _selectedType == 'all' ? null : _selectedType,
             unreadOnly: _onlyUnread ? true : null,
-            page: 1,
-            perPage: 50,
+            page: page,
+            perPage: _pageSize,
           );
         } catch (_) {
-          return const <Map<String, dynamic>>[];
+          return const LeadsListResult(
+            items: <Map<String, dynamic>>[],
+            currentPage: 1,
+            perPage: 10,
+            totalItems: 0,
+            totalPages: 1,
+          );
         }
       }
-      return const <Map<String, dynamic>>[];
+      return const LeadsListResult(
+        items: <Map<String, dynamic>>[],
+        currentPage: 1,
+        perPage: 10,
+        totalItems: 0,
+        totalPages: 1,
+      );
     }
   }
 
@@ -162,7 +186,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     for (final eventName in _socketEvents) {
       _socket?.on(eventName, (_) async {
-        await _refreshData(showLoader: false);
+        await _refreshData(showLoader: false, page: _currentPage);
       });
     }
   }
@@ -192,7 +216,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _markAllRead() async {
     try {
       await _authProvider.markAllNotificationsRead();
-      await _refreshData(showLoader: false);
+      await _refreshData(showLoader: false, page: _currentPage);
     } catch (error) {
       _showError(error.toString());
     }
@@ -201,7 +225,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _deleteAll() async {
     try {
       await _authProvider.deleteAllNotifications();
-      await _refreshData(showLoader: false);
+      await _refreshData(showLoader: false, page: _currentPage);
     } catch (error) {
       _showError(error.toString());
     }
@@ -210,7 +234,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _markOneRead(String id) async {
     try {
       await _authProvider.markSingleNotificationRead(id: id);
-      await _refreshData(showLoader: false);
+      await _refreshData(showLoader: false, page: _currentPage);
     } catch (error) {
       _showError(error.toString());
     }
@@ -219,7 +243,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _deleteOne(String id) async {
     try {
       await _authProvider.deleteSingleNotification(id: id);
-      await _refreshData(showLoader: false);
+      await _refreshData(showLoader: false, page: _currentPage);
     } catch (error) {
       _showError(error.toString());
     }
@@ -257,7 +281,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: () => _refreshData(showLoader: false),
+        onRefresh: () => _refreshData(showLoader: false, page: _currentPage),
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
@@ -294,12 +318,26 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       child: _emptyState(),
                     )
                   else
-                    SliverPadding(
+                  SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
                       sliver: SliverList.builder(
                         itemCount: _notifications.length,
                         itemBuilder: (_, index) =>
                             _notificationCard(_notifications[index], compact),
+                      ),
+                    ),
+                  if (_totalPages > 1)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        child: PaginationWidget(
+                          currentPage: _currentPage,
+                          totalPages: _totalPages,
+                          totalItems: _totalItems,
+                          itemLabel: 'notifications',
+                          onPageChanged: (page) =>
+                              _refreshData(showLoader: false, page: page),
+                        ),
                       ),
                     ),
                 ],
@@ -361,7 +399,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               const SizedBox(width: 8),
               _heroButton(
                 icon: Icons.refresh_rounded,
-                onTap: _isLoading ? null : () => _refreshData(showLoader: true),
+                onTap: _isLoading ? null : () => _refreshData(showLoader: true, page: _currentPage),
               ),
               const SizedBox(width: 6),
               PopupMenuButton<String>(
@@ -405,7 +443,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               Expanded(
                 child: _metricCard(
                   label: 'Total',
-                  value: _notifications.length.toString(),
+                  value: (_totalItems > 0 ? _totalItems : _notifications.length).toString(),
                   icon: Icons.notifications_active_outlined,
                 ),
               ),
@@ -551,8 +589,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
       }).toList(),
       onChanged: (value) {
         if (value == null) return;
-        setState(() => _selectedType = value);
-        _refreshData(showLoader: false);
+        setState(() {
+          _selectedType = value;
+          _currentPage = 1;
+        });
+        _refreshData(showLoader: false, page: 1);
       },
     );
   }
@@ -561,8 +602,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
     return FilterChip(
       selected: _onlyUnread,
       onSelected: (selected) {
-        setState(() => _onlyUnread = selected);
-        _refreshData(showLoader: false);
+        setState(() {
+          _onlyUnread = selected;
+          _currentPage = 1;
+        });
+        _refreshData(showLoader: false, page: 1);
       },
       showCheckmark: false,
       selectedColor: const Color(0xFFEEF2FF),

@@ -276,6 +276,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 child: PaginationWidget(
                   currentPage: _currentPage,
                   totalPages: _totalPages,
+                  totalItems: _totalItems,
+                  itemLabel: 'projects',
                   onPageChanged: (page) => _loadProjects(page: page),
                 ),
               ),

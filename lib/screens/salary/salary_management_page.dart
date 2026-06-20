@@ -9,6 +9,7 @@ import 'package:nextone/screens/salary/salary_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/pagination_widget.dart';
 
 class SalaryManagementPage extends StatefulWidget {
   const SalaryManagementPage({super.key});
@@ -25,11 +26,17 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   bool _isLoadingEmployees = false;
   String? _employeesError;
   int _employeesTotal = 0;
+  int _employeesCurrentPage = 1;
+  int _employeesTotalPages = 1;
+  final int _employeesPerPage = 10;
   List<SalaryEmployee> _employees = <SalaryEmployee>[];
   bool _isLoadingSlips = false;
   bool _isGeneratingAllSlips = false;
   String? _slipsError;
   int _slipsTotal = 0;
+  int _slipsCurrentPage = 1;
+  int _slipsTotalPages = 1;
+  final int _slipsPerPage = 10;
   List<SalarySlip> _salarySlips = <SalarySlip>[];
   bool _isLoadingMySalary = false;
   String? _mySalaryError;
@@ -68,8 +75,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         _isLoadingAccess = false;
       });
       if (isAdmin) {
-        await _loadEmployees();
-        await _loadSalarySlips();
+        await _loadEmployees(page: 1);
+        await _loadSalarySlips(page: 1);
       } else {
         await _loadMySalary();
       }
@@ -80,19 +87,24 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     }
   }
 
-  Future<void> _loadEmployees() async {
+  Future<void> _loadEmployees({int page = 1}) async {
     setState(() {
       _isLoadingEmployees = true;
       _employeesError = null;
     });
     try {
-      final result = await _authProvider.salaryEmployees(
+      final result = await _authProvider.salaryEmployeesPaged(
         token: _authProvider.currentAuthToken,
+        page: page,
+        perPage: _employeesPerPage,
       );
       if (!mounted) return;
       setState(() {
         _employees = result.employees;
         _employeesTotal = result.total;
+        _employeesCurrentPage =
+            result.currentPage <= 0 ? page : result.currentPage;
+        _employeesTotalPages = result.totalPages <= 0 ? 1 : result.totalPages;
         _isLoadingEmployees = false;
       });
     } catch (error) {
@@ -108,7 +120,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     await _loadRole();
   }
 
-  Future<void> _loadSalarySlips() async {
+  Future<void> _loadSalarySlips({int page = 1}) async {
     setState(() {
       _isLoadingSlips = true;
       _slipsError = null;
@@ -117,14 +129,16 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       final result = await _authProvider.salarySlips(
         month: _selectedMonth,
         year: _selectedYear,
-        page: 1,
-        perPage: 20,
+        page: page,
+        perPage: _slipsPerPage,
         token: _authProvider.currentAuthToken,
       );
       if (!mounted) return;
       setState(() {
         _salarySlips = result.items;
         _slipsTotal = result.total;
+        _slipsCurrentPage = result.page <= 0 ? page : result.page;
+        _slipsTotalPages = result.totalPages <= 0 ? 1 : result.totalPages;
         _isLoadingSlips = false;
       });
     } catch (error) {
@@ -1942,7 +1956,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: _loadEmployees,
+              onPressed: () => _loadEmployees(page: _employeesCurrentPage),
               child: const Text('Retry'),
             ),
           ],
@@ -1964,7 +1978,18 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
 
     final rows = _employees.map(_mapEmployeeToRow).toList();
     return Column(
-      children: rows.map(_buildEmployeeCard).toList(),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...rows.map(_buildEmployeeCard),
+        const SizedBox(height: 14),
+        PaginationWidget(
+          currentPage: _employeesCurrentPage,
+          totalPages: _employeesTotalPages,
+          totalItems: _employeesTotal,
+          itemLabel: 'employees',
+          onPageChanged: (page) => _loadEmployees(page: page),
+        ),
+      ],
     );
   }
 
@@ -1996,7 +2021,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: _loadSalarySlips,
+              onPressed: () => _loadSalarySlips(page: _slipsCurrentPage),
               child: const Text('Retry'),
             ),
           ],
@@ -2033,6 +2058,14 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
             ),
           ),
         ...rows.map(_buildSalarySlipCard),
+        const SizedBox(height: 14),
+        PaginationWidget(
+          currentPage: _slipsCurrentPage,
+          totalPages: _slipsTotalPages,
+          totalItems: _slipsTotal,
+          itemLabel: 'slips',
+          onPageChanged: (page) => _loadSalarySlips(page: page),
+        ),
       ],
     );
   }
@@ -2401,7 +2434,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
 
     if (selected == null || selected == _selectedMonth) return;
     setState(() => _selectedMonth = selected);
-    await _loadSalarySlips();
+    await _loadSalarySlips(page: 1);
   }
 
   Future<void> _pickYear() async {
@@ -2431,7 +2464,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
 
     if (selected == null || selected == _selectedYear) return;
     setState(() => _selectedYear = selected);
-    await _loadSalarySlips();
+    await _loadSalarySlips(page: 1);
   }
 
   _SalarySlipRow _mapSalarySlipToRow(SalarySlip slip) {
@@ -2613,7 +2646,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         _selectedMonth = selectedMonth;
         _selectedYear = selectedYear;
       });
-      await _loadSalarySlips();
+      await _loadSalarySlips(page: 1);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -3002,7 +3035,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                             );
                             if (!mounted) return;
                             Navigator.of(context).pop();
-                            await _loadEmployees();
+                            await _loadEmployees(page: _employeesCurrentPage);
                             ScaffoldMessenger.of(context)
                               ..hideCurrentSnackBar()
                               ..showSnackBar(
@@ -3350,7 +3383,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                                       );
                                       if (!mounted) return;
                                       Navigator.of(dialogContext).pop();
-                                      await _loadEmployees();
+                                       await _loadEmployees(page: _employeesCurrentPage);
                                       ScaffoldMessenger.of(context)
                                         ..hideCurrentSnackBar()
                                         ..showSnackBar(
@@ -3620,7 +3653,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                               _selectedMonth = selectedMonth;
                               _selectedYear = selectedYear;
                             });
-                            await _loadSalarySlips();
+                             await _loadSalarySlips(page: 1);
                             ScaffoldMessenger.of(context)
                               ..hideCurrentSnackBar()
                               ..showSnackBar(

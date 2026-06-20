@@ -37,6 +37,8 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emergencyContactController = TextEditingController();
+  final _addressController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authProvider = AuthProvider();
 
@@ -74,6 +76,8 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
     _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _emergencyContactController.dispose();
+    _addressController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -93,6 +97,12 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
     _emailController.text = _readString(data['email']);
     _phoneController.text = _readString(
       data['phone_number'] ?? data['phoneNumber'],
+    );
+    _emergencyContactController.text = _readString(
+      data['emergency_contact'] ?? data['emergencyContact'],
+    );
+    _addressController.text = _readString(
+      data['residential_address'] ?? data['residentialAddress'] ?? data['address'],
     );
 
     _incomingRoleValue = _readString(data['role']);
@@ -186,12 +196,8 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
 
   Future<void> _submitMember() async {
     final form = _formKey.currentState;
-    if (form == null || !form.validate()) {
-      return;
-    }
-    if ((_selectedRoleValue ?? '').trim().isEmpty) {
-      _showSnackBar('Role is required.');
-      return;
+    if (form != null) {
+      form.save();
     }
 
     FocusScope.of(context).unfocus();
@@ -336,10 +342,8 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
 
   @override
   Widget build(BuildContext context) {
-    final pageTitle = _isEditMode ? 'Edit Team Member' : 'Add Team Member';
-    final sectionTitle =
-        _isEditMode ? 'Update Team Member' : 'Create New Team Member';
-    final submitLabel = _isEditMode ? 'Update Member' : 'Create Member';
+    final pageTitle = _isEditMode ? 'Edit User' : 'Register New User';
+    final submitLabel = _isEditMode ? 'Update User' : 'Register User';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -350,12 +354,11 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          padding: const EdgeInsets.all(12),
           child: Container(
-            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(16),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.border),
             ),
             child: Form(
@@ -363,186 +366,146 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    sectionTitle,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildLabel('FIRST NAME'),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _firstNameController,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      hintText: 'Harsh',
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                    validator: (value) {
-                      if ((value?.trim() ?? '').isEmpty) {
-                        return 'First name is required.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildLabel('LAST NAME'),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _lastNameController,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      hintText: 'Joshi',
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                    validator: (value) {
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildLabel('EMAIL ADDRESS'),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _emailController,
-                    readOnly: _isEditMode,
-                    enabled: !_isEditMode,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      hintText: 'harsh@gmail.com',
-                      prefixIcon: Icon(Icons.alternate_email),
-                    ),
-                    validator: (value) {
-                      final email = value?.trim() ?? '';
-                      if (email.isEmpty) {
-                        return 'Email is required.';
-                      }
-                      if (!email.contains('@')) {
-                        return 'Enter a valid email address.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildLabel('PHONE NUMBER'),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      hintText: '+917900122449',
-                      prefixIcon: Icon(Icons.phone_outlined),
-                    ),
-                    validator: (value) {
-                      if ((value?.trim() ?? '').isEmpty) {
-                        return 'Phone number is required.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildLabel('ROLE'),
-                  const SizedBox(height: 8),
-                  Builder(
-                    builder: (fieldContext) {
-                      return GestureDetector(
-                        onTap: (_isEditMode || _isSubmitting || _isLoadingRoles)
-                            ? null
-                            : () => _openRoleMenu(fieldContext),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 14),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(12),
-                            color: Colors.white,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                _isLoadingRoles
-                                    ? 'Loading roles...'
-                                    : (_selectedRole?.label ?? 'Select role'),
-                                style: TextStyle(
-                                  color: _selectedRole == null
-                                      ? AppColors.textSecondary
-                                      : Colors.black,
-                                ),
-                              ),
-                              const Icon(Icons.keyboard_arrow_down),
-                            ],
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            pageTitle,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                  if (!_isEditMode) ...[
-                    const SizedBox(height: 16),
-                    _buildLabel('PASSWORD'),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) {
-                        if (!_isSubmitting) {
-                          _submitMember();
-                        }
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Harsh@123',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
+                        IconButton(
+                          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
                         ),
-                      ),
-                      validator: (value) {
-                        if ((value ?? '').isEmpty) {
-                          return 'Password is required.';
-                        }
-                        if ((value ?? '').length < 6) {
-                          return 'Password must be at least 6 characters.';
-                        }
-                        return null;
-                      },
+                      ],
                     ),
-                  ],
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : _submitMember,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (_isSubmitting) ...[
-                            const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                  ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                label: 'First Name',
+                                controller: _firstNameController,
+                                hintText: 'Priya',
+                                icon: Icons.person_outline,
+                                textInputAction: TextInputAction.next,
                               ),
                             ),
                             const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildTextField(
+                                label: 'Last Name',
+                                controller: _lastNameController,
+                                hintText: 'Mehta',
+                                icon: Icons.person_outline,
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
                           ],
-                          Text(submitLabel),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          label: 'Email',
+                          controller: _emailController,
+                          hintText: 'priya@nextonerealty.com',
+                          icon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                label: 'Phone Number',
+                                controller: _phoneController,
+                                hintText: '9123456789',
+                                icon: Icons.phone_outlined,
+                                keyboardType: TextInputType.phone,
+                                helperText: 'Enter 10-digit number only, without +91',
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildTextField(
+                                label: 'Emergency Contact',
+                                controller: _emergencyContactController,
+                                hintText: '9876543211',
+                                icon: Icons.phone_outlined,
+                                keyboardType: TextInputType.phone,
+                                helperText: 'Enter 10-digit number only, without +91',
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          label: 'Residential Address',
+                          controller: _addressController,
+                          hintText: '102, Andheri West, Mumbai - 400053',
+                          icon: Icons.home_outlined,
+                          maxLines: 2,
+                          textInputAction: TextInputAction.next,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildPasswordField(),
+                        const SizedBox(height: 16),
+                        _buildRoleField(),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(44),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _isSubmitting ? null : _submitMember,
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(44),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: _isSubmitting
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : Text(submitLabel),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -554,15 +517,140 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: AppColors.textSecondary,
-        fontWeight: FontWeight.w700,
-        fontSize: 12,
-        letterSpacing: 0.6,
-      ),
+  Widget _buildTextField({
+    required String label,
+    required TextEditingController controller,
+    required String hintText,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    TextInputAction textInputAction = TextInputAction.next,
+    int maxLines = 1,
+    String? helperText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          maxLines: maxLines,
+          decoration: InputDecoration(
+            hintText: hintText,
+            prefixIcon: Icon(icon),
+          ),
+        ),
+        if (helperText != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            helperText,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Password',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _passwordController,
+          obscureText: _obscurePassword,
+          textInputAction: TextInputAction.next,
+          decoration: InputDecoration(
+            hintText: 'Min 8 characters',
+            prefixIcon: const Icon(Icons.lock_outline),
+            suffixIcon: IconButton(
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Role',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Builder(
+          builder: (fieldContext) {
+            return GestureDetector(
+              onTap: (_isSubmitting || _isLoadingRoles)
+                  ? null
+                  : () => _openRoleMenu(fieldContext),
+              child: Container(
+                height: 50,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _isLoadingRoles
+                            ? 'Loading roles...'
+                            : (_selectedRole?.label ?? 'Select role'),
+                        style: TextStyle(
+                          color: _selectedRole == null
+                              ? AppColors.textSecondary
+                              : AppColors.textPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

@@ -68,8 +68,23 @@ class AuthProvider {
     return _authService.users(token: token);
   }
 
+  Future<LeadsListResult> usersPaged({
+    String? token,
+    int page = 1,
+    int perPage = 10,
+  }) {
+    return _authService.usersPaged(token: token, page: page, perPage: perPage);
+  }
+
   Future<List<Map<String, dynamic>>> assignmentUsers({String? token}) {
     return _authService.assignmentUsers(token: token);
+  }
+
+  Future<List<Map<String, dynamic>>> eligibleManagers({
+    required String forRole,
+    String? token,
+  }) {
+    return _authService.eligibleManagers(forRole: forRole, token: token);
   }
 
   Future<List<Map<String, dynamic>>> usersRoles({String? token}) {
@@ -78,6 +93,18 @@ class AuthProvider {
 
   Future<SalaryEmployeesResult> salaryEmployees({String? token}) {
     return _authService.salaryEmployees(token: token);
+  }
+
+  Future<SalaryEmployeesResult> salaryEmployeesPaged({
+    String? token,
+    int page = 1,
+    int perPage = 10,
+  }) {
+    return _authService.salaryEmployees(
+      token: token,
+      page: page,
+      perPage: perPage,
+    );
   }
 
   Future<SalarySlipsResult> salarySlips({
@@ -1588,6 +1615,22 @@ class AuthProvider {
     );
   }
 
+  Future<LeadsListResult> notificationsPaged({
+    String? token,
+    String? type,
+    bool? unreadOnly,
+    int page = 1,
+    int perPage = 10,
+  }) {
+    return _authService.notificationsPaged(
+      token: token,
+      type: type,
+      unreadOnly: unreadOnly,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
   Future<void> deleteAllNotifications({String? token}) {
     return _authService.deleteAllNotifications(token: token);
   }
@@ -1662,10 +1705,14 @@ class AuthProvider {
 
   Future<Map<String, dynamic>> targets({
     required String month,
+    int page = 1,
+    int perPage = 10,
     String? token,
   }) {
     return _authService.targets(
       month: month,
+      page: page,
+      perPage: perPage,
       token: token,
     );
   }

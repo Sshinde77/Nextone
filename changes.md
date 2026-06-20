@@ -12,7 +12,12 @@ check create lead form ✔️
 in the leads detail in the tab add call recording and reassign form ✔️
 remove share button in the lead list ✔️
 
-assign drop down to be changed in all
+assign drop down to be changed in all ✔️
 
 
-in the follow ups show lead name  and task below also show phone number 
+in the follow ups show lead name  and task below also show phone number ✔️
+
+add pagination in salary page , target page , follow up
+
+in the team page only show view deatil action button and
+ in the team detail page show the data which is there in the image 

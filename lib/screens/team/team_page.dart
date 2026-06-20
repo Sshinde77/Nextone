@@ -10,6 +10,7 @@ import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/assign_manager_dialog.dart';
 import 'package:nextone/widgets/data_card.dart';
+import 'package:nextone/widgets/pagination_widget.dart';
 
 class TeamPage extends StatefulWidget {
   const TeamPage({super.key});
@@ -23,6 +24,10 @@ class _TeamPageState extends State<TeamPage> {
   final AuthProvider _authProvider = AuthProvider();
   bool _isLoadingMembers = true;
   String? _membersLoadError;
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalItems = 0;
+  final int _pageSize = 10;
   final Set<String> _deletingMemberIds = <String>{};
   final Set<String> _changingRoleMemberIds = <String>{};
   final Set<String> _assigningManagerMemberIds = <String>{};
@@ -74,7 +79,7 @@ class _TeamPageState extends State<TeamPage> {
   void initState() {
     super.initState();
     _loadAccess();
-    _loadMembers();
+    _loadMembers(page: 1);
     _loadAssignmentMembers();
   }
 
@@ -104,7 +109,7 @@ class _TeamPageState extends State<TeamPage> {
       backgroundColor: AppColors.background,
       appBar: const CrmAppBar(title: 'Team'),
       body: RefreshIndicator(
-        onRefresh: _loadMembers,
+        onRefresh: () => _loadMembers(page: _currentPage),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
           children: [
@@ -127,7 +132,7 @@ class _TeamPageState extends State<TeamPage> {
             _buildSearchAndCreateRow(),
             const SizedBox(height: 16),
             Text(
-              'Team Members (${members.length})',
+              'Team Members (${_totalItems > 0 ? _totalItems : members.length})',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -141,27 +146,39 @@ class _TeamPageState extends State<TeamPage> {
               _buildInfoCard(
                 message: 'No team members found.',
                 actionLabel: 'Refresh',
-                onActionTap: _loadMembers,
+                onActionTap: () => _loadMembers(page: _currentPage),
               )
             else
               ...members.map(_buildMemberCard),
+            if (_totalPages > 1) ...[
+              const SizedBox(height: 14),
+              PaginationWidget(
+                currentPage: _currentPage,
+                totalPages: _totalPages,
+                totalItems: _totalItems,
+                itemLabel: 'members',
+                onPageChanged: (page) => _loadMembers(page: page),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Future<void> _loadMembers() async {
+  Future<void> _loadMembers({int page = 1}) async {
     setState(() {
       _isLoadingMembers = true;
       _membersLoadError = null;
     });
 
     try {
-      final users = await _authProvider.users(
+      final result = await _authProvider.usersPaged(
         token: _authProvider.currentAuthToken,
+        page: page,
+        perPage: _pageSize,
       );
-      final members = users
+      final members = result.items
           .where(_TeamMember.isActiveUser)
           .map(_TeamMember.fromApi)
           .toList();
@@ -172,6 +189,9 @@ class _TeamPageState extends State<TeamPage> {
         _members
           ..clear()
           ..addAll(members);
+        _currentPage = result.currentPage <= 0 ? page : result.currentPage;
+        _totalPages = result.totalPages <= 0 ? 1 : result.totalPages;
+        _totalItems = result.totalItems < 0 ? 0 : result.totalItems;
         _isLoadingMembers = false;
       });
       _loadAssignmentMembers();
@@ -220,7 +240,7 @@ class _TeamPageState extends State<TeamPage> {
       return;
     }
 
-    await _loadMembers();
+    await _loadMembers(page: _currentPage);
   }
 
   Future<void> _viewMemberDetails(_TeamMember member) async {
@@ -235,7 +255,7 @@ class _TeamPageState extends State<TeamPage> {
     }
 
     if (action == true || action == 'updated' || action == 'deleted') {
-      await _loadMembers();
+      await _loadMembers(page: _currentPage);
     }
   }
 
@@ -263,7 +283,7 @@ class _TeamPageState extends State<TeamPage> {
       return;
     }
 
-    await _loadMembers();
+    await _loadMembers(page: _currentPage);
   }
 
   Future<void> _deleteMember(_TeamMember member) async {
@@ -745,34 +765,6 @@ class _TeamPageState extends State<TeamPage> {
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        // if (_canExportData) ...[
-        //   OutlinedButton.icon(
-        //     onPressed: _exportMembers,
-        //     icon: const Icon(Icons.download_rounded, size: 18),
-        //     label: const Text('Export'),
-        //     style: OutlinedButton.styleFrom(
-        //       minimumSize: const Size(104, 50),
-        //       shape: RoundedRectangleBorder(
-        //         borderRadius: BorderRadius.circular(999),
-        //       ),
-        //     ),
-        //   ),
-        //   const SizedBox(width: 8),
-        // ],
-        if (_canCreateUsers)
-          FilledButton(
-            onPressed: _openCreateMember,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(132, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            child: const Text('Create Member'),
-          ),
       ],
     );
   }
@@ -806,28 +798,6 @@ class _TeamPageState extends State<TeamPage> {
           DataCardAction(
             icon: Icons.visibility_outlined,
             onTap: isBusy ? () {} : () => _viewMemberDetails(member),
-          ),
-          if (_canAssignManager &&
-              (member.rawRole == RoleAccess.salesExecutive ||
-                  member.rawRole == RoleAccess.externalCaller))
-            DataCardAction(
-              icon: Icons.person_add_alt_1_outlined,
-              onTap: isBusy ? () {} : () => _openAssignManagerDialog(member),
-            ),
-          if (_canEditUsers)
-            DataCardAction(
-              icon: Icons.edit_outlined,
-              onTap: isBusy ? () {} : () => _openEditMember(member),
-            ),
-          if (_assignableRoleOptions.isNotEmpty)
-            DataCardAction(
-              icon: Icons.manage_accounts_outlined,
-              onTap: isBusy ? () {} : () => _openChangeRoleSheet(member),
-            ),
-          DataCardAction(
-            icon: Icons.delete_outline,
-            color: AppColors.error,
-            onTap: isBusy ? () {} : () => _deleteMember(member),
           ),
         ],
       ),

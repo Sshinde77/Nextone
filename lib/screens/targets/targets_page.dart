@@ -9,6 +9,7 @@ import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/access_denied_view.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/pagination_widget.dart';
 
 class TargetsPage extends StatefulWidget {
   const TargetsPage({super.key});
@@ -25,6 +26,10 @@ class _TargetsPageState extends State<TargetsPage> {
   String? _targetsError;
   String _currentRole = '';
   String _currentUserId = '';
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalItems = 0;
+  final int _pageSize = 10;
   late int _selectedMonth;
   late int _selectedYear;
   List<_TargetEntry> _targets = const <_TargetEntry>[];
@@ -90,6 +95,8 @@ class _TargetsPageState extends State<TargetsPage> {
     try {
       final response = await _authProvider.targets(
         month: _selectedMonthKey,
+        page: _currentPage,
+        perPage: _pageSize,
         token: _authProvider.currentAuthToken,
       );
       final rawTargets = response['targets'];
@@ -108,6 +115,21 @@ class _TargetsPageState extends State<TargetsPage> {
       if (!mounted) return;
       setState(() {
         _targets = targets;
+        final paginationRaw = response['pagination'];
+        final pagination = paginationRaw is Map
+            ? paginationRaw.map(
+                (key, value) => MapEntry(key.toString(), value),
+              )
+            : const <String, dynamic>{};
+        _currentPage =
+            int.tryParse('${pagination['page'] ?? pagination['current_page'] ?? 1}') ??
+                1;
+        _totalItems =
+            int.tryParse('${pagination['total'] ?? pagination['total_items'] ?? targets.length}') ??
+                targets.length;
+        _totalPages =
+            int.tryParse('${pagination['total_pages'] ?? pagination['last_page'] ?? 1}') ??
+                1;
         _isLoadingTargets = false;
       });
     } catch (error) {
@@ -483,7 +505,10 @@ class _TargetsPageState extends State<TargetsPage> {
                     value: _selectedMonth,
                     onChanged: (value) {
                       if (value == null || value == _selectedMonth) return;
-                      setState(() => _selectedMonth = value);
+                      setState(() {
+                        _selectedMonth = value;
+                        _currentPage = 1;
+                      });
                       _loadTargets();
                     },
                   ),
@@ -495,7 +520,10 @@ class _TargetsPageState extends State<TargetsPage> {
                     years: _yearOptions,
                     onChanged: (value) {
                       if (value == null || value == _selectedYear) return;
-                      setState(() => _selectedYear = value);
+                      setState(() {
+                        _selectedYear = value;
+                        _currentPage = 1;
+                      });
                       _loadTargets();
                     },
                   ),
@@ -527,7 +555,7 @@ class _TargetsPageState extends State<TargetsPage> {
                     iconBg: const Color(0xFFEFF6FF),
                     iconColor: const Color(0xFF2563EB),
                     title: 'Team Members',
-                    value: '${_targets.length}',
+                    value: '${_totalItems > 0 ? _totalItems : _targets.length}',
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -554,7 +582,7 @@ class _TargetsPageState extends State<TargetsPage> {
             ),
             const SizedBox(height: 18),
             Text(
-              'Showing ${_targets.length} targets for $_selectedMonthLabel',
+              'Showing ${_totalItems > 0 ? _totalItems : _targets.length} targets for $_selectedMonthLabel',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -581,6 +609,19 @@ class _TargetsPageState extends State<TargetsPage> {
               )
             else
               ..._targets.map(_buildTargetCard),
+            if (_totalPages > 1) ...[
+              const SizedBox(height: 16),
+              PaginationWidget(
+                currentPage: _currentPage,
+                totalPages: _totalPages,
+                totalItems: _totalItems,
+                itemLabel: 'targets',
+                onPageChanged: (page) {
+                  setState(() => _currentPage = page);
+                  _loadTargets();
+                },
+              ),
+            ],
           ],
         ),
       ),

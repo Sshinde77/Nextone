@@ -1,10 +1,7 @@
-// ignore_for_file: unused_element
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
-import 'package:nextone/screens/team/add_team_member_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -27,7 +24,6 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
   String? _memberId;
   bool _isLoading = true;
   String? _loadError;
-  bool _isDeleting = false;
   String _currentRole = '';
   String _currentUserId = '';
   _HistoryTab _activeHistoryTab = _HistoryTab.leads;
@@ -53,9 +49,6 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
 
   String get _memberRole =>
       RoleAccess.normalize(_asString(_memberData['role']));
-  bool get _canManageUsers => RoleAccess.canManageUsers(_currentRole);
-  bool get _canDeleteMember =>
-      RoleAccess.canDeactivate(_currentRole, _memberRole);
 
   Future<void> _loadAccess() async {
     try {
@@ -251,102 +244,10 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
     await _loadPerformance();
   }
 
-  Future<void> _deleteMember() async {
-    if (!_canDeleteMember) {
-      _showSnackBar('You do not have permission to deactivate this user.');
-      return;
-    }
-    final memberId = _memberId;
-    if (memberId == null || memberId.isEmpty) {
-      _showSnackBar('Unable to delete member: missing user id.');
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Delete Member'),
-          content: const Text('Are you sure you want to delete this member?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: TextButton.styleFrom(foregroundColor: AppColors.error),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true || !mounted) {
-      return;
-    }
-
-    setState(() {
-      _isDeleting = true;
-    });
-
-    try {
-      await _authProvider.deleteUser(
-        id: memberId,
-        token: _authProvider.currentAuthToken,
-      );
-      if (!mounted) {
-        return;
-      }
-      _showSnackBar('Member deleted successfully.');
-      Navigator.pop(context, 'deleted');
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      _showSnackBar(AppErrorHandler.friendlyMessage(error));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isDeleting = false;
-        });
-      }
-    }
-  }
-
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  Future<void> _openEditMember() async {
-    if (!_canManageUsers) {
-      _showSnackBar('You do not have permission to edit users.');
-      return;
-    }
-    final memberId = _memberId;
-    if (memberId == null || memberId.isEmpty) {
-      _showSnackBar('Unable to edit member: missing user id.');
-      return;
-    }
-
-    final updated = await Navigator.push<TeamMemberCreationResult>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AddTeamMemberPage(
-          memberId: memberId,
-          memberData: _memberData,
-        ),
-      ),
-    );
-
-    if (!mounted || updated == null) {
-      return;
-    }
-
-    Navigator.pop(context, 'updated');
   }
 
   @override
@@ -445,7 +346,6 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
                     const SizedBox(height: 14),
                     _buildActivityHistorySection(),
                     const SizedBox(height: 20),
-                    _buildActionButtons(),
                     const SizedBox(height: 24),
                   ],
                 ),
@@ -1672,82 +1572,6 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
         fontSize: 12,
         color: AppColors.textSecondary,
         fontWeight: FontWeight.w500,
-      ),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    if (!_canManageUsers && (_memberId ?? '').isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          if (_canManageUsers)
-            Expanded(
-              child: _buildRoundedButton(
-                icon: Icons.edit_outlined,
-                label: 'Edit Member',
-                color: AppColors.primary,
-                onTap: _isDeleting ? null : _openEditMember,
-              ),
-            ),
-          if (_canManageUsers) const SizedBox(width: 12),
-          if ((_memberId ?? '').isNotEmpty)
-            Expanded(
-              child: _buildRoundedButton(
-                icon: Icons.delete_outline,
-                label: _isDeleting ? 'Deleting...' : 'Delete Member',
-                color: AppColors.error,
-                onTap: _isDeleting ? null : _deleteMember,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRoundedButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback? onTap,
-  }) {
-    final isDisabled = onTap == null;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: isDisabled ? 0.05 : 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: color.withValues(alpha: isDisabled ? 0.12 : 0.2)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

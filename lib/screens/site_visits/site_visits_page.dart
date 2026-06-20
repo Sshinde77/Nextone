@@ -9,6 +9,7 @@ import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/pagination_widget.dart';
 
 import '../../utils/app_error_handler.dart';
 
@@ -500,60 +501,12 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Widget _buildPaginationControls() {
-    final isFirstPage = _currentPage <= 1;
-    final isLastPage = _currentPage >= _totalPages;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(_s(12)),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(_s(14)),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Page $_currentPage of $_totalPages'
-            '${_totalItems > 0 ? ' - $_totalItems total' : ''}',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: _fs(10.5),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          SizedBox(height: _s(10)),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: isFirstPage || _isLoadingVisits
-                      ? null
-                      : () => _loadSiteVisits(page: _currentPage - 1),
-                  icon: const Icon(Icons.chevron_left_rounded),
-                  label: const Text('Previous'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 42),
-                  ),
-                ),
-              ),
-              SizedBox(width: _s(10)),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: isLastPage || _isLoadingVisits
-                      ? null
-                      : () => _loadSiteVisits(page: _currentPage + 1),
-                  icon: const Icon(Icons.chevron_right_rounded),
-                  label: const Text('Next'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 42),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+    return PaginationWidget(
+      currentPage: _currentPage,
+      totalPages: _totalPages,
+      totalItems: _totalItems,
+      itemLabel: 'records',
+      onPageChanged: (page) => _loadSiteVisits(page: page),
     );
   }
 

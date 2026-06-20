@@ -70,11 +70,17 @@ class SalaryEmployee {
 
 class SalaryEmployeesResult {
   const SalaryEmployeesResult({
+    required this.currentPage,
+    required this.perPage,
     required this.total,
+    required this.totalPages,
     required this.employees,
   });
 
+  final int currentPage;
+  final int perPage;
   final int total;
+  final int totalPages;
   final List<SalaryEmployee> employees;
 }
 
