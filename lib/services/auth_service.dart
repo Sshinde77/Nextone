@@ -27,7 +27,8 @@ class AuthService {
   }
 
   static String? get currentAuthToken => _authToken;
-  static EffectivePermissionsResult get currentPermissions => _currentPermissions;
+  static EffectivePermissionsResult get currentPermissions =>
+      _currentPermissions;
 
   static Future<bool> hasPersistedSession() async {
     if (_authToken != null && _authToken!.trim().isNotEmpty) {
@@ -479,12 +480,12 @@ class AuthService {
       final dynamic body = jsonDecode(response.body);
       final items = _extractUserList(body) ?? const <Map<String, dynamic>>[];
       final pagination = _extractPaginationMap(body);
-      final resolvedCurrentPage =
-          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
-              page;
-      final resolvedPerPage =
-          _readIntFromMap(pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
-              perPage;
+      final resolvedCurrentPage = _readIntFromMap(
+              pagination, ['page', 'current_page', 'currentPage']) ??
+          page;
+      final resolvedPerPage = _readIntFromMap(
+              pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
+          perPage;
       final resolvedTotalItems = _readIntFromMap(
             pagination,
             ['total', 'total_items', 'totalItems', 'count'],
@@ -494,7 +495,8 @@ class AuthService {
             pagination,
             ['total_pages', 'totalPages', 'last_page', 'lastPage'],
           ) ??
-          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
       return LeadsListResult(
         items: items,
         currentPage: resolvedCurrentPage,
@@ -587,26 +589,26 @@ class AuthService {
       throw Exception(error);
     }
 
-      try {
-        final dynamic body = jsonDecode(response.body);
-        if (body is List) {
-          return body.whereType<Map<String, dynamic>>().toList();
-        }
-        if (body is Map<String, dynamic>) {
-          final data = body['data'];
-          if (data is List) {
-            return data.whereType<Map<String, dynamic>>().toList();
-          }
-          if (data is Map<String, dynamic>) {
-            final managers = data['managers'];
-            if (managers is List) {
-              return managers.whereType<Map<String, dynamic>>().toList();
-            }
-          }
-        }
-      } catch (_) {
-        // Fall through to generic error below.
+    try {
+      final dynamic body = jsonDecode(response.body);
+      if (body is List) {
+        return body.whereType<Map<String, dynamic>>().toList();
       }
+      if (body is Map<String, dynamic>) {
+        final data = body['data'];
+        if (data is List) {
+          return data.whereType<Map<String, dynamic>>().toList();
+        }
+        if (data is Map<String, dynamic>) {
+          final managers = data['managers'];
+          if (managers is List) {
+            return managers.whereType<Map<String, dynamic>>().toList();
+          }
+        }
+      }
+    } catch (_) {
+      // Fall through to generic error below.
+    }
 
     throw Exception('Eligible managers response format is not valid.');
   }
@@ -653,8 +655,9 @@ class AuthService {
     int perPage = 10,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryEmployees}')
-        .replace(queryParameters: <String, String>{
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryEmployees}')
+            .replace(queryParameters: <String, String>{
       'page': page.toString(),
       'per_page': perPage.toString(),
     });
@@ -715,7 +718,9 @@ class AuthService {
             pagination,
             ['total_pages', 'totalPages', 'last_page', 'lastPage'],
           ) ??
-          _deriveTotalPages(total: total > 0 ? total : employees.length, perPage: resolvedPerPage);
+          _deriveTotalPages(
+              total: total > 0 ? total : employees.length,
+              perPage: resolvedPerPage);
 
       return SalaryEmployeesResult(
         currentPage: resolvedCurrentPage,
@@ -1168,7 +1173,8 @@ class AuthService {
 
   Future<List<SalaryHistoryEntry>> mySalaryHistory({String? token}) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.mySalaryHistory}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.mySalaryHistory}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'mySalaryHistory',
@@ -1228,8 +1234,9 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryIncentives}')
-        .replace(queryParameters: <String, String>{
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryIncentives}')
+            .replace(queryParameters: <String, String>{
       'user_id': normalizedUserId,
     });
     final headers = _headers(accept: 'application/json', token: resolvedToken);
@@ -1284,7 +1291,8 @@ class AuthService {
 
   Future<List<Map<String, dynamic>>> myIncentives({String? token}) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.myIncentives}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.myIncentives}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'myIncentives',
@@ -1362,8 +1370,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final uri =
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryIncentiveCreate}');
+    final uri = Uri.parse(
+        '${ApiConstants.baseUrl}${ApiConstants.salaryIncentiveCreate}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     final body = jsonEncode(<String, dynamic>{
       'user_id': normalizedUserId,
@@ -1640,9 +1648,10 @@ class AuthService {
       final resolvedTotalItems = _readIntFromMap(
               pagination, ['total', 'total_items', 'totalItems', 'count']) ??
           items.length;
-      final resolvedTotalPages = _readIntFromMap(
-              pagination, ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
-          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+      final resolvedTotalPages = _readIntFromMap(pagination,
+              ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
 
       return LeadsListResult(
         items: items,
@@ -1666,7 +1675,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint = ApiConstants.deleteleads.replaceFirst('{id}', normalizedId);
+    final endpoint =
+        ApiConstants.deleteleads.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: '*/*', token: resolvedToken);
     _logRequest(
@@ -2665,7 +2675,8 @@ class AuthService {
 
   Future<Map<String, dynamic>> attendanceLate({String? token}) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceLate}');
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceLate}');
     final headers = _headers(accept: '*/*', token: resolvedToken);
     _logRequest(
       endpoint: 'attendanceLate',
@@ -2721,8 +2732,9 @@ class AuthService {
       query['to'] = to.trim();
     }
 
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceTeam}')
-        .replace(queryParameters: query);
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceTeam}')
+            .replace(queryParameters: query);
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'attendanceTeam',
@@ -3774,6 +3786,116 @@ class AuthService {
       );
     } catch (_) {
       throw Exception('My site visits response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> mySummary({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.mySummary}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'mySummary',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('mySummary', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch my summary.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Summary response format is not valid.');
+      }
+
+      final dynamic data = decoded['data'];
+      if (data is Map<String, dynamic>) {
+        final dynamic summary = data['summary'];
+        if (summary is Map<String, dynamic>) {
+          return _stringDynamicMap(summary);
+        }
+        if (summary is Map) {
+          return _stringDynamicMap(summary);
+        }
+        return _stringDynamicMap(data);
+      }
+
+      final dynamic summary = decoded['summary'];
+      if (summary is Map<String, dynamic>) {
+        return _stringDynamicMap(summary);
+      }
+      if (summary is Map) {
+        return _stringDynamicMap(summary);
+      }
+
+      return _stringDynamicMap(decoded);
+    } catch (_) {
+      throw Exception('Summary response format is not valid.');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> myActivities({
+    int limit = 8,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.myActivities}')
+        .replace(queryParameters: <String, String>{
+      'limit': limit.toString(),
+    });
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'myActivities',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('myActivities', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch my activity feed.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Activities response format is not valid.');
+      }
+
+      dynamic activities = decoded['data'];
+      if (activities is Map<String, dynamic>) {
+        activities = activities['activities'] ??
+            activities['items'] ??
+            activities['results'] ??
+            activities['data'];
+      }
+      if (activities is! List) {
+        return const <Map<String, dynamic>>[];
+      }
+
+      return activities
+          .whereType<Map>()
+          .map((entry) => _stringDynamicMap(entry))
+          .toList();
+    } catch (_) {
+      throw Exception('Activities response format is not valid.');
     }
   }
 
@@ -5306,9 +5428,9 @@ class AuthService {
       final items = _extractLeadsItems(body);
       final pagination = _extractPaginationMap(body);
 
-      final resolvedCurrentPage =
-          _readIntFromMap(pagination, ['page', 'current_page', 'currentPage']) ??
-              page;
+      final resolvedCurrentPage = _readIntFromMap(
+              pagination, ['page', 'current_page', 'currentPage']) ??
+          page;
       final resolvedPerPage = _readIntFromMap(
             pagination,
             ['per_page', 'perPage', 'page_size', 'limit'],
@@ -5336,7 +5458,8 @@ class AuthService {
         totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
       );
     } catch (_) {
-      throw Exception('Lead reassignment history response format is not valid.');
+      throw Exception(
+          'Lead reassignment history response format is not valid.');
     }
   }
 
@@ -6607,7 +6730,7 @@ class AuthService {
       contentType: contentTypeHeader.trim().isEmpty
           ? 'application/zip'
           : contentTypeHeader,
-      );
+    );
   }
 
   Future<ExportFileResult> downloadAllProjectPaymentPlans({
@@ -6666,8 +6789,8 @@ class AuthService {
     }
 
     final resolvedToken = token ?? _authToken;
-    final endpoint =
-        ApiConstants.projectVideosDownloadAll.replaceFirst('{id}', normalizedId);
+    final endpoint = ApiConstants.projectVideosDownloadAll
+        .replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/zip', token: resolvedToken);
     _logRequest(
@@ -7097,7 +7220,8 @@ class AuthService {
             pagination,
             ['total_pages', 'totalPages', 'last_page', 'lastPage'],
           ) ??
-          _deriveTotalPages(total: resolvedTotalItems, perPage: resolvedPerPage);
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
       return LeadsListResult(
         items: items,
         currentPage: resolvedCurrentPage,
@@ -7705,7 +7829,8 @@ class AuthService {
 
     final uniqueUsers = <String, Map<String, dynamic>>{
       for (final user in users)
-        if (_readId(user).isNotEmpty) _readId(user): Map<String, dynamic>.from(user),
+        if (_readId(user).isNotEmpty)
+          _readId(user): Map<String, dynamic>.from(user),
     };
 
     if (uniqueUsers.containsKey(currentUserId)) {
@@ -8382,8 +8507,9 @@ class AuthService {
       body: body,
     );
 
-    final response =
-        await http.post(uri, headers: headers, body: body).timeout(_requestTimeout);
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
     _logResponse('setTarget', response);
 
     final error = _handleResponse(

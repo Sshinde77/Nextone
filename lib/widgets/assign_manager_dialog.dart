@@ -244,7 +244,8 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
                                                   style: const TextStyle(
                                                     fontSize: 13,
                                                     fontWeight: FontWeight.w700,
-                                                    color: AppColors.textPrimary,
+                                                    color:
+                                                        AppColors.textPrimary,
                                                   ),
                                                   children: [
                                                     if (manager.roleLabel
@@ -272,7 +273,8 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
                                         .toList(),
                                     onChanged: (value) {
                                       if (value == null) return;
-                                      setState(() => _selectedManagerId = value);
+                                      setState(
+                                          () => _selectedManagerId = value);
                                     },
                                   ),
                                 ),
@@ -330,15 +332,15 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
                                 child: SizedBox(
                                   height: buttonHeight,
                                   child: OutlinedButton(
-                                    onPressed: () => Navigator.of(context).pop(),
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(),
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: AppColors.textPrimary,
                                       side: const BorderSide(
                                         color: AppColors.border,
                                       ),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
                                     child: const Text('Cancel'),
@@ -359,8 +361,7 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
                                       backgroundColor: AppColors.primary,
                                       foregroundColor: Colors.white,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
                                     child: Text(

@@ -236,9 +236,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: uploadCategory == 'videos'
-          ? _videoExtensions
-          : _documentExtensions,
+      allowedExtensions:
+          uploadCategory == 'videos' ? _videoExtensions : _documentExtensions,
       allowMultiple: true,
     );
     if (!mounted || picked == null || picked.files.isEmpty) {
@@ -246,9 +245,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     }
 
     final acceptedPaths = <String>[];
-    final allowedExtensions = uploadCategory == 'videos'
-        ? _videoExtensions
-        : _documentExtensions;
+    final allowedExtensions =
+        uploadCategory == 'videos' ? _videoExtensions : _documentExtensions;
     for (final file in picked.files.take(_maxDocumentCount)) {
       final extension = (file.extension ?? '').toLowerCase();
       if (!allowedExtensions.contains(extension)) {
@@ -279,8 +277,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             uploadCategory == 'unit_plans' ? acceptedPaths : const <String>[],
         creativeFilePaths:
             uploadCategory == 'creatives' ? acceptedPaths : const <String>[],
-        paymentPlanFilePaths:
-            uploadCategory == 'payment_plans' ? acceptedPaths : const <String>[],
+        paymentPlanFilePaths: uploadCategory == 'payment_plans'
+            ? acceptedPaths
+            : const <String>[],
         videoFilePaths:
             uploadCategory == 'videos' ? acceptedPaths : const <String>[],
         token: _authProvider.currentAuthToken,
@@ -713,7 +712,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                                     onChanged: (value) {
                                       setSheetState(() {
                                         if (value == true) {
-                                          if (!selectedIds.contains(option.id)) {
+                                          if (!selectedIds
+                                              .contains(option.id)) {
                                             selectedIds.add(option.id);
                                           }
                                         } else {
@@ -1119,8 +1119,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                                 selectedFieldKeys.isEmpty
                                     ? 'Select fields'
                                     : _shareFieldOptions
-                                        .where((option) =>
-                                            selectedFieldKeys.contains(option.key))
+                                        .where((option) => selectedFieldKeys
+                                            .contains(option.key))
                                         .map((option) => option.label)
                                         .join(', '),
                                 maxLines: 2,
@@ -1882,9 +1882,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             ),
             const Spacer(),
             TextButton.icon(
-              onPressed: documents.isEmpty || _isDocumentAction
-                  ? null
-                  : onDownloadAll,
+              onPressed:
+                  documents.isEmpty || _isDocumentAction ? null : onDownloadAll,
               icon: Icon(Icons.download_outlined, size: 15, color: accentColor),
               label: Text(
                 'Download all',

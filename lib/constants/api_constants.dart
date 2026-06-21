@@ -26,6 +26,8 @@ class ApiConstants {
       '/team-history/{userId}/follow-ups';
   static const String teamHistorySiteVisits =
       '/team-history/{userId}/site-visits';
+  static const String mySummary = '/me/summary';
+  static const String myActivities = '/me/activities';
 
   //leads Endpoints
   static const String myLeads = '/me/leads';

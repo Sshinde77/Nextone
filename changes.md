@@ -21,3 +21,5 @@ add pagination in all screeen ✔️
  
 in the team page only show view deatil action button ✔️
  in the team detail page show the data which is there in the image ✔️
+
+ in the project for the associate role hide the share and download button please take care it is only for associate role

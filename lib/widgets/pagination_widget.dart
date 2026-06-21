@@ -83,7 +83,9 @@ class PaginationWidget extends StatelessWidget {
               children: [
                 info,
                 const SizedBox(height: 12),
-                Center(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: controls)),
+                Center(
+                    child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal, child: controls)),
               ],
             );
           }

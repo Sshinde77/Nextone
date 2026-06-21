@@ -113,11 +113,9 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
         final dataRaw = response['data'];
         if (dataRaw is List) {
           allRows.addAll(
-            dataRaw
-                .whereType<Map>()
-                .map((item) => item.map(
-                      (key, value) => MapEntry(key.toString(), value),
-                    )),
+            dataRaw.whereType<Map>().map((item) => item.map(
+                  (key, value) => MapEntry(key.toString(), value),
+                )),
           );
         }
 
@@ -282,8 +280,10 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
       earned = 0;
     }
 
-    final checkInLabel = checkIn == null ? '-' : DateFormat('hh:mm a').format(checkIn);
-    final checkOutLabel = checkOut == null ? '-' : DateFormat('hh:mm a').format(checkOut);
+    final checkInLabel =
+        checkIn == null ? '-' : DateFormat('hh:mm a').format(checkIn);
+    final checkOutLabel =
+        checkOut == null ? '-' : DateFormat('hh:mm a').format(checkOut);
     final timeLabel = '$checkInLabel - $checkOutLabel';
 
     return _AttendanceDayRow(
@@ -291,7 +291,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
       status: status,
       statusLabel: _statusText(status),
       timeLabel: timeLabel,
-      hoursLabel: workingHours > 0 ? '${workingHours.toStringAsFixed(2)}h' : '-',
+      hoursLabel:
+          workingHours > 0 ? '${workingHours.toStringAsFixed(2)}h' : '-',
       earned: earned,
     );
   }
@@ -324,7 +325,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
 
   void _changeMonth(int delta) {
     setState(() {
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + delta, 1);
+      _selectedMonth =
+          DateTime(_selectedMonth.year, _selectedMonth.month + delta, 1);
     });
     _loadAttendanceForSelectedMonth();
   }
@@ -376,7 +378,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
       return InputDecoration(
         hintText: hintText,
         prefixText: prefixText,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: AppColors.border),
@@ -466,7 +469,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           widget.name,
@@ -495,7 +499,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
                             const SizedBox(height: 8),
                             TextField(
                               controller: amountController,
-                              keyboardType: const TextInputType.numberWithOptions(
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
                                 decimal: true,
                               ),
                               decoration: fieldDecoration(
@@ -546,9 +551,9 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
                             onPressed: isSaving
                                 ? null
                                 : () async {
-                                    final amount =
-                                        double.tryParse(amountController.text.trim()) ??
-                                            0;
+                                    final amount = double.tryParse(
+                                            amountController.text.trim()) ??
+                                        0;
                                     final reason = reasonController.text.trim();
                                     if (amount <= 0) {
                                       ScaffoldMessenger.of(context)
@@ -577,8 +582,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
 
                                     setModalState(() => isSaving = true);
                                     try {
-                                      final result =
-                                          await _authProvider.salaryAddIncentive(
+                                      final result = await _authProvider
+                                          .salaryAddIncentive(
                                         userId: widget.userId,
                                         month: _selectedMonth.month,
                                         year: _selectedMonth.year,
@@ -593,7 +598,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
                                       ScaffoldMessenger.of(this.context)
                                         ..hideCurrentSnackBar()
                                         ..showSnackBar(
-                                          SnackBar(content: Text(result.message)),
+                                          SnackBar(
+                                              content: Text(result.message)),
                                         );
                                     } catch (error) {
                                       if (!mounted) return;
@@ -603,7 +609,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
                                         ..showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                              AppErrorHandler.friendlyMessage(error),
+                                              AppErrorHandler.friendlyMessage(
+                                                  error),
                                             ),
                                           ),
                                         );
@@ -686,9 +693,12 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
             crossAxisSpacing: 7,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              _statCard('Present Days', '$_presentDays', 'Month total', const Color(0xFF10B981)),
-              _statCard('Absent Days', '$_absentDays', 'No pay', const Color(0xFFEF4444)),
-              _statCard('On Leave', '$_onLeaveDays', 'Leave days', const Color(0xFFF59E0B)),
+              _statCard('Present Days', '$_presentDays', 'Month total',
+                  const Color(0xFF10B981)),
+              _statCard('Absent Days', '$_absentDays', 'No pay',
+                  const Color(0xFFEF4444)),
+              _statCard('On Leave', '$_onLeaveDays', 'Leave days',
+                  const Color(0xFFF59E0B)),
               _statCard(
                 'Earned (Est.)',
                 _currency(_earnedTotal),
@@ -698,7 +708,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
             ],
           ),
           const SizedBox(height: 10),
-          _daywiseCard(monthLabel: monthLabel, perDaySalary: widget.perDaySalary),
+          _daywiseCard(
+              monthLabel: monthLabel, perDaySalary: widget.perDaySalary),
           const SizedBox(height: 10),
           _salaryInfoCard(monthLabel: monthLabel),
         ],
@@ -728,7 +739,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
             width: double.infinity,
             padding: EdgeInsets.all(isCompact ? 11 : 12),
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
               gradient: const LinearGradient(
                 colors: [Color(0xFF0A7CFF), Color(0xFF2F5FE3)],
               ),
@@ -787,8 +799,12 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
               children: [
                 Row(
                   children: [
-                    Expanded(child: _meta('Monthly Salary', _currency(monthlySalary))),
-                    Expanded(child: _meta('Per Day Salary', _currency(perDaySalary))),
+                    Expanded(
+                        child:
+                            _meta('Monthly Salary', _currency(monthlySalary))),
+                    Expanded(
+                        child:
+                            _meta('Per Day Salary', _currency(perDaySalary))),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -809,7 +825,9 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
   Widget _monthRow(String monthLabel) {
     return Row(
       children: [
-        GestureDetector(onTap: () => _changeMonth(-1), child: _navCircle(Icons.chevron_left)),
+        GestureDetector(
+            onTap: () => _changeMonth(-1),
+            child: _navCircle(Icons.chevron_left)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -821,7 +839,9 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
             ),
           ),
         ),
-        GestureDetector(onTap: () => _changeMonth(1), child: _navCircle(Icons.chevron_right)),
+        GestureDetector(
+            onTap: () => _changeMonth(1),
+            child: _navCircle(Icons.chevron_right)),
       ],
     );
   }
@@ -853,7 +873,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
         children: [
           Text(
             title,
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+            style:
+                const TextStyle(color: AppColors.textSecondary, fontSize: 11),
           ),
           const SizedBox(height: 2),
           Text(
@@ -866,7 +887,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
           ),
           Text(
             subtitle,
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+            style:
+                const TextStyle(color: AppColors.textSecondary, fontSize: 10),
           ),
         ],
       ),
@@ -901,7 +923,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
                 ),
                 Text(
                   '$monthLabel - ${_rows.length} records',
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 12),
                 ),
               ],
             ),
@@ -986,7 +1009,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: statusColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(999),
@@ -1237,7 +1261,8 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF86E7A5),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

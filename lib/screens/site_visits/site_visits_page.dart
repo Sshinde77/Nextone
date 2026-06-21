@@ -114,8 +114,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   bool get _showScopeTabs =>
       _currentRole.isNotEmpty &&
       !RoleAccess.isSuperAdmin(_currentRole) &&
-      !RoleAccess.isAdmin(_currentRole) &&
-      RoleAccess.normalize(_currentRole) != RoleAccess.externalCaller;
+      !RoleAccess.isAdmin(_currentRole);
 
   Iterable<_SiteVisit> get _statusFilteredVisits {
     if (!_isMyScope || _selectedStatus.trim().isEmpty) {
@@ -634,7 +633,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         children: [
           Expanded(
             child: _scopeTabItem(
-              label: 'My Follow Up',
+              label: 'My Site Visit',
               isActive: _isMyScope,
               onTap: () {
                 if (_isMyScope) return;
@@ -1676,7 +1675,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         return;
       }
       _showSnackBar(AppErrorHandler.friendlyMessage(e));
-    } 
+    }
   }
 
   int _countByStatus(_VisitStatus status) {
@@ -1787,8 +1786,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
             )
           : await _authProvider.siteVisits(
               token: _authProvider.currentAuthToken,
-              status:
-                  _selectedStatus.trim().isEmpty ? null : _selectedStatus.trim(),
+              status: _selectedStatus.trim().isEmpty
+                  ? null
+                  : _selectedStatus.trim(),
               page: targetPage,
               perPage: _perPage,
             );

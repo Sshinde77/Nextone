@@ -102,7 +102,9 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
       data['emergency_contact'] ?? data['emergencyContact'],
     );
     _addressController.text = _readString(
-      data['residential_address'] ?? data['residentialAddress'] ?? data['address'],
+      data['residential_address'] ??
+          data['residentialAddress'] ??
+          data['address'],
     );
 
     _incomingRoleValue = _readString(data['role']);
@@ -381,7 +383,9 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                           ),
                         ),
                         IconButton(
-                          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                          onPressed: _isSubmitting
+                              ? null
+                              : () => Navigator.pop(context),
                           icon: const Icon(Icons.close),
                         ),
                       ],
@@ -435,7 +439,8 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                                 hintText: '9123456789',
                                 icon: Icons.phone_outlined,
                                 keyboardType: TextInputType.phone,
-                                helperText: 'Enter 10-digit number only, without +91',
+                                helperText:
+                                    'Enter 10-digit number only, without +91',
                                 textInputAction: TextInputAction.next,
                               ),
                             ),
@@ -447,7 +452,8 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                                 hintText: '9876543211',
                                 icon: Icons.phone_outlined,
                                 keyboardType: TextInputType.phone,
-                                helperText: 'Enter 10-digit number only, without +91',
+                                helperText:
+                                    'Enter 10-digit number only, without +91',
                                 textInputAction: TextInputAction.next,
                               ),
                             ),
@@ -471,7 +477,9 @@ class _AddTeamMemberPageState extends State<AddTeamMemberPage> {
                           children: [
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                                onPressed: _isSubmitting
+                                    ? null
+                                    : () => Navigator.pop(context),
                                 style: OutlinedButton.styleFrom(
                                   minimumSize: const Size.fromHeight(44),
                                   shape: RoundedRectangleBorder(

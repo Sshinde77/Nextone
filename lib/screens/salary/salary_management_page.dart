@@ -205,7 +205,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   }
 
   List<_SummaryStat> get _stats {
-    final totalEmployees = _employeesTotal > 0 ? _employeesTotal : _employees.length;
+    final totalEmployees =
+        _employeesTotal > 0 ? _employeesTotal : _employees.length;
     final salarySetCount = _employees.where((e) => e.salarySet).length;
     final pendingCount = totalEmployees - salarySetCount;
     final monthlyPayroll = _employees.fold<double>(
@@ -213,9 +214,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       (sum, item) => sum + (item.monthlySalary ?? 0),
     );
     final now = DateTime.now();
-    final slipsThisMonth = (_selectedMonth == now.month && _selectedYear == now.year)
-        ? _salarySlips.length
-        : 0;
+    final slipsThisMonth =
+        (_selectedMonth == now.month && _selectedYear == now.year)
+            ? _salarySlips.length
+            : 0;
 
     return <_SummaryStat>[
       _SummaryStat(
@@ -323,7 +325,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
             _buildEmployeesSection()
           else ...[
             _buildFilterTile(
-              DateFormat('MMMM').format(DateTime(_selectedYear, _selectedMonth)),
+              DateFormat('MMMM')
+                  .format(DateTime(_selectedYear, _selectedMonth)),
               onTap: _pickMonth,
             ),
             const SizedBox(height: 10),
@@ -429,7 +432,9 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                             style: const TextStyle(color: AppColors.error),
                           ),
                           const SizedBox(height: 8),
-                          TextButton(onPressed: _loadMySalary, child: const Text('Retry')),
+                          TextButton(
+                              onPressed: _loadMySalary,
+                              child: const Text('Retry')),
                         ],
                       ),
                     )
@@ -449,13 +454,15 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     const SizedBox(height: 10),
                     _buildFilterTile(monthName, onTap: _pickMySalaryMonth),
                     const SizedBox(height: 8),
-                    _buildFilterTile(_selectedYear.toString(), onTap: _pickMySalaryYear),
+                    _buildFilterTile(_selectedYear.toString(),
+                        onTap: _pickMySalaryYear),
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: IconButton(
                         onPressed: _loadMySalary,
-                        icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
+                        icon: const Icon(Icons.refresh,
+                            color: AppColors.textSecondary),
                       ),
                     ),
                     if (_mySalaryTab == 0)
@@ -648,7 +655,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   }
 
   DateTime _historyDateOf(SalaryHistoryEntry item) {
-    return item.effectiveFrom ?? item.createdAt ?? item.updatedAt ?? DateTime(1970, 1, 1);
+    return item.effectiveFrom ??
+        item.createdAt ??
+        item.updatedAt ??
+        DateTime(1970, 1, 1);
   }
 
   String _readStringValue(dynamic value) {
@@ -677,7 +687,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
 
   _MySalaryIncentiveRow _mapMyIncentiveRow(Map<String, dynamic> json) {
     final amount = _readDoubleValue(
-      json['amount'] ?? json['incentive_amount'] ?? json['incentive'] ?? json['value'],
+      json['amount'] ??
+          json['incentive_amount'] ??
+          json['incentive'] ??
+          json['value'],
     );
     final note = _readStringValue(
       json['note'] ??
@@ -705,7 +718,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     return _mySalaryHistory.where((item) {
       final date = _historyDateOf(item);
       final matchesYear = date.year == _selectedYear;
-      final matchesMonth = _mySalarySelectedMonth == 0 || date.month == _mySalarySelectedMonth;
+      final matchesMonth =
+          _mySalarySelectedMonth == 0 || date.month == _mySalarySelectedMonth;
       return matchesYear && matchesMonth;
     }).toList();
   }
@@ -713,7 +727,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   List<_MySalaryIncentiveRow> _filteredMyIncentives() {
     return _myIncentives.where((item) {
       final matchesYear = item.date.year == _selectedYear;
-      final matchesMonth = _mySalarySelectedMonth == 0 || item.date.month == _mySalarySelectedMonth;
+      final matchesMonth = _mySalarySelectedMonth == 0 ||
+          item.date.month == _mySalarySelectedMonth;
       return matchesYear && matchesMonth;
     }).toList();
   }
@@ -754,7 +769,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                   padding: const EdgeInsets.all(12),
                   child: Row(
                     children: [
-                      const Icon(Icons.description_outlined, color: Color(0xFF16A34A)),
+                      const Icon(Icons.description_outlined,
+                          color: Color(0xFF16A34A)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -770,7 +786,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                             ),
                             Text(
                               '${s.presentDays} / ${s.workingDays} working days',
-                              style: const TextStyle(color: AppColors.textSecondary),
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary),
                             ),
                           ],
                         ),
@@ -780,7 +797,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                         children: [
                           const Text(
                             'Final Salary',
-                            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                            style: TextStyle(
+                                color: AppColors.textSecondary, fontSize: 12),
                           ),
                           Text(
                             _formatCurrency(s.finalSalary),
@@ -794,7 +812,9 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                       ),
                       const SizedBox(width: 6),
                       Icon(
-                        isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        isExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
                         color: AppColors.textSecondary,
                       ),
                     ],
@@ -857,7 +877,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                         ),
                         child: Column(
                           children: [
-                            _previewRow('Earned Salary', _formatCurrency(s.earnedSalary)),
+                            _previewRow('Earned Salary',
+                                _formatCurrency(s.earnedSalary)),
                             const Divider(height: 14, color: Color(0xFFC8EFD7)),
                             _previewRow(
                               'Final Salary',
@@ -956,7 +977,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
               borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              gradient: LinearGradient(colors: [Color(0xFF0A7CFF), Color(0xFF2F5FE3)]),
+              gradient: LinearGradient(
+                  colors: [Color(0xFF0A7CFF), Color(0xFF2F5FE3)]),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -990,9 +1012,12 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
             child: Row(
               children: [
                 Expanded(
-                  child: _miniInfo('Monthly Base', _formatCurrency(_myDailyMonthlySalary)),
+                  child: _miniInfo(
+                      'Monthly Base', _formatCurrency(_myDailyMonthlySalary)),
                 ),
-                Expanded(child: _miniInfo('Per Day', _formatCurrency(_myDailyPerDaySalary))),
+                Expanded(
+                    child: _miniInfo(
+                        'Per Day', _formatCurrency(_myDailyPerDaySalary))),
                 Expanded(
                   child: _miniInfo(
                     'Days Present',
@@ -1132,7 +1157,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     return Column(
       children: history.map((item) {
         final effectiveDate = _historyDateOf(item);
-        final setter = item.setByName.trim().isEmpty ? 'Unknown' : item.setByName.trim();
+        final setter =
+            item.setByName.trim().isEmpty ? 'Unknown' : item.setByName.trim();
         return Container(
           width: double.infinity,
           margin: const EdgeInsets.only(bottom: 10),
@@ -1161,7 +1187,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     colors: [Color(0xFF2D7CFF), Color(0xFF4E46E5)],
                   ),
                 ),
-                child: const Icon(Icons.currency_rupee, color: Colors.white, size: 28),
+                child: const Icon(Icons.currency_rupee,
+                    color: Colors.white, size: 28),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -1293,7 +1320,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     final statusFg = isHalfDay
         ? const Color(0xFFC2185B)
         : (isPositive ? const Color(0xFF14864A) : AppColors.textSecondary);
-    final earnedFg = isPositive ? const Color(0xFF16A34A) : AppColors.textSecondary;
+    final earnedFg =
+        isPositive ? const Color(0xFF16A34A) : AppColors.textSecondary;
 
     return Container(
       width: double.infinity,
@@ -1319,7 +1347,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: statusBg,
                   borderRadius: BorderRadius.circular(999),
@@ -1352,7 +1381,9 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
               Expanded(
                 child: _myDailyMeta(
                   'Earned',
-                  isPositive ? '+${_formatCurrency(row.earned)}' : _formatCurrency(0),
+                  isPositive
+                      ? '+${_formatCurrency(row.earned)}'
+                      : _formatCurrency(0),
                   alignRight: true,
                   valueColor: earnedFg,
                 ),
@@ -1371,7 +1402,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     Color? valueColor,
   }) {
     return Column(
-      crossAxisAlignment: alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment:
+          alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
         Text(
           label,
@@ -1397,9 +1429,12 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
 
   Widget _myDailyRowTile(_MyDailyEarningRow row) {
     final isPositive = row.earned > 0;
-    final statusBg = isPositive ? const Color(0xFFDDF6E8) : const Color(0xFFF1F5F9);
-    final statusFg = isPositive ? const Color(0xFF14864A) : AppColors.textSecondary;
-    final earnedFg = isPositive ? const Color(0xFF16A34A) : AppColors.textSecondary;
+    final statusBg =
+        isPositive ? const Color(0xFFDDF6E8) : const Color(0xFFF1F5F9);
+    final statusFg =
+        isPositive ? const Color(0xFF14864A) : AppColors.textSecondary;
+    final earnedFg =
+        isPositive ? const Color(0xFF16A34A) : AppColors.textSecondary;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1433,7 +1468,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
             flex: 3,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: statusBg,
                   borderRadius: BorderRadius.circular(999),
@@ -1462,7 +1498,9 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
           Expanded(
             flex: 2,
             child: Text(
-              isPositive ? '+${_formatCurrency(row.earned)}' : _formatCurrency(0),
+              isPositive
+                  ? '+${_formatCurrency(row.earned)}'
+                  : _formatCurrency(0),
               textAlign: TextAlign.right,
               style: TextStyle(
                 color: earnedFg,
@@ -1476,7 +1514,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     );
   }
 
-  Future<_MyDailyEarningSummary> _buildMyDailyEarnings(MySalaryResult salaryResult) async {
+  Future<_MyDailyEarningSummary> _buildMyDailyEarnings(
+      MySalaryResult salaryResult) async {
     final payload = await _fetchAttendancePayload();
     final allRows = payload.rows;
     final salarySummary = payload.salarySummary;
@@ -1489,7 +1528,9 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
 
     final filtered = allRows
         .where((row) => row.date.year == _selectedYear)
-        .where((row) => _mySalarySelectedMonth == 0 || row.date.month == _mySalarySelectedMonth)
+        .where((row) =>
+            _mySalarySelectedMonth == 0 ||
+            row.date.month == _mySalarySelectedMonth)
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
 
@@ -1502,7 +1543,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     for (final row in filtered) {
       final status = row.status.toLowerCase();
       final isHalf = status.contains('half');
-      final isPresent = status.contains('present') || status.contains('approved') || isHalf;
+      final isPresent =
+          status.contains('present') || status.contains('approved') || isHalf;
       final double earned =
           isPresent ? (isHalf ? perDaySalary / 2 : perDaySalary) : 0.0;
 
@@ -1543,22 +1585,31 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   double _resolvePerDaySalary(MySalaryResult result) {
     final selected = _mySalarySelectedMonth == 0
         ? null
-        : result.salarySlips.where((s) => s.month == _mySalarySelectedMonth).toList();
-    if (selected != null && selected.isNotEmpty) return selected.first.perDaySalary;
+        : result.salarySlips
+            .where((s) => s.month == _mySalarySelectedMonth)
+            .toList();
+    if (selected != null && selected.isNotEmpty)
+      return selected.first.perDaySalary;
     if (result.currentMonthlySalary?.perDaySalary != null) {
       return result.currentMonthlySalary!.perDaySalary!;
     }
-    if (result.salarySlips.isNotEmpty) return result.salarySlips.first.perDaySalary;
+    if (result.salarySlips.isNotEmpty)
+      return result.salarySlips.first.perDaySalary;
     return 0;
   }
 
   double _resolveMonthlySalary(MySalaryResult result) {
     final selected = _mySalarySelectedMonth == 0
         ? null
-        : result.salarySlips.where((s) => s.month == _mySalarySelectedMonth).toList();
-    if (selected != null && selected.isNotEmpty) return selected.first.monthlySalary;
-    if (result.currentMonthlySalary != null) return result.currentMonthlySalary!.amount;
-    if (result.salarySlips.isNotEmpty) return result.salarySlips.first.monthlySalary;
+        : result.salarySlips
+            .where((s) => s.month == _mySalarySelectedMonth)
+            .toList();
+    if (selected != null && selected.isNotEmpty)
+      return selected.first.monthlySalary;
+    if (result.currentMonthlySalary != null)
+      return result.currentMonthlySalary!.amount;
+    if (result.salarySlips.isNotEmpty)
+      return result.salarySlips.first.monthlySalary;
     return 0;
   }
 
@@ -1584,7 +1635,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
 
     final Map<String, _AttendanceRow> unique = <String, _AttendanceRow>{};
     for (final row in rows) {
-      final key = '${row.date.toIso8601String()}-${row.status}-${row.timeLabel}';
+      final key =
+          '${row.date.toIso8601String()}-${row.status}-${row.timeLabel}';
       unique[key] = row;
     }
     return _AttendanceMePayload(
@@ -1600,13 +1652,13 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         ? directList
         : _pickFirstList(root, const [
             'data',
-      'attendance',
-      'attendances',
-      'items',
-      'rows',
-      'results',
-      'history',
-    ]);
+            'attendance',
+            'attendances',
+            'items',
+            'rows',
+            'results',
+            'history',
+          ]);
     if (list == null) return const <_AttendanceRow>[];
 
     final List<_AttendanceRow> parsed = <_AttendanceRow>[];
@@ -1663,7 +1715,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     return null;
   }
 
-  List<dynamic>? _pickFirstList(Map<String, dynamic> source, List<String> keys) {
+  List<dynamic>? _pickFirstList(
+      Map<String, dynamic> source, List<String> keys) {
     for (final key in keys) {
       final value = source[key];
       if (value is List) return value;
@@ -1705,19 +1758,23 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     String formatOne(String raw) {
       if (raw.isEmpty) return '';
       final dt = DateTime.tryParse(raw);
-      return dt == null ? raw : DateFormat('hh:mm a').format(dt.toLocal()).toLowerCase();
+      return dt == null
+          ? raw
+          : DateFormat('hh:mm a').format(dt.toLocal()).toLowerCase();
     }
 
     final checkIn = formatOne(checkInRaw);
     final checkOut = formatOne(checkOutRaw);
-    if (checkIn.isNotEmpty && checkOut.isNotEmpty) return '→$checkIn   ←$checkOut';
+    if (checkIn.isNotEmpty && checkOut.isNotEmpty)
+      return '→$checkIn   ←$checkOut';
     if (checkIn.isNotEmpty) return '→$checkIn';
     if (checkOut.isNotEmpty) return '←$checkOut';
     return '';
   }
 
   String _readWorkingHoursLabel(Map<String, dynamic> source) {
-    final raw = _readFirstString(source, const ['working_hours', 'workingHours', 'hours']);
+    final raw = _readFirstString(
+        source, const ['working_hours', 'workingHours', 'hours']);
     if (raw.isEmpty) return '--';
     final value = double.tryParse(raw);
     if (value == null) return raw;
@@ -2071,7 +2128,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   }
 
   Widget _buildEmployeeCard(_EmployeeSalaryRow row) {
-    final salaryColor = row.isNotSet ? const Color(0xFFF59E0B) : AppColors.textPrimary;
+    final salaryColor =
+        row.isNotSet ? const Color(0xFFF59E0B) : AppColors.textPrimary;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
@@ -2224,7 +2282,9 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: _metaSection(label: 'Monthly Salary', value: row.monthlySalary)),
+              Expanded(
+                  child: _metaSection(
+                      label: 'Monthly Salary', value: row.monthlySalary)),
               const SizedBox(width: 10),
               Expanded(child: _metaSection(label: 'Days', value: row.days)),
             ],
@@ -2261,7 +2321,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _metaSection(label: 'Generated By', value: row.generatedBy),
+                child:
+                    _metaSection(label: 'Generated By', value: row.generatedBy),
               ),
             ],
           ),
@@ -2471,7 +2532,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     return _SalarySlipRow(
       employee: slip.employeeName.isEmpty ? '-' : slip.employeeName,
       role: _toTitleCase(slip.employeeRole),
-      month: '${DateFormat('MMM').format(DateTime(slip.year, slip.month))} ${slip.year}',
+      month:
+          '${DateFormat('MMM').format(DateTime(slip.year, slip.month))} ${slip.year}',
       monthlySalary: _formatCurrency(slip.monthlySalary),
       days: '${slip.presentDays}/${slip.workingDays}',
       earned: _formatCurrency(slip.earnedSalary),
@@ -2911,13 +2973,15 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                           _previewRow(
                             'Monthly',
                             _formatCurrency(
-                              double.tryParse(monthlyController.text.trim()) ?? 0,
+                              double.tryParse(monthlyController.text.trim()) ??
+                                  0,
                             ),
                           ),
                           _previewRow(
                             'Per Day',
                             _formatCurrency(
-                              double.tryParse(perDayController.text.trim()) ?? 0,
+                              double.tryParse(perDayController.text.trim()) ??
+                                  0,
                             ),
                             color: const Color(0xFF059669),
                           ),
@@ -2998,7 +3062,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed: isSaving ? null : () => Navigator.of(context).pop(),
+                  onPressed:
+                      isSaving ? null : () => Navigator.of(context).pop(),
                   child: const Text('Cancel'),
                 ),
                 FilledButton.icon(
@@ -3006,11 +3071,14 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                       ? null
                       : () async {
                           final monthly =
-                              double.tryParse(monthlyController.text.trim()) ?? 0;
+                              double.tryParse(monthlyController.text.trim()) ??
+                                  0;
                           final perDay =
-                              double.tryParse(perDayController.text.trim()) ?? 0;
+                              double.tryParse(perDayController.text.trim()) ??
+                                  0;
                           final days =
-                              int.tryParse(workingDaysController.text.trim()) ?? 0;
+                              int.tryParse(workingDaysController.text.trim()) ??
+                                  0;
                           if (monthly <= 0 || perDay <= 0 || days <= 0) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -3383,7 +3451,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                                       );
                                       if (!mounted) return;
                                       Navigator.of(dialogContext).pop();
-                                       await _loadEmployees(page: _employeesCurrentPage);
+                                      await _loadEmployees(
+                                          page: _employeesCurrentPage);
                                       ScaffoldMessenger.of(context)
                                         ..hideCurrentSnackBar()
                                         ..showSnackBar(
@@ -3416,7 +3485,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Icon(Icons.trending_up_rounded, size: 17),
+                                : const Icon(Icons.trending_up_rounded,
+                                    size: 17),
                             label: Text(
                               isSaving ? 'Saving...' : 'Save Appraisal',
                             ),
@@ -3622,18 +3692,17 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed: isGenerating
-                      ? null
-                      : () => Navigator.of(context).pop(),
+                  onPressed:
+                      isGenerating ? null : () => Navigator.of(context).pop(),
                   child: const Text('Cancel'),
                 ),
                 FilledButton.icon(
                   onPressed: isGenerating
                       ? null
                       : () async {
-                          final deductions =
-                              double.tryParse(deductionsController.text.trim()) ??
-                                  0;
+                          final deductions = double.tryParse(
+                                  deductionsController.text.trim()) ??
+                              0;
                           final workingOverride =
                               int.tryParse(workingDaysController.text.trim());
                           setModalState(() => isGenerating = true);
@@ -3653,7 +3722,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                               _selectedMonth = selectedMonth;
                               _selectedYear = selectedYear;
                             });
-                             await _loadSalarySlips(page: 1);
+                            await _loadSalarySlips(page: 1);
                             ScaffoldMessenger.of(context)
                               ..hideCurrentSnackBar()
                               ..showSnackBar(
@@ -3882,8 +3951,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                                   final item = entry.value;
                                   final effective = item.effectiveFrom == null
                                       ? '-'
-                                      : DateFormat('dd MMM yyyy')
-                                          .format(item.effectiveFrom!.toLocal());
+                                      : DateFormat('dd MMM yyyy').format(
+                                          item.effectiveFrom!.toLocal());
                                   final isCurrent = index == 0;
                                   return Container(
                                     width: double.infinity,
@@ -3892,7 +3961,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: AppColors.border),
+                                      border:
+                                          Border.all(color: AppColors.border),
                                     ),
                                     child: Row(
                                       children: [
@@ -3902,7 +3972,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                _formatCurrency(item.monthlySalary),
+                                                _formatCurrency(
+                                                    item.monthlySalary),
                                                 style: const TextStyle(
                                                   fontSize: 18,
                                                   fontWeight: FontWeight.w700,
@@ -3913,7 +3984,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                                               Text(
                                                 'Effective: $effective',
                                                 style: const TextStyle(
-                                                  color: AppColors.textSecondary,
+                                                  color:
+                                                      AppColors.textSecondary,
                                                   fontWeight: FontWeight.w600,
                                                 ),
                                               ),
@@ -3935,15 +4007,19 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                                             ),
                                             if (isCurrent)
                                               Container(
-                                                margin: const EdgeInsets.only(top: 4),
-                                                padding: const EdgeInsets.symmetric(
+                                                margin: const EdgeInsets.only(
+                                                    top: 4),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
                                                   horizontal: 8,
                                                   vertical: 3,
                                                 ),
                                                 decoration: BoxDecoration(
-                                                  color: const Color(0xFFDDF6E8),
+                                                  color:
+                                                      const Color(0xFFDDF6E8),
                                                   borderRadius:
-                                                      BorderRadius.circular(999),
+                                                      BorderRadius.circular(
+                                                          999),
                                                 ),
                                                 child: const Text(
                                                   'Current',

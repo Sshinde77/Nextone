@@ -475,7 +475,8 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   List<_TeamMember> get _managerOptions {
-    final source = _assignmentMembers.isNotEmpty ? _assignmentMembers : _members;
+    final source =
+        _assignmentMembers.isNotEmpty ? _assignmentMembers : _members;
     return source.where((member) {
       return member.rawRole == RoleAccess.salesManager;
     }).toList();

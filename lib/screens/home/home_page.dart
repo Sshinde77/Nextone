@@ -52,12 +52,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _loadDashboardStats();
-    _loadUpcomingSiteVisits();
-    _loadRecentActivity();
     _loadLeadPipeline();
-    _loadLeadSources();
-    _loadLeadTrend();
     _loadAccess();
   }
 
@@ -68,13 +63,41 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _currentRole = role;
       });
-      if (!RoleAccess.isAdmin(role) &&
-          !RoleAccess.isSuperAdmin(role) &&
-          RoleAccess.canViewModule('targets')) {
-        _loadTargetStats();
+      final isAssociateRole = RoleAccess.normalize(role) == 'associate';
+      final isPrivilegedRole =
+          RoleAccess.isAdmin(role) || RoleAccess.isSuperAdmin(role);
+      if (isPrivilegedRole) {
+        _loadDashboardStats();
+        _loadUpcomingSiteVisits();
+        _loadRecentActivity();
+        _loadLeadSources();
+        _loadLeadTrend();
+      } else {
+        _loadPersonalSummary();
+        _loadPersonalUpcomingSiteVisits();
+        _loadPersonalRecentActivity();
+        if (!isAssociateRole) {
+          _loadLeadSources();
+          _loadLeadTrend();
+        } else {
+          setState(() {
+            _leadSourcesLoading = false;
+            _leadSourcesError = null;
+            _leadSources = null;
+            _leadTrendLoading = false;
+            _leadTrendError = null;
+            _leadTrendData = null;
+          });
+        }
+        if (RoleAccess.canViewModule('targets')) {
+          _loadTargetStats();
+        }
       }
     } catch (_) {
-      // Keep the lowest-privilege UI fallback if profile cannot be read.
+      // Keep the existing dashboard data if the role cannot be read.
+      _loadDashboardStats();
+      _loadUpcomingSiteVisits();
+      _loadRecentActivity();
     }
   }
 
@@ -163,6 +186,230 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final activity = await _authProvider.dashboardRecentActivity(limit: 5);
+      if (!mounted) return;
+      setState(() {
+        _recentActivity = activity;
+        _recentActivityLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _recentActivityError = error.toString();
+        _recentActivityLoading = false;
+      });
+    }
+  }
+
+  Map<String, dynamic> _normalizePersonalSummary(
+    Map<String, dynamic> summary,
+  ) {
+    Map<String, dynamic> asMap(dynamic value) {
+      if (value is Map<String, dynamic>) return value;
+      if (value is Map) {
+        return value.map((key, val) => MapEntry(key.toString(), val));
+      }
+      return const <String, dynamic>{};
+    }
+
+    int readValue(Iterable<String> keys) {
+      for (final key in keys) {
+        final dynamic value = summary[key];
+        if (value is int) return value;
+        if (value is num) return value.toInt();
+        if (value is String) {
+          final parsed = int.tryParse(value);
+          if (parsed != null) return parsed;
+        }
+      }
+      return 0;
+    }
+
+    final leads = asMap(summary['leads']);
+    final siteVisits = asMap(summary['site_visits']);
+    final tasks = asMap(summary['tasks']);
+    final projects = asMap(summary['projects']);
+
+    int readNested(Map<String, dynamic> map, Iterable<String> keys) {
+      for (final key in keys) {
+        final dynamic value = map[key];
+        if (value is int) return value;
+        if (value is num) return value.toInt();
+        if (value is String) {
+          final parsed = int.tryParse(value);
+          if (parsed != null) return parsed;
+        }
+      }
+      return 0;
+    }
+
+    final totalLeads = readNested(leads, const <String>[
+      'total',
+      'total_leads',
+      'totalLeads',
+      'leads',
+      'lead_count',
+      'leadCount',
+    ]);
+    final bookedLeads = readNested(leads, const <String>[
+      'booked',
+      'booked_leads',
+      'bookedLeads',
+      'converted_leads',
+      'convertedLeads',
+    ]);
+    final totalSiteVisits = readNested(siteVisits, const <String>[
+      'total',
+      'total_site_visits',
+      'totalSiteVisits',
+      'site_visits',
+      'siteVisits',
+      'site_visit_count',
+      'siteVisitCount',
+    ]);
+    final upcomingSiteVisits = readNested(siteVisits, const <String>[
+      'upcoming',
+      'upcoming_site_visits',
+      'upcomingSiteVisits',
+      'scheduled_site_visits',
+      'scheduledSiteVisits',
+    ]);
+    final doneSiteVisits = readNested(siteVisits, const <String>[
+      'done',
+      'site_visits_done',
+      'siteVisitsDone',
+      'completed_site_visits',
+      'completedSiteVisits',
+      'done_site_visits',
+      'doneSiteVisits',
+    ]);
+    final totalFollowUps = readNested(tasks, const <String>[
+      'total',
+      'total_follow_ups',
+      'totalFollowUps',
+      'follow_ups',
+      'followUps',
+      'follow_up',
+      'follow_up_leads',
+      'followUpLeads',
+      'pipeline',
+    ]);
+    final pendingFollowUps = readNested(tasks, const <String>[
+      'pending',
+      'pending_follow_ups',
+      'pendingFollowUps',
+      'open_follow_ups',
+      'openFollowUps',
+    ]);
+    final totalProjects = (() {
+      final nested = readNested(projects, const <String>[
+        'total_projects',
+        'totalProjects',
+        'projects',
+        'project_count',
+        'projectCount',
+      ]);
+      if (nested != 0) return nested;
+      return readValue(const <String>[
+        'total_projects',
+        'totalProjects',
+        'projects',
+        'project_count',
+        'projectCount',
+      ]);
+    })();
+    final activeProjects = readNested(projects, const <String>[
+      'active_projects',
+      'activeProjects',
+    ]);
+    final upcomingProjects = readNested(projects, const <String>[
+      'upcoming_projects',
+      'upcomingProjects',
+    ]);
+
+    return <String, dynamic>{
+      'total_leads': <String, dynamic>{
+        'value': totalLeads,
+        'booked': bookedLeads,
+      },
+      'total_site_visits': <String, dynamic>{
+        'value': totalSiteVisits,
+        'upcoming': upcomingSiteVisits,
+        'done': doneSiteVisits,
+      },
+      'total_follow_ups': <String, dynamic>{
+        'value': totalFollowUps,
+        'pending': pendingFollowUps,
+      },
+      'total_projects': <String, dynamic>{
+        'value': totalProjects,
+        'active': activeProjects,
+        'upcoming': upcomingProjects,
+      },
+      'meta': <String, dynamic>{
+        'activities_this_month': readValue(const <String>[
+          'activities_this_month',
+          'activitiesThisMonth',
+        ]),
+        'notifications_unread': readValue(const <String>[
+          'notifications_unread',
+          'unread_notifications',
+        ]),
+      },
+    };
+  }
+
+  Future<void> _loadPersonalSummary() async {
+    setState(() {
+      _statsLoading = true;
+      _statsError = null;
+    });
+
+    try {
+      final summary = await _authProvider.mySummary();
+      if (!mounted) return;
+      setState(() {
+        _dashboardStats = _normalizePersonalSummary(summary);
+        _statsLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _statsError = error.toString();
+        _statsLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadPersonalUpcomingSiteVisits() async {
+    setState(() {
+      _upcomingVisitsLoading = true;
+      _upcomingVisitsError = null;
+    });
+
+    try {
+      final visits = await _authProvider.mySiteVisits(page: 1, perPage: 5);
+      if (!mounted) return;
+      setState(() {
+        _upcomingVisits = visits.items;
+        _upcomingVisitsLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _upcomingVisitsError = error.toString();
+        _upcomingVisitsLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadPersonalRecentActivity() async {
+    setState(() {
+      _recentActivityLoading = true;
+      _recentActivityError = null;
+    });
+
+    try {
+      final activity = await _authProvider.myActivities(limit: 8);
       if (!mounted) return;
       setState(() {
         _recentActivity = activity;
@@ -300,6 +547,19 @@ class _HomePageState extends State<HomePage> {
     final compactText = MediaQuery.of(
       context,
     ).copyWith(textScaler: const TextScaler.linear(0.9));
+    final hasResolvedRole = _currentRole.isNotEmpty;
+    final isPrivilegedRole = hasResolvedRole &&
+        (RoleAccess.isAdmin(_currentRole) ||
+            RoleAccess.isSuperAdmin(_currentRole));
+    final isAssociateRole = RoleAccess.normalize(_currentRole) == 'associate';
+    final canShowLeads = isPrivilegedRole ||
+        (hasResolvedRole && RoleAccess.canViewModule('leads'));
+    final canShowSiteVisits = isPrivilegedRole ||
+        (hasResolvedRole && RoleAccess.canViewModule('site_visits'));
+    final canShowFollowUps = isPrivilegedRole ||
+        (hasResolvedRole && RoleAccess.canViewModule('follow_ups'));
+    final canShowProjects = isPrivilegedRole ||
+        (hasResolvedRole && RoleAccess.canViewProjects(_currentRole));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FC),
@@ -315,9 +575,7 @@ class _HomePageState extends State<HomePage> {
               children: [
                 const _HeaderBlock(),
                 const SizedBox(height: 12),
-                if (_currentRole.isNotEmpty &&
-                    !RoleAccess.isAdmin(_currentRole) &&
-                    !RoleAccess.isSuperAdmin(_currentRole))
+                if (hasResolvedRole && !isPrivilegedRole)
                   _MonthlyTargetSection(
                     stats: _targetStats,
                     isLoading: _targetsLoading,
@@ -326,9 +584,7 @@ class _HomePageState extends State<HomePage> {
                         ? () => _openMainTab(11)
                         : null,
                   ),
-                if (_currentRole.isNotEmpty &&
-                    !RoleAccess.isAdmin(_currentRole) &&
-                    !RoleAccess.isSuperAdmin(_currentRole))
+                if (hasResolvedRole && !isPrivilegedRole)
                   const SizedBox(height: 12),
                 _StatsGrid(
                   stats: _dashboardStats,
@@ -338,8 +594,11 @@ class _HomePageState extends State<HomePage> {
                   onLeadsTap: () => _openMainTab(1),
                   onSiteVisitsTap: () => _openMainTab(3),
                   onFollowUpsTap: () => _openMainTab(2),
-                  onProjectsTap: () => _openMainTab(5),
-                  showProjects: RoleAccess.canViewProjects(_currentRole),
+                  onProjectsTap: canShowProjects ? () => _openMainTab(5) : null,
+                  showLeads: canShowLeads,
+                  showSiteVisits: canShowSiteVisits,
+                  showFollowUps: canShowFollowUps,
+                  showProjects: canShowProjects,
                 ),
                 const SizedBox(height: 10),
                 _RowWrap(
@@ -354,57 +613,69 @@ class _HomePageState extends State<HomePage> {
                       Navigator.pushNamed(context, AppRoutes.notifications);
                     },
                     onReportsTap: () => _openMainTab(8),
-                    showProjects: RoleAccess.canViewProjects(_currentRole),
+                    showLeads: canShowLeads,
+                    showSiteVisits: canShowSiteVisits,
+                    showFollowUps: canShowFollowUps,
+                    showProjects: canShowProjects,
                     showTeam: RoleAccess.canViewTeam(_currentRole),
                   ),
-                  rightChild: _UpcomingVisitsCard(
-                    visits: _upcomingVisits,
-                    isLoading: _upcomingVisitsLoading,
-                    hasError: _upcomingVisitsError != null,
-                    onRetry: _loadUpcomingSiteVisits,
-                    onViewAllTap: () => _openMainTab(3),
-                  ),
+                  rightChild: canShowSiteVisits
+                      ? _UpcomingVisitsCard(
+                          visits: _upcomingVisits,
+                          isLoading: _upcomingVisitsLoading,
+                          hasError: _upcomingVisitsError != null,
+                          onRetry: _loadUpcomingSiteVisits,
+                          onViewAllTap: () => _openMainTab(3),
+                        )
+                      : const SizedBox.shrink(),
                 ),
+                if (canShowLeads ||
+                    canShowSiteVisits ||
+                    canShowFollowUps ||
+                    canShowProjects) ...[
+                  const SizedBox(height: 10),
+                  _RecentActivityCard(
+                    activity: _recentActivity,
+                    isLoading: _recentActivityLoading,
+                    hasError: _recentActivityError != null,
+                    onRetry: _loadRecentActivity,
+                  ),
+                ],
                 const SizedBox(height: 10),
-                _RecentActivityCard(
-                  activity: _recentActivity,
-                  isLoading: _recentActivityLoading,
-                  hasError: _recentActivityError != null,
-                  onRetry: _loadRecentActivity,
-                ),
-                const SizedBox(height: 10),
-                _RowWrap(
-                  leftChild: _LeadPipelineCard(
-                    pipeline: _leadPipeline,
-                    isLoading: _leadPipelineLoading,
-                    hasError: _leadPipelineError != null,
-                    onRetry: _loadLeadPipeline,
+                if (canShowLeads && !isAssociateRole) ...[
+                  _RowWrap(
+                    leftChild: _LeadPipelineCard(
+                      pipeline: _leadPipeline,
+                      isLoading: _leadPipelineLoading,
+                      hasError: _leadPipelineError != null,
+                      onRetry: _loadLeadPipeline,
+                    ),
+                    rightChild: _LeadSourcesCard(
+                      leadSources: _leadSources,
+                      isLoading: _leadSourcesLoading,
+                      hasError: _leadSourcesError != null,
+                      onRetry: _loadLeadSources,
+                    ),
                   ),
-                  rightChild: _LeadSourcesCard(
-                    leadSources: _leadSources,
-                    isLoading: _leadSourcesLoading,
-                    hasError: _leadSourcesError != null,
-                    onRetry: _loadLeadSources,
+                  const SizedBox(height: 10),
+                  _RowWrap(
+                    leftChild: _LeadTrendCard(
+                      selectedPeriod: _leadTrendPeriod,
+                      onPeriodChanged: (period) {
+                        if (_leadTrendPeriod == period) return;
+                        setState(() {
+                          _leadTrendPeriod = period;
+                        });
+                        _loadLeadTrend();
+                      },
+                      trendData: _leadTrendData,
+                      isLoading: _leadTrendLoading,
+                      hasError: _leadTrendError != null,
+                      onRetry: _loadLeadTrend,
+                    ),
+                    rightChild: _PerformanceCard(),
                   ),
-                ),
-                const SizedBox(height: 10),
-                _RowWrap(
-                  leftChild: _LeadTrendCard(
-                    selectedPeriod: _leadTrendPeriod,
-                    onPeriodChanged: (period) {
-                      if (_leadTrendPeriod == period) return;
-                      setState(() {
-                        _leadTrendPeriod = period;
-                      });
-                      _loadLeadTrend();
-                    },
-                    trendData: _leadTrendData,
-                    isLoading: _leadTrendLoading,
-                    hasError: _leadTrendError != null,
-                    onRetry: _loadLeadTrend,
-                  ),
-                  rightChild: _PerformanceCard(),
-                ),
+                ],
                 const SizedBox(height: 90),
               ],
             ),
@@ -830,6 +1101,9 @@ class _StatsGrid extends StatelessWidget {
     required this.onSiteVisitsTap,
     required this.onFollowUpsTap,
     required this.onProjectsTap,
+    required this.showLeads,
+    required this.showSiteVisits,
+    required this.showFollowUps,
     required this.showProjects,
   });
 
@@ -840,7 +1114,10 @@ class _StatsGrid extends StatelessWidget {
   final VoidCallback onLeadsTap;
   final VoidCallback onSiteVisitsTap;
   final VoidCallback onFollowUpsTap;
-  final VoidCallback onProjectsTap;
+  final VoidCallback? onProjectsTap;
+  final bool showLeads;
+  final bool showSiteVisits;
+  final bool showFollowUps;
   final bool showProjects;
 
   @override
@@ -917,15 +1194,8 @@ class _StatsGrid extends StatelessWidget {
       builder: (context, constraints) {
         final wide = constraints.maxWidth > 900;
         final compact = constraints.maxWidth < 420;
-        return GridView.count(
-          crossAxisCount: wide ? 4 : 2,
-          padding: EdgeInsets.zero,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: wide ? 1.85 : (compact ? 1.25 : 1.38),
-          children: [
+        final cards = <Widget>[
+          if (showLeads)
             _StatCard(
               icon: Icons.group_outlined,
               iconBg: const Color(0xFF3B82F6),
@@ -936,6 +1206,7 @@ class _StatsGrid extends StatelessWidget {
               compact: compact,
               onTap: onLeadsTap,
             ),
+          if (showSiteVisits)
             _StatCard(
               icon: Icons.calendar_month_outlined,
               iconBg: const Color(0xFF8B5CF6),
@@ -947,6 +1218,7 @@ class _StatsGrid extends StatelessWidget {
               compact: compact,
               onTap: onSiteVisitsTap,
             ),
+          if (showFollowUps)
             _StatCard(
               icon: Icons.call_outlined,
               iconBg: const Color(0xFF10B981),
@@ -957,19 +1229,43 @@ class _StatsGrid extends StatelessWidget {
               compact: compact,
               onTap: onFollowUpsTap,
             ),
-            if (showProjects)
-              _StatCard(
-                icon: Icons.apartment_outlined,
-                iconBg: const Color(0xFFF59E0B),
-                bubbleColor: const Color(0xFFFEF3C7),
-                title: 'Projects',
-                value: '$totalProjects',
-                subtitle: '$activeProjects active',
-                tag: '$upcomingProjects upcoming',
-                compact: compact,
-                onTap: onProjectsTap,
+          if (showProjects)
+            _StatCard(
+              icon: Icons.apartment_outlined,
+              iconBg: const Color(0xFFF59E0B),
+              bubbleColor: const Color(0xFFFEF3C7),
+              title: 'Projects',
+              value: '$totalProjects',
+              subtitle: '$activeProjects active',
+              tag: '$upcomingProjects upcoming',
+              compact: compact,
+              onTap: onProjectsTap,
+            ),
+        ];
+
+        if (cards.isEmpty) {
+          return const _DashCard(
+            child: SizedBox(
+              height: 90,
+              child: Center(
+                child: Text(
+                  'No dashboard modules available.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
               ),
-          ],
+            ),
+          );
+        }
+
+        return GridView.count(
+          crossAxisCount: wide ? 4 : 2,
+          padding: EdgeInsets.zero,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: wide ? 1.85 : (compact ? 1.25 : 1.38),
+          children: cards,
         );
       },
     );
@@ -1162,9 +1458,8 @@ class _MonthlyTargetSection extends StatelessWidget {
                     title: 'Closures',
                     valueText: '$closuresDone / $closuresTarget',
                     remainingText: '$closuresRemaining remaining',
-                    progress: closuresTarget <= 0
-                        ? 0
-                        : closuresDone / closuresTarget,
+                    progress:
+                        closuresTarget <= 0 ? 0 : closuresDone / closuresTarget,
                   );
 
                   if (stackCards) {
@@ -1444,6 +1739,9 @@ class _QuickAccessCard extends StatelessWidget {
     required this.onAttendanceTap,
     required this.onNotificationsTap,
     required this.onReportsTap,
+    required this.showLeads,
+    required this.showSiteVisits,
+    required this.showFollowUps,
     required this.showProjects,
     required this.showTeam,
   });
@@ -1456,30 +1754,36 @@ class _QuickAccessCard extends StatelessWidget {
   final VoidCallback onAttendanceTap;
   final VoidCallback onNotificationsTap;
   final VoidCallback onReportsTap;
+  final bool showLeads;
+  final bool showSiteVisits;
+  final bool showFollowUps;
   final bool showProjects;
   final bool showTeam;
 
   @override
   Widget build(BuildContext context) {
     final items = <_QuickAccessItem>[
-      _QuickAccessItem(
-        title: 'Leads',
-        icon: Icons.group_outlined,
-        color: const Color(0xFF3B82F6),
-        onTap: onLeadsTap,
-      ),
-      _QuickAccessItem(
-        title: 'Site Visits',
-        icon: Icons.calendar_month_outlined,
-        color: const Color(0xFF8B5CF6),
-        onTap: onSiteVisitsTap,
-      ),
-      _QuickAccessItem(
-        title: 'Follow-Ups',
-        icon: Icons.call_outlined,
-        color: const Color(0xFF10B981),
-        onTap: onFollowUpsTap,
-      ),
+      if (showLeads)
+        _QuickAccessItem(
+          title: 'Leads',
+          icon: Icons.group_outlined,
+          color: const Color(0xFF3B82F6),
+          onTap: onLeadsTap,
+        ),
+      if (showSiteVisits)
+        _QuickAccessItem(
+          title: 'Site Visits',
+          icon: Icons.calendar_month_outlined,
+          color: const Color(0xFF8B5CF6),
+          onTap: onSiteVisitsTap,
+        ),
+      if (showFollowUps)
+        _QuickAccessItem(
+          title: 'Follow-Ups',
+          icon: Icons.call_outlined,
+          color: const Color(0xFF10B981),
+          onTap: onFollowUpsTap,
+        ),
       if (showProjects)
         _QuickAccessItem(
           title: 'Projects',
@@ -1780,12 +2084,18 @@ class _RecentActivityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activities = activity.map((item) {
-      final title = (item['title']?.toString().trim().isNotEmpty ?? false)
-          ? item['title'].toString()
-          : (item['message']?.toString() ?? 'Activity update');
+      final title = (item['note']?.toString().trim().isNotEmpty ?? false)
+          ? item['note'].toString()
+          : ((item['title']?.toString().trim().isNotEmpty ?? false)
+              ? item['title'].toString()
+              : (item['message']?.toString() ?? 'Activity update'));
       final actor = (item['actor_name']?.toString().trim().isNotEmpty ?? false)
           ? item['actor_name'].toString()
-          : (item['created_by_name']?.toString() ?? 'System');
+          : ((item['created_by_name']?.toString().trim().isNotEmpty ?? false)
+              ? item['created_by_name'].toString()
+              : ((item['lead_name']?.toString().trim().isNotEmpty ?? false)
+                  ? item['lead_name'].toString()
+                  : 'System'));
       final type = (item['type']?.toString() ?? '').toLowerCase();
       final when = _timeAgo(item['created_at']);
 

@@ -61,8 +61,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
   bool get _showScopeTabs =>
       _currentRole.isNotEmpty &&
       !RoleAccess.isSuperAdmin(_currentRole) &&
-      !RoleAccess.isAdmin(_currentRole) &&
-      RoleAccess.normalize(_currentRole) != RoleAccess.externalCaller;
+      !RoleAccess.isAdmin(_currentRole);
 
   Future<void> _loadAccess() async {
     try {
@@ -416,12 +415,14 @@ class _FollowUpPageState extends State<FollowUpPage> {
     final priority = _readString(payload['priority']).toLowerCase();
     final title = _readString(payload['title']);
     final leadName = _readString(payload['lead_name'] ?? payload['leadName']);
-    final leadPhone = _readString(payload['lead_phone'] ?? payload['leadPhone']);
+    final leadPhone =
+        _readString(payload['lead_phone'] ?? payload['leadPhone']);
 
     return _FollowUpModel(
       id: id,
       leadId: _readString(payload['lead_id']),
-      customerName: leadName.isEmpty ? (title.isEmpty ? 'Follow Up' : title) : leadName,
+      customerName:
+          leadName.isEmpty ? (title.isEmpty ? 'Follow Up' : title) : leadName,
       title: title.isEmpty ? 'Follow Up' : title,
       leadPhone: leadPhone,
       status: 'Pending',
@@ -526,7 +527,8 @@ class _FollowUpPageState extends State<FollowUpPage> {
     return rawRole
         .split('_')
         .where((part) => part.trim().isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
   }
 
@@ -1188,7 +1190,8 @@ class _FollowUpPageState extends State<FollowUpPage> {
                   priorityColor: followUp.priorityColor,
                   nextFollowUpDate: '${followUp.dueDate} - ${followUp.dueTime}',
                   budget: followUp.channel,
-                  phone: followUp.leadPhone.isEmpty ? 'N/A' : followUp.leadPhone,
+                  phone:
+                      followUp.leadPhone.isEmpty ? 'N/A' : followUp.leadPhone,
                   profileImageUrl: followUp.assignee.imageUrl,
                   assigneeName: followUp.assignee.name,
                   assigneeImageUrl: followUp.assignee.imageUrl,

@@ -304,7 +304,8 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  Future<List<_UserItem>> _loadEligibleManagers({required String forRole}) async {
+  Future<List<_UserItem>> _loadEligibleManagers(
+      {required String forRole}) async {
     final data = await _authProvider.eligibleManagers(
       forRole: forRole,
       token: _authProvider.currentAuthToken,

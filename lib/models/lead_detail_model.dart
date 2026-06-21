@@ -34,18 +34,17 @@ class LeadDetailModel {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
-      alternatePhoneNumber:
-          json['alternate_phone_number']?.toString() ?? '',
+      alternatePhoneNumber: json['alternate_phone_number']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       source: json['source']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
       budget: json['budget']?.toString() ?? '',
       locationPreference: json['location_preference']?.toString() ?? '',
       callbackTime: json['callback_time']?.toString() ?? '',
-      nextFollowupTime: (json['next_followup_time'] ??
-              json['next_follow_up_time'])
-          ?.toString() ??
-          '',
+      nextFollowupTime:
+          (json['next_followup_time'] ?? json['next_follow_up_time'])
+                  ?.toString() ??
+              '',
       projectName: (json['project_name'] ??
                   (json['project'] is Map<String, dynamic>
                       ? (json['project'] as Map<String, dynamic>)['name']

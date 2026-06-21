@@ -1895,7 +1895,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
     return rawRole
         .split('_')
         .where((part) => part.trim().isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
   }
 

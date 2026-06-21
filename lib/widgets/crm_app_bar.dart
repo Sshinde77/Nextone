@@ -80,7 +80,7 @@ class _CrmAppBarState extends State<CrmAppBar> {
         if (resolvedName.isNotEmpty) {
           _profileName = resolvedName;
         }
-         if (role.isNotEmpty) {
+        if (role.isNotEmpty) {
           _profileRole = role;
         }
       });
@@ -375,4 +375,3 @@ class _CrmAppBarState extends State<CrmAppBar> {
     );
   }
 }
-

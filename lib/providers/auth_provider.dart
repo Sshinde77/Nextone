@@ -52,7 +52,8 @@ class AuthProvider {
     return _authService.profile(token: token);
   }
 
-  Future<EffectivePermissionsResult> myPermissions({String? token, bool forceRefresh = false}) {
+  Future<EffectivePermissionsResult> myPermissions(
+      {String? token, bool forceRefresh = false}) {
     return _authService.myPermissions(token: token, forceRefresh: forceRefresh);
   }
 
@@ -882,6 +883,17 @@ class AuthProvider {
       page: page,
       perPage: perPage,
     );
+  }
+
+  Future<Map<String, dynamic>> mySummary({String? token}) {
+    return _authService.mySummary(token: token);
+  }
+
+  Future<List<Map<String, dynamic>>> myActivities({
+    int limit = 8,
+    String? token,
+  }) {
+    return _authService.myActivities(limit: limit, token: token);
   }
 
   Future<LeadsListResult> siteRevisits({

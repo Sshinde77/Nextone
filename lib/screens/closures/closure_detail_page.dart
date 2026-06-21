@@ -125,8 +125,10 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _readString(d['project_name'], fallback: 'Closure Project'),
-                      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
+                      _readString(d['project_name'],
+                          fallback: 'Closure Project'),
+                      style: const TextStyle(
+                          fontSize: 19, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -152,13 +154,21 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: _miniTile('Unit', _readString(d['unit_number'], fallback: '-'))),
+              Expanded(
+                  child: _miniTile(
+                      'Unit', _readString(d['unit_number'], fallback: '-'))),
               const SizedBox(width: 8),
-              Expanded(child: _miniTile('Tower', _readString(d['tower_block'], fallback: '-'))),
+              Expanded(
+                  child: _miniTile(
+                      'Tower', _readString(d['tower_block'], fallback: '-'))),
               const SizedBox(width: 8),
-              Expanded(child: _miniTile('Floor', d['floor_number']?.toString() ?? '-')),
+              Expanded(
+                  child:
+                      _miniTile('Floor', d['floor_number']?.toString() ?? '-')),
               const SizedBox(width: 8),
-              Expanded(child: _miniTile('Deal Value', _rupee(_toDouble(d['agreed_price'])))),
+              Expanded(
+                  child: _miniTile(
+                      'Deal Value', _rupee(_toDouble(d['agreed_price'])))),
             ],
           ),
         ],
@@ -175,7 +185,8 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _row('Current', _readString(d['status'], fallback: '-')),
-          _row('Updated', _formatDateTime(_readString(d['updated_at'], fallback: ''))),
+          _row('Updated',
+              _formatDateTime(_readString(d['updated_at'], fallback: ''))),
         ],
       ),
     );
@@ -207,7 +218,8 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
       child: Column(
         children: [
           _row('Amount', '${_rupee(amount)} (${percent.toStringAsFixed(0)}%)'),
-          _row('Payment Status', d['commission_paid'] == true ? 'Paid' : 'Pending'),
+          _row('Payment Status',
+              d['commission_paid'] == true ? 'Paid' : 'Pending'),
           _row(
             'Paid Date',
             _formatDate(_readString(d['commission_paid_date'], fallback: '')),
@@ -242,7 +254,8 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
       child: Column(
         children: [
           _row('Name', _readString(d['closed_by_name'], fallback: '-')),
-          _row('Manager', _readString(d['closed_by_manager_name'], fallback: '-')),
+          _row('Manager',
+              _readString(d['closed_by_manager_name'], fallback: '-')),
         ],
       ),
     );
@@ -286,7 +299,8 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
               ),
             ],
           ),
@@ -370,7 +384,8 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
       ),
       child: Text(
         status.toUpperCase(),
-        style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11),
+        style:
+            TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11),
       ),
     );
   }
@@ -387,7 +402,8 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_error ?? 'Unable to load detail', style: const TextStyle(color: AppColors.error)),
+          Text(_error ?? 'Unable to load detail',
+              style: const TextStyle(color: AppColors.error)),
           const SizedBox(height: 10),
           FilledButton(
             onPressed: _loadDetail,
@@ -476,4 +492,3 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
     }
   }
 }
-

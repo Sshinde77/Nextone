@@ -299,8 +299,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                         Icon(
                                           _getIconData(role['icon']!),
                                           size: 20,
-                                          color: AppColors.primary.withValues(alpha: 
-                                            0.7,
+                                          color: AppColors.primary.withValues(
+                                            alpha: 0.7,
                                           ),
                                         ),
                                         const SizedBox(width: 12),
@@ -404,4 +404,3 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 }
-

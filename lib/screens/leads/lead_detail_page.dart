@@ -54,6 +54,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   bool _hasPhoneAccess = false;
   bool _hasPendingPhoneRequest = false;
   String _accessiblePhone = '';
+  bool _isPhoneVisible = false;
   bool _isCheckingPhoneAccess = false;
   bool _isLoadingTimeline = false;
   bool _isUploadingRecording = false;
@@ -100,6 +101,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       setState(() {
         _lead = lead;
         _selectedNextStatus ??= _firstStatusAfter(normalizedCurrent);
+        _isPhoneVisible = false;
         _isLoading = false;
       });
       await _loadPhoneAccess();
@@ -120,7 +122,13 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     try {
       final role = await RoleAccess.currentRole(_authProvider);
       if (!mounted) return;
-      setState(() => _currentRole = role);
+      setState(() {
+        _currentRole = role;
+        if (_isAssociateRole &&
+            _selectedTimelineTab == _LeadTimelineTab.reassignHistory) {
+          _selectedTimelineTab = _LeadTimelineTab.activity;
+        }
+      });
       await _loadPhoneAccess();
     } catch (_) {
       // Phone visibility stays restricted if access cannot be resolved.
@@ -138,6 +146,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         _hasPhoneAccess = true;
         _hasPendingPhoneRequest = false;
         _accessiblePhone = _lead!.phone;
+        _isPhoneVisible = true;
       });
       return;
     }
@@ -167,6 +176,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         _hasPhoneAccess = hasAccess;
         _hasPendingPhoneRequest = hasPendingRequest;
         _accessiblePhone = phone.isNotEmpty ? phone : (_lead?.phone ?? '');
+        if (hasAccess) {
+          _isPhoneVisible = true;
+        }
       });
     } catch (_) {
       if (!mounted) return;
@@ -174,6 +186,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         _hasPhoneAccess = false;
         _hasPendingPhoneRequest = false;
         _accessiblePhone = _lead?.phone ?? '';
+        _isPhoneVisible = false;
       });
     } finally {
       if (mounted) {
@@ -181,6 +194,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       }
     }
   }
+
+  bool get _isAssociateRole =>
+      RoleAccess.normalize(_currentRole) == 'associate';
 
   Future<void> _loadLeadTimelineData() async {
     if (!mounted) {
@@ -200,12 +216,19 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         id: widget.leadId,
         token: _authProvider.currentAuthToken,
       );
-      final reassignmentFuture = _authProvider.leadReassignmentHistory(
-        id: widget.leadId,
-        token: _authProvider.currentAuthToken,
-        page: 1,
-        perPage: 20,
-      );
+      final Future<List<Map<String, dynamic>>> reassignmentFuture =
+          _isAssociateRole
+              ? Future<List<Map<String, dynamic>>>.value(
+                  const <Map<String, dynamic>>[],
+                )
+              : _authProvider
+                  .leadReassignmentHistory(
+                    id: widget.leadId,
+                    token: _authProvider.currentAuthToken,
+                    page: 1,
+                    perPage: 20,
+                  )
+                  .then((result) => result.items);
 
       final activityResponse = await activityFuture;
       final recordingsResponse = await recordingsFuture;
@@ -219,7 +242,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
           .map((item) => Map<String, dynamic>.from(item))
           .map(_LeadRecordingItem.fromJson)
           .toList(growable: false);
-      final List<_LeadReassignmentItem> reassignments = reassignmentResult.items
+      final List<_LeadReassignmentItem> reassignments = reassignmentResult
           .map((item) => Map<String, dynamic>.from(item))
           .map(_LeadReassignmentItem.fromJson)
           .toList(growable: false);
@@ -322,7 +345,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     return rawRole
         .split('_')
         .where((part) => part.trim().isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
   }
 
@@ -436,7 +460,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     }
 
     final defaultPhone = _lead?.phone.trim() ?? '';
-    final defaultName = file.name.trim().isEmpty ? 'Call recording' : file.name.trim();
+    final defaultName =
+        file.name.trim().isEmpty ? 'Call recording' : file.name.trim();
 
     setState(() {
       _isUploadingRecording = true;
@@ -513,8 +538,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed:
-                              isSaving ? null : () => Navigator.of(sheetContext).pop(),
+                          onPressed: isSaving
+                              ? null
+                              : () => Navigator.of(sheetContext).pop(),
                           child: const Text('Cancel'),
                         ),
                       ),
@@ -553,8 +579,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                                         isSaving = false;
                                       });
                                     }
-                                  } finally {
-                                  }
+                                  } finally {}
                                 },
                           child: Text(isSaving ? 'Saving...' : 'Save'),
                         ),
@@ -1509,7 +1534,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   }
 
   String _toHexColor(Color color) {
-    final value = color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase();
+    final value =
+        color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase();
     return '#${value.substring(2)}';
   }
 
@@ -1689,7 +1715,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                         label: const Text('Site Visit'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.04),
+                          backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.04),
                           side: BorderSide(
                             color: AppColors.primary.withValues(alpha: 0.22),
                           ),
@@ -1708,7 +1735,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                         label: const Text('Follow Up'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.04),
+                          backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.04),
                           side: BorderSide(
                             color: AppColors.primary.withValues(alpha: 0.22),
                           ),
@@ -1835,9 +1863,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     final items = <_LeadInfoItem>[
       _LeadInfoItem(
         'Phone',
-        _hasPhoneAccess
-            ? (_accessiblePhone.isEmpty ? _lead!.phone : _accessiblePhone)
-            : _maskedPhone(_lead!.phone),
+        _phoneDisplayValue(),
       ),
       _LeadInfoItem('Alternate Phone', _lead!.alternatePhoneNumber),
       _LeadInfoItem('Email', _lead!.email),
@@ -1890,16 +1916,38 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        item.value.isEmpty ? 'N/A' : item.value,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                      if (item.label == 'Phone')
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                item.value.isEmpty ? 'N/A' : item.value,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: fontSize,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            if (_phoneRevealAction() != null) ...[
+                              const SizedBox(width: 8),
+                              _phoneRevealAction()!,
+                            ],
+                          ],
+                        )
+                      else
+                        Text(
+                          item.value.isEmpty ? 'N/A' : item.value,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -2014,18 +2062,21 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                         icon: Icons.mic_none_rounded,
                         count: _recordingItems.length,
                       ),
-                      const SizedBox(width: 8),
-                      _buildTimelineTabChip(
-                        tab: _LeadTimelineTab.reassignHistory,
-                        label: 'Reassign History',
-                        icon: Icons.history_toggle_off_rounded,
-                        count: _reassignmentItems.length,
-                      ),
+                      if (!_isAssociateRole) ...[
+                        const SizedBox(width: 8),
+                        _buildTimelineTabChip(
+                          tab: _LeadTimelineTab.reassignHistory,
+                          label: 'Reassign History',
+                          icon: Icons.history_toggle_off_rounded,
+                          count: _reassignmentItems.length,
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ),
-              if (_selectedTimelineTab == _LeadTimelineTab.reassignHistory) ...[
+              if (!_isAssociateRole &&
+                  _selectedTimelineTab == _LeadTimelineTab.reassignHistory) ...[
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: _isSubmittingReassign ? null : _openReassignSheet,
@@ -2177,6 +2228,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       case _LeadTimelineTab.recordings:
         return _buildRecordingsTabBody();
       case _LeadTimelineTab.reassignHistory:
+        if (_isAssociateRole) {
+          return _buildActivityTabBody();
+        }
         return _buildReassignHistoryTabBody();
     }
   }
@@ -3096,9 +3150,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       return _buildInfoTile(
         Icons.phone_outlined,
         'Phone',
-        _accessiblePhone.isNotEmpty ? _accessiblePhone : _lead!.phone,
+        _phoneDisplayValue(),
         onTap: () => _makeCall(
-          _accessiblePhone.isNotEmpty ? _accessiblePhone : _lead!.phone,
+          _phoneCallValue(),
         ),
       );
     }
@@ -3127,29 +3181,41 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Phone',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  Row(
+                    children: [
+                      const Text(
+                        'Phone',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_phoneRevealAction() != null) _phoneRevealAction()!,
+                    ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    _maskedPhone(_lead?.phone ?? ''),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _phoneDisplayValue(),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _hasPendingPhoneRequest
                         ? 'Request pending for this lead'
                         : 'Request approval to view full number',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: Color(0xFFC47A00),
@@ -3273,6 +3339,56 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       return value;
     }
     return '${value.substring(0, keepCount)}${'x' * hiddenCount}';
+  }
+
+  String _phoneDisplayValue() {
+    final phone = _lead?.phone.trim() ?? '';
+    if (phone.isEmpty) {
+      return 'Not available';
+    }
+    if (_hasPhoneAccess) {
+      return _accessiblePhone.isNotEmpty ? _accessiblePhone : phone;
+    }
+    if (_isPhoneVisible) {
+      final accessible = _accessiblePhone.trim();
+      return accessible.isNotEmpty ? accessible : phone;
+    }
+    return _maskedPhone(phone);
+  }
+
+  String _phoneCallValue() {
+    final phone = _lead?.phone.trim() ?? '';
+    if (_hasPhoneAccess || _isPhoneVisible) {
+      return _accessiblePhone.trim().isNotEmpty ? _accessiblePhone : phone;
+    }
+    return phone;
+  }
+
+  Widget? _phoneRevealAction() {
+    final phone = _lead?.phone.trim() ?? '';
+    if (_hasPhoneAccess || phone.isEmpty) {
+      return null;
+    }
+    final isVisible = _isPhoneVisible;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _isPhoneVisible = !isVisible;
+        });
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Text(
+          isVisible ? 'Hide' : 'View',
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildInfoTile(IconData icon, String label, String value,
@@ -3536,7 +3652,10 @@ class _LeadActivityItem {
       json['description'] ?? json['note'] ?? json['details'] ?? json['remarks'],
     );
     final type = read(
-      json['type'] ?? json['category'] ?? json['action_type'] ?? json['event_type'],
+      json['type'] ??
+          json['category'] ??
+          json['action_type'] ??
+          json['event_type'],
     );
     final actorName = read(
       json['added_by_name'] ??
@@ -3645,7 +3764,8 @@ class _LeadRecordingItem {
     if (parsed != null && parsed.hasScheme) {
       return trimmed;
     }
-    final normalizedPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+    final normalizedPath =
+        trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
     return '$_recordingBaseUrl$normalizedPath';
   }
 }
@@ -3682,9 +3802,10 @@ class _LeadReassignmentItem {
       return null;
     }
 
-    final fromMap =
-        mapValue(json['from_user'] ?? json['previous_assignee'] ?? json['from']);
-    final toMap = mapValue(json['to_user'] ?? json['assigned_to'] ?? json['to']);
+    final fromMap = mapValue(
+        json['from_user'] ?? json['previous_assignee'] ?? json['from']);
+    final toMap =
+        mapValue(json['to_user'] ?? json['assigned_to'] ?? json['to']);
     final changedByMap =
         mapValue(json['changed_by'] ?? json['updated_by'] ?? json['actor']);
 

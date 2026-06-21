@@ -118,7 +118,8 @@ class _LeadBulkUploadPageState extends State<LeadBulkUploadPage> {
     final roleLabel = roleRaw
         .split('_')
         .where((part) => part.trim().isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
     final baseName = displayName.isEmpty ? 'User $id' : displayName;
 

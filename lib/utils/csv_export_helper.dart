@@ -12,7 +12,8 @@ class CsvExportHelper {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text('No data available to export for $fileLabel.')),
+          SnackBar(
+              content: Text('No data available to export for $fileLabel.')),
         );
       return;
     }

@@ -375,8 +375,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
     }
 
     final normalizedRole = RoleAccess.normalize(_currentUserRole);
-    final shouldAssignToSelf =
-        normalizedRole.isNotEmpty &&
+    final shouldAssignToSelf = normalizedRole.isNotEmpty &&
         normalizedRole != RoleAccess.admin &&
         normalizedRole != RoleAccess.superAdmin &&
         (_currentUserId?.trim().isNotEmpty ?? false);
@@ -445,7 +444,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
     return rawRole
         .split('_')
         .where((part) => part.trim().isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
   }
 
@@ -747,8 +747,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(
-                          widget.isEditMode ? 'Update Lead' : 'Create Lead'),
+                      : Text(widget.isEditMode ? 'Update Lead' : 'Create Lead'),
                 ),
               ),
               const SizedBox(height: 20),
@@ -800,9 +799,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           .toList(),
       isLoading: _isLoadingAssignees,
       errorText: _assigneeLoadError,
-      helperText: _isLoadingAssignees
-          ? 'Loading team members...'
-          : null,
+      helperText: _isLoadingAssignees ? 'Loading team members...' : null,
       onRetry: _loadAssigneeOptions,
       onSelected: (value) {
         setState(() {
@@ -861,8 +858,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
     String? helperText,
     Future<void> Function()? onRetry,
   }) {
-    final hasSelectedValue =
-        selectedValue != null && options.any((option) => option.value == selectedValue);
+    final hasSelectedValue = selectedValue != null &&
+        options.any((option) => option.value == selectedValue);
     T? dropdownValue;
     if (hasSelectedValue) {
       dropdownValue = selectedValue;
@@ -904,7 +901,9 @@ class _LeadFormPageState extends State<LeadFormPage> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: selectedLabel?.isNotEmpty == true ? Colors.black : Colors.grey,
+              color: selectedLabel?.isNotEmpty == true
+                  ? Colors.black
+                  : Colors.grey,
             ),
           ),
         ),
@@ -912,7 +911,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
           const SizedBox(height: 8),
           Text(
             helperText,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style:
+                const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
         if (errorText != null) ...[

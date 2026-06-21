@@ -5,7 +5,8 @@ class ExportFileHelper {
     required String fileName,
     required List<int> bytes,
   }) async {
-    final sanitizedFileName = fileName.trim().isEmpty ? 'export.xlsx' : fileName.trim();
+    final sanitizedFileName =
+        fileName.trim().isEmpty ? 'export.xlsx' : fileName.trim();
     final candidateDirs = <String>[
       '/storage/emulated/0/Download/nextone',
       '/sdcard/Download/nextone',

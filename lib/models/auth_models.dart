@@ -52,7 +52,14 @@ class EffectivePermissionsResult {
   }
 
   bool hasModuleAccess(String module) {
-    return canAny(module, const <String>['view', 'create', 'edit', 'delete', 'approve', 'export']);
+    return canAny(module, const <String>[
+      'view',
+      'create',
+      'edit',
+      'delete',
+      'approve',
+      'export'
+    ]);
   }
 }
 

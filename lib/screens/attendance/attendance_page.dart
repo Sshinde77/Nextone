@@ -15,6 +15,7 @@ import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:nextone/widgets/pagination_widget.dart';
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
@@ -45,6 +46,9 @@ class _AttendancePageState extends State<AttendancePage> {
   bool _isLoadingDailyView = false;
   String? _dailyViewError;
   Map<String, dynamic> _dailyViewData = <String, dynamic>{};
+  int _dailyViewCurrentPage = 1;
+  int _dailyViewTotalPages = 1;
+  int _dailyViewTotalItems = 0;
   bool _isLoadingSummary = false;
   String? _summaryError;
   Map<String, dynamic> _summaryData = <String, dynamic>{};
@@ -69,6 +73,18 @@ class _AttendancePageState extends State<AttendancePage> {
     _TabData('Month Grid', Icons.group_outlined),
     _TabData('Daily View', Icons.person_search_outlined),
     _TabData('Summary', Icons.trending_up_rounded),
+  ];
+  static const List<_TabData> _associateTabs = [
+    _TabData('Overview', Icons.bar_chart_rounded),
+    _TabData('Calendar', Icons.calendar_month_outlined),
+    _TabData('My History', Icons.watch_later_outlined),
+    _TabData('Month Grid', Icons.group_outlined),
+    _TabData('Daily View', Icons.person_search_outlined),
+  ];
+  static const List<_TabData> _tierFourTabs = [
+    _TabData('Overview', Icons.bar_chart_rounded),
+    _TabData('Calendar', Icons.calendar_month_outlined),
+    _TabData('My History', Icons.watch_later_outlined),
   ];
   static const List<_TabData> _salesManagerTabs = [
     _TabData('Overview', Icons.bar_chart_rounded),
@@ -98,9 +114,6 @@ class _AttendancePageState extends State<AttendancePage> {
     _loadTodayAttendance();
     _loadCalendarAttendance();
     _loadMyHistoryAttendance();
-    _loadMonthGridAttendance();
-    _loadDailyViewAttendance();
-    _loadSummaryAttendance();
   }
 
   @override
@@ -114,19 +127,50 @@ class _AttendancePageState extends State<AttendancePage> {
       RoleAccess.isAdmin(_currentRole) || RoleAccess.isSuperAdmin(_currentRole);
   bool get _canViewLateReports =>
       RoleAccess.isAdmin(_currentRole) || RoleAccess.isSuperAdmin(_currentRole);
+  bool get _isAssociateRole =>
+      RoleAccess.normalize(_currentRole) == 'associate';
   bool get _isSalesManager => RoleAccess.isSalesManager(_currentRole);
-  List<_TabData> get _tabs =>
-      _isSalesManager
-          ? _salesManagerTabs
-          : <_TabData>[
-              ..._baseTabs,
-              if (_canViewLateReports) _lateReportsTab,
-              _approvalTab,
-            ];
+  bool get _usesTeamDailyView {
+    final normalizedRole = RoleAccess.normalize(_currentRole);
+    return {
+      'associate',
+      'associate_partner',
+      'cluster_head',
+      'cluster',
+      'partner',
+      'team_leader',
+      'sales_manager',
+      'sales_manger',
+    }.contains(normalizedRole);
+  }
 
-  int get _lateReportsTabIndex => _canViewLateReports ? _baseTabs.length : -1;
+  bool get _usesTeamMonthView => _usesTeamDailyView;
+
+  bool get _hideSummaryAndApprovalsForRole {
+    final normalizedRole = RoleAccess.normalize(_currentRole);
+    return {
+      'associate',
+      'associate_partner',
+      'cluster_head',
+      'cluster',
+      'partner',
+      'team_leader',
+      'sales_manager',
+      'sales_manger',
+    }.contains(normalizedRole);
+  }
+
+  List<_TabData> get _tabs =>
+      _currentRole.isEmpty ? _baseTabs : _tabsForRole(_currentRole);
+
+  int get _lateReportsTabIndex => _tabsForRole(_currentRole)
+      .indexWhere((tab) => tab.label == 'Late Reports');
   int get _approvalsTabIndex =>
-      _isSalesManager ? -1 : _baseTabs.length + (_canViewLateReports ? 1 : 0);
+      _tabsForRole(_currentRole).indexWhere((tab) => tab.label == 'Approvals');
+  int get _dailyViewTabIndex => _tabsForRole(_currentRole)
+      .indexWhere((tab) => tab.label.contains('Daily'));
+  int get _summaryTabIndex => _tabsForRole(_currentRole)
+      .indexWhere((tab) => tab.label.contains('Summary'));
 
   Future<void> _loadAccess() async {
     try {
@@ -134,21 +178,29 @@ class _AttendancePageState extends State<AttendancePage> {
       if (!mounted) return;
       setState(() {
         _currentRole = role;
-        if (_selectedTabIndex >= _tabsForRole(role).length) {
-          _selectedTabIndex = _tabsForRole(role).length - 1;
+        final tabs = _tabsForRole(role);
+        if (_selectedTabIndex >= tabs.length) {
+          _selectedTabIndex = tabs.length - 1;
         }
         if (RoleAccess.isSalesManager(role)) {
           _approvalRows = <Map<String, dynamic>>[];
           _approvalsError = null;
         }
       });
-      _loadMonthGridAttendance();
-      _loadDailyViewAttendance();
-      _loadSummaryAttendance();
-      if (_canViewLateReports) {
+      final tabs = _tabsForRole(role);
+      if (tabs.any((tab) => tab.label.contains('Month'))) {
+        _loadMonthGridAttendance();
+      }
+      if (tabs.any((tab) => tab.label.contains('Daily'))) {
+        _loadDailyViewAttendance();
+      }
+      if (tabs.any((tab) => tab.label.contains('Summary'))) {
+        _loadSummaryAttendance();
+      }
+      if (tabs.any((tab) => tab.label == 'Late Reports')) {
         _loadLateReports();
       }
-      if (!RoleAccess.isSalesManager(role)) {
+      if (tabs.any((tab) => tab.label == 'Approvals')) {
         _loadApprovalPending();
       }
     } catch (_) {
@@ -157,15 +209,33 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   List<_TabData> _tabsForRole(String role) {
-    if (RoleAccess.isSalesManager(role)) {
-      return _salesManagerTabs;
+    final normalizedRole = RoleAccess.normalize(role);
+    if (RoleAccess.isTierFour(role)) {
+      return _tierFourTabs;
     }
-    return <_TabData>[
-      ..._baseTabs,
-      if (RoleAccess.isAdmin(role) || RoleAccess.isSuperAdmin(role))
-        _lateReportsTab,
-      _approvalTab,
-    ];
+    final restrictedTabs = _hideSummaryAndApprovalsForRole
+        ? <String>{'summary', 'approvals', 'team summary'}
+        : <String>{};
+
+    final tabs = RoleAccess.isSalesManager(role)
+        ? _salesManagerTabs
+        : normalizedRole == 'associate'
+            ? _associateTabs
+            : <_TabData>[
+                ..._baseTabs,
+                if (RoleAccess.isAdmin(role) || RoleAccess.isSuperAdmin(role))
+                  _lateReportsTab,
+                _approvalTab,
+              ];
+
+    if (restrictedTabs.isEmpty) {
+      return tabs;
+    }
+
+    return tabs.where((tab) {
+      final label = tab.label.toLowerCase();
+      return !restrictedTabs.any((blocked) => label.contains(blocked));
+    }).toList(growable: false);
   }
 
   @override
@@ -274,9 +344,11 @@ class _AttendancePageState extends State<AttendancePage> {
           children: [
             Expanded(child: titleBlock),
             const SizedBox(width: 8),
-            actions[0],
-            const SizedBox(width: 8),
-            actions[1],
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: actions,
+            ),
           ],
         );
       },
@@ -596,6 +668,59 @@ class _AttendancePageState extends State<AttendancePage> {
       _monthGridError = null;
     });
     try {
+      if (_usesTeamMonthView) {
+        final from = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
+        final to = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
+        final firstPage = await _authProvider.attendanceByMonth(
+          month: _calendarMonth.month,
+          year: _calendarMonth.year,
+          page: 1,
+          perPage: 10,
+          token: _authProvider.currentAuthToken,
+        );
+
+        final allRows = <dynamic>[];
+        final firstRows = _sourceRows(firstPage);
+        if (firstRows.isNotEmpty) {
+          allRows.addAll(firstRows);
+        }
+
+        final paginationRaw = firstPage['pagination'];
+        final pagination = paginationRaw is Map
+            ? Map<String, dynamic>.from(
+                paginationRaw.map(
+                  (key, value) => MapEntry(key.toString(), value),
+                ),
+              )
+            : const <String, dynamic>{};
+        final totalPages = _readIntValue(pagination['total_pages'], 1);
+
+        for (var page = 2; page <= totalPages; page++) {
+          final nextPage = await _authProvider.attendanceByMonth(
+            month: _calendarMonth.month,
+            year: _calendarMonth.year,
+            page: page,
+            perPage: 10,
+            token: _authProvider.currentAuthToken,
+          );
+          final nextRows = _sourceRows(nextPage);
+          if (nextRows.isNotEmpty) {
+            allRows.addAll(nextRows);
+          }
+        }
+
+        if (!mounted) return;
+        setState(() {
+          _monthGridData = _buildTeamMonthGridData(
+            source: firstPage,
+            rows: allRows,
+            from: from,
+            to: to,
+          );
+        });
+        return;
+      }
+
       if (_isSalesManager) {
         final from = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
         final to = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
@@ -1195,31 +1320,48 @@ class _AttendancePageState extends State<AttendancePage> {
     setState(() {
       _dailyViewDate = DateTime(picked.year, picked.month, picked.day);
       _calendarMonth = DateTime(picked.year, picked.month, 1);
+      _dailyViewCurrentPage = 1;
     });
     _loadDailyViewAttendance();
   }
 
-  Future<void> _loadDailyViewAttendance() async {
+  Future<void> _loadDailyViewAttendance({int page = 1}) async {
     setState(() {
       _isLoadingDailyView = true;
       _dailyViewError = null;
     });
     try {
-      if (_isSalesManager) {
+      if (_usesTeamDailyView) {
         final date = _formatDateForApi(_dailyViewDate);
         final data = await _authProvider.attendanceTeam(
           from: date,
           to: date,
-          page: 1,
-          perPage: 100,
+          page: page,
+          perPage: 10,
           token: _authProvider.currentAuthToken,
         );
         if (!mounted) return;
+        final pagination = _paginationMap(data['pagination']);
+        final dailyViewData = _buildSalesManagerDailyViewData(
+          source: data,
+          selectedDate: _dailyViewDate,
+        );
+        final visibleRows = _dailyViewRowsFromSource(dailyViewData).length;
         setState(() {
-          _dailyViewData = _buildSalesManagerDailyViewData(
-            source: data,
-            selectedDate: _dailyViewDate,
+          _dailyViewCurrentPage = _readIntValue(pagination['page'],
+              _readIntValue(pagination['current_page'], page));
+          _dailyViewTotalPages = _readIntValue(
+            pagination['total_pages'],
+            _readIntValue(pagination['last_page'], 1),
           );
+          _dailyViewTotalItems = _readIntValue(
+            pagination['total'],
+            _readIntValue(pagination['total_items'], visibleRows),
+          );
+          if (_dailyViewTotalItems < visibleRows) {
+            _dailyViewTotalItems = visibleRows;
+          }
+          _dailyViewData = dailyViewData;
         });
         return;
       }
@@ -1230,6 +1372,9 @@ class _AttendancePageState extends State<AttendancePage> {
       );
       if (!mounted) return;
       setState(() {
+        _dailyViewCurrentPage = 1;
+        _dailyViewTotalPages = 1;
+        _dailyViewTotalItems = 0;
         _dailyViewData = data;
       });
     } catch (e) {
@@ -1247,11 +1392,17 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   List<Map<String, dynamic>> _dailyViewRows() {
+    return _dailyViewRowsFromSource(_dailyViewData);
+  }
+
+  List<Map<String, dynamic>> _dailyViewRowsFromSource(
+      Map<String, dynamic> source) {
     final rows = <Map<String, dynamic>>[];
 
-    final recordsRaw = _dailyViewData['records'];
-    if (recordsRaw is List) {
-      for (final entry in recordsRaw) {
+    for (final key in const ['records', 'data', 'items', 'rows']) {
+      final rawRows = source[key];
+      if (rawRows is! List) continue;
+      for (final entry in rawRows) {
         if (entry is! Map) continue;
         rows.add(
           Map<String, dynamic>.from(
@@ -1259,9 +1410,10 @@ class _AttendancePageState extends State<AttendancePage> {
           ),
         );
       }
+      if (rows.isNotEmpty) break;
     }
 
-    final noRecordRaw = _dailyViewData['no_record'];
+    final noRecordRaw = source['no_record'];
     if (noRecordRaw is List) {
       for (final entry in noRecordRaw) {
         if (entry is! Map) continue;
@@ -1274,6 +1426,18 @@ class _AttendancePageState extends State<AttendancePage> {
     }
 
     return rows;
+  }
+
+  Map<String, dynamic> _paginationMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(
+        value.map((key, val) => MapEntry(key.toString(), val)),
+      );
+    }
+    return const <String, dynamic>{};
   }
 
   Map<String, int> _dailyViewSummaryCounts(List<Map<String, dynamic>> rows) {
@@ -1832,9 +1996,9 @@ class _AttendancePageState extends State<AttendancePage> {
                       _loadMyHistoryAttendance();
                     } else if (index == 3) {
                       _loadMonthGridAttendance();
-                    } else if (index == 4) {
+                    } else if (index == _dailyViewTabIndex) {
                       _loadDailyViewAttendance();
-                    } else if (index == 5) {
+                    } else if (index == _summaryTabIndex) {
                       _loadSummaryAttendance();
                     } else if (index == _lateReportsTabIndex) {
                       _loadLateReports();
@@ -1912,10 +2076,10 @@ class _AttendancePageState extends State<AttendancePage> {
         if (_selectedTabIndex == 3) {
           return _buildMonthGridTabContent(constraints.maxWidth);
         }
-        if (_selectedTabIndex == 4) {
+        if (_selectedTabIndex == _dailyViewTabIndex) {
           return _buildDailyViewTabContent(constraints.maxWidth);
         }
-        if (_selectedTabIndex == 5) {
+        if (_selectedTabIndex == _summaryTabIndex) {
           return _buildSummaryTabContent(constraints.maxWidth);
         }
         if (_selectedTabIndex == _lateReportsTabIndex) {
@@ -1989,7 +2153,7 @@ class _AttendancePageState extends State<AttendancePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _isSalesManager
+                      _usesTeamMonthView
                           ? 'Team Month'
                           : 'Monthly Attendance Grid',
                       style: TextStyle(
@@ -2464,6 +2628,22 @@ class _AttendancePageState extends State<AttendancePage> {
                 return _buildDailyEmployeeRow(rows[index], compact);
               },
             ),
+          if (_usesTeamDailyView) ...[
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: PaginationWidget(
+                currentPage: _dailyViewCurrentPage,
+                totalPages: _dailyViewTotalPages,
+                totalItems: _dailyViewTotalItems,
+                itemLabel: 'records',
+                onPageChanged: (page) {
+                  if (_isLoadingDailyView) return;
+                  _loadDailyViewAttendance(page: page);
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -2474,7 +2654,7 @@ class _AttendancePageState extends State<AttendancePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _isSalesManager ? 'Team Daily' : 'Daily Attendance View',
+          _usesTeamDailyView ? 'Team Daily' : 'Daily Attendance View',
           style: TextStyle(
             color: Color(0xFF172B4D),
             fontSize: 16,
@@ -2842,7 +3022,8 @@ class _AttendancePageState extends State<AttendancePage> {
         .toList();
   }
 
-  List<Map<String, dynamic>> _extractLateReportRows(Map<String, dynamic> source) {
+  List<Map<String, dynamic>> _extractLateReportRows(
+      Map<String, dynamic> source) {
     dynamic data = source['data'];
     if (data is Map<String, dynamic>) {
       data = data['data'] ?? data['items'] ?? data['rows'] ?? data['records'];
@@ -2893,24 +3074,23 @@ class _AttendancePageState extends State<AttendancePage> {
               entry.map((key, value) => MapEntry(key.toString(), value)),
             ))
         .where((row) {
-          final date = _parseApiDate(row['date']);
-          if (date == null) {
-            return true;
-          }
-          final normalized = DateTime(date.year, date.month, date.day);
-          final from = DateTime(
-            _lateReportsFromDate.year,
-            _lateReportsFromDate.month,
-            _lateReportsFromDate.day,
-          );
-          final to = DateTime(
-            _lateReportsToDate.year,
-            _lateReportsToDate.month,
-            _lateReportsToDate.day,
-          );
-          return !normalized.isBefore(from) && !normalized.isAfter(to);
-        })
-        .toList(growable: false);
+      final date = _parseApiDate(row['date']);
+      if (date == null) {
+        return true;
+      }
+      final normalized = DateTime(date.year, date.month, date.day);
+      final from = DateTime(
+        _lateReportsFromDate.year,
+        _lateReportsFromDate.month,
+        _lateReportsFromDate.day,
+      );
+      final to = DateTime(
+        _lateReportsToDate.year,
+        _lateReportsToDate.month,
+        _lateReportsToDate.day,
+      );
+      return !normalized.isBefore(from) && !normalized.isAfter(to);
+    }).toList(growable: false);
   }
 
   String _lateReportsTitleRange() {
@@ -2941,7 +3121,8 @@ class _AttendancePageState extends State<AttendancePage> {
     return raw
         .split('_')
         .where((part) => part.trim().isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
   }
 
@@ -2993,6 +3174,101 @@ class _AttendancePageState extends State<AttendancePage> {
       ),
       'all_days': _dateRangeStrings(from, to),
     };
+  }
+
+  Map<String, dynamic> _buildTeamMonthGridData({
+    required Map<String, dynamic> source,
+    required List<dynamic> rows,
+    required DateTime from,
+    required DateTime to,
+  }) {
+    return <String, dynamic>{
+      ...source,
+      'data': _normalizeTeamMonthRows(
+        source: source,
+        rows: rows,
+        from: from,
+        to: to,
+      ),
+      'all_days': _dateRangeStrings(from, to),
+    };
+  }
+
+  List<Map<String, dynamic>> _normalizeTeamMonthRows({
+    required Map<String, dynamic> source,
+    required List<dynamic> rows,
+    required DateTime from,
+    required DateTime to,
+  }) {
+    final attendanceRows = <String, Map<String, dynamic>>{};
+    for (final entry in rows.whereType<Map>()) {
+      final row = Map<String, dynamic>.from(
+        entry.map((key, value) => MapEntry(key.toString(), value)),
+      );
+      final key = _salesManagerUserKey(row);
+      if (key.isNotEmpty) {
+        attendanceRows[key] = row;
+      }
+    }
+
+    final mergedRows = <Map<String, dynamic>>[];
+    final seen = <String>{};
+
+    void addCandidate(Map<String, dynamic> candidate) {
+      final key = _salesManagerUserKey(candidate);
+      final fallbackKey = key.isNotEmpty
+          ? key
+          : _readStringFromMap(
+              candidate,
+              const ['full_name', 'fullName', 'name', 'email'],
+              fallback: '',
+            );
+      if (fallbackKey.isEmpty || seen.contains(fallbackKey)) {
+        return;
+      }
+      seen.add(fallbackKey);
+      mergedRows.add(
+        _normalizeSalesManagerTeamRow(
+          candidate,
+          from,
+          to,
+        ),
+      );
+    }
+
+    for (final entry in rows.whereType<Map>()) {
+      final row = Map<String, dynamic>.from(
+        entry.map((key, value) => MapEntry(key.toString(), value)),
+      );
+      final key = _salesManagerUserKey(row);
+      final merged = key.isNotEmpty && attendanceRows.containsKey(key)
+          ? <String, dynamic>{...row, ...attendanceRows[key]!}
+          : row;
+      addCandidate(merged);
+    }
+
+    for (final teamMember in _teamMemberRows(source)) {
+      final key = _salesManagerUserKey(teamMember);
+      final merged = key.isNotEmpty && attendanceRows.containsKey(key)
+          ? <String, dynamic>{...teamMember, ...attendanceRows[key]!}
+          : teamMember;
+      addCandidate(merged);
+    }
+
+    final sourceUser = _sourceUserRow(source);
+    if (sourceUser.isNotEmpty) {
+      final key = _salesManagerUserKey(sourceUser);
+      final merged = key.isNotEmpty && attendanceRows.containsKey(key)
+          ? <String, dynamic>{...sourceUser, ...attendanceRows[key]!}
+          : sourceUser;
+      addCandidate(merged);
+    }
+
+    if (mergedRows.isNotEmpty) {
+      return mergedRows;
+    }
+
+    return _salesManagerFallbackRows(source, from, to);
   }
 
   Widget _buildLateReportsTabContent(double maxWidth) {
@@ -3372,13 +3648,9 @@ class _AttendancePageState extends State<AttendancePage> {
     required Map<String, dynamic> source,
     required DateTime selectedDate,
   }) {
-    final rows = _normalizeSalesManagerTeamRows(
+    final rows = _buildSalesManagerDailyRows(
       source: source,
-      rows: source['data'] is List
-          ? source['data'] as List<dynamic>
-          : const <dynamic>[],
-      from: selectedDate,
-      to: selectedDate,
+      selectedDate: selectedDate,
     );
     final records = rows.map((row) {
       final user = _userFromMonthGridRow(row);
@@ -3421,6 +3693,148 @@ class _AttendancePageState extends State<AttendancePage> {
     };
   }
 
+  List<Map<String, dynamic>> _buildSalesManagerDailyRows({
+    required Map<String, dynamic> source,
+    required DateTime selectedDate,
+  }) {
+    final attendanceRows = _sourceRows(source);
+    final teamMemberRows = _teamMemberRows(source);
+    final attendanceByUserId = <String, Map<String, dynamic>>{};
+
+    for (final entry in attendanceRows.whereType<Map>()) {
+      final row = Map<String, dynamic>.from(
+        entry.map((key, value) => MapEntry(key.toString(), value)),
+      );
+      final userId = _salesManagerUserKey(row);
+      if (userId.isNotEmpty) {
+        attendanceByUserId[userId] = row;
+      }
+    }
+
+    final baseRows = teamMemberRows.isNotEmpty
+        ? teamMemberRows
+        : attendanceRows
+            .whereType<Map>()
+            .map(
+              (entry) => Map<String, dynamic>.from(
+                entry.map((key, value) => MapEntry(key.toString(), value)),
+              ),
+            )
+            .toList();
+
+    if (baseRows.isEmpty) {
+      return _salesManagerFallbackRows(source, selectedDate, selectedDate);
+    }
+
+    return baseRows.map((entry) {
+      final row = Map<String, dynamic>.from(entry);
+      final user = _extractSalesManagerUser(row);
+      final userId = _salesManagerUserKey(user).isNotEmpty
+          ? _salesManagerUserKey(user)
+          : _salesManagerUserKey(row);
+      final attendance = userId.isNotEmpty ? attendanceByUserId[userId] : null;
+      final mergedDay = attendance == null
+          ? _defaultSalesManagerDay(selectedDate)
+          : _normalizeSalesManagerTeamDay(
+              <String, dynamic>{
+                ...attendance,
+                'date': _formatDateForApi(selectedDate),
+              },
+            );
+      final summary = _extractSalesManagerSummary(
+        {
+          ...row,
+          'summary': <String, dynamic>{
+            'present': mergedDay['status'] == 'present' ? 1 : 0,
+            'late': mergedDay['status'] == 'late' ? 1 : 0,
+            'absent': mergedDay['status'] == 'absent' ? 1 : 0,
+            'on_leave': mergedDay['status'] == 'on_leave' ||
+                    mergedDay['status'] == 'leave'
+                ? 1
+                : 0,
+            'total_working_hours': mergedDay['working_hours'] ?? 0,
+          },
+        },
+        <Map<String, dynamic>>[mergedDay],
+      );
+      return <String, dynamic>{
+        ...row,
+        'user': user,
+        'days': <Map<String, dynamic>>[mergedDay],
+        'summary': summary,
+        'present': summary['present'],
+        'late': summary['late'],
+        'absent': summary['absent'],
+        'on_leave': summary['on_leave'],
+        'total_working_hours': summary['total_working_hours'],
+      };
+    }).toList();
+  }
+
+  List<dynamic> _sourceRows(Map<String, dynamic> source) {
+    for (final key in const ['data', 'records', 'items', 'rows']) {
+      final value = source[key];
+      if (value is List) return value;
+      if (value is Map) {
+        for (final nestedKey in const ['data', 'records', 'items', 'rows']) {
+          final nestedValue = value[nestedKey];
+          if (nestedValue is List) return nestedValue;
+        }
+      }
+    }
+    return const <dynamic>[];
+  }
+
+  List<Map<String, dynamic>> _teamMemberRows(Map<String, dynamic> source) {
+    for (final key in const ['team_members', 'teamMembers', 'members']) {
+      final value = source[key];
+      if (value is! List) continue;
+      return value.whereType<Map>().map((entry) {
+        return Map<String, dynamic>.from(
+          entry.map((key, val) => MapEntry(key.toString(), val)),
+        );
+      }).toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
+  Map<String, dynamic> _sourceUserRow(Map<String, dynamic> source) {
+    for (final key in const ['user', 'current_user', 'currentUser', 'me']) {
+      final value = source[key];
+      if (value is Map<String, dynamic>) {
+        return value;
+      }
+      if (value is Map) {
+        return Map<String, dynamic>.from(
+          value.map((k, v) => MapEntry(k.toString(), v)),
+        );
+      }
+    }
+    return const <String, dynamic>{};
+  }
+
+  String _salesManagerUserKey(Map<String, dynamic> row) {
+    final key = _readStringFromMap(
+      row,
+      const ['user_id', 'id', 'userId', 'member_id', 'memberId'],
+      fallback: '',
+    );
+    if (key.isNotEmpty) {
+      return key;
+    }
+    final user = row['user'];
+    if (user is Map) {
+      return _readStringFromMap(
+        Map<String, dynamic>.from(
+          user.map((k, v) => MapEntry(k.toString(), v)),
+        ),
+        const ['id', 'user_id', 'userId'],
+        fallback: '',
+      );
+    }
+    return '';
+  }
+
   Map<String, dynamic> _buildSalesManagerSummaryData(
     Map<String, dynamic> source,
   ) {
@@ -3460,12 +3874,10 @@ class _AttendancePageState extends State<AttendancePage> {
           'late': late,
           'absent': absent,
           'on_leave': leave,
-          'total_working_hours': summary['total_working_hours'] ??
-              row['total_working_hours'] ??
-              0,
-          'attendance_percent': denominator == 0
-              ? 0.0
-              : ((present + late) / denominator) * 100,
+          'total_working_hours':
+              summary['total_working_hours'] ?? row['total_working_hours'] ?? 0,
+          'attendance_percent':
+              denominator == 0 ? 0.0 : ((present + late) / denominator) * 100,
         };
       }).toList(),
     };
@@ -3515,8 +3927,12 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Map<String, dynamic> _extractSalesManagerUser(Map<String, dynamic> row) {
-    for (final candidate
-        in [row['user'], row['employee'], row['team_member'], row['member']]) {
+    for (final candidate in [
+      row['user'],
+      row['employee'],
+      row['team_member'],
+      row['member']
+    ]) {
       if (candidate is Map<String, dynamic>) {
         return candidate;
       }
@@ -3649,9 +4065,8 @@ class _AttendancePageState extends State<AttendancePage> {
       };
     }
 
-    final present = row.containsKey('present')
-        ? _readIntValue(row['present'], 0)
-        : -1;
+    final present =
+        row.containsKey('present') ? _readIntValue(row['present'], 0) : -1;
     final late = row.containsKey('late') ? _readIntValue(row['late'], 0) : -1;
     final absent =
         row.containsKey('absent') ? _readIntValue(row['absent'], 0) : -1;
@@ -3674,13 +4089,15 @@ class _AttendancePageState extends State<AttendancePage> {
     };
   }
 
-  Map<String, dynamic> _countsFromSalesManagerDays(List<Map<String, dynamic>> days) {
+  Map<String, dynamic> _countsFromSalesManagerDays(
+      List<Map<String, dynamic>> days) {
     var present = 0;
     var late = 0;
     var absent = 0;
     var leave = 0;
     for (final day in days) {
-      final status = _readStringFromMap(day, const ['status'], fallback: 'absent');
+      final status =
+          _readStringFromMap(day, const ['status'], fallback: 'absent');
       switch (status) {
         case 'present':
           present++;
@@ -3734,7 +4151,8 @@ class _AttendancePageState extends State<AttendancePage> {
     }).toList();
   }
 
-  List<Map<String, dynamic>> _defaultSalesManagerDays(DateTime from, DateTime to) {
+  List<Map<String, dynamic>> _defaultSalesManagerDays(
+      DateTime from, DateTime to) {
     return _dateRangeStrings(from, to)
         .map((date) => _defaultSalesManagerDay(DateTime.parse(date)))
         .toList();
@@ -4471,8 +4889,9 @@ class _AttendancePageState extends State<AttendancePage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed:
-                        _isAttendanceSubmitting ? null : _handleAttendanceAction,
+                    onPressed: _isAttendanceSubmitting
+                        ? null
+                        : _handleAttendanceAction,
                     icon: Icon(
                       _isCheckedIn ? Icons.logout_rounded : Icons.login_rounded,
                       size: 20,

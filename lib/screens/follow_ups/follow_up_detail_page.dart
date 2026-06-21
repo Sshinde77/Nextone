@@ -571,4 +571,3 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
     }
   }
 }
-

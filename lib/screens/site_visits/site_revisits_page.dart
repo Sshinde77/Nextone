@@ -56,8 +56,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   bool get _showScopeTabs =>
       _currentRole.isNotEmpty &&
       !RoleAccess.isSuperAdmin(_currentRole) &&
-      !RoleAccess.isAdmin(_currentRole) &&
-      RoleAccess.normalize(_currentRole) != RoleAccess.externalCaller;
+      !RoleAccess.isAdmin(_currentRole);
 
   Future<void> _loadAccess() async {
     try {
@@ -207,7 +206,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
         children: [
           Expanded(
             child: _scopeTabItem(
-              label: 'My Follow Up',
+              label: 'My Revisit',
               isActive: _isMyScope,
               onTap: () {
                 if (_isMyScope) return;
@@ -938,8 +937,10 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       token: _authProvider.currentAuthToken,
     );
     bool isActiveUser(Map<String, dynamic> user) {
-      final value =
-          user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'];
+      final value = user['is_active'] ??
+          user['isActive'] ??
+          user['active'] ??
+          user['status'];
       if (value is bool) {
         return value;
       }
@@ -967,7 +968,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       return rawRole
           .split('_')
           .where((part) => part.trim().isNotEmpty)
-          .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+          .map((part) =>
+              '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
           .join(' ');
     }
 

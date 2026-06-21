@@ -87,7 +87,8 @@ class ClosureDataCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
@@ -105,7 +106,8 @@ class ClosureDataCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           _infoRow('Project', '$projectName, $projectCity'),
-          _infoRow('Unit', '$unitNumber • $unitType • $towerBlock • $floorNumber'),
+          _infoRow(
+              'Unit', '$unitNumber • $unitType • $towerBlock • $floorNumber'),
           _infoRow('Booking Date', bookingDate),
           _infoRow('Deal Value', dealValueLabel),
           _infoRow('Commission', commissionLabel),
@@ -206,4 +208,3 @@ class _InitialAvatar extends StatelessWidget {
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   }
 }
-

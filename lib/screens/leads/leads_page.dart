@@ -273,7 +273,8 @@ class _LeadsPageState extends State<LeadsPage> {
     return rawRole
         .split('_')
         .where((part) => part.trim().isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
   }
 
@@ -540,7 +541,8 @@ class _LeadsPageState extends State<LeadsPage> {
                             setState(() {
                               _selectedStatus = tempStatus;
                               _selectedSource = tempSource;
-                              _selectedTeamId = _isMyLeadsTab ? null : tempTeamId;
+                              _selectedTeamId =
+                                  _isMyLeadsTab ? null : tempTeamId;
                               _currentPage = 1;
                               _selectedLeadIds.clear();
                               _isBulkSelectionMode = false;
@@ -1301,16 +1303,7 @@ class _LeadsPageState extends State<LeadsPage> {
       await _callLead(_callPhoneForLead(lead));
       return;
     }
-    final access = _leadPhoneAccessById[lead.id];
-    if (access?.hasAccess == true) {
-      await _callLead(_callPhoneForLead(lead));
-      return;
-    }
-    if (access?.hasPendingRequest == true) {
-      _showSnackBar('Request pending for this lead.');
-      return;
-    }
-    await _openPhoneRequestSheet(lead);
+    await _callLead(lead.phone);
   }
 
   Future<void> _openPhoneRequestSheet(_LeadModel lead) async {
@@ -2208,16 +2201,16 @@ class _LeadsPageState extends State<LeadsPage> {
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_showLeadTabs) ...[
-                  _buildLeadTabs(),
-                  const SizedBox(height: 16),
-                ],
-                _buildToolbar(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_showLeadTabs) ...[
+                _buildLeadTabs(),
                 const SizedBox(height: 16),
-                if (selectedCount > 0) ...[
+              ],
+              _buildToolbar(),
+              const SizedBox(height: 16),
+              if (selectedCount > 0) ...[
                 _buildBulkActionBar(selectedCount),
                 const SizedBox(height: 16),
               ],

@@ -639,4 +639,3 @@ class _FeedbackFormDialogState extends State<_FeedbackFormDialog> {
     return options.contains(trimmed) ? trimmed : '';
   }
 }
-

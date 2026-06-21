@@ -232,28 +232,40 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
   }
 
   String _readUserId(Map<String, dynamic> user) {
-    return (user['id'] ?? user['user_id'] ?? user['userId'] ?? user['uuid'] ?? '')
+    return (user['id'] ??
+            user['user_id'] ??
+            user['userId'] ??
+            user['uuid'] ??
+            '')
         .toString()
         .trim();
   }
 
   String _readUserName(Map<String, dynamic> user) {
-    final first = (user['first_name'] ?? user['firstName'] ?? '').toString().trim();
-    final last = (user['last_name'] ?? user['lastName'] ?? '').toString().trim();
+    final first =
+        (user['first_name'] ?? user['firstName'] ?? '').toString().trim();
+    final last =
+        (user['last_name'] ?? user['lastName'] ?? '').toString().trim();
     final combined = [if (first.isNotEmpty) first, if (last.isNotEmpty) last]
         .join(' ')
         .trim();
     if (combined.isNotEmpty) {
       return combined;
     }
-    return (user['full_name'] ?? user['fullName'] ?? user['name'] ?? user['email'] ?? '')
+    return (user['full_name'] ??
+            user['fullName'] ??
+            user['name'] ??
+            user['email'] ??
+            '')
         .toString()
         .trim();
   }
 
   bool _readUserActive(Map<String, dynamic> user) {
-    final value =
-        user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'];
+    final value = user['is_active'] ??
+        user['isActive'] ??
+        user['active'] ??
+        user['status'];
     if (value is bool) {
       return value;
     }
@@ -268,17 +280,21 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
   }
 
   String _readUserRoleLabel(Map<String, dynamic> user) {
-    final rawRole =
-        (user['role'] ?? user['user_role'] ?? user['userRole'] ?? user['designation'] ?? '')
-            .toString()
-            .trim();
+    final rawRole = (user['role'] ??
+            user['user_role'] ??
+            user['userRole'] ??
+            user['designation'] ??
+            '')
+        .toString()
+        .trim();
     if (rawRole.isEmpty) {
       return '';
     }
     return rawRole
         .split('_')
         .where((part) => part.trim().isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
   }
 

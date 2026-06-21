@@ -58,7 +58,8 @@ class _TargetsPageState extends State<TargetsPage> {
         _authProvider,
         forceRefresh: true,
       );
-      var currentUserId = _extractUserIdFromToken(_authProvider.currentAuthToken);
+      var currentUserId =
+          _extractUserIdFromToken(_authProvider.currentAuthToken);
       if (currentUserId.isEmpty) {
         try {
           final profile = await _authProvider.profile(
@@ -121,15 +122,15 @@ class _TargetsPageState extends State<TargetsPage> {
                 (key, value) => MapEntry(key.toString(), value),
               )
             : const <String, dynamic>{};
-        _currentPage =
-            int.tryParse('${pagination['page'] ?? pagination['current_page'] ?? 1}') ??
-                1;
-        _totalItems =
-            int.tryParse('${pagination['total'] ?? pagination['total_items'] ?? targets.length}') ??
-                targets.length;
-        _totalPages =
-            int.tryParse('${pagination['total_pages'] ?? pagination['last_page'] ?? 1}') ??
-                1;
+        _currentPage = int.tryParse(
+                '${pagination['page'] ?? pagination['current_page'] ?? 1}') ??
+            1;
+        _totalItems = int.tryParse(
+                '${pagination['total'] ?? pagination['total_items'] ?? targets.length}') ??
+            targets.length;
+        _totalPages = int.tryParse(
+                '${pagination['total_pages'] ?? pagination['last_page'] ?? 1}') ??
+            1;
         _isLoadingTargets = false;
       });
     } catch (error) {
@@ -206,7 +207,8 @@ class _TargetsPageState extends State<TargetsPage> {
 
   Future<void> _openSetTargetDialog(_TargetEntry target) async {
     if (_isSavingTarget || !_canEditTargets) return;
-    if (target.userId.trim().isEmpty || target.userId.trim() == _currentUserId) {
+    if (target.userId.trim().isEmpty ||
+        target.userId.trim() == _currentUserId) {
       return;
     }
 
@@ -629,8 +631,9 @@ class _TargetsPageState extends State<TargetsPage> {
   }
 
   Widget _buildTargetCard(_TargetEntry target) {
-    final canSetTarget =
-        _canEditTargets && target.userId.trim().isNotEmpty && target.userId != _currentUserId;
+    final canSetTarget = _canEditTargets &&
+        target.userId.trim().isNotEmpty &&
+        target.userId != _currentUserId;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -724,8 +727,9 @@ class _TargetsPageState extends State<TargetsPage> {
                     ),
                   if (canSetTarget)
                     OutlinedButton.icon(
-                      onPressed:
-                          _isSavingTarget ? null : () => _openSetTargetDialog(target),
+                      onPressed: _isSavingTarget
+                          ? null
+                          : () => _openSetTargetDialog(target),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(0, 36),
                         padding: const EdgeInsets.symmetric(
@@ -828,7 +832,8 @@ class _TargetEntry {
       return false;
     }
 
-    String readString(dynamic value) => value == null ? '' : value.toString().trim();
+    String readString(dynamic value) =>
+        value == null ? '' : value.toString().trim();
 
     return _TargetEntry(
       userId: readString(json['user_id'] ?? json['userId']),
@@ -939,7 +944,8 @@ class _TargetProgressSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = total <= 0 ? 0.0 : (done / total).clamp(0.0, 1.0).toDouble();
+    final progress =
+        total <= 0 ? 0.0 : (done / total).clamp(0.0, 1.0).toDouble();
     final percent = total <= 0 ? 0 : ((done / total) * 100).round();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

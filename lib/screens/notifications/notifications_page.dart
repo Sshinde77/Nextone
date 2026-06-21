@@ -75,9 +75,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
       final typeListFuture = _safeTypeListFetch();
 
       final notificationsResult = await notificationsFuture;
-      final notifications = notificationsResult.items
-          .map(_normalizeNotification)
-          .toList();
+      final notifications =
+          notificationsResult.items.map(_normalizeNotification).toList();
       final unreadCount = await unreadCountFuture;
       final typeList = (await typeListFuture).toSet().toList()..sort();
 
@@ -86,11 +85,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
         _notifications
           ..clear()
           ..addAll(notifications);
-        _currentPage =
-            notificationsResult.currentPage <= 0 ? page : notificationsResult.currentPage;
-        _totalPages = notificationsResult.totalPages <= 0 ? 1 : notificationsResult.totalPages;
-        _totalItems =
-            notificationsResult.totalItems < 0 ? 0 : notificationsResult.totalItems;
+        _currentPage = notificationsResult.currentPage <= 0
+            ? page
+            : notificationsResult.currentPage;
+        _totalPages = notificationsResult.totalPages <= 0
+            ? 1
+            : notificationsResult.totalPages;
+        _totalItems = notificationsResult.totalItems < 0
+            ? 0
+            : notificationsResult.totalItems;
         _unreadCount = unreadCount;
         _notificationTypes
           ..clear()
@@ -281,7 +284,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-        onRefresh: () => _refreshData(showLoader: false, page: _currentPage),
+              onRefresh: () =>
+                  _refreshData(showLoader: false, page: _currentPage),
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
@@ -318,7 +322,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       child: _emptyState(),
                     )
                   else
-                  SliverPadding(
+                    SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
                       sliver: SliverList.builder(
                         itemCount: _notifications.length,
@@ -399,7 +403,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
               const SizedBox(width: 8),
               _heroButton(
                 icon: Icons.refresh_rounded,
-                onTap: _isLoading ? null : () => _refreshData(showLoader: true, page: _currentPage),
+                onTap: _isLoading
+                    ? null
+                    : () => _refreshData(showLoader: true, page: _currentPage),
               ),
               const SizedBox(width: 6),
               PopupMenuButton<String>(
@@ -420,7 +426,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   if (value == 'delete_all') _deleteAll();
                 },
                 itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'read_all', child: Text('Mark all as read')),
+                  PopupMenuItem(
+                      value: 'read_all', child: Text('Mark all as read')),
                   PopupMenuItem(
                     value: 'delete_all',
                     child: Text('Delete all notifications'),
@@ -443,7 +450,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
               Expanded(
                 child: _metricCard(
                   label: 'Total',
-                  value: (_totalItems > 0 ? _totalItems : _notifications.length).toString(),
+                  value: (_totalItems > 0 ? _totalItems : _notifications.length)
+                      .toString(),
                   icon: Icons.notifications_active_outlined,
                 ),
               ),
@@ -555,7 +563,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   Widget _typeDropdown() {
     return DropdownButtonFormField<String>(
-      initialValue: _notificationTypes.contains(_selectedType) ? _selectedType : 'all',
+      initialValue:
+          _notificationTypes.contains(_selectedType) ? _selectedType : 'all',
       isExpanded: true,
       decoration: InputDecoration(
         labelText: 'Category',
@@ -566,7 +575,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         ),
         filled: true,
         fillColor: const Color(0xFFF8FAFC),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -617,7 +627,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
       label: Text(
         'Unread only',
         style: TextStyle(
-          color: _onlyUnread ? const Color(0xFF4F46E5) : const Color(0xFF475569),
+          color:
+              _onlyUnread ? const Color(0xFF4F46E5) : const Color(0xFF475569),
           fontWeight: FontWeight.w700,
           fontSize: 12,
         ),
@@ -762,7 +773,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       color: _typeColor(type).withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(_typeIcon(type), color: _typeColor(type), size: 21),
+                    child: Icon(_typeIcon(type),
+                        color: _typeColor(type), size: 21),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -912,4 +924,3 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 }
-

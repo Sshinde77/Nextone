@@ -8,8 +8,7 @@ import 'package:flutter/foundation.dart';
 class AppErrorHandler {
   static const String noInternetMessage =
       'No internet connection. Please check your network.';
-  static const String timeoutMessage =
-      'Request timed out. Please try again.';
+  static const String timeoutMessage = 'Request timed out. Please try again.';
   static const String sessionExpiredMessage =
       'Your session has expired. Please login again.';
   static const String permissionMessage =
@@ -173,8 +172,8 @@ class AppErrorHandler {
     result = result.replaceFirst(RegExp(r'^HandshakeException:\s*'), '');
     result = result.replaceFirst(RegExp(r'^HttpException:\s*'), '');
     result = result.replaceFirst(RegExp(r'^ClientException:\s*'), '');
-    result = result.replaceFirst(RegExp(r'^DioException(?:\s*\[[^\]]+\])?:\s*'),
-        '');
+    result =
+        result.replaceFirst(RegExp(r'^DioException(?:\s*\[[^\]]+\])?:\s*'), '');
     return result.trim();
   }
 
