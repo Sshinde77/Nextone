@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:nextone/services/auth_service.dart';
+import 'package:nextone/services/notification_navigation_service.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 
 @pragma('vm:entry-point')
@@ -44,7 +46,37 @@ class PushNotificationService {
     const initializationSettings =
         InitializationSettings(android: androidSettings);
 
-    await _localNotifications.initialize(initializationSettings);
+    await _localNotifications.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload == null || payload.trim().isEmpty) {
+          return;
+        }
+
+        try {
+          final decoded = jsonDecode(payload);
+          if (decoded is Map) {
+            unawaited(
+              NotificationNavigationService.handlePayload(
+                decoded.map(
+                  (key, dynamic value) =>
+                      MapEntry(key.toString(), value),
+                ),
+                sourceLabel: 'local_notification',
+              ),
+            );
+          }
+        } catch (error, stackTrace) {
+          AppErrorHandler.logDebug(
+            'Failed to decode local notification payload.',
+            name: 'PushNotificationService',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }
+      },
+    );
     await _localNotifications
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
@@ -88,6 +120,7 @@ class PushNotificationService {
         'Notification tapped: ${message.messageId}, data=${message.data}',
         name: 'PushNotificationService',
       );
+      unawaited(NotificationNavigationService.handleRemoteMessage(message));
     });
 
     final initialMessage = await _messaging.getInitialMessage();
@@ -96,6 +129,7 @@ class PushNotificationService {
         'Opened from terminated state: ${initialMessage.messageId}, data=${initialMessage.data}',
         name: 'PushNotificationService',
       );
+      unawaited(NotificationNavigationService.handleRemoteMessage(initialMessage));
     }
 
     _messaging.onTokenRefresh.listen((token) {
@@ -118,11 +152,14 @@ class PushNotificationService {
 
     final title =
         message.notification?.title ?? message.data['title']?.toString();
-    final body = message.notification?.body ?? message.data['body']?.toString();
-
-    if ((title == null || title.isEmpty) && (body == null || body.isEmpty)) {
-      return;
-    }
+    final body = message.notification?.body ??
+        message.data['body']?.toString() ??
+        message.data['message']?.toString() ??
+        message.data['description']?.toString();
+    final resolvedTitle =
+        (title == null || title.trim().isEmpty) ? 'New notification' : title;
+    final resolvedBody =
+        (body == null || body.trim().isEmpty) ? 'Tap to view details' : body;
 
     final androidDetails = AndroidNotificationDetails(
       _androidChannel.id,
@@ -136,9 +173,15 @@ class PushNotificationService {
 
     await _localNotifications.show(
       message.hashCode,
-      title ?? 'New notification',
-      body ?? '',
+      resolvedTitle,
+      resolvedBody,
       notificationDetails,
+      payload: jsonEncode(<String, dynamic>{
+        ...message.data,
+        if (message.messageId != null) 'message_id': message.messageId,
+        'title': resolvedTitle,
+        'body': resolvedBody,
+      }),
     );
   }
 

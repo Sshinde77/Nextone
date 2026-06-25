@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:nextone/screens/attendance/attendance_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +15,7 @@ import 'package:nextone/screens/team/team_page.dart';
 import 'package:nextone/screens/targets/targets_page.dart';
 import 'package:nextone/screens/users/users_page.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/services/notification_navigation_service.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_bottom_nav.dart';
 
@@ -39,6 +42,9 @@ class _MainScreenState extends State<MainScreen> {
     final index = widget.initialIndex;
     _currentIndex = index < 0 ? 0 : (index >= 12 ? 11 : index);
     _loadAccess();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(NotificationNavigationService.flushPendingNavigation());
+    });
   }
 
   Future<void> _loadAccess() async {

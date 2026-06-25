@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/models/auth_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/services/notification_navigation_service.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
@@ -739,7 +740,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return false;
       },
       child: InkWell(
-        onTap: isRead ? null : () => _markOneRead(id),
+        onTap: () async {
+          await NotificationNavigationService.handlePayload(item);
+          if (!isRead) {
+            unawaited(_markOneRead(id));
+          }
+        },
         borderRadius: BorderRadius.circular(16),
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
