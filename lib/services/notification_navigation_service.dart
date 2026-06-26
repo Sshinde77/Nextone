@@ -4,11 +4,13 @@ import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/routes/app_routes.dart';
 import 'package:nextone/screens/closures/closure_detail_page.dart';
 import 'package:nextone/screens/follow_ups/follow_up_detail_page.dart';
 import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/screens/notifications/notifications_page.dart';
 import 'package:nextone/screens/projects/project_detail_page.dart';
+import 'package:nextone/screens/salary/salary_management_page.dart';
 import 'package:nextone/screens/site_visits/site_revisit_detail_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
 import 'package:nextone/screens/team/team_member_details_page.dart';
@@ -25,12 +27,66 @@ class NotificationNavigationService {
   static final Set<String> _handledPayloadKeys = <String>{};
   static final Set<String> _pendingPayloadKeys = <String>{};
 
+  @visibleForTesting
+  static void resetForTests() {
+    _pendingPayloads.clear();
+    _handledPayloadKeys.clear();
+    _pendingPayloadKeys.clear();
+  }
+
+  @visibleForTesting
+  static String? debugResolveRouteKey(Map<String, dynamic> payload) {
+    final instruction = _resolveInstruction(_flattenPayload(payload));
+    if (instruction == null) {
+      return null;
+    }
+
+    switch (instruction.kind) {
+      case _NotificationTargetKind.leadList:
+        return 'lead_list';
+      case _NotificationTargetKind.leadDetail:
+        return 'lead_detail:${instruction.entityId}';
+      case _NotificationTargetKind.followUpList:
+        return 'follow_up_list';
+      case _NotificationTargetKind.projectDetail:
+        return 'project_detail:${instruction.entityId}';
+      case _NotificationTargetKind.salaryManagement:
+        return 'salary_management';
+      case _NotificationTargetKind.followUpDetail:
+        return 'follow_up_detail:${instruction.entityId}';
+      case _NotificationTargetKind.siteVisitList:
+        return 'site_visit_list';
+      case _NotificationTargetKind.siteVisitDetail:
+        return 'site_visit_detail:${instruction.entityId}';
+      case _NotificationTargetKind.siteRevisitDetail:
+        return 'site_revisit_detail:${instruction.entityId}';
+      case _NotificationTargetKind.closureList:
+        return 'closure_list';
+      case _NotificationTargetKind.closureDetail:
+        return 'closure_detail:${instruction.entityId}';
+      case _NotificationTargetKind.teamMemberDetail:
+        return 'team_member_detail:${instruction.entityId}';
+      case _NotificationTargetKind.notifications:
+        return 'notifications';
+    }
+  }
+
   static Future<void> handleRemoteMessage(RemoteMessage message) async {
+    AppErrorHandler.logDebug(
+      'handleRemoteMessage called: '
+      'id=${message.messageId}, '
+      'title=${message.notification?.title}, '
+      'body=${message.notification?.body}, '
+      'data=${message.data}',
+      name: 'NotificationNavigationService',
+    );
     final payload = <String, dynamic>{
       ...message.data,
       if (message.messageId != null) 'message_id': message.messageId,
-      if (message.notification?.title != null) 'title': message.notification?.title,
-      if (message.notification?.body != null) 'body': message.notification?.body,
+      if (message.notification?.title != null)
+        'title': message.notification?.title,
+      if (message.notification?.body != null)
+        'body': message.notification?.body,
     };
     await handlePayload(
       payload,
@@ -46,19 +102,45 @@ class NotificationNavigationService {
   }) async {
     final payloadKey = _notificationKey(payload, fallbackKey: sourceKey);
     final normalized = _flattenPayload(payload);
+    AppErrorHandler.logDebug(
+      'handlePayload called: '
+      'sourceLabel=$sourceLabel, '
+      'sourceKey=$sourceKey, '
+      'payloadKey=$payloadKey, '
+      'payload=$payload, '
+      'normalized=$normalized',
+      name: 'NotificationNavigationService',
+    );
     if (_handledPayloadKeys.contains(payloadKey) ||
         _pendingPayloadKeys.contains(payloadKey)) {
+      AppErrorHandler.logDebug(
+        'Skipping duplicate notification payload: $payloadKey',
+        name: 'NotificationNavigationService',
+      );
       return;
     }
 
     final instruction = _resolveInstruction(normalized);
     if (instruction == null) {
+      AppErrorHandler.logDebug(
+        'No instruction resolved; opening notifications list instead.',
+        name: 'NotificationNavigationService',
+      );
       _handledPayloadKeys.add(payloadKey);
       await _navigateToNotifications();
       return;
     }
 
+    AppErrorHandler.logDebug(
+      'Resolved notification instruction: ${_instructionDebugLabel(instruction)}',
+      name: 'NotificationNavigationService',
+    );
+
     if (!_isReadyForNavigation()) {
+      AppErrorHandler.logDebug(
+        'Navigator not ready; queueing notification payload.',
+        name: 'NotificationNavigationService',
+      );
       _queuePayload(
         _QueuedNotificationPayload(
           key: payloadKey,
@@ -71,6 +153,10 @@ class NotificationNavigationService {
     }
 
     if (!await _canNavigateToInstruction(instruction)) {
+      AppErrorHandler.logDebug(
+        'Navigation blocked by auth state; queueing notification payload.',
+        name: 'NotificationNavigationService',
+      );
       _queuePayload(
         _QueuedNotificationPayload(
           key: payloadKey,
@@ -103,6 +189,10 @@ class NotificationNavigationService {
     }
 
     final queued = List<_QueuedNotificationPayload>.from(_pendingPayloads);
+    AppErrorHandler.logDebug(
+      'Flushing pending notification payloads: count=${queued.length}',
+      name: 'NotificationNavigationService',
+    );
     for (final item in queued) {
       if (_handledPayloadKeys.contains(item.key)) {
         _removePendingKey(item.key);
@@ -160,19 +250,35 @@ class NotificationNavigationService {
   static Future<void> _navigate(_NotificationInstruction instruction) async {
     final navigator = navigatorKey.currentState;
     if (navigator == null) {
+      AppErrorHandler.logDebug(
+        'Navigator state was null during navigation.',
+        name: 'NotificationNavigationService',
+      );
       return;
     }
 
+    AppErrorHandler.logDebug(
+      'Navigating to ${_instructionDebugLabel(instruction)}',
+      name: 'NotificationNavigationService',
+    );
     switch (instruction.kind) {
+      case _NotificationTargetKind.leadList:
+        unawaited(navigator.pushNamed<void>(AppRoutes.leads));
+        return;
       case _NotificationTargetKind.leadDetail:
-        navigator.push(
+        _pushRoute(
+          navigator,
           MaterialPageRoute<void>(
             builder: (_) => LeadDetailPage(leadId: instruction.entityId!),
           ),
         );
         return;
+      case _NotificationTargetKind.followUpList:
+        unawaited(navigator.pushNamed<void>(AppRoutes.followUps));
+        return;
       case _NotificationTargetKind.projectDetail:
-        navigator.push(
+        _pushRoute(
+          navigator,
           MaterialPageRoute<void>(
             builder: (_) => ProjectDetailPage(
               projectId: instruction.entityId!,
@@ -181,16 +287,29 @@ class NotificationNavigationService {
           ),
         );
         return;
+      case _NotificationTargetKind.salaryManagement:
+        _pushRoute(
+          navigator,
+          MaterialPageRoute<void>(
+            builder: (_) => const SalaryManagementPage(),
+          ),
+        );
+        return;
       case _NotificationTargetKind.followUpDetail:
-        navigator.push(
+        _pushRoute(
+          navigator,
           MaterialPageRoute<void>(
             builder: (_) =>
                 FollowUpDetailPage(followUpId: instruction.entityId!),
           ),
         );
         return;
+      case _NotificationTargetKind.siteVisitList:
+        unawaited(navigator.pushNamed<void>(AppRoutes.siteVisits));
+        return;
       case _NotificationTargetKind.siteVisitDetail:
-        navigator.push(
+        _pushRoute(
+          navigator,
           MaterialPageRoute<void>(
             builder: (_) => SiteVisitDetailsPage(
               visitId: instruction.entityId!,
@@ -200,15 +319,20 @@ class NotificationNavigationService {
         );
         return;
       case _NotificationTargetKind.siteRevisitDetail:
-        navigator.push(
+        _pushRoute(
+          navigator,
           MaterialPageRoute<void>(
             builder: (_) =>
                 SiteRevisitDetailPage(revisitId: instruction.entityId!),
           ),
         );
         return;
+      case _NotificationTargetKind.closureList:
+        unawaited(navigator.pushNamed<void>(AppRoutes.closures));
+        return;
       case _NotificationTargetKind.closureDetail:
-        navigator.push(
+        _pushRoute(
+          navigator,
           MaterialPageRoute<void>(
             builder: (_) => ClosureDetailPage(lookupId: instruction.entityId!),
           ),
@@ -222,14 +346,16 @@ class NotificationNavigationService {
         if (navigatorKey.currentState == null) {
           return;
         }
-        navigator.push(
+        _pushRoute(
+          navigator,
           MaterialPageRoute<void>(
             builder: (_) => TeamMemberDetailsPage(memberData: details),
           ),
         );
         return;
       case _NotificationTargetKind.notifications:
-        navigator.push(
+        _pushRoute(
+          navigator,
           MaterialPageRoute<void>(
             builder: (_) => const NotificationsPage(),
           ),
@@ -238,16 +364,28 @@ class NotificationNavigationService {
     }
   }
 
+  static void _pushRoute(NavigatorState navigator, Route<void> route) {
+    unawaited(navigator.push<void>(route));
+  }
+
   static Future<void> _navigateToNotifications() async {
     if (!_isReadyForNavigation()) {
       return;
     }
+    AppErrorHandler.logDebug(
+      'Opening notifications screen as fallback.',
+      name: 'NotificationNavigationService',
+    );
     await _navigate(const _NotificationInstruction.notifications());
   }
 
   static _NotificationInstruction? _resolveInstruction(
     Map<String, dynamic> payload,
   ) {
+    AppErrorHandler.logDebug(
+      'Resolving instruction from payload keys: ${payload.keys.toList()}',
+      name: 'NotificationNavigationService',
+    );
     final explicitTarget = _firstString(payload, const <String>[
       'route',
       'route_name',
@@ -260,13 +398,42 @@ class NotificationNavigationService {
       'entity',
       'entity_type',
       'type',
+      'reference_type',
+      'action',
+      'click_action',
+      'notification_type',
+      'notificationType',
+      'category',
+      'screen_type',
+      'screenType',
     ]);
-    final normalizedTarget = _normalizeTarget(explicitTarget);
+    final referenceType = _firstString(payload, const <String>[
+      'reference_type',
+      'referenceType',
+    ]);
+    final normalizedTarget = _normalizeTarget(
+      explicitTarget.isNotEmpty ? explicitTarget : referenceType,
+    );
+    final normalizedReferenceType = _normalizeTarget(referenceType);
+    final effectiveTarget = _matchesAny(normalizedTarget, const <String>[
+              'general',
+              'notification',
+              'notifications',
+            ]) &&
+            normalizedReferenceType.isNotEmpty
+        ? normalizedReferenceType
+        : (normalizedTarget.isNotEmpty
+            ? normalizedTarget
+            : normalizedReferenceType);
 
     final leadId = _firstString(payload, const <String>[
       'lead_id',
       'leadId',
       'lead',
+    ]);
+    final referenceId = _firstString(payload, const <String>[
+      'reference_id',
+      'referenceId',
     ]);
     final projectId = _firstString(payload, const <String>[
       'project_id',
@@ -362,161 +529,218 @@ class NotificationNavigationService {
 
     final resolvedLeadId = leadId.isNotEmpty
         ? leadId
-        : _firstString(leadData ?? const <String, dynamic>{}, const <String>[
-            'lead_id',
-            'leadId',
-            'id',
-            'entity_id',
-            'entityId',
-            'target_id',
-            'targetId',
-            'record_id',
-            'recordId',
-          ]);
+        : referenceId.isNotEmpty
+            ? referenceId
+            : _firstString(
+                leadData ?? const <String, dynamic>{},
+                const <String>[
+                  'lead_id',
+                  'leadId',
+                  'id',
+                  'entity_id',
+                  'entityId',
+                  'target_id',
+                  'targetId',
+                  'record_id',
+                  'recordId',
+                ],
+              );
     final resolvedProjectId = projectId.isNotEmpty
         ? projectId
-        : _firstString(projectData ?? const <String, dynamic>{}, const <String>[
-            'project_id',
-            'projectId',
-            'id',
-            'entity_id',
-            'entityId',
-            'target_id',
-            'targetId',
-            'record_id',
-            'recordId',
-          ]);
+        : referenceId.isNotEmpty
+            ? referenceId
+            : _firstString(
+                projectData ?? const <String, dynamic>{},
+                const <String>[
+                  'project_id',
+                  'projectId',
+                  'id',
+                  'entity_id',
+                  'entityId',
+                  'target_id',
+                  'targetId',
+                  'record_id',
+                  'recordId',
+                ],
+              );
     final resolvedFollowUpId = followUpId.isNotEmpty
         ? followUpId
-        : _firstString(
-            followUpData ?? const <String, dynamic>{},
-            const <String>[
-              'follow_up_id',
-              'followUpId',
-              'id',
-              'entity_id',
-              'entityId',
-              'target_id',
-              'targetId',
-              'record_id',
-              'recordId',
-              'task_id',
-              'taskId',
-            ],
-          );
+        : referenceId.isNotEmpty
+            ? referenceId
+            : _firstString(
+                followUpData ?? const <String, dynamic>{},
+                const <String>[
+                  'follow_up_id',
+                  'followUpId',
+                  'id',
+                  'entity_id',
+                  'entityId',
+                  'target_id',
+                  'targetId',
+                  'record_id',
+                  'recordId',
+                  'task_id',
+                  'taskId',
+                ],
+              );
     final resolvedVisitId = visitId.isNotEmpty
         ? visitId
-        : _firstString(visitData ?? const <String, dynamic>{}, const <String>[
-            'visit_id',
-            'visitId',
-            'id',
-            'entity_id',
-            'entityId',
-            'target_id',
-            'targetId',
-            'record_id',
-            'recordId',
-          ]);
+        : referenceId.isNotEmpty
+            ? referenceId
+            : _firstString(
+                visitData ?? const <String, dynamic>{},
+                const <String>[
+                  'visit_id',
+                  'visitId',
+                  'id',
+                  'entity_id',
+                  'entityId',
+                  'target_id',
+                  'targetId',
+                  'record_id',
+                  'recordId',
+                ],
+              );
     final resolvedRevisitId = revisitId.isNotEmpty
         ? revisitId
-        : _firstString(
-            revisitData ?? const <String, dynamic>{},
-            const <String>[
-              'revisit_id',
-              'revisitId',
-              'id',
-              'entity_id',
-              'entityId',
-              'target_id',
-              'targetId',
-              'record_id',
-              'recordId',
-            ],
-          );
+        : referenceId.isNotEmpty
+            ? referenceId
+            : _firstString(
+                revisitData ?? const <String, dynamic>{},
+                const <String>[
+                  'revisit_id',
+                  'revisitId',
+                  'id',
+                  'entity_id',
+                  'entityId',
+                  'target_id',
+                  'targetId',
+                  'record_id',
+                  'recordId',
+                ],
+              );
     final resolvedClosureId = closureId.isNotEmpty
         ? closureId
-        : _firstString(
-            closureData ?? const <String, dynamic>{},
-            const <String>[
-              'closure_id',
-              'closureId',
-              'lead_id',
-              'leadId',
-              'id',
-              'entity_id',
-              'entityId',
-              'target_id',
-              'targetId',
-              'record_id',
-              'recordId',
-            ],
-          );
+        : referenceId.isNotEmpty
+            ? referenceId
+            : _firstString(
+                closureData ?? const <String, dynamic>{},
+                const <String>[
+                  'closure_id',
+                  'closureId',
+                  'lead_id',
+                  'leadId',
+                  'id',
+                  'entity_id',
+                  'entityId',
+                  'target_id',
+                  'targetId',
+                  'record_id',
+                  'recordId',
+                ],
+              );
     final resolvedUserId = userId.isNotEmpty
         ? userId
-        : _firstString(userData ?? const <String, dynamic>{}, const <String>[
-            'user_id',
-            'userId',
-            'employee_id',
-            'employeeId',
-            'team_member_id',
-            'teamMemberId',
-            'id',
-            'entity_id',
-            'entityId',
-            'target_id',
-            'targetId',
-            'record_id',
-            'recordId',
-          ]);
+        : referenceId.isNotEmpty
+            ? referenceId
+            : _firstString(
+                userData ?? const <String, dynamic>{},
+                const <String>[
+                  'user_id',
+                  'userId',
+                  'employee_id',
+                  'employeeId',
+                  'team_member_id',
+                  'teamMemberId',
+                  'id',
+                  'entity_id',
+                  'entityId',
+                  'target_id',
+                  'targetId',
+                  'record_id',
+                  'recordId',
+                ],
+              );
 
-    if (_matchesAny(normalizedTarget, const <String>[
-          'lead',
-          'lead_detail',
-          'lead_detail_page',
-          'lead_assigned',
-          'lead_new',
-          'lead_updated',
-        ]) &&
-        resolvedLeadId.isNotEmpty) {
-      return _NotificationInstruction.lead(resolvedLeadId);
+    if (_matchesAny(effectiveTarget, const <String>[
+      'appraisal',
+      'salary_appraisal',
+      'salary_update',
+      'salary_updated',
+      'salary_increment',
+      'salary_revision',
+    ])) {
+      return const _NotificationInstruction.salaryManagement();
     }
 
-    if (_matchesAny(normalizedTarget, const <String>[
-          'follow_up',
-          'followup',
-          'follow_up_detail',
-          'follow_up_created',
-          'follow_up_due',
-          'follow_up_overdue',
-          'follow_up_completed',
-          'task',
-          'task_detail',
-          'task_created',
-          'task_reminder',
-          'task_completed',
-        ]) &&
-        resolvedFollowUpId.isNotEmpty) {
-      return _NotificationInstruction.followUp(resolvedFollowUpId);
+    if (_matchesAny(effectiveTarget, const <String>[
+      'lead',
+      'lead_detail',
+      'lead_detail_page',
+      'lead_screen',
+      'lead_page',
+      'lead_assigned',
+      'lead_new',
+      'lead_updated',
+      'lead_item',
+      'lead_item_detail',
+      'lead_notification',
+      'lead_notifications',
+      'leads',
+      'lead_list',
+    ])) {
+      if (resolvedLeadId.isNotEmpty) {
+        return _NotificationInstruction.lead(resolvedLeadId);
+      }
+      return const _NotificationInstruction.leadList();
     }
 
-    if (_matchesAny(normalizedTarget, const <String>[
-          'visit',
-          'site_visit',
-          'visit_detail',
-          'visit_scheduled',
-          'visit_reminder',
-          'visit_done',
-          'visit_cancelled',
-          'visit_rescheduled',
-        ]) &&
-        resolvedVisitId.isNotEmpty) {
-      return _NotificationInstruction.siteVisit(
-        resolvedVisitId,
-        initialData: hasVisitData ? visitData : null,
-      );
+    if (_matchesAny(effectiveTarget, const <String>[
+      'follow_up',
+      'followup',
+      'follow_up_detail',
+      'follow_up_screen',
+      'follow_up_page',
+      'follow_up_created',
+      'follow_up_due',
+      'follow_up_overdue',
+      'follow_up_completed',
+      'follow_up_list',
+      'task',
+      'task_detail',
+      'task_created',
+      'task_reminder',
+      'task_completed',
+    ])) {
+      if (resolvedFollowUpId.isNotEmpty) {
+        return _NotificationInstruction.followUp(resolvedFollowUpId);
+      }
+      return const _NotificationInstruction.followUpList();
     }
 
-    if (_matchesAny(normalizedTarget, const <String>[
+    if (_matchesAny(effectiveTarget, const <String>[
+      'visit',
+      'site_visit',
+      'visit_detail',
+      'visit_screen',
+      'visit_page',
+      'visit_scheduled',
+      'visit_reminder',
+      'visit_done',
+      'visit_cancelled',
+      'visit_rescheduled',
+      'visit_list',
+    ])) {
+      if (resolvedVisitId.isNotEmpty) {
+        return _NotificationInstruction.siteVisit(
+          resolvedVisitId,
+          initialData: hasVisitData ? visitData : null,
+        );
+      }
+      return const _NotificationInstruction.siteVisitList();
+    }
+
+    if (_matchesAny(effectiveTarget, const <String>[
           'revisit',
           'site_revisit',
           'revisit_detail',
@@ -526,9 +750,11 @@ class NotificationNavigationService {
       return _NotificationInstruction.siteRevisit(resolvedRevisitId);
     }
 
-    if (_matchesAny(normalizedTarget, const <String>[
+    if (_matchesAny(effectiveTarget, const <String>[
           'project',
           'project_detail',
+          'project_screen',
+          'project_page',
           'project_new',
           'project_updated',
         ]) &&
@@ -539,20 +765,25 @@ class NotificationNavigationService {
       );
     }
 
-    if (_matchesAny(normalizedTarget, const <String>[
-          'closure',
-          'closure_detail',
-          'closure_created',
-          'closure_booked',
-          'booking',
-        ]) &&
-        (resolvedLeadId.isNotEmpty || resolvedClosureId.isNotEmpty)) {
-      return _NotificationInstruction.closure(
-        resolvedLeadId.isNotEmpty ? resolvedLeadId : resolvedClosureId,
-      );
+    if (_matchesAny(effectiveTarget, const <String>[
+      'closure',
+      'closure_detail',
+      'closure_screen',
+      'closure_page',
+      'closure_created',
+      'closure_booked',
+      'booking',
+      'closure_list',
+    ])) {
+      if (resolvedLeadId.isNotEmpty || resolvedClosureId.isNotEmpty) {
+        return _NotificationInstruction.closure(
+          resolvedLeadId.isNotEmpty ? resolvedLeadId : resolvedClosureId,
+        );
+      }
+      return const _NotificationInstruction.closureList();
     }
 
-    if (_matchesAny(normalizedTarget, const <String>[
+    if (_matchesAny(effectiveTarget, const <String>[
           'user',
           'team',
           'team_member',
@@ -566,7 +797,8 @@ class NotificationNavigationService {
     }
 
     final singleResolvedInstruction = <_NotificationInstruction>[
-      if (resolvedLeadId.isNotEmpty) _NotificationInstruction.lead(resolvedLeadId),
+      if (resolvedLeadId.isNotEmpty)
+        _NotificationInstruction.lead(resolvedLeadId),
       if (resolvedProjectId.isNotEmpty)
         _NotificationInstruction.project(
           resolvedProjectId,
@@ -586,7 +818,13 @@ class NotificationNavigationService {
       if (resolvedUserId.isNotEmpty)
         _NotificationInstruction.teamMember(resolvedUserId),
     ];
-    if (normalizedTarget.isEmpty && singleResolvedInstruction.length == 1) {
+    if ((_normalizeTarget(effectiveTarget).isEmpty ||
+            _matchesAny(effectiveTarget, const <String>[
+              'general',
+              'notification',
+              'notifications',
+            ])) &&
+        singleResolvedInstruction.length == 1) {
       return singleResolvedInstruction.first;
     }
 
@@ -674,8 +912,7 @@ class NotificationNavigationService {
       final decoded = jsonDecode(trimmed);
       if (decoded is Map) {
         return decoded.map(
-          (key, dynamic entryValue) =>
-              MapEntry(key.toString(), entryValue),
+          (key, dynamic entryValue) => MapEntry(key.toString(), entryValue),
         );
       }
     } catch (_) {
@@ -708,6 +945,8 @@ class NotificationNavigationService {
       'notification_id',
       'notificationId',
       'id',
+      'reference_id',
+      'referenceId',
     ]);
     if (messageId.isNotEmpty) {
       return messageId;
@@ -733,6 +972,7 @@ class NotificationNavigationService {
         'revisit_id',
         'closure_id',
         'user_id',
+        'reference_id',
       ]),
       _firstString(payload, const <String>[
         'title',
@@ -746,32 +986,98 @@ class NotificationNavigationService {
   }
 
   static String _normalizeTarget(String? target) {
-    return target?.trim().toLowerCase().replaceAll('-', '_').replaceAll(
-              ' ',
-              '_',
-            ) ??
-        '';
+    final normalized = target?.trim().toLowerCase() ?? '';
+    if (normalized.isEmpty) {
+      return '';
+    }
+
+    return normalized
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+  }
+
+  static String _compactTarget(String? target) {
+    final normalized = target?.trim().toLowerCase() ?? '';
+    if (normalized.isEmpty) {
+      return '';
+    }
+
+    return normalized.replaceAll(RegExp(r'[^a-z0-9]+'), '');
   }
 
   static bool _matchesAny(String value, List<String> expected) {
     if (value.isEmpty) {
       return false;
     }
+
+    final compactValue = _compactTarget(value);
+    if (compactValue.isEmpty) {
+      return false;
+    }
+
     for (final target in expected) {
-      if (value == target || value.contains(target) || target.contains(value)) {
+      final normalizedTarget = _normalizeTarget(target);
+      final compactTarget = _compactTarget(target);
+      if (normalizedTarget.isEmpty || compactTarget.isEmpty) {
+        continue;
+      }
+      if (value == normalizedTarget ||
+          value.contains(normalizedTarget) ||
+          normalizedTarget.contains(value) ||
+          compactValue == compactTarget ||
+          compactValue.contains(compactTarget) ||
+          compactTarget.contains(compactValue)) {
         return true;
       }
     }
+
     return false;
+  }
+
+  static String _instructionDebugLabel(_NotificationInstruction instruction) {
+    switch (instruction.kind) {
+      case _NotificationTargetKind.leadList:
+        return 'leadList';
+      case _NotificationTargetKind.leadDetail:
+        return 'leadDetail(${instruction.entityId})';
+      case _NotificationTargetKind.followUpList:
+        return 'followUpList';
+      case _NotificationTargetKind.projectDetail:
+        return 'projectDetail(${instruction.entityId})';
+      case _NotificationTargetKind.salaryManagement:
+        return 'salaryManagement';
+      case _NotificationTargetKind.followUpDetail:
+        return 'followUpDetail(${instruction.entityId})';
+      case _NotificationTargetKind.siteVisitList:
+        return 'siteVisitList';
+      case _NotificationTargetKind.siteVisitDetail:
+        return 'siteVisitDetail(${instruction.entityId})';
+      case _NotificationTargetKind.siteRevisitDetail:
+        return 'siteRevisitDetail(${instruction.entityId})';
+      case _NotificationTargetKind.closureList:
+        return 'closureList';
+      case _NotificationTargetKind.closureDetail:
+        return 'closureDetail(${instruction.entityId})';
+      case _NotificationTargetKind.teamMemberDetail:
+        return 'teamMemberDetail(${instruction.entityId})';
+      case _NotificationTargetKind.notifications:
+        return 'notifications';
+    }
   }
 }
 
 enum _NotificationTargetKind {
+  leadList,
   leadDetail,
+  followUpList,
   projectDetail,
+  salaryManagement,
   followUpDetail,
+  siteVisitList,
   siteVisitDetail,
   siteRevisitDetail,
+  closureList,
   closureDetail,
   teamMemberDetail,
   notifications,
@@ -785,11 +1091,23 @@ class _NotificationInstruction {
     this.initialData,
   });
 
+  const _NotificationInstruction.leadList()
+      : this._(
+          kind: _NotificationTargetKind.leadList,
+          requiresAuth: true,
+        );
+
   const _NotificationInstruction.lead(String leadId)
       : this._(
           kind: _NotificationTargetKind.leadDetail,
           requiresAuth: true,
           entityId: leadId,
+        );
+
+  const _NotificationInstruction.followUpList()
+      : this._(
+          kind: _NotificationTargetKind.followUpList,
+          requiresAuth: true,
         );
 
   const _NotificationInstruction.project(
@@ -802,11 +1120,23 @@ class _NotificationInstruction {
           initialData: initialData,
         );
 
+  const _NotificationInstruction.salaryManagement()
+      : this._(
+          kind: _NotificationTargetKind.salaryManagement,
+          requiresAuth: true,
+        );
+
   const _NotificationInstruction.followUp(String followUpId)
       : this._(
           kind: _NotificationTargetKind.followUpDetail,
           requiresAuth: true,
           entityId: followUpId,
+        );
+
+  const _NotificationInstruction.siteVisitList()
+      : this._(
+          kind: _NotificationTargetKind.siteVisitList,
+          requiresAuth: true,
         );
 
   const _NotificationInstruction.siteVisit(
@@ -831,6 +1161,12 @@ class _NotificationInstruction {
           kind: _NotificationTargetKind.closureDetail,
           requiresAuth: true,
           entityId: lookupId,
+        );
+
+  const _NotificationInstruction.closureList()
+      : this._(
+          kind: _NotificationTargetKind.closureList,
+          requiresAuth: true,
         );
 
   const _NotificationInstruction.teamMember(String userId)

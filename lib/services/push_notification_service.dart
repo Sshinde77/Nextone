@@ -11,7 +11,11 @@ import 'package:nextone/utils/app_error_handler.dart';
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   AppErrorHandler.logDebug(
-    'Background message received: ${message.messageId}, data=${message.data}',
+    'Background message received: '
+    'id=${message.messageId}, '
+    'title=${message.notification?.title}, '
+    'body=${message.notification?.body}, '
+    'data=${message.data}',
     name: 'PushNotificationService',
   );
 }
@@ -31,6 +35,10 @@ class PushNotificationService {
   );
 
   static Future<void> initialize() async {
+    AppErrorHandler.logDebug(
+      'Initializing push notification service.',
+      name: 'PushNotificationService',
+    );
     await _initializeLocalNotifications();
     await _requestPermission();
     await _configureForegroundPresentation();
@@ -41,6 +49,10 @@ class PushNotificationService {
   static Future<void> _initializeLocalNotifications() async {
     if (kIsWeb) return;
 
+    AppErrorHandler.logDebug(
+      'Initializing local notifications.',
+      name: 'PushNotificationService',
+    );
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const initializationSettings =
@@ -49,38 +61,35 @@ class PushNotificationService {
     await _localNotifications.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (response) {
-        final payload = response.payload;
-        if (payload == null || payload.trim().isEmpty) {
-          return;
-        }
-
-        try {
-          final decoded = jsonDecode(payload);
-          if (decoded is Map) {
-            unawaited(
-              NotificationNavigationService.handlePayload(
-                decoded.map(
-                  (key, dynamic value) =>
-                      MapEntry(key.toString(), value),
-                ),
-                sourceLabel: 'local_notification',
-              ),
-            );
-          }
-        } catch (error, stackTrace) {
-          AppErrorHandler.logDebug(
-            'Failed to decode local notification payload.',
-            name: 'PushNotificationService',
-            error: error,
-            stackTrace: stackTrace,
-          );
-        }
+        AppErrorHandler.logDebug(
+          'Local notification tapped: '
+          'id=${response.id}, '
+          'actionId=${response.actionId}, '
+          'payload=${response.payload}',
+          name: 'PushNotificationService',
+        );
+        unawaited(_handleLocalNotificationPayload(response.payload));
       },
     );
     await _localNotifications
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(_androidChannel);
+
+    final launchDetails =
+        await _localNotifications.getNotificationAppLaunchDetails();
+    final launchPayload = launchDetails?.notificationResponse?.payload;
+    AppErrorHandler.logDebug(
+      'Notification launch details: '
+      'didLaunch=${launchDetails?.didNotificationLaunchApp}, '
+      'payload=$launchPayload',
+      name: 'PushNotificationService',
+    );
+    if (launchDetails?.didNotificationLaunchApp == true &&
+        launchPayload != null &&
+        launchPayload.trim().isNotEmpty) {
+      await _handleLocalNotificationPayload(launchPayload);
+    }
   }
 
   static Future<void> _requestPermission() async {
@@ -105,7 +114,7 @@ class PushNotificationService {
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       AppErrorHandler.logDebug(
-        'Foreground message: ${message.messageId}, '
+        'Foreground message received: ${message.messageId}, '
         'title=${message.notification?.title}, '
         'body=${message.notification?.body}, '
         'data=${message.data}',
@@ -117,19 +126,32 @@ class PushNotificationService {
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       AppErrorHandler.logDebug(
-        'Notification tapped: ${message.messageId}, data=${message.data}',
+        'Notification tapped while app in background: '
+        'id=${message.messageId}, '
+        'title=${message.notification?.title}, '
+        'body=${message.notification?.body}, '
+        'data=${message.data}',
         name: 'PushNotificationService',
       );
       unawaited(NotificationNavigationService.handleRemoteMessage(message));
     });
 
     final initialMessage = await _messaging.getInitialMessage();
+    AppErrorHandler.logDebug(
+      'Initial FCM message: '
+      'id=${initialMessage?.messageId}, '
+      'title=${initialMessage?.notification?.title}, '
+      'body=${initialMessage?.notification?.body}, '
+      'data=${initialMessage?.data}',
+      name: 'PushNotificationService',
+    );
     if (initialMessage != null) {
       AppErrorHandler.logDebug(
-        'Opened from terminated state: ${initialMessage.messageId}, data=${initialMessage.data}',
+        'Opened from terminated state via FCM.',
         name: 'PushNotificationService',
       );
-      unawaited(NotificationNavigationService.handleRemoteMessage(initialMessage));
+      unawaited(
+          NotificationNavigationService.handleRemoteMessage(initialMessage));
     }
 
     _messaging.onTokenRefresh.listen((token) {
@@ -170,6 +192,14 @@ class PushNotificationService {
     );
 
     final notificationDetails = NotificationDetails(android: androidDetails);
+    AppErrorHandler.logDebug(
+      'Showing local foreground notification: '
+      'id=${message.messageId}, '
+      'title=$resolvedTitle, '
+      'body=$resolvedBody, '
+      'data=${message.data}',
+      name: 'PushNotificationService',
+    );
 
     await _localNotifications.show(
       message.hashCode,
@@ -183,6 +213,48 @@ class PushNotificationService {
         'body': resolvedBody,
       }),
     );
+  }
+
+  static Future<void> _handleLocalNotificationPayload(String? payload) async {
+    if (payload == null || payload.trim().isEmpty) {
+      AppErrorHandler.logDebug(
+        'Local notification payload was empty.',
+        name: 'PushNotificationService',
+      );
+      return;
+    }
+
+    AppErrorHandler.logDebug(
+      'Decoding local notification payload: $payload',
+      name: 'PushNotificationService',
+    );
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map) {
+        AppErrorHandler.logDebug(
+          'Local notification payload decoded successfully: $decoded',
+          name: 'PushNotificationService',
+        );
+        await NotificationNavigationService.handlePayload(
+          decoded.map(
+            (key, dynamic value) => MapEntry(key.toString(), value),
+          ),
+          sourceLabel: 'local_notification',
+        );
+      } else {
+        AppErrorHandler.logDebug(
+          'Local notification payload decoded to non-map type: ${decoded.runtimeType}',
+          name: 'PushNotificationService',
+        );
+      }
+    } catch (error, stackTrace) {
+      AppErrorHandler.logDebug(
+        'Failed to decode local notification payload.',
+        name: 'PushNotificationService',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   static Future<void> _printToken() async {
