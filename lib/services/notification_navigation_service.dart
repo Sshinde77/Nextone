@@ -10,6 +10,7 @@ import 'package:nextone/screens/follow_ups/follow_up_detail_page.dart';
 import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/screens/notifications/notifications_page.dart';
 import 'package:nextone/screens/projects/project_detail_page.dart';
+import 'package:nextone/screens/attendance/attendance_page.dart';
 import 'package:nextone/screens/salary/salary_management_page.dart';
 import 'package:nextone/screens/site_visits/site_revisit_detail_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
@@ -52,6 +53,8 @@ class NotificationNavigationService {
         return 'project_detail:${instruction.entityId}';
       case _NotificationTargetKind.salaryManagement:
         return 'salary_management';
+      case _NotificationTargetKind.attendance:
+        return 'attendance';
       case _NotificationTargetKind.followUpDetail:
         return 'follow_up_detail:${instruction.entityId}';
       case _NotificationTargetKind.siteVisitList:
@@ -291,7 +294,15 @@ class NotificationNavigationService {
         _pushRoute(
           navigator,
           MaterialPageRoute<void>(
-            builder: (_) => const SalaryManagementPage(),
+            builder: (_) => const SalaryManagementPage(showBackButton: true),
+          ),
+        );
+        return;
+      case _NotificationTargetKind.attendance:
+        _pushRoute(
+          navigator,
+          MaterialPageRoute<void>(
+            builder: (_) => const AttendancePage(),
           ),
         );
         return;
@@ -664,6 +675,7 @@ class NotificationNavigationService {
 
     if (_matchesAny(effectiveTarget, const <String>[
       'appraisal',
+      'incentive',
       'salary_appraisal',
       'salary_update',
       'salary_updated',
@@ -671,6 +683,23 @@ class NotificationNavigationService {
       'salary_revision',
     ])) {
       return const _NotificationInstruction.salaryManagement();
+    }
+
+    if (_matchesAny(effectiveTarget, const <String>[
+      'attendance',
+      'attendance_checkin',
+      'attendance_checkout',
+      'attendance_reminder',
+      'attendance_notice',
+      'check_in_reminder',
+      'checkin_reminder',
+      'check_out_reminder',
+      'checkout_reminder',
+      'mark_attendance',
+      'mark_in',
+      'mark_out',
+    ])) {
+      return const _NotificationInstruction.attendance();
     }
 
     if (_matchesAny(effectiveTarget, const <String>[
@@ -789,7 +818,6 @@ class NotificationNavigationService {
           'team_member',
           'team_member_detail',
           'employee',
-          'attendance',
           'salary',
         ]) &&
         resolvedUserId.isNotEmpty) {
@@ -1047,6 +1075,8 @@ class NotificationNavigationService {
         return 'projectDetail(${instruction.entityId})';
       case _NotificationTargetKind.salaryManagement:
         return 'salaryManagement';
+      case _NotificationTargetKind.attendance:
+        return 'attendance';
       case _NotificationTargetKind.followUpDetail:
         return 'followUpDetail(${instruction.entityId})';
       case _NotificationTargetKind.siteVisitList:
@@ -1073,6 +1103,7 @@ enum _NotificationTargetKind {
   followUpList,
   projectDetail,
   salaryManagement,
+  attendance,
   followUpDetail,
   siteVisitList,
   siteVisitDetail,
@@ -1123,6 +1154,12 @@ class _NotificationInstruction {
   const _NotificationInstruction.salaryManagement()
       : this._(
           kind: _NotificationTargetKind.salaryManagement,
+          requiresAuth: true,
+        );
+
+  const _NotificationInstruction.attendance()
+      : this._(
+          kind: _NotificationTargetKind.attendance,
           requiresAuth: true,
         );
 

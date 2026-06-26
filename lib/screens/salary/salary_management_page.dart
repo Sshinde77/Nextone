@@ -12,7 +12,12 @@ import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
 
 class SalaryManagementPage extends StatefulWidget {
-  const SalaryManagementPage({super.key});
+  const SalaryManagementPage({
+    super.key,
+    this.showBackButton = false,
+  });
+
+  final bool showBackButton;
 
   @override
   State<SalaryManagementPage> createState() => _SalaryManagementPageState();
@@ -259,7 +264,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FC),
-      appBar: const CrmAppBar(title: 'Salary Management'),
+      appBar: CrmAppBar(
+        title: 'Salary Management',
+        showBackButton: widget.showBackButton,
+      ),
       body: _isLoadingAccess
           ? const Center(child: CircularProgressIndicator())
           : _isAdminSalaryView
@@ -271,92 +279,135 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   Widget _buildAdminBody() {
     return RefreshIndicator(
       onRefresh: _refreshAdminData,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 120),
-        children: [
-          const Text(
-            'Set salaries, generate slips and track payroll',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 540;
+          final sidePadding = 16.0;
+
+          Widget actionButtons() {
+            final refreshButton = SizedBox(
+              width: isNarrow ? double.infinity : null,
+              child: OutlinedButton.icon(
+                onPressed: _refreshAdminData,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Refresh'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: const BorderSide(color: AppColors.border),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            );
+
+            final generateButton = SizedBox(
+              width: isNarrow ? double.infinity : null,
+              child: ElevatedButton.icon(
+                onPressed: _isGeneratingAllSlips
+                    ? null
+                    : _showGenerateAllSalarySlipsDialog,
+                icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                label: _isGeneratingAllSlips
+                    ? const Text('Generating...')
+                    : const Text('Generate All Slips'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            );
+
+            if (isNarrow) {
+              return Column(
+                children: [
+                  refreshButton,
+                  const SizedBox(height: 8),
+                  generateButton,
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: refreshButton),
+                const SizedBox(width: 8),
+                Expanded(child: generateButton),
+              ],
+            );
+          }
+
+          return ListView(
+            padding: EdgeInsets.fromLTRB(sidePadding, 12, sidePadding, 120),
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _refreshAdminData,
-                  icon: const Icon(Icons.refresh, size: 18),
-                  label: const Text('Refresh'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: AppColors.border),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
+              const Text(
+                'Set salaries, generate slips and track payroll',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _isGeneratingAllSlips
-                      ? null
-                      : _showGenerateAllSalarySlipsDialog,
-                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                  label: _isGeneratingAllSlips
-                      ? const Text('Generating...')
-                      : const Text('Generate All Slips'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
+              const SizedBox(height: 10),
+              actionButtons(),
+              const SizedBox(height: 12),
+              _buildSummaryGrid(),
+              const SizedBox(height: 20),
+              _buildTabBar(),
+              const SizedBox(height: 12),
+              if (_selectedTab == 0)
+                _buildEmployeesSection()
+              else ...[
+                _buildFilterTile(
+                  DateFormat('MMMM')
+                      .format(DateTime(_selectedYear, _selectedMonth)),
+                  onTap: _pickMonth,
                 ),
-              ),
+                const SizedBox(height: 10),
+                _buildFilterTile(
+                  _selectedYear.toString(),
+                  onTap: _pickYear,
+                ),
+                const SizedBox(height: 10),
+                _buildSalarySlipsSection(),
+                const SizedBox(height: 150),
+              ],
             ],
-          ),
-          const SizedBox(height: 12),
-          _buildSummaryGrid(),
-          const SizedBox(height: 20),
-          _buildTabBar(),
-          const SizedBox(height: 12),
-          if (_selectedTab == 0)
-            _buildEmployeesSection()
-          else ...[
-            _buildFilterTile(
-              DateFormat('MMMM')
-                  .format(DateTime(_selectedYear, _selectedMonth)),
-              onTap: _pickMonth,
-            ),
-            const SizedBox(height: 10),
-            _buildFilterTile(
-              _selectedYear.toString(),
-              onTap: _pickYear,
-            ),
-            const SizedBox(height: 10),
-            _buildSalarySlipsSection(),
-            const SizedBox(height: 150),
-          ],
-        ],
+          );
+        },
       ),
     );
   }
 
   Widget _buildSummaryGrid() {
-    return GridView.builder(
-      itemCount: _stats.length,
-      shrinkWrap: true,
-      primary: false,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 2.45,
-      ),
-      itemBuilder: (context, index) => _buildSummaryCard(_stats[index]),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final crossAxisCount = width >= 1100
+            ? 4
+            : width >= 760
+                ? 3
+                : 2;
+        final aspectRatio = width >= 1100
+            ? 3.0
+            : width >= 760
+                ? 2.7
+                : 2.45;
+
+        return GridView.builder(
+          itemCount: _stats.length,
+          shrinkWrap: true,
+          primary: false,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: aspectRatio,
+          ),
+          itemBuilder: (context, index) => _buildSummaryCard(_stats[index]),
+        );
+      },
     );
   }
 
@@ -374,111 +425,103 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         : DateFormat('MMMM').format(DateTime(2000, _mySalarySelectedMonth));
     final width = MediaQuery.of(context).size.width;
     final isCompact = width < 380;
-    final isMobile = width < 700;
     final bottomInset = MediaQuery.of(context).padding.bottom;
+    final horizontalPadding = 16.0;
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'My Salary',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 2),
+        const Text(
+          'Your salary, daily earnings and payment history',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (_isLoadingMySalary)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_mySalaryError != null)
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _mySalaryError!,
+                  style: const TextStyle(color: AppColors.error),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                    onPressed: _loadMySalary, child: const Text('Retry')),
+              ],
+            ),
+          )
+        else ...[
+          _mySalaryTopSection(
+            isCompact: isCompact,
+            isMobile: width < 700,
+            monthly: current?.amount ?? 0,
+            perDay: perDay,
+            effectiveFrom: effectiveFrom,
+            totalSlips: slips.length,
+            latestMonth: latestSlip?.monthLabel ?? '-',
+            totalEarned: totalEarned,
+          ),
+          const SizedBox(height: 10),
+          _mySalaryTabBar(),
+          const SizedBox(height: 10),
+          _buildFilterTile(monthName, onTap: _pickMySalaryMonth),
+          const SizedBox(height: 8),
+          _buildFilterTile(_selectedYear.toString(), onTap: _pickMySalaryYear),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              onPressed: _loadMySalary,
+              icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
+            ),
+          ),
+          if (_mySalaryTab == 0)
+            _mySalarySlipsList(slips)
+          else if (_mySalaryTab == 1)
+            _mySalaryDayWise(slips)
+          else if (_mySalaryTab == 2)
+            _mySalaryHistoryList(history)
+          else
+            _myIncentivesList(incentives),
+        ],
+      ],
+    );
 
     return RefreshIndicator(
       onRefresh: _loadMySalary,
       child: ListView(
         padding: EdgeInsets.fromLTRB(
-          isMobile ? 10 : 14,
+          horizontalPadding,
           10,
-          isMobile ? 10 : 14,
+          horizontalPadding,
           bottomInset + 120,
         ),
-        children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 460),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'My Salary',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Your salary, daily earnings and payment history',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (_isLoadingMySalary)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else if (_mySalaryError != null)
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _mySalaryError!,
-                            style: const TextStyle(color: AppColors.error),
-                          ),
-                          const SizedBox(height: 8),
-                          TextButton(
-                              onPressed: _loadMySalary,
-                              child: const Text('Retry')),
-                        ],
-                      ),
-                    )
-                  else ...[
-                    _mySalaryTopSection(
-                      isCompact: isCompact,
-                      isMobile: isMobile,
-                      monthly: current?.amount ?? 0,
-                      perDay: perDay,
-                      effectiveFrom: effectiveFrom,
-                      totalSlips: slips.length,
-                      latestMonth: latestSlip?.monthLabel ?? '-',
-                      totalEarned: totalEarned,
-                    ),
-                    const SizedBox(height: 10),
-                    _mySalaryTabBar(),
-                    const SizedBox(height: 10),
-                    _buildFilterTile(monthName, onTap: _pickMySalaryMonth),
-                    const SizedBox(height: 8),
-                    _buildFilterTile(_selectedYear.toString(),
-                        onTap: _pickMySalaryYear),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        onPressed: _loadMySalary,
-                        icon: const Icon(Icons.refresh,
-                            color: AppColors.textSecondary),
-                      ),
-                    ),
-                    if (_mySalaryTab == 0)
-                      _mySalarySlipsList(slips)
-                    else if (_mySalaryTab == 1)
-                      _mySalaryDayWise(slips)
-                    else if (_mySalaryTab == 2)
-                      _mySalaryHistoryList(history)
-                    else
-                      _myIncentivesList(incentives),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
+        children: [content],
       ),
     );
   }
@@ -493,86 +536,100 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     required String latestMonth,
     required double totalEarned,
   }) {
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF0A7CFF), Color(0xFF2F5FE3)],
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'MONTHLY SALARY',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _formatCurrency(monthly),
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isCompact ? 21 : (isMobile ? 23 : 26),
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Per day: ${_formatCurrency(perDay)}',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 11,
-                ),
-              ),
-              Text(
-                'Effective from ${_formatDate(effectiveFrom)}',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 11,
-                ),
-              ),
-              const Divider(height: 18, color: Colors.white24),
-              const Text(
-                'Total earned this period',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-              Text(
-                _formatCurrency(totalEarned),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 520;
+        final latestMonthText =
+            latestMonth.trim().isEmpty || latestMonth.trim() == '-'
+                ? 'No slips yet'
+                : latestMonth;
+
+        final stats = isWide
+            ? Row(
+                children: [
+                  Expanded(child: _smallStatCard('Total Slips', '$totalSlips')),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: _smallStatCard('Latest Month', latestMonthText)),
+                ],
+              )
+            : Column(
+                children: [
+                  _smallStatCard('Total Slips', '$totalSlips'),
+                  const SizedBox(height: 8),
+                  _smallStatCard('Latest Month', latestMonthText),
+                ],
+              );
+
+        return Column(
           children: [
-            Expanded(child: _smallStatCard('Total Slips', '$totalSlips')),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _smallStatCard(
-                'Latest Month',
-                latestMonth.trim().isEmpty || latestMonth.trim() == '-'
-                    ? 'No slips yet'
-                    : latestMonth,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0A7CFF), Color(0xFF2F5FE3)],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'MONTHLY SALARY',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatCurrency(monthly),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: isCompact ? 21 : (isMobile ? 23 : 26),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Per day: ${_formatCurrency(perDay)}',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                  ),
+                  Text(
+                    'Effective from ${_formatDate(effectiveFrom)}',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                  ),
+                  const Divider(height: 18, color: Colors.white24),
+                  const Text(
+                    'Total earned this period',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  Text(
+                    _formatCurrency(totalEarned),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
             ),
+            const SizedBox(height: 8),
+            stats,
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -2138,103 +2195,161 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 560;
+          final details = [
+            _metaSection(
+              label: 'Monthly Salary',
+              value: row.salary,
+              valueColor: salaryColor,
+              leadingDot: !row.isNotSet,
+            ),
+            _metaSection(
+              label: 'Effective From',
+              value: row.effectiveFrom,
+              icon: Icons.calendar_month_outlined,
+            ),
+            _metaSection(
+              label: 'Set By',
+              value: row.setBy,
+              icon: Icons.badge_outlined,
+            ),
+          ];
+
+          final actionButtons = Wrap(
+            spacing: 6,
+            runSpacing: 6,
             children: [
-              Expanded(
-                child: Column(
+              _ActionIcon(
+                icon: Icons.visibility_outlined,
+                onPressed: () => _openSalaryDetail(row),
+              ),
+              _ActionIcon(
+                icon: row.isNotSet
+                    ? Icons.currency_rupee
+                    : Icons.trending_up_rounded,
+                color: row.isNotSet
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFFF59E0B),
+                onPressed: row.isNotSet
+                    ? () => _showSetSalaryDialog(row)
+                    : () => _showAppraisalDialog(row),
+              ),
+              _ActionIcon(
+                icon: Icons.receipt_long_outlined,
+                color: const Color(0xFF16A34A),
+                onPressed: () => _showGenerateSlipDialog(row),
+              ),
+              _ActionIcon(
+                icon: Icons.history_outlined,
+                onPressed: () => _showSalaryHistoryDialog(row),
+              ),
+            ],
+          );
+
+          if (isCompact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      row.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            row.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            row.email,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      row.email,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
+                    const SizedBox(width: 8),
+                    _roleChip(row.role),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              _roleChip(row.role),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
+                const SizedBox(height: 12),
+                ...details.map(
+                  (meta) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: meta,
+                  ),
+                ),
+                Align(alignment: Alignment.centerLeft, child: actionButtons),
+              ],
+            );
+          }
+
+          return Column(
             children: [
-              Expanded(
-                child: _metaSection(
-                  label: 'Monthly Salary',
-                  value: row.salary,
-                  valueColor: salaryColor,
-                  leadingDot: !row.isNotSet,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _metaSection(
-                  label: 'Effective From',
-                  value: row.effectiveFrom,
-                  icon: Icons.calendar_month_outlined,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _metaSection(
-                  label: 'Set By',
-                  value: row.setBy,
-                  icon: Icons.badge_outlined,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Wrap(
-                spacing: 6,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ActionIcon(
-                    icon: Icons.visibility_outlined,
-                    onPressed: () => _openSalaryDetail(row),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          row.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          row.email,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  _ActionIcon(
-                    icon: row.isNotSet
-                        ? Icons.currency_rupee
-                        : Icons.trending_up_rounded,
-                    color: row.isNotSet
-                        ? const Color(0xFF2563EB)
-                        : const Color(0xFFF59E0B),
-                    onPressed: row.isNotSet
-                        ? () => _showSetSalaryDialog(row)
-                        : () => _showAppraisalDialog(row),
-                  ),
-                  _ActionIcon(
-                    icon: Icons.receipt_long_outlined,
-                    color: const Color(0xFF16A34A),
-                    onPressed: () => _showGenerateSlipDialog(row),
-                  ),
-                  _ActionIcon(
-                    icon: Icons.history_outlined,
-                    onPressed: () => _showSalaryHistoryDialog(row),
+                  const SizedBox(width: 8),
+                  _roleChip(row.role),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: details[0]),
+                  const SizedBox(width: 10),
+                  Expanded(child: details[1]),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: details[2]),
+                  const SizedBox(width: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: actionButtons,
                   ),
                 ],
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -2248,85 +2363,133 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 560;
+          final infoBlocks = [
+            _metaSection(label: 'Monthly Salary', value: row.monthlySalary),
+            _metaSection(label: 'Days', value: row.days),
+            _metaSection(
+              label: 'Earned',
+              value: row.earned,
+              valueColor: const Color(0xFF1D4ED8),
+            ),
+            _metaSection(
+              label: 'Deductions',
+              value: row.deductions,
+              valueColor: const Color(0xFFDC2626),
+            ),
+            _metaSection(
+              label: 'Final',
+              value: row.finalAmount,
+              valueColor: const Color(0xFF16A34A),
+            ),
+            _metaSection(label: 'Generated By', value: row.generatedBy),
+          ];
+
+          if (isCompact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      row.employee,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            row.employee,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            row.role,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      row.role,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    _roleChip(row.month),
                   ],
                 ),
-              ),
-              _roleChip(row.month),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
+                const SizedBox(height: 10),
+                ...infoBlocks
+                    .map(
+                      (block) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: block,
+                      ),
+                    )
+                    .toList(),
+              ],
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                  child: _metaSection(
-                      label: 'Monthly Salary', value: row.monthlySalary)),
-              const SizedBox(width: 10),
-              Expanded(child: _metaSection(label: 'Days', value: row.days)),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          row.employee,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          row.role,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _roleChip(row.month),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: infoBlocks[0]),
+                  const SizedBox(width: 10),
+                  Expanded(child: infoBlocks[1]),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: infoBlocks[2]),
+                  const SizedBox(width: 10),
+                  Expanded(child: infoBlocks[3]),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: infoBlocks[4]),
+                  const SizedBox(width: 10),
+                  Expanded(child: infoBlocks[5]),
+                ],
+              ),
             ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _metaSection(
-                  label: 'Earned',
-                  value: row.earned,
-                  valueColor: const Color(0xFF1D4ED8),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _metaSection(
-                  label: 'Deductions',
-                  value: row.deductions,
-                  valueColor: const Color(0xFFDC2626),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _metaSection(
-                  label: 'Final',
-                  value: row.finalAmount,
-                  valueColor: const Color(0xFF16A34A),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child:
-                    _metaSection(label: 'Generated By', value: row.generatedBy),
-              ),
-            ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }

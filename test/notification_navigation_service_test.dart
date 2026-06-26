@@ -45,4 +45,15 @@ void main() {
 
     expect(routeKey, 'salary_management');
   });
+
+  test('resolves incentive notifications to salary management', () {
+    final routeKey = NotificationNavigationService.debugResolveRouteKey(
+      <String, dynamic>{
+        'reference_type': 'incentive',
+        'reference_id': 'inc-123',
+      },
+    );
+
+    expect(routeKey, 'salary_management');
+  });
 }

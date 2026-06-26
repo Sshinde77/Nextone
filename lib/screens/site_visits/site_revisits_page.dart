@@ -10,6 +10,7 @@ import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/site_revisit_data_card.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SiteRevisitsPage extends StatefulWidget {
   const SiteRevisitsPage({
@@ -419,6 +420,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       onView: () => _openRevisitDetail(item),
       onEdit: () => _openEditRevisit(item),
       onStatus: () => _openStatusUpdateDialog(item),
+      onCall: () => _launchCaller(leadPhone),
     );
   }
 
@@ -489,6 +491,17 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString().trim() ?? '');
+  }
+
+  Future<void> _launchCaller(String phone) async {
+    final normalizedPhone = phone.trim();
+    if (normalizedPhone.isEmpty || normalizedPhone.toLowerCase() == 'n/a') {
+      return;
+    }
+    final uri = Uri.parse('tel:$normalizedPhone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
   }
 
   String _formatDate(String iso) {

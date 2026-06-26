@@ -21,6 +21,7 @@ class SiteRevisitDataCard extends StatelessWidget {
     this.onView,
     this.onEdit,
     this.onStatus,
+    this.onCall,
     this.onDelete,
   });
 
@@ -41,6 +42,7 @@ class SiteRevisitDataCard extends StatelessWidget {
   final VoidCallback? onView;
   final VoidCallback? onEdit;
   final VoidCallback? onStatus;
+  final VoidCallback? onCall;
   final VoidCallback? onDelete;
 
   @override
@@ -115,6 +117,7 @@ class SiteRevisitDataCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              _action(Icons.phone_outlined, onCall, color: AppColors.primary),
               _action(Icons.remove_red_eye_outlined, onView),
               _action(Icons.edit_outlined, onEdit),
               if (!_isDoneStatus) _action(Icons.check_circle_outline, onStatus),
@@ -131,7 +134,11 @@ class SiteRevisitDataCard extends StatelessWidget {
     return normalized == 'done' || normalized == 'completed';
   }
 
-  Widget _action(IconData icon, VoidCallback? onTap) {
+  Widget _action(
+    IconData icon,
+    VoidCallback? onTap, {
+    Color? color,
+  }) {
     return Container(
       margin: const EdgeInsets.only(left: 6),
       decoration: BoxDecoration(
@@ -140,7 +147,13 @@ class SiteRevisitDataCard extends StatelessWidget {
       ),
       child: IconButton(
         onPressed: onTap,
-        icon: Icon(icon, size: 18, color: AppColors.textSecondary),
+        icon: Icon(
+          icon,
+          size: 18,
+          color: onTap == null
+              ? AppColors.textSecondary.withValues(alpha: 0.45)
+              : (color ?? AppColors.textSecondary),
+        ),
         constraints: const BoxConstraints.tightFor(width: 34, height: 34),
         padding: EdgeInsets.zero,
       ),

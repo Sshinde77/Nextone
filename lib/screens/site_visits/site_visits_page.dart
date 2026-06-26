@@ -10,6 +10,7 @@ import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../utils/app_error_handler.dart';
 
@@ -36,6 +37,7 @@ class _SiteVisit {
     required this.id,
     required this.property,
     required this.lead,
+    required this.leadPhone,
     required this.location,
     required this.transport,
     required this.dateTime,
@@ -53,6 +55,7 @@ class _SiteVisit {
   final String id;
   String property;
   String lead;
+  String leadPhone;
   String location;
   String transport;
   DateTime dateTime;
@@ -206,105 +209,99 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: _s(14)),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 430),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: _s(14)),
+              Text(
+                'SCHEDULE',
+                style: TextStyle(
+                  color: AppColors.warning,
+                  fontSize: _fs(10),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  SizedBox(height: _s(14)),
-                  Text(
-                    'SCHEDULE',
-                    style: TextStyle(
-                      color: AppColors.warning,
-                      fontSize: _fs(10),
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.0,
+                  Expanded(
+                    child: Text(
+                      'Visits',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: _fs(26),
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Visits',
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: _fs(26),
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      _buildViewToggle(),
-                      SizedBox(width: _s(6)),
-                      _buildExportButton(),
-                    ],
-                  ),
-                  if (_showScopeTabs) ...[
-                    SizedBox(height: _s(10)),
-                    _buildScopeTabs(),
-                  ],
-                  SizedBox(height: _s(10)),
-                  _buildQuickActions(),
-                  SizedBox(height: _s(12)),
-                  _buildStatusAndRevisitsRow(),
-                  SizedBox(height: _s(14)),
-                  if (_isCalendarView) ...[
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: _buildCalendarCard(),
-                    ),
-                    SizedBox(height: _s(18)),
-                  ] else
-                    SizedBox(height: _s(8)),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _visitSectionTitle,
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: _fs(18),
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (_isCalendarView)
-                        Text(
-                          _selectedDateLabel.toUpperCase(),
-                          style: TextStyle(
-                            color:
-                                AppColors.textSecondary.withValues(alpha: 0.6),
-                            fontSize: _fs(9),
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                    ],
-                  ),
-                  SizedBox(height: _s(12)),
-                  if (_isLoadingVisits)
-                    const Center(child: CircularProgressIndicator())
-                  else if (_loadError != null)
-                    _buildErrorState()
-                  else if (visibleVisits.isEmpty)
-                    _buildEmptyState()
-                  else
-                    ...visibleVisits.map(_buildVisitCard),
-                  if (!_isLoadingVisits &&
-                      _loadError == null &&
-                      _totalPages > 1) ...[
-                    SizedBox(height: _s(12)),
-                    _buildPaginationControls(),
-                  ],
-                  SizedBox(height: _s(90)),
+                  _buildViewToggle(),
+                  SizedBox(width: _s(6)),
+                  _buildExportButton(),
                 ],
               ),
-            ),
+              if (_showScopeTabs) ...[
+                SizedBox(height: _s(10)),
+                _buildScopeTabs(),
+              ],
+              SizedBox(height: _s(10)),
+              _buildQuickActions(),
+              SizedBox(height: _s(12)),
+              _buildStatusAndRevisitsRow(),
+              SizedBox(height: _s(14)),
+              if (_isCalendarView) ...[
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _buildCalendarCard(),
+                ),
+                SizedBox(height: _s(18)),
+              ] else
+                SizedBox(height: _s(8)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      _visitSectionTitle,
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: _fs(18),
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (_isCalendarView)
+                    Text(
+                      _selectedDateLabel.toUpperCase(),
+                      style: TextStyle(
+                        color: AppColors.textSecondary.withValues(alpha: 0.6),
+                        fontSize: _fs(9),
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                ],
+              ),
+              SizedBox(height: _s(12)),
+              if (_isLoadingVisits)
+                const Center(child: CircularProgressIndicator())
+              else if (_loadError != null)
+                _buildErrorState()
+              else if (visibleVisits.isEmpty)
+                _buildEmptyState()
+              else
+                ...visibleVisits.map(_buildVisitCard),
+              if (!_isLoadingVisits &&
+                  _loadError == null &&
+                  _totalPages > 1) ...[
+                SizedBox(height: _s(12)),
+                _buildPaginationControls(),
+              ],
+              SizedBox(height: _s(90)),
+            ],
           ),
         ),
       ),
@@ -313,76 +310,110 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
   Widget _buildQuickActions() {
     final compact = _isCompactMobile;
-    return Column(
-      children: [
-        Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 420;
+
+        final scheduledTile = _buildKpiTile(
+          label: 'Scheduled',
+          value: _countByStatus(_VisitStatus.scheduled).toString(),
+          color: AppColors.warning,
+        );
+        final completedTile = _buildKpiTile(
+          label: 'Completed',
+          value: _countByStatus(_VisitStatus.completed).toString(),
+          color: AppColors.tertiary,
+        );
+        final scheduleButton = FilledButton.icon(
+          onPressed: _openScheduleForm,
+          icon: Icon(Icons.add, size: _s(16)),
+          label: Text(compact ? 'Add' : 'Schedule'),
+          style: FilledButton.styleFrom(
+            minimumSize: Size.fromHeight(_s(52)),
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(_s(14)),
+            ),
+            padding: EdgeInsets.symmetric(horizontal: _s(8)),
+            textStyle: TextStyle(
+              fontSize: _fs(12),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+
+        if (isNarrow) {
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(child: scheduledTile),
+                  SizedBox(width: _s(8)),
+                  Expanded(child: completedTile),
+                ],
+              ),
+              SizedBox(height: _s(8)),
+              SizedBox(width: constraints.maxWidth, child: scheduleButton),
+            ],
+          );
+        }
+
+        return Row(
           children: [
-            Expanded(
-              child: _buildKpiTile(
-                label: 'Scheduled',
-                value: _countByStatus(_VisitStatus.scheduled).toString(),
-                color: AppColors.warning,
-              ),
-            ),
+            Expanded(child: scheduledTile),
             SizedBox(width: _s(8)),
-            Expanded(
-              child: _buildKpiTile(
-                label: 'Completed',
-                value: _countByStatus(_VisitStatus.completed).toString(),
-                color: AppColors.tertiary,
-              ),
-            ),
+            Expanded(child: completedTile),
             SizedBox(width: _s(8)),
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: _openScheduleForm,
-                icon: Icon(Icons.add, size: _s(16)),
-                label: Text(compact ? 'Add' : 'Schedule'),
-                style: FilledButton.styleFrom(
-                  minimumSize: Size.fromHeight(_s(52)),
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(_s(14)),
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: _s(8)),
-                  textStyle: TextStyle(
-                    fontSize: _fs(12),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
+            Expanded(child: scheduleButton),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
   Widget _buildStatusAndRevisitsRow() {
-    final revisitButton = SizedBox(
-      height: _s(46),
-      child: OutlinedButton.icon(
-        onPressed: _openRevisitsPage,
-        icon: const Icon(Icons.repeat_rounded, size: 18),
-        label: const Text('Open Re-visits'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.35)),
-          minimumSize: const Size(0, 46),
-          padding: EdgeInsets.symmetric(horizontal: _s(14)),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(_s(12)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 560;
+        final revisitButton = SizedBox(
+          height: _s(46),
+          width: isNarrow ? constraints.maxWidth : 170,
+          child: OutlinedButton.icon(
+            onPressed: _openRevisitsPage,
+            icon: const Icon(Icons.repeat_rounded, size: 18),
+            label: const Text('Open Re-visits'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side:
+                  BorderSide(color: AppColors.primary.withValues(alpha: 0.35)),
+              minimumSize: const Size(0, 46),
+              padding: EdgeInsets.symmetric(horizontal: _s(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(_s(12)),
+              ),
+            ),
           ),
-        ),
-      ),
-    );
+        );
 
-    return Row(
-      children: [
-        Expanded(child: _buildStatusFilterBar()),
-        SizedBox(width: _s(10)),
-        SizedBox(width: 170, child: revisitButton),
-      ],
+        if (isNarrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildStatusFilterBar(),
+              SizedBox(height: _s(10)),
+              revisitButton,
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: _buildStatusFilterBar()),
+            SizedBox(width: _s(10)),
+            revisitButton,
+          ],
+        );
+      },
     );
   }
 
@@ -1136,6 +1167,14 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                   ),
                 ),
                 _cardActionButton(
+                  icon: Icons.phone_outlined,
+                  iconColor: AppColors.primary,
+                  onTap: _isValidPhone(visit.leadPhone)
+                      ? () => _launchCaller(visit.leadPhone)
+                      : null,
+                ),
+                SizedBox(width: _s(6)),
+                _cardActionButton(
                   icon: Icons.check_circle_outline,
                   onTap: () => _handleVisitAction('status', visit),
                 ),
@@ -1203,7 +1242,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
   Widget _cardActionButton({
     required IconData icon,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
+    Color? iconColor,
   }) {
     return InkWell(
       onTap: onTap,
@@ -1215,9 +1255,31 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           color: const Color(0xFFEFF2F8),
           borderRadius: BorderRadius.circular(_s(10)),
         ),
-        child: Icon(icon, size: _s(16), color: AppColors.textSecondary),
+        child: Icon(
+          icon,
+          size: _s(16),
+          color: onTap == null
+              ? AppColors.textSecondary.withValues(alpha: 0.45)
+              : (iconColor ?? AppColors.textSecondary),
+        ),
       ),
     );
+  }
+
+  bool _isValidPhone(String phone) {
+    final cleaned = phone.trim();
+    return cleaned.isNotEmpty && cleaned.toLowerCase() != 'n/a';
+  }
+
+  Future<void> _launchCaller(String? phone) async {
+    final normalizedPhone = (phone ?? '').trim();
+    if (normalizedPhone.isEmpty || normalizedPhone.toLowerCase() == 'n/a') {
+      return;
+    }
+    final uri = Uri.parse('tel:$normalizedPhone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
   }
 
   String _projectInitials(String project) {
@@ -1845,6 +1907,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           leadMap['full_name'] ??
           leadMap['first_name'],
     );
+    final leadPhone = _readString(
+      json['lead_phone'] ?? leadMap['phone'] ?? leadMap['mobile'],
+    );
     final projectName = _readString(json['project_name'] ?? projectMap['name']);
     final assigneeName = _readString(
       json['assigned_to_name'] ??
@@ -1870,6 +1935,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       id: id,
       property: projectName.isEmpty ? 'N/A' : projectName,
       lead: leadName.isEmpty ? 'N/A' : leadName,
+      leadPhone: leadPhone.isEmpty ? 'N/A' : leadPhone,
       location: _readString(
         projectMap['address'] ?? projectMap['locality'] ?? projectMap['city'],
       ).isEmpty
