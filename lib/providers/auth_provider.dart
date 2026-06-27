@@ -48,6 +48,16 @@ class AuthProvider {
     return _authService.forgotPassword(email: email);
   }
 
+  Future<String?> resetPassword({
+    required String token,
+    required String newPassword,
+  }) {
+    return _authService.resetPassword(
+      token: token,
+      newPassword: newPassword,
+    );
+  }
+
   Future<AuthProfileResult> profile({String? token}) {
     return _authService.profile(token: token);
   }

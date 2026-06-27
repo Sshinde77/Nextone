@@ -94,6 +94,13 @@ class AuthService {
 
     _logResponse('login', response);
 
+    if (response.statusCode == 401) {
+      final loginErrorBody = _decodeJsonMap(response.body);
+      final message =
+          loginErrorBody != null ? _readMessage(loginErrorBody) : null;
+      return message ?? 'Invalid credentials';
+    }
+
     final error = _handleResponse(response, fallbackMessage: 'Login failed.');
     if (error == null) {
       await _storeTokensFromResponse(response.body);
@@ -166,8 +173,9 @@ class AuthService {
   Future<ForgotPasswordResult> forgotPassword({required String email}) async {
     final uri =
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.forgotPassword}');
-    final headers = _headers(accept: '*/*');
-    final body = jsonEncode({'email': email});
+    final headers = _headers(accept: 'application/json');
+    final normalizedEmail = email.trim().toLowerCase();
+    final body = jsonEncode({'email': normalizedEmail});
     _logRequest(
       endpoint: 'forgotPassword',
       method: 'POST',
@@ -190,19 +198,23 @@ class AuthService {
         if (body is Map<String, dynamic>) {
           final dynamic message = body['message'];
           final dynamic data = body['data'];
-          String? resetToken;
+          final payload = data is Map<String, dynamic> ? data : body;
+          final token = _readForgotPasswordToken(payload);
+          final emailValue = _readStringValue(
+            payload,
+            const <String>['email'],
+          );
+          final expiresIn = _readStringValue(
+            payload,
+            const <String>['expires_in', 'expiresIn', 'expires'],
+          );
 
-          if (data is Map<String, dynamic>) {
-            final dynamic token = data['reset_token'];
-            if (token is String && token.trim().isNotEmpty) {
-              resetToken = token;
-            }
-          }
-
-          if (message is String && message.trim().isNotEmpty) {
+          if (message is String && message.trim().isNotEmpty && token != null) {
             return ForgotPasswordResult(
               message: message,
-              resetToken: resetToken,
+              token: token,
+              email: emailValue,
+              expiresIn: expiresIn,
             );
           }
         }
@@ -211,8 +223,14 @@ class AuthService {
       }
 
       return const ForgotPasswordResult(
-        message: 'Password reset token generated.',
+        message: 'Email verified. Use the token to reset your password.',
       );
+    }
+
+    if (response.statusCode == 404) {
+      final exactMessage = _readForgotPasswordErrorMessage(response.body) ??
+          'No account found with this email address';
+      throw Exception(exactMessage);
     }
 
     throw Exception(
@@ -220,6 +238,62 @@ class AuthService {
         response,
         fallbackMessage: 'Forgot password request failed.',
       ),
+    );
+  }
+
+  Future<String?> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    final normalizedToken = token.trim();
+    final normalizedPassword = newPassword.trim();
+    if (normalizedToken.isEmpty) {
+      throw Exception('Reset token is required.');
+    }
+    if (normalizedPassword.isEmpty) {
+      throw Exception('New password is required.');
+    }
+
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.resetPassword}');
+    final headers = _headers(accept: 'application/json');
+    final body = jsonEncode(<String, String>{
+      'token': normalizedToken,
+      'new_password': normalizedPassword,
+    });
+    _logRequest(
+      endpoint: 'resetPassword',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    http.Response response;
+    try {
+      response = await _sendWithRetry(
+        () => http.post(
+          uri,
+          headers: headers,
+          body: body,
+        ),
+      );
+    } on TimeoutException {
+      return AppErrorHandler.timeoutMessage;
+    } on SocketException {
+      return AppErrorHandler.noInternetMessage;
+    } on HandshakeException {
+      return AppErrorHandler.unknownMessage;
+    } on http.ClientException {
+      return AppErrorHandler.unknownMessage;
+    } catch (_) {
+      return AppErrorHandler.unknownMessage;
+    }
+
+    _logResponse('resetPassword', response);
+    return _handleResponse(
+      response,
+      fallbackMessage: 'Password reset failed.',
     );
   }
 
@@ -7611,6 +7685,69 @@ class AuthService {
   String? _readMessage(Map<String, dynamic> body) {
     final message = body['message'] ?? body['error'] ?? body['detail'];
     return message is String ? message : null;
+  }
+
+  Map<String, dynamic>? _decodeJsonMap(String responseBody) {
+    try {
+      final dynamic decoded = jsonDecode(responseBody);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // Ignore malformed JSON and fall back to the default message.
+    }
+    return null;
+  }
+
+  String? _readForgotPasswordToken(dynamic source) {
+    if (source is! Map<String, dynamic>) {
+      return null;
+    }
+
+    for (final key in const <String>[
+      'token',
+      'reset_token',
+      'resetToken',
+      'reset_password_token',
+    ]) {
+      final dynamic value = source[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+
+    return null;
+  }
+
+  String? _readForgotPasswordErrorMessage(String responseBody) {
+    try {
+      final dynamic decoded = jsonDecode(responseBody);
+      if (decoded is Map<String, dynamic>) {
+        for (final key in const <String>['message', 'error', 'detail']) {
+          final dynamic value = decoded[key];
+          if (value is String && value.trim().isNotEmpty) {
+            return value.trim();
+          }
+        }
+      }
+    } catch (_) {
+      // Fall back to the default message below.
+    }
+
+    return null;
+  }
+
+  String? _readStringValue(
+    Map<String, dynamic> source,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final dynamic value = source[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+    return null;
   }
 
   EffectivePermissionsResult _effectivePermissionsResultFromBody(

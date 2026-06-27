@@ -10,7 +10,7 @@ leads
 in leads remove tabs of my leads and team leads for admin and super admin ✔️
 check create lead form ✔️
 in the leads detail in the tab add call recording and reassign form ✔️
-remove share button in the lead list ✔️
+remove share button in the lead list ✔️ 
 
 assign drop down to be changed in all ✔️
 

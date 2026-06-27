@@ -1,8 +1,17 @@
 class ForgotPasswordResult {
-  const ForgotPasswordResult({required this.message, this.resetToken});
+  const ForgotPasswordResult({
+    required this.message,
+    this.token,
+    this.email,
+    this.expiresIn,
+  });
 
   final String message;
-  final String? resetToken;
+  final String? token;
+  final String? email;
+  final String? expiresIn;
+
+  String? get resetToken => token;
 }
 
 class AuthProfileResult {
