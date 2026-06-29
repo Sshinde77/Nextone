@@ -7620,6 +7620,7 @@ class AuthService {
       response.statusCode,
       response.body,
       fallbackMessage: fallbackMessage,
+      reasonPhrase: response.reasonPhrase,
     );
   }
 

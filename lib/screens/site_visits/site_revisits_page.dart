@@ -8,6 +8,7 @@ import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/searchable_dropdown_field.dart';
 import 'package:nextone/widgets/site_revisit_data_card.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -718,23 +719,24 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                         const SizedBox(height: 10),
                         const Text('Original Site Visit *'),
                         const SizedBox(height: 6),
-                        DropdownButtonFormField<_OriginalVisitOption>(
-                          initialValue: selectedVisit,
-                          isExpanded: true,
-                          decoration: _fieldDecoration(),
+                        SearchableDropdownField<_OriginalVisitOption>(
+                          label: 'Original Site Visit *',
+                          sheetTitle: 'Original Site Visit',
+                          showFieldLabel: false,
+                          value: selectedVisit,
+                          hintText: 'Select original visit...',
                           items: visits
                               .map(
-                                (v) => DropdownMenuItem<_OriginalVisitOption>(
+                                (v) => SearchableDropdownItem<_OriginalVisitOption>(
                                   value: v,
-                                  child: Text(v.label,
-                                      overflow: TextOverflow.ellipsis),
+                                  label: v.label,
+                                  subtitle: v.assigneeName,
                                 ),
                               )
                               .toList(),
-                          onChanged: isSubmitting
-                              ? null
-                              : (value) =>
-                                  setLocalState(() => selectedVisit = value),
+                          enabled: !isSubmitting,
+                          onChanged: (value) =>
+                              setLocalState(() => selectedVisit = value),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -1144,22 +1146,23 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                         const SizedBox(height: 10),
                         const Text('Assign To'),
                         const SizedBox(height: 6),
-                        DropdownButtonFormField<_TeamMemberOption>(
-                          initialValue: selectedMember,
-                          decoration:
-                              _fieldDecoration(hint: 'Select team member'),
+                        SearchableDropdownField<_TeamMemberOption>(
+                          label: 'Assign To',
+                          sheetTitle: 'Assign To',
+                          showFieldLabel: false,
+                          value: selectedMember,
+                          hintText: 'Select team member',
                           items: members
                               .map(
-                                (m) => DropdownMenuItem<_TeamMemberOption>(
+                                (m) => SearchableDropdownItem<_TeamMemberOption>(
                                   value: m,
-                                  child: Text(m.name,
-                                      overflow: TextOverflow.ellipsis),
+                                  label: m.name,
                                 ),
                               )
                               .toList(),
-                          onChanged: isSubmitting
-                              ? null
-                              : (v) => setLocalState(() => selectedMember = v),
+                          enabled: !isSubmitting,
+                          onChanged: (v) =>
+                              setLocalState(() => selectedMember = v),
                         ),
                         const SizedBox(height: 10),
                         const Text('Reason'),

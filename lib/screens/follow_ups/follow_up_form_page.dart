@@ -5,6 +5,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/searchable_dropdown_field.dart';
 
 class FollowUpFormPage extends StatefulWidget {
   const FollowUpFormPage({
@@ -280,58 +281,6 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _openLeadMenu(BuildContext context) async {
-    if (_isSubmitting || _isLoadingLeads || _leadOptions.isEmpty) {
-      return;
-    }
-
-    final fieldContext = context;
-    final renderBox = fieldContext.findRenderObject() as RenderBox?;
-    if (renderBox == null) {
-      return;
-    }
-
-    final overlay =
-        Overlay.of(fieldContext).context.findRenderObject() as RenderBox;
-    final topLeft = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
-    final bottomLeft = renderBox.localToGlobal(
-      Offset(0, renderBox.size.height),
-      ancestor: overlay,
-    );
-
-    final selected = await showMenu<String>(
-      context: fieldContext,
-      color: Colors.white,
-      elevation: 4,
-      constraints: BoxConstraints.tightFor(width: renderBox.size.width),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      position: RelativeRect.fromLTRB(
-        topLeft.dx,
-        bottomLeft.dy + 6,
-        overlay.size.width - topLeft.dx - renderBox.size.width,
-        overlay.size.height - bottomLeft.dy,
-      ),
-      items: _leadOptions
-          .map(
-            (lead) => PopupMenuItem<String>(
-              value: lead.id,
-              child: Text(lead.name),
-            ),
-          )
-          .toList(),
-    );
-
-    if (!mounted || selected == null) {
-      return;
-    }
-    setState(() {
-      _selectedLeadId = selected;
-    });
-  }
-
   Future<void> _openPriorityMenu(BuildContext context) async {
     if (_isSubmitting) {
       return;
@@ -468,78 +417,30 @@ class _FollowUpFormPageState extends State<FollowUpFormPage> {
   }
 
   Widget _buildLeadDropdown() {
-    String? selectedLeadLabel;
-    for (final lead in _leadOptions) {
-      if (lead.id == _selectedLeadId) {
-        selectedLeadLabel = lead.name;
-        break;
-      }
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Lead',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Builder(
-          builder: (fieldContext) {
-            return GestureDetector(
-              onTap: (_isSubmitting || _isLoadingLeads)
-                  ? null
-                  : () => _openLeadMenu(fieldContext),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      selectedLeadLabel ?? 'Select lead',
-                      style: TextStyle(
-                        color: selectedLeadLabel == null
-                            ? Colors.grey
-                            : Colors.black,
-                      ),
-                    ),
-                    const Icon(Icons.keyboard_arrow_down),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-        if (_isLoadingLeads) ...[
-          const SizedBox(height: 8),
-          const Text(
-            'Loading leads...',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-        ],
-        if (_leadLoadError != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _leadLoadError!,
-            style: const TextStyle(fontSize: 12, color: AppColors.error),
-          ),
-          const SizedBox(height: 4),
-          TextButton(
-            onPressed: _loadLeadOptions,
-            child: const Text('Retry'),
-          ),
-        ],
-      ],
+    return SearchableDropdownField<String>(
+      label: 'Lead',
+      value: _selectedLeadId,
+      hintText: _isLoadingLeads
+          ? 'Loading leads...'
+          : _leadOptions.isEmpty
+              ? 'No leads available'
+              : 'Select lead',
+      items: _leadOptions
+          .map(
+            (lead) => SearchableDropdownItem<String>(
+              value: lead.id,
+              label: lead.name,
+            ),
+          )
+          .toList(),
+      isLoading: _isLoadingLeads,
+      errorText: _leadLoadError,
+      onRetry: _loadLeadOptions,
+      onChanged: (value) {
+        setState(() {
+          _selectedLeadId = value;
+        });
+      },
     );
   }
 

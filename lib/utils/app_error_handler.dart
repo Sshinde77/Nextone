@@ -16,8 +16,6 @@ class AppErrorHandler {
   static const String notFoundMessage = 'Requested data not found.';
   static const String validationFallbackMessage =
       'Please check the entered details.';
-  static const String serverErrorMessage =
-      'Something went wrong on our side. Please try again later.';
   static const String unknownMessage =
       'Something went wrong. Please try again.';
 
@@ -97,13 +95,6 @@ class AppErrorHandler {
           ? validationMessage!.trim()
           : validationFallbackMessage;
     }
-    if (_containsAny(lower, const <String>[
-      '500',
-      'internal server error',
-      'server error',
-    ])) {
-      return serverErrorMessage;
-    }
     if (_looksTechnical(lower)) {
       return fallbackMessage ?? unknownMessage;
     }
@@ -115,6 +106,7 @@ class AppErrorHandler {
     int statusCode,
     String responseBody, {
     String? fallbackMessage,
+    String? reasonPhrase,
   }) {
     if (statusCode == 401) {
       return sessionExpiredMessage;
@@ -125,9 +117,6 @@ class AppErrorHandler {
     if (statusCode == 404) {
       return notFoundMessage;
     }
-    if (statusCode == 500) {
-      return serverErrorMessage;
-    }
     if (statusCode == 422) {
       final validationMessage = _extractValidationMessage(responseBody);
       return validationMessage?.trim().isNotEmpty == true
@@ -137,10 +126,17 @@ class AppErrorHandler {
 
     final parsedMessage = _extractMessage(responseBody);
     if (parsedMessage != null && parsedMessage.trim().isNotEmpty) {
-      return friendlyMessage(
-        parsedMessage,
-        fallbackMessage: fallbackMessage,
-      );
+      return parsedMessage.trim();
+    }
+
+    final rawBody = responseBody.trim();
+    if (rawBody.isNotEmpty) {
+      return rawBody;
+    }
+
+    final rawReason = reasonPhrase?.trim();
+    if (rawReason != null && rawReason.isNotEmpty) {
+      return rawReason;
     }
 
     return fallbackMessage ?? unknownMessage;

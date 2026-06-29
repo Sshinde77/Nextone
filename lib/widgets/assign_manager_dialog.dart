@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/widgets/searchable_dropdown_field.dart';
 
 class AssignManagerOption {
   const AssignManagerOption({
@@ -183,100 +184,26 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
                                     ),
                                   ),
                                 )
-                              : DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _selectedManagerId,
-                                    isExpanded: true,
-                                    isDense: true,
-                                    itemHeight: 48,
-                                    menuMaxHeight: media.height * 0.45,
-                                    icon: const Icon(
-                                      Icons.keyboard_arrow_down_rounded,
-                                    ),
-                                    selectedItemBuilder: (context) {
-                                      return widget.managers
-                                          .map(
-                                            (manager) => Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Text.rich(
-                                                TextSpan(
-                                                  text: manager.name,
-                                                  style: const TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                  children: [
-                                                    if (manager.roleLabel
-                                                        .trim()
-                                                        .isNotEmpty)
-                                                      TextSpan(
-                                                        text:
-                                                            '  ${manager.roleLabel}',
-                                                        style: const TextStyle(
-                                                          fontSize: 10,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: AppColors
-                                                              .textSecondary,
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          )
-                                          .toList();
-                                    },
-                                    items: widget.managers
-                                        .map(
-                                          (manager) => DropdownMenuItem<String>(
-                                            value: manager.id,
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                vertical: 6,
-                                              ),
-                                              child: Text.rich(
-                                                TextSpan(
-                                                  text: manager.name,
-                                                  style: const TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w700,
-                                                    color:
-                                                        AppColors.textPrimary,
-                                                  ),
-                                                  children: [
-                                                    if (manager.roleLabel
-                                                        .trim()
-                                                        .isNotEmpty)
-                                                      TextSpan(
-                                                        text:
-                                                            '  ${manager.roleLabel}',
-                                                        style: const TextStyle(
-                                                          fontSize: 10,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: AppColors
-                                                              .textSecondary,
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: (value) {
-                                      if (value == null) return;
-                                      setState(
-                                          () => _selectedManagerId = value);
-                                    },
-                                  ),
+                              : SearchableDropdownField<String>(
+                                  label: 'Assign Manager',
+                                  sheetTitle: 'Assign Manager',
+                                  showFieldLabel: false,
+                                  value: _selectedManagerId,
+                                  hintText: widget.actionLabel,
+                                  items: widget.managers
+                                      .map(
+                                        (manager) => SearchableDropdownItem<String>(
+                                          value: manager.id,
+                                          label: manager.name,
+                                          subtitle: manager.roleLabel,
+                                        ),
+                                      )
+                                      .toList(),
+                                  enabled: widget.managers.isNotEmpty,
+                                  onChanged: (value) {
+                                    if (value == null) return;
+                                    setState(() => _selectedManagerId = value);
+                                  },
                                 ),
                         ),
                         const SizedBox(height: 20),

@@ -12,6 +12,7 @@ import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/searchable_dropdown_field.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LeadDetailPage extends StatefulWidget {
@@ -804,19 +805,21 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              DropdownButtonFormField<String>(
-                initialValue: _selectedNextStatus,
-                isExpanded: true,
-                decoration: _fieldDecoration('Select status'),
+              SearchableDropdownField<String>(
+                label: 'Status',
+                sheetTitle: 'Update Status',
+                value: _selectedNextStatus,
+                hintText: 'Select status',
                 items: nextStatuses
-                    .map((status) => DropdownMenuItem<String>(
-                          value: status,
-                          child: Text(_prettyStatus(status)),
-                        ))
+                    .map(
+                      (status) => SearchableDropdownItem<String>(
+                        value: status,
+                        label: _prettyStatus(status),
+                      ),
+                    )
                     .toList(),
-                onChanged: _isSubmittingStatus
-                    ? null
-                    : (value) => setState(() => _selectedNextStatus = value),
+                enabled: !_isSubmittingStatus,
+                onChanged: (value) => setState(() => _selectedNextStatus = value),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -873,19 +876,21 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              DropdownButtonFormField<String>(
-                initialValue: _selectedAssigneeId,
-                isExpanded: true,
-                decoration: _fieldDecoration('Select assignee'),
+              SearchableDropdownField<String>(
+                label: 'Assignee',
+                sheetTitle: 'Reassign Lead',
+                value: _selectedAssigneeId,
+                hintText: 'Select assignee',
                 items: _assigneeOptions
-                    .map((user) => DropdownMenuItem<String>(
-                          value: user.id,
-                          child: Text(user.name),
-                        ))
+                    .map(
+                      (user) => SearchableDropdownItem<String>(
+                        value: user.id,
+                        label: user.name,
+                      ),
+                    )
                     .toList(),
-                onChanged: _isSubmittingReassign
-                    ? null
-                    : (value) => setState(() => _selectedAssigneeId = value),
+                enabled: !_isSubmittingReassign,
+                onChanged: (value) => setState(() => _selectedAssigneeId = value),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -2700,18 +2705,21 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
             ],
           ),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: selectedKey,
-            isExpanded: true,
-            decoration: _fieldDecoration('Select stage'),
+          SearchableDropdownField<String>(
+            label: 'Pipeline Status',
+            sheetTitle: 'Pipeline Status',
+            showFieldLabel: false,
+            value: selectedKey,
+            hintText: 'Select stage',
             items: statuses
                 .map(
-                  (s) => DropdownMenuItem<String>(
+                  (s) => SearchableDropdownItem<String>(
                     value: s.key,
-                    child: Text(s.label),
+                    label: s.label,
                   ),
                 )
                 .toList(),
+            enabled: true,
             onChanged: (value) =>
                 setState(() => _selectedPipelineStatusKey = value),
           ),

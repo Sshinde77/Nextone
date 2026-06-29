@@ -7,6 +7,7 @@ import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/searchable_dropdown_field.dart';
 
 class LeadFormPage extends StatefulWidget {
   const LeadFormPage({
@@ -669,18 +670,17 @@ class _LeadFormPageState extends State<LeadFormPage> {
                     const SizedBox(height: 12),
                     _buildProjectDropdown(),
                     const SizedBox(height: 12),
-                    _buildSelectionDropdown<String>(
+                    SearchableDropdownField<String>(
                       label: 'Lead Source',
-                      selectedValue: _selectedLeadSource,
-                      selectedLabel: _selectedLeadSource,
-                      placeholder: _isLoadingLeadSources
+                      value: _selectedLeadSource,
+                      hintText: _isLoadingLeadSources
                           ? 'Loading lead sources...'
                           : _leadSourceOptions.isEmpty
                               ? 'No lead sources available'
                               : 'Select lead source',
-                      options: _leadSourceOptions
+                      items: _leadSourceOptions
                           .map(
-                            (option) => _DropdownOption<String>(
+                            (option) => SearchableDropdownItem<String>(
                               value: option.name,
                               label: option.name,
                             ),
@@ -689,7 +689,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
                       isLoading: _isLoadingLeadSources,
                       errorText: _leadSourceLoadError,
                       onRetry: _loadLeadSourceOptions,
-                      onSelected: (value) {
+                      onChanged: (value) {
                         setState(() {
                           _selectedLeadSource = value;
                         });
@@ -772,26 +772,17 @@ class _LeadFormPageState extends State<LeadFormPage> {
   }
 
   Widget _buildAssigneeDropdown() {
-    String? selectedLabel;
-    for (final user in _assigneeOptions) {
-      if (user.id == _selectedAssigneeId) {
-        selectedLabel = user.name;
-        break;
-      }
-    }
-
-    return _buildSelectionDropdown<String>(
+    return SearchableDropdownField<String>(
       label: 'Assigned To',
-      selectedValue: _selectedAssigneeId,
-      selectedLabel: selectedLabel,
-      placeholder: _isLoadingAssignees
+      value: _selectedAssigneeId,
+      hintText: _isLoadingAssignees
           ? 'Loading assignees...'
           : _assigneeOptions.isEmpty
               ? 'No assignee options available'
               : 'Select assignee',
-      options: _assigneeOptions
+      items: _assigneeOptions
           .map(
-            (user) => _DropdownOption<String>(
+            (user) => SearchableDropdownItem<String>(
               value: user.id,
               label: user.name,
             ),
@@ -801,7 +792,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
       errorText: _assigneeLoadError,
       helperText: _isLoadingAssignees ? 'Loading team members...' : null,
       onRetry: _loadAssigneeOptions,
-      onSelected: (value) {
+      onChanged: (value) {
         setState(() {
           _selectedAssigneeId = value;
         });
@@ -810,26 +801,17 @@ class _LeadFormPageState extends State<LeadFormPage> {
   }
 
   Widget _buildProjectDropdown() {
-    String? selectedLabel;
-    for (final option in _projectOptions) {
-      if (option.id == _selectedProjectId) {
-        selectedLabel = option.name;
-        break;
-      }
-    }
-
-    return _buildSelectionDropdown<String>(
+    return SearchableDropdownField<String>(
       label: 'Project Name',
-      selectedValue: _selectedProjectId,
-      selectedLabel: selectedLabel,
-      placeholder: _isLoadingProjects
+      value: _selectedProjectId,
+      hintText: _isLoadingProjects
           ? 'Loading projects...'
           : _projectOptions.isEmpty
               ? 'No projects available'
               : 'Select project',
-      options: _projectOptions
+      items: _projectOptions
           .map(
-            (project) => _DropdownOption<String>(
+            (project) => SearchableDropdownItem<String>(
               value: project.id,
               label: project.name,
             ),
@@ -838,98 +820,11 @@ class _LeadFormPageState extends State<LeadFormPage> {
       isLoading: _isLoadingProjects,
       errorText: _projectLoadError,
       onRetry: _loadProjectOptions,
-      onSelected: (value) {
+      onChanged: (value) {
         setState(() {
           _selectedProjectId = value;
         });
       },
-    );
-  }
-
-  Widget _buildSelectionDropdown<T>({
-    required String label,
-    required T? selectedValue,
-    required String? selectedLabel,
-    required String placeholder,
-    required List<_DropdownOption<T>> options,
-    required ValueChanged<T?> onSelected,
-    bool isLoading = false,
-    String? errorText,
-    String? helperText,
-    Future<void> Function()? onRetry,
-  }) {
-    final hasSelectedValue = selectedValue != null &&
-        options.any((option) => option.value == selectedValue);
-    T? dropdownValue;
-    if (hasSelectedValue) {
-      dropdownValue = selectedValue;
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 6),
-        DropdownButtonFormField<T>(
-          initialValue: dropdownValue,
-          isExpanded: true,
-          decoration: _fieldDecoration(hintText: placeholder),
-          items: options
-              .map(
-                (option) => DropdownMenuItem<T>(
-                  value: option.value,
-                  child: Text(
-                    option.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (_isSubmitting || isLoading || options.isEmpty)
-              ? null
-              : onSelected,
-          hint: Text(
-            selectedLabel?.isNotEmpty == true ? selectedLabel! : placeholder,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: selectedLabel?.isNotEmpty == true
-                  ? Colors.black
-                  : Colors.grey,
-            ),
-          ),
-        ),
-        if (helperText != null && helperText.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            helperText,
-            style:
-                const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-        ],
-        if (errorText != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            errorText,
-            style: const TextStyle(fontSize: 12, color: AppColors.error),
-          ),
-          if (onRetry != null) ...[
-            const SizedBox(height: 4),
-            TextButton(
-              onPressed: onRetry,
-              child: const Text('Retry'),
-            ),
-          ],
-        ],
-      ],
     );
   }
 
@@ -1107,14 +1002,4 @@ class _ProjectOption {
 
     return _ProjectOption(id: id, name: name);
   }
-}
-
-class _DropdownOption<T> {
-  const _DropdownOption({
-    required this.value,
-    required this.label,
-  });
-
-  final T value;
-  final String label;
 }

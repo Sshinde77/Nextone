@@ -7,6 +7,7 @@ import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/closure_data_card.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
+import 'package:nextone/widgets/searchable_dropdown_field.dart';
 
 class _SelectionOption {
   const _SelectionOption({
@@ -314,14 +315,13 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           label: 'Lead *',
                           value: selectedLeadId,
                           hint: 'Select lead to book...',
-                          items: leads
+                          items: const <DropdownMenuItem<String>>[],
+                          searchable: true,
+                          searchableItems: leads
                               .map(
-                                (e) => DropdownMenuItem<String>(
+                                (e) => SearchableDropdownItem<String>(
                                   value: _readString(e['id'], fallback: ''),
-                                  child: Text(
-                                    _readString(e['name'], fallback: 'Lead'),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                  label: _readString(e['name'], fallback: 'Lead'),
                                 ),
                               )
                               .toList(),
@@ -333,14 +333,14 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           label: 'Project *',
                           value: selectedProjectId,
                           hint: 'Select project...',
-                          items: projects
+                          items: const <DropdownMenuItem<String>>[],
+                          searchable: true,
+                          searchableItems: projects
                               .map(
-                                (e) => DropdownMenuItem<String>(
+                                (e) => SearchableDropdownItem<String>(
                                   value: _readString(e['id'], fallback: ''),
-                                  child: Text(
-                                    _readString(e['name'], fallback: 'Project'),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                  label:
+                                      _readString(e['name'], fallback: 'Project'),
                                 ),
                               )
                               .toList(),
@@ -664,7 +664,30 @@ class _ClosuresPageState extends State<ClosuresPage> {
     required String hint,
     required List<DropdownMenuItem<String>> items,
     required ValueChanged<String?> onChanged,
+    bool searchable = false,
+    List<SearchableDropdownItem<String>>? searchableItems,
   }) {
+    if (searchable) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label),
+          const SizedBox(height: 6),
+          SearchableDropdownField<String>(
+            label: label,
+            sheetTitle: label,
+            showFieldLabel: false,
+            value: (value ?? '').isEmpty ? null : value,
+            hintText: hint,
+            items: searchableItems ?? const <SearchableDropdownItem<String>>[],
+            enabled: (searchableItems ?? const <SearchableDropdownItem<String>>[])
+                .isNotEmpty,
+            onChanged: onChanged,
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1689,23 +1712,24 @@ class _ClosuresPageState extends State<ClosuresPage> {
                       const SizedBox(height: 12),
                       const Text('New Status'),
                       const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedStatus,
-                        decoration: _fieldDecoration(hint: 'Select status'),
+                      SearchableDropdownField<String>(
+                        label: 'New Status',
+                        sheetTitle: 'Change Closure Status',
+                        showFieldLabel: false,
+                        value: selectedStatus,
+                        hintText: 'Select status',
                         items: allowedStatuses
                             .map(
-                              (s) => DropdownMenuItem<String>(
+                              (s) => SearchableDropdownItem<String>(
                                 value: s,
-                                child: Text(s),
+                                label: s,
                               ),
                             )
                             .toList(),
-                        onChanged: isSubmitting
-                            ? null
-                            : (value) => setLocalState(
-                                  () =>
-                                      selectedStatus = value ?? selectedStatus,
-                                ),
+                        enabled: !isSubmitting,
+                        onChanged: (value) => setLocalState(
+                          () => selectedStatus = value ?? selectedStatus,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       const Text('Note (optional)'),

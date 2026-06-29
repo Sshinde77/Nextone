@@ -4,6 +4,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/searchable_dropdown_field.dart';
 
 class SiteVisitFormPage extends StatefulWidget {
   final String? visitId;
@@ -202,8 +203,8 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
     return null;
   }
 
-  List<_DropdownOption> _buildAssigneeOptions() {
-    final unique = <String, _DropdownOption>{};
+  List<SearchableDropdownItem<String>> _buildAssigneeOptions() {
+    final unique = <String, SearchableDropdownItem<String>>{};
     for (final member in _teamMembers) {
       if (!_readUserActive(member)) {
         continue;
@@ -220,7 +221,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       }
 
       final roleLabel = _readUserRoleLabel(member);
-      unique[id] = _DropdownOption(
+      unique[id] = SearchableDropdownItem<String>(
         value: id,
         label: roleLabel.isEmpty ? name : '$name ($roleLabel)',
       );
@@ -418,11 +419,12 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                         _buildLabel('LEAD *'),
                         const SizedBox(height: 8),
                         _buildDropdown(
+                          sheetTitle: 'Lead',
                           value: _selectedLeadId,
                           hint: 'Select lead...',
                           items: _leads
                               .map(
-                                (e) => _DropdownOption(
+                                (e) => SearchableDropdownItem<String>(
                                   value: e['id'].toString(),
                                   label: (e['name'] ?? 'Unknown').toString(),
                                 ),
@@ -437,11 +439,12 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                         _buildLabel('PROJECT *'),
                         const SizedBox(height: 8),
                         _buildDropdown(
+                          sheetTitle: 'Project',
                           value: _selectedProjectId,
                           hint: 'Select project...',
                           items: _projects
                               .map(
-                                (e) => _DropdownOption(
+                                (e) => SearchableDropdownItem<String>(
                                   value: e['id'].toString(),
                                   label: (e['name'] ?? 'Unknown').toString(),
                                 ),
@@ -494,6 +497,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                         _buildLabel('ASSIGN TO'),
                         const SizedBox(height: 8),
                         _buildDropdown(
+                          sheetTitle: 'Assign To',
                           value: _selectedAssigneeId,
                           hint: 'Select team member...',
                           items: _buildAssigneeOptions(),
@@ -593,141 +597,24 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
   }
 
   Widget _buildDropdown({
+    required String sheetTitle,
     required String? value,
     required String hint,
-    required List<_DropdownOption> items,
+    required List<SearchableDropdownItem<String>> items,
     required void Function(String?) onChanged,
     String? Function(String?)? validator,
   }) {
-    _DropdownOption? selectedOption;
-    if (value != null) {
-      for (final item in items) {
-        if (item.value == value) {
-          selectedOption = item;
-          break;
-        }
-      }
-    }
-
-    return FormField<String>(
-      initialValue: value,
+    return SearchableDropdownField<String>(
+      label: sheetTitle,
+      sheetTitle: sheetTitle,
+      showFieldLabel: false,
+      value: value,
+      hintText: hint,
+      items: items,
+      enabled: !_isSubmitting && !_isLoadingDropdowns && items.isNotEmpty,
+      isLoading: _isLoadingDropdowns,
       validator: validator,
-      autovalidateMode: AutovalidateMode.onUserInteraction,
-      builder: (fieldState) {
-        final displayText = selectedOption?.label.isNotEmpty == true
-            ? selectedOption!.label
-            : hint;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Builder(
-              builder: (fieldContext) {
-                return GestureDetector(
-                  onTap: (_isSubmitting || _isLoadingDropdowns || items.isEmpty)
-                      ? null
-                      : () async {
-                          final renderBox =
-                              fieldContext.findRenderObject() as RenderBox?;
-                          if (renderBox == null) {
-                            return;
-                          }
-
-                          final overlay = Overlay.of(fieldContext)
-                              .context
-                              .findRenderObject() as RenderBox;
-                          final topLeft = renderBox.localToGlobal(
-                            Offset.zero,
-                            ancestor: overlay,
-                          );
-                          final bottomLeft = renderBox.localToGlobal(
-                            Offset(0, renderBox.size.height),
-                            ancestor: overlay,
-                          );
-
-                          final selected = await showMenu<String>(
-                            context: fieldContext,
-                            color: Colors.white,
-                            elevation: 4,
-                            constraints: BoxConstraints.tightFor(
-                                width: renderBox.size.width),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: const BorderSide(color: AppColors.border),
-                            ),
-                            position: RelativeRect.fromLTRB(
-                              topLeft.dx,
-                              bottomLeft.dy + 6,
-                              overlay.size.width -
-                                  topLeft.dx -
-                                  renderBox.size.width,
-                              overlay.size.height - bottomLeft.dy,
-                            ),
-                            items: items
-                                .map(
-                                  (item) => PopupMenuItem<String>(
-                                    value: item.value,
-                                    child: Text(item.label.isEmpty
-                                        ? 'Unknown'
-                                        : item.label),
-                                  ),
-                                )
-                                .toList(),
-                          );
-
-                          if (!mounted || selected == null) {
-                            return;
-                          }
-                          fieldState.didChange(selected);
-                          onChanged(selected);
-                        },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 14),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: fieldState.hasError
-                            ? AppColors.error
-                            : AppColors.border,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.white,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            displayText,
-                            style: TextStyle(
-                              color: selectedOption == null
-                                  ? AppColors.textSecondary
-                                  : AppColors.textPrimary,
-                              fontSize: 14,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const Icon(Icons.keyboard_arrow_down),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-            if (fieldState.hasError) ...[
-              const SizedBox(height: 6),
-              Text(
-                fieldState.errorText ?? '',
-                style: const TextStyle(
-                  color: AppColors.error,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ],
-        );
-      },
+      onChanged: onChanged,
     );
   }
 
@@ -769,14 +656,4 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       ),
     );
   }
-}
-
-class _DropdownOption {
-  final String value;
-  final String label;
-
-  const _DropdownOption({
-    required this.value,
-    required this.label,
-  });
 }

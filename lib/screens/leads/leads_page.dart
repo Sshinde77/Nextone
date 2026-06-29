@@ -18,6 +18,7 @@ import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
+import 'package:nextone/widgets/searchable_dropdown_field.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -469,47 +470,53 @@ class _LeadsPageState extends State<LeadsPage> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String?>(
-                    initialValue: tempSource,
-                    decoration: _sheetFieldDecoration('Select source'),
-                    items: <DropdownMenuItem<String?>>[
-                      const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('All'),
+                  SearchableDropdownField<String>(
+                    label: 'Source',
+                    sheetTitle: 'Select source',
+                    value: tempSource ?? '',
+                    hintText: 'All',
+                    items: <SearchableDropdownItem<String>>[
+                      const SearchableDropdownItem<String>(
+                        value: '',
+                        label: 'All',
                       ),
                       ..._sourceOptions.map(
-                        (source) => DropdownMenuItem<String?>(
+                        (source) => SearchableDropdownItem<String>(
                           value: source,
-                          child: Text(source),
+                          label: source,
                         ),
                       ),
                     ],
+                    enabled: true,
                     onChanged: (value) {
                       setSheetState(() {
-                        tempSource = value;
+                        tempSource = value == null || value.isEmpty ? null : value;
                       });
                     },
                   ),
                   if (!_isMyLeadsTab) ...[
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String?>(
-                      initialValue: tempTeamId,
-                      decoration: _sheetFieldDecoration('Select team member'),
-                      items: <DropdownMenuItem<String?>>[
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('All'),
+                    SearchableDropdownField<String>(
+                      label: 'Team Member',
+                      sheetTitle: 'Select team member',
+                      value: tempTeamId ?? '',
+                      hintText: 'All',
+                      items: <SearchableDropdownItem<String>>[
+                        const SearchableDropdownItem<String>(
+                          value: '',
+                          label: 'All',
                         ),
                         ..._assigneeOptions.map(
-                          (assignee) => DropdownMenuItem<String?>(
+                          (assignee) => SearchableDropdownItem<String>(
                             value: assignee.id,
-                            child: Text(assignee.name),
+                            label: assignee.name,
                           ),
                         ),
                       ],
+                      enabled: true,
                       onChanged: (value) {
                         setSheetState(() {
-                          tempTeamId = value;
+                          tempTeamId = value == null || value.isEmpty ? null : value;
                         });
                       },
                     ),
@@ -1613,25 +1620,27 @@ class _LeadsPageState extends State<LeadsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedAssigneeId,
-                    isExpanded: true,
-                    decoration: _sheetFieldDecoration('Select assignee'),
+                  SearchableDropdownField<String>(
+                    label: 'Assignee',
+                    sheetTitle: lead.assignedToId.isEmpty
+                        ? 'Assign Lead'
+                        : 'Reassign Lead',
+                    value: _selectedAssigneeId,
+                    hintText: 'Select assignee',
                     items: _assigneeOptions
                         .map(
-                          (user) => DropdownMenuItem<String>(
+                          (user) => SearchableDropdownItem<String>(
                             value: user.id,
-                            child: Text(user.name),
+                            label: user.name,
                           ),
                         )
                         .toList(),
-                    onChanged: _isSubmittingReassign
-                        ? null
-                        : (value) {
-                            setSheetState(() {
-                              _selectedAssigneeId = value;
-                            });
-                          },
+                    enabled: !_isSubmittingReassign,
+                    onChanged: (value) {
+                      setSheetState(() {
+                        _selectedAssigneeId = value;
+                      });
+                    },
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -1746,25 +1755,25 @@ class _LeadsPageState extends State<LeadsPage> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedAssigneeId,
-                    isExpanded: true,
-                    decoration: _sheetFieldDecoration('Select assignee'),
+                  SearchableDropdownField<String>(
+                    label: 'Assignee',
+                    sheetTitle: 'Assign Selected Leads',
+                    value: _selectedAssigneeId,
+                    hintText: 'Select assignee',
                     items: _assigneeOptions
                         .map(
-                          (user) => DropdownMenuItem<String>(
+                          (user) => SearchableDropdownItem<String>(
                             value: user.id,
-                            child: Text(user.name),
+                            label: user.name,
                           ),
                         )
                         .toList(),
-                    onChanged: _isSubmittingReassign
-                        ? null
-                        : (value) {
-                            setSheetState(() {
-                              _selectedAssigneeId = value;
-                            });
-                          },
+                    enabled: !_isSubmittingReassign,
+                    onChanged: (value) {
+                      setSheetState(() {
+                        _selectedAssigneeId = value;
+                      });
+                    },
                   ),
                   const SizedBox(height: 10),
                   TextField(

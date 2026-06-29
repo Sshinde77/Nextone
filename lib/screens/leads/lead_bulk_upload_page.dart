@@ -5,6 +5,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
+import 'package:nextone/widgets/searchable_dropdown_field.dart';
 
 class LeadBulkUploadResult {
   const LeadBulkUploadResult({
@@ -718,8 +719,6 @@ class _AssigneeDropdown extends StatefulWidget {
 }
 
 class _AssigneeDropdownState extends State<_AssigneeDropdown> {
-  bool _isOpen = false;
-
   static const List<String> _groupOrder = <String>[
     'Sales Managers',
     'Sales Executives',
@@ -728,85 +727,43 @@ class _AssigneeDropdownState extends State<_AssigneeDropdown> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedName = _selectedName;
     final hasOptions = widget.options.isNotEmpty;
     final isEnabled = widget.enabled && hasOptions;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        return PopupMenuButton<String>(
-          enabled: isEnabled,
-          position: PopupMenuPosition.under,
-          offset: const Offset(0, 6),
-          constraints: BoxConstraints(
-            minWidth: constraints.maxWidth,
-            maxWidth: constraints.maxWidth,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Color(0xFFE2E8F0)),
-          ),
-          color: Colors.white,
-          elevation: 8,
-          onOpened: () => setState(() => _isOpen = true),
-          onCanceled: () => setState(() => _isOpen = false),
-          onSelected: (value) {
-            setState(() => _isOpen = false);
-            widget.onSelected(value);
-          },
-          itemBuilder: (context) {
-            final items = <PopupMenuEntry<String>>[];
-            for (final group in _groupOrder) {
-              final groupOptions = widget.options
-                  .where((option) => option.group == group)
-                  .toList();
-              if (groupOptions.isEmpty) {
-                continue;
-              }
-              items.add(_groupHeader(group));
-              for (final option in groupOptions) {
-                items.add(
-                  PopupMenuItem<String>(
+        if (!hasOptions) {
+          return _buildField(
+            text: 'No active team members',
+            showHint: true,
+            enabled: false,
+          );
+        }
+
+        return SizedBox(
+          width: constraints.maxWidth,
+          child: SearchableDropdownField<String>(
+            label: 'Assign all leads to',
+            sheetTitle: 'Assign team member',
+            showFieldLabel: false,
+            value: widget.selectedId,
+            hintText: widget.hintText,
+            items: widget.options
+                .map(
+                  (option) => SearchableDropdownItem<String>(
                     value: option.id,
-                    height: 40,
-                    child: Text(
-                      option.name,
-                      style: const TextStyle(
-                        color: Color(0xFF334155),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    label: option.name,
+                    subtitle: option.group,
+                    groupLabel: option.group,
                   ),
-                );
-              }
-            }
-            return items;
-          },
-          child: _buildField(
-            text: hasOptions
-                ? (selectedName ?? widget.hintText)
-                : 'No active team members',
-            showHint: selectedName == null,
+                )
+                .toList(),
             enabled: isEnabled,
+            groupOrder: _groupOrder,
+            onChanged: widget.onSelected,
           ),
         );
       },
-    );
-  }
-
-  PopupMenuEntry<String> _groupHeader(String title) {
-    return PopupMenuItem<String>(
-      enabled: false,
-      height: 38,
-      child: Text(
-        '-- $title --',
-        style: const TextStyle(
-          color: Color(0xFF334155),
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
     );
   }
 
@@ -823,10 +780,7 @@ class _AssigneeDropdownState extends State<_AssigneeDropdown> {
       decoration: BoxDecoration(
         color: enabled ? Colors.white : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _isOpen ? AppColors.primary : const Color(0xFFDCE3ED),
-          width: _isOpen ? 1.5 : 1,
-        ),
+        border: Border.all(color: const Color(0xFFDCE3ED)),
       ),
       child: Row(
         children: [
@@ -845,7 +799,7 @@ class _AssigneeDropdownState extends State<_AssigneeDropdown> {
             ),
           ),
           Icon(
-            _isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+            Icons.keyboard_arrow_down,
             color: const Color(0xFF94A3B8),
             size: 22,
           ),
@@ -854,18 +808,6 @@ class _AssigneeDropdownState extends State<_AssigneeDropdown> {
     );
   }
 
-  String? get _selectedName {
-    final selectedId = widget.selectedId;
-    if (selectedId == null || selectedId.isEmpty) {
-      return null;
-    }
-    for (final option in widget.options) {
-      if (option.id == selectedId) {
-        return option.name;
-      }
-    }
-    return null;
-  }
 }
 
 class _StepNumber extends StatelessWidget {
