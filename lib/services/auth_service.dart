@@ -3574,6 +3574,84 @@ class AuthService {
     };
   }
 
+  Future<Map<String, dynamic>> createLeadWithFollowUp({
+    required String name,
+    required String phone,
+    String alternatePhoneNumber = '',
+    required String email,
+    required String source,
+    String projectId = '',
+    required String assignedTo,
+    String budget = '',
+    String locationPreference = '',
+    String configuration = '',
+    String leadNotes = '',
+    String callbackTime = '',
+    String nextFollowUpTime = '',
+    required String title,
+    required String dueDate,
+    required String priority,
+    required String notes,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+        '${ApiConstants.baseUrl}${ApiConstants.createFollowUpWithLead}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final requestPayload = <String, dynamic>{
+      'name': name.trim(),
+      'phone': phone.trim(),
+      'alternate_phone_number': alternatePhoneNumber.trim(),
+      'email': email.trim(),
+      'source': source.trim(),
+      'project_id': projectId.trim(),
+      'assigned_to': assignedTo.trim(),
+      'budget': budget.trim(),
+      'location_preference': locationPreference.trim(),
+      'configuration': configuration.trim(),
+      'lead_notes': leadNotes.trim(),
+      'callback_time': callbackTime.trim(),
+      'next_followup_time': nextFollowUpTime.trim(),
+      'title': title.trim(),
+      'due_date': dueDate.trim(),
+      'priority': priority.trim(),
+      'notes': notes.trim(),
+    };
+    final body = jsonEncode(requestPayload);
+
+    _logRequest(
+      endpoint: 'createLeadWithFollowUp',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('createLeadWithFollowUp', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create lead with follow-up.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return _mergeCreateLeadWithFollowUpResponse(decoded, requestPayload);
+      }
+    } catch (_) {
+      // Fall through and return the submitted payload below.
+    }
+
+    return requestPayload;
+  }
+
   Future<Map<String, dynamic>> editFollowUp({
     required String id,
     String? title,
@@ -4366,6 +4444,84 @@ class AuthService {
     };
   }
 
+  Future<Map<String, dynamic>> createSiteVisitWithLead({
+    required String name,
+    required String phone,
+    String alternatePhoneNumber = '',
+    required String email,
+    required String source,
+    String projectId = '',
+    required String assignedTo,
+    String budget = '',
+    String locationPreference = '',
+    String configuration = '',
+    String leadNotes = '',
+    String callbackTime = '',
+    String nextFollowUpTime = '',
+    required String visitDate,
+    required String visitTime,
+    required String notes,
+    required bool transportArranged,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+        '${ApiConstants.baseUrl}${ApiConstants.createSiteVisitWithLead}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final requestPayload = <String, dynamic>{
+      'name': name.trim(),
+      'phone': phone.trim(),
+      'alternate_phone_number': alternatePhoneNumber.trim(),
+      'email': email.trim(),
+      'source': source.trim(),
+      'project_id': projectId.trim(),
+      'assigned_to': assignedTo.trim(),
+      'budget': budget.trim(),
+      'location_preference': locationPreference.trim(),
+      'configuration': configuration.trim(),
+      'lead_notes': leadNotes.trim(),
+      'callback_time': callbackTime.trim(),
+      'next_followup_time': nextFollowUpTime.trim(),
+      'visit_date': visitDate.trim(),
+      'visit_time': visitTime.trim(),
+      'notes': notes.trim(),
+      'transport_arranged': transportArranged,
+    };
+    final body = jsonEncode(requestPayload);
+
+    _logRequest(
+      endpoint: 'createSiteVisitWithLead',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('createSiteVisitWithLead', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create site visit with lead.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return _mergeCreateLeadWithFollowUpResponse(decoded, requestPayload);
+      }
+    } catch (_) {
+      // Fall through and return the submitted payload below.
+    }
+
+    return requestPayload;
+  }
+
   Future<Map<String, dynamic>> createSiteRevisit({
     required String originalVisitId,
     required String visitDate,
@@ -4798,6 +4954,7 @@ class AuthService {
     required String id,
     required String status,
     String note = '',
+    String? closingPerson,
     String? token,
   }) async {
     final normalizedId = id.trim();
@@ -4816,6 +4973,8 @@ class AuthService {
     final body = jsonEncode({
       'status': normalizedStatus,
       'note': note.trim(),
+      if (closingPerson != null && closingPerson.trim().isNotEmpty)
+        'closing_person': closingPerson.trim(),
     });
 
     _logRequest(
@@ -4850,6 +5009,8 @@ class AuthService {
       'id': normalizedId,
       'status': normalizedStatus,
       'note': note.trim(),
+      if (closingPerson != null && closingPerson.trim().isNotEmpty)
+        'closing_person': closingPerson.trim(),
     };
   }
 
@@ -4921,6 +5082,8 @@ class AuthService {
   Future<Map<String, dynamic>> updateSiteVisitStatus({
     required String id,
     required String status,
+    String note = '',
+    String? closingPerson,
     String? token,
   }) async {
     final normalizedId = id.trim();
@@ -4937,7 +5100,12 @@ class AuthService {
         ApiConstants.updatestatussitevisits.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
-    final body = jsonEncode({'status': normalizedStatus});
+    final body = jsonEncode({
+      'status': normalizedStatus,
+      'note': note.trim(),
+      if (closingPerson != null && closingPerson.trim().isNotEmpty)
+        'closing_person': closingPerson.trim(),
+    });
 
     _logRequest(
       endpoint: 'updateSiteVisitStatus',
@@ -4968,7 +5136,13 @@ class AuthService {
       }
     } catch (_) {}
 
-    return <String, dynamic>{'id': normalizedId, 'status': normalizedStatus};
+    return <String, dynamic>{
+      'id': normalizedId,
+      'status': normalizedStatus,
+      'note': note.trim(),
+      if (closingPerson != null && closingPerson.trim().isNotEmpty)
+        'closing_person': closingPerson.trim(),
+    };
   }
 
   Future<Map<String, dynamic>> submitSiteVisitFeedback({
@@ -5731,6 +5905,50 @@ class AuthService {
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
     };
+  }
+
+  Map<String, dynamic> _mergeCreateLeadWithFollowUpResponse(
+    Map<String, dynamic> decoded,
+    Map<String, dynamic> requestPayload,
+  ) {
+    final merged = <String, dynamic>{...requestPayload};
+
+    void mergeMap(Map<String, dynamic> source) {
+      for (final entry in source.entries) {
+        final key = entry.key.toString();
+        final value = entry.value;
+        if (value is Map<String, dynamic>) {
+          merged[key] = value;
+        } else {
+          merged[key] = value;
+        }
+      }
+    }
+
+    final data = decoded['data'];
+    if (data is Map<String, dynamic>) {
+      mergeMap(data);
+      final lead = data['lead'];
+      if (lead is Map<String, dynamic>) {
+        mergeMap(lead);
+      }
+      final task = data['task'];
+      if (task is Map<String, dynamic>) {
+        mergeMap(task);
+      }
+    }
+
+    final lead = decoded['lead'];
+    if (lead is Map<String, dynamic>) {
+      mergeMap(lead);
+    }
+    final task = decoded['task'];
+    if (task is Map<String, dynamic>) {
+      mergeMap(task);
+    }
+
+    mergeMap(decoded);
+    return merged;
   }
 
   Future<Map<String, dynamic>> updateLeadStatus({

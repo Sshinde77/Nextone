@@ -819,7 +819,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                     )
                     .toList(),
                 enabled: !_isSubmittingStatus,
-                onChanged: (value) => setState(() => _selectedNextStatus = value),
+                onChanged: (value) =>
+                    setState(() => _selectedNextStatus = value),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -890,7 +891,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                     )
                     .toList(),
                 enabled: !_isSubmittingReassign,
-                onChanged: (value) => setState(() => _selectedAssigneeId = value),
+                onChanged: (value) =>
+                    setState(() => _selectedAssigneeId = value),
               ),
               const SizedBox(height: 10),
               TextField(

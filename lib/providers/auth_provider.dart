@@ -856,6 +856,48 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> createLeadWithFollowUp({
+    required String name,
+    required String phone,
+    String alternatePhoneNumber = '',
+    required String email,
+    required String source,
+    String projectId = '',
+    required String assignedTo,
+    String budget = '',
+    String locationPreference = '',
+    String configuration = '',
+    String leadNotes = '',
+    String callbackTime = '',
+    String nextFollowUpTime = '',
+    required String title,
+    required String dueDate,
+    required String priority,
+    required String notes,
+    String? token,
+  }) {
+    return _authService.createLeadWithFollowUp(
+      name: name,
+      phone: phone,
+      alternatePhoneNumber: alternatePhoneNumber,
+      email: email,
+      source: source,
+      projectId: projectId,
+      assignedTo: assignedTo,
+      budget: budget,
+      locationPreference: locationPreference,
+      configuration: configuration,
+      leadNotes: leadNotes,
+      callbackTime: callbackTime,
+      nextFollowUpTime: nextFollowUpTime,
+      title: title,
+      dueDate: dueDate,
+      priority: priority,
+      notes: notes,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> editFollowUp({
     required String id,
     String? title,
@@ -1006,6 +1048,48 @@ class AuthProvider {
       visitDate: visitDate,
       visitTime: visitTime,
       assignedTo: assignedTo,
+      notes: notes,
+      transportArranged: transportArranged,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> createSiteVisitWithLead({
+    required String name,
+    required String phone,
+    String alternatePhoneNumber = '',
+    required String email,
+    required String source,
+    String projectId = '',
+    required String assignedTo,
+    String budget = '',
+    String locationPreference = '',
+    String configuration = '',
+    String leadNotes = '',
+    String callbackTime = '',
+    String nextFollowUpTime = '',
+    required String visitDate,
+    required String visitTime,
+    required String notes,
+    required bool transportArranged,
+    String? token,
+  }) {
+    return _authService.createSiteVisitWithLead(
+      name: name,
+      phone: phone,
+      alternatePhoneNumber: alternatePhoneNumber,
+      email: email,
+      source: source,
+      projectId: projectId,
+      assignedTo: assignedTo,
+      budget: budget,
+      locationPreference: locationPreference,
+      configuration: configuration,
+      leadNotes: leadNotes,
+      callbackTime: callbackTime,
+      nextFollowUpTime: nextFollowUpTime,
+      visitDate: visitDate,
+      visitTime: visitTime,
       notes: notes,
       transportArranged: transportArranged,
       token: token,
@@ -1174,12 +1258,14 @@ class AuthProvider {
     required String id,
     required String status,
     String note = '',
+    String? closingPerson,
     String? token,
   }) {
     return _authService.updateSiteRevisitStatus(
       id: id,
       status: status,
       note: note,
+      closingPerson: closingPerson,
       token: token,
     );
   }
@@ -1203,11 +1289,15 @@ class AuthProvider {
   Future<Map<String, dynamic>> updateSiteVisitStatus({
     required String id,
     required String status,
+    String note = '',
+    String? closingPerson,
     String? token,
   }) {
     return _authService.updateSiteVisitStatus(
       id: id,
       status: status,
+      note: note,
+      closingPerson: closingPerson,
       token: token,
     );
   }

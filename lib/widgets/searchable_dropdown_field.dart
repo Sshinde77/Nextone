@@ -45,8 +45,8 @@ class SearchableDropdownField<T> extends FormField<T> {
                 selectedLabel ?? selectedItem?.label ?? hintText;
             final displaySubtitle =
                 selectedItem != null ? selectedItem.subtitle : null;
-            final hasSelection =
-                selectedItem != null || selectedLabel?.trim().isNotEmpty == true;
+            final hasSelection = selectedItem != null ||
+                selectedLabel?.trim().isNotEmpty == true;
             final isInteractive = enabled && !isLoading && items.isNotEmpty;
 
             Future<void> openSheet() async {
@@ -101,9 +101,8 @@ class SearchableDropdownField<T> extends FormField<T> {
                       errorText: fieldState.errorText,
                       isDense: true,
                       filled: true,
-                      fillColor: enabled
-                          ? Colors.white
-                          : const Color(0xFFF8FAFC),
+                      fillColor:
+                          enabled ? Colors.white : const Color(0xFFF8FAFC),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFD8E0EA)),
@@ -203,7 +202,7 @@ class SearchableDropdownField<T> extends FormField<T> {
               ],
             );
           },
-          );
+        );
 
   final bool showFieldLabel;
 }

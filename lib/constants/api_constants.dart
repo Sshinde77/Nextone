@@ -60,6 +60,7 @@ class ApiConstants {
   //followup Endpoints
   static const String followups = '/tasks';
   static const String createfollowups = '/tasks';
+  static const String createFollowUpWithLead = '/tasks/create-with-lead';
   static const String followupsdetail = '/tasks/{id}';
   static const String deletefollowups = '/tasks/{id}';
   static const String editfollowups = '/tasks/{id}';
@@ -89,6 +90,7 @@ class ApiConstants {
   //site visit Endpoints
   static const String sitevisits = '/site-visits';
   static const String createsitevisits = '/site-visits';
+  static const String createSiteVisitWithLead = '/site-visits/create-with-lead';
   static const String sitevisitsdetail = '/site-visits/{id}';
   static const String editsitevisits = '/site-visits/{id}';
   static const String updatestatussitevisits = '/site-visits/{id}/status';

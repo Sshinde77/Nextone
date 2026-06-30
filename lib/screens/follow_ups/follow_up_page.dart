@@ -9,6 +9,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_detail_page.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
+import 'package:nextone/screens/follow_ups/lead_follow_up_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
@@ -124,6 +125,104 @@ class _FollowUpPageState extends State<FollowUpPage> {
     });
   }
 
+  Future<void> _openCreateFollowUpMenu(BuildContext buttonContext) async {
+    final renderBox = buttonContext.findRenderObject() as RenderBox?;
+    if (renderBox == null) {
+      return;
+    }
+
+    final overlay =
+        Overlay.of(buttonContext).context.findRenderObject() as RenderBox;
+    final topLeft = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
+    final bottomRight = renderBox.localToGlobal(
+      Offset(renderBox.size.width, renderBox.size.height),
+      ancestor: overlay,
+    );
+
+    final choice = await showMenu<String>(
+      context: buttonContext,
+      color: Colors.white,
+      elevation: 6,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      position: RelativeRect.fromLTRB(
+        topLeft.dx,
+        bottomRight.dy + 8,
+        overlay.size.width - bottomRight.dx,
+        overlay.size.height - bottomRight.dy,
+      ),
+      items: const [
+        PopupMenuItem<String>(
+          value: 'existing',
+          child: Row(
+            children: [
+              Icon(Icons.person_outline, size: 20),
+              SizedBox(width: 10),
+              Text('Existing Lead'),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'new',
+          child: Row(
+            children: [
+              Icon(Icons.add, size: 20),
+              SizedBox(width: 10),
+              Text('New Lead + Follow-up'),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (!mounted || choice == null) {
+      return;
+    }
+
+    if (choice == 'new') {
+      await _openCreateLeadWithFollowUp();
+    } else {
+      await _openCreateFollowUp();
+    }
+  }
+
+  Future<void> _openCreateLeadWithFollowUp() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'create',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
+    final payload = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (_) => const LeadFollowUpFormPage()),
+    );
+    if (!mounted || payload == null) {
+      return;
+    }
+
+    final createdId = _readFollowUpId(payload);
+    final created = _modelFromPayload(
+      payload: payload,
+      id: createdId.isNotEmpty
+          ? createdId
+          : 'FU-${DateTime.now().millisecondsSinceEpoch}',
+      assignee: _personFromPayload(
+        payload,
+        fallbackName: 'You',
+      ),
+    );
+
+    setState(() {
+      _followUps.insert(0, created);
+      _currentPage = 1;
+      _totalItems += 1;
+    });
+  }
+
   Future<void> _openCreateFollowUp() async {
     final allowed = await PermissionGuard.allowModuleAction(
       context,
@@ -141,10 +240,13 @@ class _FollowUpPageState extends State<FollowUpPage> {
       return;
     }
 
+    final createdId = _readFollowUpId(payload);
     final created = _modelFromPayload(
       payload: payload,
-      id: 'FU-${DateTime.now().millisecondsSinceEpoch}',
-      assignee: const _PersonModel(name: 'You', imageUrl: ''),
+      id: createdId.isNotEmpty
+          ? createdId
+          : 'FU-${DateTime.now().millisecondsSinceEpoch}',
+      assignee: _personFromPayload(payload, fallbackName: 'You'),
     );
 
     setState(() {
@@ -414,9 +516,15 @@ class _FollowUpPageState extends State<FollowUpPage> {
     final due = DateTime.tryParse(dueRaw)?.toLocal() ?? DateTime.now();
     final priority = _readString(payload['priority']).toLowerCase();
     final title = _readString(payload['title']);
-    final leadName = _readString(payload['lead_name'] ?? payload['leadName']);
-    final leadPhone =
-        _readString(payload['lead_phone'] ?? payload['leadPhone']);
+    final leadName = _readString(
+      payload['lead_name'] ??
+          payload['leadName'] ??
+          payload['name'] ??
+          payload['customer_name'],
+    );
+    final leadPhone = _readString(
+      payload['lead_phone'] ?? payload['leadPhone'] ?? payload['phone'],
+    );
 
     return _FollowUpModel(
       id: id,
@@ -434,6 +542,45 @@ class _FollowUpPageState extends State<FollowUpPage> {
       channel: 'Call',
       notes: _readString(payload['notes']),
       assignee: assignee,
+    );
+  }
+
+  String _readFollowUpId(Map<String, dynamic> payload) {
+    for (final key in const [
+      'task_id',
+      'taskId',
+      'follow_up_id',
+      'followUpId',
+      'id',
+    ]) {
+      final value = _readString(payload[key]);
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+    return '';
+  }
+
+  _PersonModel _personFromPayload(
+    Map<String, dynamic> payload, {
+    required String fallbackName,
+  }) {
+    final assigneeName = _readString(
+      payload['assigned_to_name'] ??
+          payload['assignedToName'] ??
+          payload['assignee_name'] ??
+          payload['assigneeName'],
+    );
+    final assigneePhone = _readString(
+      payload['assigned_to_phone'] ??
+          payload['assignedToPhone'] ??
+          payload['assignee_phone'] ??
+          payload['assigneePhone'],
+    );
+    return _PersonModel(
+      name: assigneeName.isEmpty ? fallbackName : assigneeName,
+      imageUrl: '',
+      phone: assigneePhone,
     );
   }
 
@@ -919,18 +1066,22 @@ class _FollowUpPageState extends State<FollowUpPage> {
         //       )
         //     : null;
 
-        final addButton = FilledButton.icon(
-          onPressed: _openCreateFollowUp,
-          icon: const Icon(Icons.add, size: 18),
-          label: const Text('Add Follow Up'),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size(0, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
+        final addButton = Builder(
+          builder: (buttonContext) {
+            return FilledButton.icon(
+              onPressed: () => _openCreateFollowUpMenu(buttonContext),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Follow Up'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            );
+          },
         );
 
         if (isCompact) {

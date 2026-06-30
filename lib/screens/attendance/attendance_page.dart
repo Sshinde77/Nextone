@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/attendance/attendance_user_history_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:path_provider/path_provider.dart';
@@ -1288,6 +1289,30 @@ class _AttendancePageState extends State<AttendancePage> {
     return fromCalendar.isNotEmpty ? fromCalendar : _userRole();
   }
 
+  Future<void> _openMonthGridUserHistory(Map<String, dynamic> row) async {
+    final userId = _salesManagerUserKey(row);
+    if (userId.isEmpty) {
+      _showSnackBar('User id is missing for this employee.');
+      return;
+    }
+
+    final from = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
+    final to = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => AttendanceUserHistoryPage(
+          userId: userId,
+          initialName: _monthGridEmployeeName(row),
+          initialRole: _monthGridEmployeeRole(row),
+          initialFrom: from,
+          initialTo: to,
+        ),
+      ),
+    );
+  }
+
   String _shortWeekday(DateTime date) {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return days[date.weekday - 1];
@@ -2437,14 +2462,23 @@ class _AttendancePageState extends State<AttendancePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _monthGridEmployeeName(row),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF0B1F3A),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                  InkWell(
+                    onTap: () => _openMonthGridUserHistory(row),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        _monthGridEmployeeName(row),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF0A66C2),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Color(0xFF0A66C2),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),

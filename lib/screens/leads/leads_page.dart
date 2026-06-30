@@ -490,7 +490,8 @@ class _LeadsPageState extends State<LeadsPage> {
                     enabled: true,
                     onChanged: (value) {
                       setSheetState(() {
-                        tempSource = value == null || value.isEmpty ? null : value;
+                        tempSource =
+                            value == null || value.isEmpty ? null : value;
                       });
                     },
                   ),
@@ -516,7 +517,8 @@ class _LeadsPageState extends State<LeadsPage> {
                       enabled: true,
                       onChanged: (value) {
                         setSheetState(() {
-                          tempTeamId = value == null || value.isEmpty ? null : value;
+                          tempTeamId =
+                              value == null || value.isEmpty ? null : value;
                         });
                       },
                     ),

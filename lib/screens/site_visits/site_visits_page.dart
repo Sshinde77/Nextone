@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/site_visits/lead_site_visit_form_page.dart';
 import 'package:nextone/screens/site_visits/site_revisits_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
@@ -43,6 +44,7 @@ class _SiteVisit {
     required this.dateTime,
     required this.imageUrl,
     required this.assignee,
+    this.closingPerson = '',
     this.status = _VisitStatus.scheduled,
     this.feedback = '',
     this.rating = 0,
@@ -61,6 +63,7 @@ class _SiteVisit {
   DateTime dateTime;
   String imageUrl;
   String assignee;
+  String closingPerson;
   _VisitStatus status;
   String feedback;
   int rating;
@@ -324,22 +327,26 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           value: _countByStatus(_VisitStatus.completed).toString(),
           color: AppColors.tertiary,
         );
-        final scheduleButton = FilledButton.icon(
-          onPressed: _openScheduleForm,
-          icon: Icon(Icons.add, size: _s(16)),
-          label: Text(compact ? 'Add' : 'Schedule'),
-          style: FilledButton.styleFrom(
-            minimumSize: Size.fromHeight(_s(52)),
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(_s(14)),
-            ),
-            padding: EdgeInsets.symmetric(horizontal: _s(8)),
-            textStyle: TextStyle(
-              fontSize: _fs(12),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+        final scheduleButton = Builder(
+          builder: (buttonContext) {
+            return FilledButton.icon(
+              onPressed: () => _openScheduleMenu(buttonContext),
+              icon: Icon(Icons.add, size: _s(16)),
+              label: Text(compact ? 'Add' : 'Schedule'),
+              style: FilledButton.styleFrom(
+                minimumSize: Size.fromHeight(_s(52)),
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(_s(14)),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: _s(8)),
+                textStyle: TextStyle(
+                  fontSize: _fs(12),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            );
+          },
         );
 
         if (isNarrow) {
@@ -1137,6 +1144,16 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                     iconColor: Colors.amber,
                   ),
                 ),
+                SizedBox(width: _s(14)),
+                Expanded(
+                  child: _visitInfoBlock(
+                    label: 'Closing Person',
+                    icon: Icons.person_pin_circle_outlined,
+                    value: visit.closingPerson.isNotEmpty
+                        ? visit.closingPerson
+                        : 'N/A',
+                  ),
+                ),
               ],
             ),
             SizedBox(height: _s(10)),
@@ -1356,7 +1373,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           ),
           SizedBox(height: _s(10)),
           FilledButton(
-            onPressed: _openScheduleForm,
+            onPressed: () => _openScheduleMenu(context),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(
@@ -1377,6 +1394,70 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     );
   }
 
+  Future<void> _openScheduleMenu(BuildContext buttonContext) async {
+    final renderBox = buttonContext.findRenderObject() as RenderBox?;
+    if (renderBox == null) {
+      await _openScheduleForm();
+      return;
+    }
+
+    final overlay =
+        Overlay.of(buttonContext).context.findRenderObject() as RenderBox;
+    final topLeft = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
+    final bottomRight = renderBox.localToGlobal(
+      Offset(renderBox.size.width, renderBox.size.height),
+      ancestor: overlay,
+    );
+
+    final choice = await showMenu<String>(
+      context: buttonContext,
+      color: Colors.white,
+      elevation: 6,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      position: RelativeRect.fromLTRB(
+        topLeft.dx,
+        bottomRight.dy + 8,
+        overlay.size.width - bottomRight.dx,
+        overlay.size.height - bottomRight.dy,
+      ),
+      items: const [
+        PopupMenuItem<String>(
+          value: 'existing',
+          child: Row(
+            children: [
+              Icon(Icons.person_outline, size: 20),
+              SizedBox(width: 10),
+              Text('Existing Lead'),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'new',
+          child: Row(
+            children: [
+              Icon(Icons.add, size: 20),
+              SizedBox(width: 10),
+              Text('New Lead + Site Visit'),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (!mounted || choice == null) {
+      return;
+    }
+
+    if (choice == 'new') {
+      await _openScheduleWithLeadForm();
+      return;
+    }
+
+    await _openScheduleForm();
+  }
+
   Future<void> _openScheduleForm() async {
     final allowed = await PermissionGuard.allowModuleAction(
       context,
@@ -1395,6 +1476,38 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
     final created = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(builder: (_) => const SiteVisitFormPage()),
+    );
+
+    if (created == null || !mounted) {
+      return;
+    }
+    await _loadSiteVisits(page: _currentPage);
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Site visit scheduled successfully.')),
+      );
+  }
+
+  Future<void> _openScheduleWithLeadForm() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'create',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
+    if (_isCalendarView) {
+      setState(() {
+        _isCalendarView = false;
+      });
+    }
+
+    final created = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (_) => const LeadSiteVisitFormPage()),
     );
 
     if (created == null || !mounted) {
@@ -1572,70 +1685,161 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     );
     if (!allowed) return;
 
-    final status = await showModalBottomSheet<_VisitStatus>(
+    final noteController = TextEditingController();
+    final closingPersonController = TextEditingController();
+    bool isSubmitting = false;
+    _VisitStatus selectedStatus = visit.status;
+
+    final updated = await showDialog<bool>(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Update Visit Status',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            Future<void> submit() async {
+              setLocalState(() => isSubmitting = true);
+              try {
+                await _authProvider.updateSiteVisitStatus(
+                  id: visit.id,
+                  status: _apiStatus(selectedStatus),
+                  note: noteController.text.trim(),
+                  closingPerson: closingPersonController.text.trim(),
+                  token: _authProvider.currentAuthToken,
+                );
+                if (!context.mounted) return;
+                Navigator.of(context).pop(true);
+              } catch (e) {
+                if (!context.mounted) return;
+                setLocalState(() => isSubmitting = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
+                );
+              }
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(height: 10),
-              ..._VisitStatus.values.map(
-                (status) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: _statusColor(status),
-                      shape: BoxShape.circle,
+              child: SizedBox(
+                width: 560,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Update Visit Status',
+                                style: TextStyle(
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(false),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Status'),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<_VisitStatus>(
+                          initialValue: selectedStatus,
+                          decoration: _fieldDecoration(),
+                          items: _VisitStatus.values
+                              .map(
+                                (status) => DropdownMenuItem<_VisitStatus>(
+                                  value: status,
+                                  child: Text(_statusLabel(status)),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: isSubmitting
+                              ? null
+                              : (value) => setLocalState(
+                                    () => selectedStatus =
+                                        value ?? _VisitStatus.scheduled,
+                                  ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text('Note (optional)'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: noteController,
+                          enabled: !isSubmitting,
+                          maxLines: 3,
+                          decoration: _fieldDecoration(
+                            hint: 'Add a note about this status update...',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text('Closing Person (optional)'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: closingPersonController,
+                          enabled: !isSubmitting,
+                          decoration: _fieldDecoration(
+                            hint: 'Rajesh Kumar',
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () => Navigator.of(context).pop(false),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: isSubmitting ? null : submit,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                ),
+                                child: isSubmitting
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text('Update Status'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  title: Text(_statusLabel(status)),
-                  trailing: visit.status == status
-                      ? const Icon(
-                          Icons.check_circle,
-                          color: AppColors.tertiary,
-                        )
-                      : null,
-                  onTap: () => Navigator.pop(context, status),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
 
-    if (status == null) return;
-    try {
-      await _authProvider.updateSiteVisitStatus(
-        id: visit.id,
-        status: _apiStatus(status),
-        token: _authProvider.currentAuthToken,
-      );
-      if (!mounted) {
-        return;
-      }
+    noteController.dispose();
+    closingPersonController.dispose();
+    if (updated == true && mounted) {
       setState(() {
-        visit.status = status;
+        visit.status = selectedStatus;
       });
       _showSnackBar('Site visit status updated.');
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      _showSnackBar(AppErrorHandler.friendlyMessage(e));
     }
   }
 
@@ -1832,6 +2036,18 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     }
   }
 
+  InputDecoration _fieldDecoration({String? hint}) {
+    return InputDecoration(
+      hintText: hint,
+      isDense: true,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+    );
+  }
+
   Future<void> _loadSiteVisits({int? page}) async {
     final targetPage = page ?? _currentPage;
     setState(() {
@@ -1918,6 +2134,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           assignedToMap['name'] ??
           assignedToMap['first_name'],
     );
+    final closingPerson = _readString(
+      json['closing_person'] ?? json['closingPerson'],
+    );
     final status = _statusFromApi(_readString(json['status']));
     final feedbackMap = json['feedback'] is Map<String, dynamic>
         ? (json['feedback'] as Map<String, dynamic>)
@@ -1951,6 +2170,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       dateTime: parsedDateTime,
       imageUrl: _demoImages[id.hashCode.abs() % _demoImages.length],
       assignee: assigneeName.isEmpty ? 'Unassigned' : assigneeName,
+      closingPerson: closingPerson,
       status: status,
       feedback: feedbackText,
       rating: rating,

@@ -807,7 +807,6 @@ class _AssigneeDropdownState extends State<_AssigneeDropdown> {
       ),
     );
   }
-
 }
 
 class _StepNumber extends StatelessWidget {

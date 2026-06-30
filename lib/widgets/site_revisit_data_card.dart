@@ -11,6 +11,7 @@ class SiteRevisitDataCard extends StatelessWidget {
     required this.visitDateLabel,
     required this.visitTimeLabel,
     required this.assignedToName,
+    required this.closingPersonName,
     required this.transportLabel,
     required this.statusLabel,
     required this.statusColor,
@@ -32,6 +33,7 @@ class SiteRevisitDataCard extends StatelessWidget {
   final String visitDateLabel;
   final String visitTimeLabel;
   final String assignedToName;
+  final String closingPersonName;
   final String transportLabel;
   final String statusLabel;
   final Color statusColor;
@@ -111,6 +113,7 @@ class SiteRevisitDataCard extends StatelessWidget {
           _infoRow('Date', visitDateLabel),
           _infoRow('Time', visitTimeLabel),
           _infoRow('Assigned To', assignedToName),
+          _infoRow('Closing Person', closingPersonName),
           _infoRow('Transport', transportLabel),
           if (rating != null && rating! > 0) _infoRow('Rating', '$rating/5'),
           const SizedBox(height: 10),

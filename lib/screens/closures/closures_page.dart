@@ -321,7 +321,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               .map(
                                 (e) => SearchableDropdownItem<String>(
                                   value: _readString(e['id'], fallback: ''),
-                                  label: _readString(e['name'], fallback: 'Lead'),
+                                  label:
+                                      _readString(e['name'], fallback: 'Lead'),
                                 ),
                               )
                               .toList(),
@@ -339,8 +340,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               .map(
                                 (e) => SearchableDropdownItem<String>(
                                   value: _readString(e['id'], fallback: ''),
-                                  label:
-                                      _readString(e['name'], fallback: 'Project'),
+                                  label: _readString(e['name'],
+                                      fallback: 'Project'),
                                 ),
                               )
                               .toList(),
@@ -680,8 +681,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
             value: (value ?? '').isEmpty ? null : value,
             hintText: hint,
             items: searchableItems ?? const <SearchableDropdownItem<String>>[],
-            enabled: (searchableItems ?? const <SearchableDropdownItem<String>>[])
-                .isNotEmpty,
+            enabled:
+                (searchableItems ?? const <SearchableDropdownItem<String>>[])
+                    .isNotEmpty,
             onChanged: onChanged,
           ),
         ],

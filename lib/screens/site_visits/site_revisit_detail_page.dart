@@ -90,6 +90,27 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
                 'Notes',
                 _readString(_data!['notes'], fallback: '-'),
               ),
+              if (_readString(_data!['closing_person'], fallback: '')
+                      .trim()
+                      .isNotEmpty ||
+                  _readString(_data!['note'], fallback: '')
+                      .trim()
+                      .isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _infoSection(
+                  'Completion Details',
+                  [
+                    if (_readString(_data!['closing_person'], fallback: '')
+                        .trim()
+                        .isNotEmpty)
+                      'Closing Person: ${_readString(_data!['closing_person'], fallback: '')}',
+                    if (_readString(_data!['note'], fallback: '')
+                        .trim()
+                        .isNotEmpty)
+                      'Note: ${_readString(_data!['note'], fallback: '')}',
+                  ].join('\n'),
+                ),
+              ],
               const SizedBox(height: 10),
               _leadCard(),
               const SizedBox(height: 10),

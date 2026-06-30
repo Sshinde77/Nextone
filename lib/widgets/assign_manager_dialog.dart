@@ -192,7 +192,8 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
                                   hintText: widget.actionLabel,
                                   items: widget.managers
                                       .map(
-                                        (manager) => SearchableDropdownItem<String>(
+                                        (manager) =>
+                                            SearchableDropdownItem<String>(
                                           value: manager.id,
                                           label: manager.name,
                                           subtitle: manager.roleLabel,
