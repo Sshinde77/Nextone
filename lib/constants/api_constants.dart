@@ -118,7 +118,9 @@ class ApiConstants {
   static const String attendanceUploadPhoto = '/attendance/upload-photo';
   static const String attendanceToday = '/attendance/today';
   static const String attendanceMe = '/attendance/me';
-  static const String attendanceUser = '/attendance/user/{id}';
+  static const String attendanceUserHistory =
+      '/attendance/user/{userId}/history';
+  static const String attendanceUser = attendanceUserHistory;
   static const String attendanceCalendar = '/attendance/calendar';
   static const String attendanceByMonth = '/attendance/by-month';
   static const String attendanceByDate = '/attendance/by-date';

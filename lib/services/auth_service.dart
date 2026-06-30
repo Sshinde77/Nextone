@@ -2553,23 +2553,31 @@ class AuthService {
     throw Exception('Attendance history response is not valid JSON.');
   }
 
-  Future<Map<String, dynamic>> attendanceUser({
+  Future<Map<String, dynamic>> attendanceUserHistory({
     required String userId,
+    String? from,
+    String? to,
+    String? status,
     int page = 1,
     int perPage = 30,
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final path = ApiConstants.attendanceUser.replaceFirst('{id}', userId);
-    final uri = Uri.parse(
-      '${ApiConstants.baseUrl}$path',
-    ).replace(queryParameters: <String, String>{
+    final path =
+        ApiConstants.attendanceUserHistory.replaceFirst('{userId}', userId);
+    final queryParameters = <String, String>{
       'page': page.toString(),
       'per_page': perPage.toString(),
-    });
+      if (from != null && from.trim().isNotEmpty) 'from': from.trim(),
+      if (to != null && to.trim().isNotEmpty) 'to': to.trim(),
+      if (status != null && status.trim().isNotEmpty) 'status': status.trim(),
+    };
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}$path',
+    ).replace(queryParameters: queryParameters);
     final headers = _headers(accept: '*/*', token: resolvedToken);
     _logRequest(
-      endpoint: 'attendanceUser',
+      endpoint: 'attendanceUserHistory',
       method: 'GET',
       uri: uri,
       headers: headers,
@@ -2577,7 +2585,7 @@ class AuthService {
 
     final response =
         await http.get(uri, headers: headers).timeout(_requestTimeout);
-    _logResponse('attendanceUser', response);
+    _logResponse('attendanceUserHistory', response);
 
     final error = _handleResponse(
       response,
@@ -2597,6 +2605,26 @@ class AuthService {
     }
 
     throw Exception('User attendance history response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> attendanceUser({
+    required String userId,
+    String? from,
+    String? to,
+    String? status,
+    int page = 1,
+    int perPage = 30,
+    String? token,
+  }) {
+    return attendanceUserHistory(
+      userId: userId,
+      from: from,
+      to: to,
+      status: status,
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
   }
 
   Future<Map<String, dynamic>> attendanceByMonth({

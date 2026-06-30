@@ -103,31 +103,17 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
       var totalPages = 1;
 
       do {
-        final response = await _authProvider.attendanceUser(
+        final response = await _authProvider.attendanceUserHistory(
           userId: widget.userId,
           page: page,
           perPage: 30,
           token: _authProvider.currentAuthToken,
         );
 
-        final dataRaw = response['data'];
-        if (dataRaw is List) {
-          allRows.addAll(
-            dataRaw.whereType<Map>().map((item) => item.map(
-                  (key, value) => MapEntry(key.toString(), value),
-                )),
-          );
-        }
+        allRows.addAll(_attendanceHistoryRows(response));
 
-        final paginationRaw = response['pagination'];
-        if (paginationRaw is Map) {
-          final pagination = paginationRaw.map(
-            (key, value) => MapEntry(key.toString(), value),
-          );
-          totalPages = _readInt(pagination['total_pages'], fallback: 1);
-        } else {
-          totalPages = 1;
-        }
+        final pagination = _attendanceHistoryPagination(response);
+        totalPages = _readInt(pagination['total_pages'], fallback: 1);
         page += 1;
       } while (page <= totalPages);
 
@@ -173,6 +159,75 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
         _isLoading = false;
       });
     }
+  }
+
+  List<Map<String, dynamic>> _attendanceHistoryRows(
+    Map<String, dynamic> response,
+  ) {
+    dynamic rowsRaw = response['data'];
+    if (rowsRaw is Map) {
+      rowsRaw = rowsRaw['data'] ??
+          rowsRaw['records'] ??
+          rowsRaw['items'] ??
+          rowsRaw['rows'] ??
+          rowsRaw['attendance'] ??
+          rowsRaw['attendances'];
+    }
+    rowsRaw ??= response['records'] ??
+        response['items'] ??
+        response['rows'] ??
+        response['attendance'] ??
+        response['attendances'];
+
+    if (rowsRaw is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    return rowsRaw
+        .whereType<Map>()
+        .map(
+          (item) => Map<String, dynamic>.from(
+            item.map((key, value) => MapEntry(key.toString(), value)),
+          ),
+        )
+        .toList();
+  }
+
+  Map<String, dynamic> _attendanceHistoryPagination(
+    Map<String, dynamic> response,
+  ) {
+    final paginationRaw = response['pagination'];
+    if (paginationRaw is Map) {
+      return Map<String, dynamic>.from(
+        paginationRaw.map((key, value) => MapEntry(key.toString(), value)),
+      );
+    }
+
+    final metaRaw = response['meta'];
+    if (metaRaw is Map) {
+      return Map<String, dynamic>.from(
+        metaRaw.map((key, value) => MapEntry(key.toString(), value)),
+      );
+    }
+
+    final dataRaw = response['data'];
+    if (dataRaw is Map) {
+      final nestedPagination = dataRaw['pagination'];
+      if (nestedPagination is Map) {
+        return Map<String, dynamic>.from(
+          nestedPagination.map((key, value) => MapEntry(key.toString(), value)),
+        );
+      }
+
+      final nestedMeta = dataRaw['meta'];
+      if (nestedMeta is Map) {
+        return Map<String, dynamic>.from(
+          nestedMeta.map((key, value) => MapEntry(key.toString(), value)),
+        );
+      }
+    }
+
+    return const <String, dynamic>{};
   }
 
   int _readInt(dynamic value, {int fallback = 0}) {

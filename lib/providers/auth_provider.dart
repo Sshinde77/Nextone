@@ -586,14 +586,40 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> attendanceUserHistory({
+    required String userId,
+    String? from,
+    String? to,
+    String? status,
+    int page = 1,
+    int perPage = 30,
+    String? token,
+  }) {
+    return _authService.attendanceUserHistory(
+      userId: userId,
+      from: from,
+      to: to,
+      status: status,
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> attendanceUser({
     required String userId,
+    String? from,
+    String? to,
+    String? status,
     int page = 1,
     int perPage = 30,
     String? token,
   }) {
     return _authService.attendanceUser(
       userId: userId,
+      from: from,
+      to: to,
+      status: status,
       page: page,
       perPage: perPage,
       token: token,
