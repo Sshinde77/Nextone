@@ -6764,15 +6764,24 @@ class AuthService {
           .toList(),
       'status': status.trim(),
       'description': description.trim(),
-      'brochure_url': brochureUrl.trim(),
-      'video_url': videoUrl.trim(),
-      'payment_plan_url': paymentPlanUrl.trim(),
       'home_loan_info': homeLoanInfo.trim(),
       'unit_plans': unitPlans,
       'creatives': creatives,
       'payment_plans': paymentPlans,
       'videos': videos,
     };
+    final trimmedBrochureUrl = brochureUrl.trim();
+    if (trimmedBrochureUrl.isNotEmpty) {
+      bodyMap['brochure_url'] = trimmedBrochureUrl;
+    }
+    final trimmedVideoUrl = videoUrl.trim();
+    if (trimmedVideoUrl.isNotEmpty) {
+      bodyMap['video_url'] = trimmedVideoUrl;
+    }
+    final trimmedPaymentPlanUrl = paymentPlanUrl.trim();
+    if (trimmedPaymentPlanUrl.isNotEmpty) {
+      bodyMap['payment_plan_url'] = trimmedPaymentPlanUrl;
+    }
     final body = jsonEncode(bodyMap);
 
     _logRequest(
@@ -7521,15 +7530,24 @@ class AuthService {
           .toList(),
       'status': status.trim(),
       'description': description.trim(),
-      'brochure_url': brochureUrl.trim(),
-      'video_url': videoUrl.trim(),
-      'payment_plan_url': paymentPlanUrl.trim(),
       'home_loan_info': homeLoanInfo.trim(),
       'unit_plans': unitPlans,
       'creatives': creatives,
       'payment_plans': paymentPlans,
       'videos': videos,
     };
+    final trimmedBrochureUrl = brochureUrl.trim();
+    if (trimmedBrochureUrl.isNotEmpty) {
+      bodyMap['brochure_url'] = trimmedBrochureUrl;
+    }
+    final trimmedVideoUrl = videoUrl.trim();
+    if (trimmedVideoUrl.isNotEmpty) {
+      bodyMap['video_url'] = trimmedVideoUrl;
+    }
+    final trimmedPaymentPlanUrl = paymentPlanUrl.trim();
+    if (trimmedPaymentPlanUrl.isNotEmpty) {
+      bodyMap['payment_plan_url'] = trimmedPaymentPlanUrl;
+    }
     final body = jsonEncode(bodyMap);
 
     _logRequest(

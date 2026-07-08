@@ -55,9 +55,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   final _reraNumberController = TextEditingController();
   final _amenitiesController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _brochureUrlController = TextEditingController();
-  final _videoUrlController = TextEditingController();
-  final _paymentPlanUrlController = TextEditingController();
   final _homeLoanInfoController = TextEditingController();
 
   String _status = 'active';
@@ -100,9 +97,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     _reraNumberController.dispose();
     _amenitiesController.dispose();
     _descriptionController.dispose();
-    _brochureUrlController.dispose();
-    _videoUrlController.dispose();
-    _paymentPlanUrlController.dispose();
     _homeLoanInfoController.dispose();
     super.dispose();
   }
@@ -125,9 +119,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     _reraNumberController.text = _readString(data['rera_number']);
     _amenitiesController.text = _readListText(data['amenities']);
     _descriptionController.text = _readString(data['description']);
-    _brochureUrlController.text = _readString(data['brochure_url']);
-    _videoUrlController.text = _readString(data['video_url']);
-    _paymentPlanUrlController.text = _readString(data['payment_plan_url']);
     _homeLoanInfoController.text = _readString(data['home_loan_info']);
     _existingUnitPlanDocs = _readDocumentPayloads(data, 'unit_plans');
     _existingCreativeDocs = _readDocumentPayloads(data, 'creatives');
@@ -313,9 +304,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       final reraNumber = _reraNumberController.text.trim();
       final amenities = _splitCsv(_amenitiesController.text);
       final description = _descriptionController.text.trim();
-      final brochureUrl = _brochureUrlController.text.trim();
-      final videoUrl = _videoUrlController.text.trim();
-      final paymentPlanUrl = _paymentPlanUrlController.text.trim();
       final homeLoanInfo = _homeLoanInfoController.text.trim();
       final resolvedAddress = address.isNotEmpty
           ? address
@@ -362,9 +350,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           creatives: creatives,
           paymentPlans: paymentPlans,
           videos: videos,
-          brochureUrl: brochureUrl,
-          videoUrl: videoUrl,
-          paymentPlanUrl: paymentPlanUrl,
           homeLoanInfo: homeLoanInfo,
           token: _authProvider.currentAuthToken,
         );
@@ -387,9 +372,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           creatives: creatives,
           paymentPlans: paymentPlans,
           videos: videos,
-          brochureUrl: brochureUrl,
-          videoUrl: videoUrl,
-          paymentPlanUrl: paymentPlanUrl,
           homeLoanInfo: homeLoanInfo,
           token: _authProvider.currentAuthToken,
         );
@@ -576,11 +558,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                             children: [
                               _buildTextField(
                                 controller: _nameController,
-                                label: 'Project Name *',
+                                label: 'Project Name',
                                 hintText: 'Skyline Heights',
-                                validator: _requiredValidator(
-                                  'Project Name is required.',
-                                ),
                               ),
                               _buildTextField(
                                 controller: _developerController,
@@ -595,11 +574,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                             children: [
                               _buildTextField(
                                 controller: _cityController,
-                                label: 'City *',
+                                label: 'City',
                                 hintText: 'Mumbai',
-                                validator: _requiredValidator(
-                                  'City is required.',
-                                ),
                               ),
                               _buildTextField(
                                 controller: _localityController,
@@ -611,11 +587,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                           const SizedBox(height: 12),
                           _buildTextField(
                             controller: _addressController,
-                            label: 'Address *',
+                            label: 'Address',
                             hintText: 'Plot 14, Veera Desai Road',
-                            validator: _requiredValidator(
-                              'Address is required.',
-                            ),
                           ),
                           const SizedBox(height: 12),
                           _buildResponsiveRow(
@@ -628,11 +601,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                               ),
                               _buildTextField(
                                 controller: _possessionDateController,
-                                label: 'Possession Date *',
+                                label: 'Possession Date',
                                 hintText: '2027-12-01',
-                                validator: _requiredValidator(
-                                  'Possession Date is required.',
-                                ),
                               ),
                             ],
                           ),
@@ -689,24 +659,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                                 'Brief overview of project features, amenities...',
                             minLines: 3,
                             maxLines: 3,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildTextField(
-                            controller: _brochureUrlController,
-                            label: 'Brochure URL',
-                            hintText: '/uploads/projects/brochure.pdf',
-                          ),
-                          const SizedBox(height: 12),
-                          _buildTextField(
-                            controller: _videoUrlController,
-                            label: 'Video URL',
-                            hintText: 'https://youtube.com/watch?v=abc',
-                          ),
-                          const SizedBox(height: 12),
-                          _buildTextField(
-                            controller: _paymentPlanUrlController,
-                            label: 'Payment Plan URL',
-                            hintText: '/uploads/projects/payment_plan.pdf',
                           ),
                           const SizedBox(height: 12),
                           _buildTextField(
@@ -1111,7 +1063,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     TextInputType? keyboardType,
     int minLines = 1,
     int maxLines = 1,
-    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1124,7 +1075,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           minLines: minLines,
           maxLines: maxLines,
           enabled: !_isSubmitting,
-          validator: validator,
           style: const TextStyle(
             color: Color(0xFF374151),
             fontSize: 13,
@@ -1134,15 +1084,6 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
         ),
       ],
     );
-  }
-
-  String? Function(String?) _requiredValidator(String message) {
-    return (value) {
-      if (value == null || value.trim().isEmpty) {
-        return message;
-      }
-      return null;
-    };
   }
 
   InputDecoration _fieldDecoration({required String hintText}) {
