@@ -33,6 +33,7 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
   final _nextFollowUpTimeController = TextEditingController();
   final _leadNotesController = TextEditingController();
   final _notesController = TextEditingController();
+  final _projectNameController = TextEditingController();
 
   bool _isSubmitting = false;
   bool _isLoadingAssignees = true;
@@ -40,6 +41,7 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
   bool _isLoadingProjects = true;
   bool _isLoadingUserContext = true;
   bool _transportArranged = false;
+  bool _useManualProjectInput = false;
 
   String? _assigneeLoadError;
   String? _leadSourceLoadError;
@@ -65,6 +67,7 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
   @override
   void initState() {
     super.initState();
+    _projectNameController.addListener(_syncProjectSelectionMode);
     _loadCurrentUserContext();
     _loadAssigneeOptions();
     _loadLeadSourceOptions();
@@ -73,6 +76,7 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
 
   @override
   void dispose() {
+    _projectNameController.removeListener(_syncProjectSelectionMode);
     _nameController.dispose();
     _phoneController.dispose();
     _alternatePhoneController.dispose();
@@ -84,6 +88,7 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
     _nextFollowUpTimeController.dispose();
     _leadNotesController.dispose();
     _notesController.dispose();
+    _projectNameController.dispose();
     super.dispose();
   }
 
@@ -349,6 +354,24 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
     if (!allowed) return;
 
     final assignedTo = _resolveAssignedToForCreate();
+    final projectId = _resolveSelectedProjectId();
+    final projectName = _resolveSelectedProjectName();
+
+    if (projectId.isEmpty) {
+      if (projectName.isEmpty) {
+        _showSnackBar('Project is required.');
+        return;
+      }
+
+      final hasMatchingProject = _projectOptions.any(
+        (project) =>
+            project.name.trim().toLowerCase() == projectName.toLowerCase(),
+      );
+      if (_projectOptions.isNotEmpty && !hasMatchingProject) {
+        _showSnackBar('Project not found, please select from the list');
+        return;
+      }
+    }
 
     setState(() {
       _isSubmitting = true;
@@ -361,7 +384,8 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
         alternatePhoneNumber: _alternatePhoneController.text.trim(),
         email: _emailController.text.trim(),
         source: _selectedLeadSource?.trim() ?? '',
-        projectId: _selectedProjectId?.trim() ?? '',
+        projectId: projectId,
+        projectName: projectName,
         assignedTo: assignedTo,
         budget: _budgetController.text.trim(),
         locationPreference: _locationPreferenceController.text.trim(),
@@ -393,7 +417,14 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
       if (!mounted) {
         return;
       }
-      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+      final message = AppErrorHandler.friendlyMessage(error);
+      if (projectId.isEmpty &&
+          projectName.isNotEmpty &&
+          message == AppErrorHandler.notFoundMessage) {
+        _showSnackBar('Project not found, please select from the list');
+      } else {
+        _showSnackBar(message);
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -485,6 +516,31 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
     }
 
     return '';
+  }
+
+  String _resolveSelectedProjectId() {
+    if (_useManualProjectInput) {
+      return '';
+    }
+    return _selectedProjectId?.trim() ?? '';
+  }
+
+  String _resolveSelectedProjectName() {
+    if (_useManualProjectInput) {
+      return _projectNameController.text.trim();
+    }
+    return '';
+  }
+
+  void _setManualProjectMode(bool enabled) {
+    setState(() {
+      _useManualProjectInput = enabled;
+      if (enabled) {
+        _selectedProjectId = null;
+      } else {
+        _projectNameController.clear();
+      }
+    });
   }
 
   String? _resolveAssigneeSelection(List<_AssigneeOption> options) {
@@ -689,7 +745,44 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
               hintText: '3BHK',
             ),
             const SizedBox(height: 12),
-            _buildProjectDropdown(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+              ),
+              child: CheckboxListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                title: const Text(
+                  'Use manual project name',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                subtitle: Text(
+                  _useManualProjectInput
+                      ? 'Type the project name yourself'
+                      : 'Select a project from the list',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                value: _useManualProjectInput,
+                onChanged: _isSubmitting
+                    ? null
+                    : (value) => _setManualProjectMode(value ?? false),
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (_useManualProjectInput)
+              _buildProjectNameField()
+            else
+              _buildProjectDropdown(),
             const SizedBox(height: 12),
             _twoFields(
               _buildDateTimeField(
@@ -751,8 +844,9 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
     final visitDateText = _selectedVisitDate == null
         ? 'dd-mm-yyyy'
         : DateFormat('dd-MM-yyyy').format(_selectedVisitDate!);
-    final visitTimeText =
-        _selectedVisitTime == null ? '--:--' : _selectedVisitTime!.format(context);
+    final visitTimeText = _selectedVisitTime == null
+        ? '--:--'
+        : _selectedVisitTime!.format(context);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1066,12 +1160,62 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
       isLoading: _isLoadingProjects,
       errorText: _projectLoadError,
       onRetry: _loadProjectOptions,
+      onClear: () {
+        setState(() {
+          _selectedProjectId = null;
+        });
+      },
       onChanged: (value) {
         setState(() {
           _selectedProjectId = value;
+          if (value != null && value.isNotEmpty) {
+            _projectNameController.clear();
+          }
         });
       },
     );
+  }
+
+  Widget _buildProjectNameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Manual Project Name',
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: _projectNameController,
+          enabled: !_isSubmitting,
+          validator: (value) {
+            if (!_useManualProjectInput) {
+              return null;
+            }
+            if ((value ?? '').trim().isEmpty) {
+              return 'Project name is required';
+            }
+            return null;
+          },
+          decoration: _fieldDecoration(
+            hintText: 'Type project name here',
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _syncProjectSelectionMode() {
+    if (_projectNameController.text.trim().isNotEmpty &&
+        (_selectedProjectId?.isNotEmpty ?? false)) {
+      setState(() {
+        _selectedProjectId = null;
+      });
+    }
   }
 
   InputDecoration _fieldDecoration({required String hintText}) {

@@ -32,6 +32,13 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     'doc',
     'docx',
   ];
+  static const List<String> _videoExtensions = <String>[
+    'mp4',
+    'mov',
+    'm4v',
+    'webm',
+    'avi',
+  ];
 
   final _formKey = GlobalKey<FormState>();
   final _authProvider = AuthProvider();
@@ -40,13 +47,28 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   final _developerController = TextEditingController();
   final _cityController = TextEditingController();
   final _localityController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _configurationsController = TextEditingController();
   final _priceRangeController = TextEditingController();
   final _totalUnitsController = TextEditingController();
+  final _possessionDateController = TextEditingController();
   final _reraNumberController = TextEditingController();
-  final _paymentPlanTextController = TextEditingController();
+  final _amenitiesController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _brochureUrlController = TextEditingController();
+  final _videoUrlController = TextEditingController();
+  final _paymentPlanUrlController = TextEditingController();
+  final _homeLoanInfoController = TextEditingController();
 
   String _status = 'active';
+  List<Map<String, dynamic>> _existingUnitPlanDocs =
+      const <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _existingCreativeDocs =
+      const <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _existingPaymentPlanDocs =
+      const <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _existingVideoDocs =
+      const <Map<String, dynamic>>[];
   List<PlatformFile> _unitPlanFiles = const <PlatformFile>[];
   List<PlatformFile> _creativeFiles = const <PlatformFile>[];
   List<PlatformFile> _paymentPlanFiles = const <PlatformFile>[];
@@ -70,11 +92,18 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     _developerController.dispose();
     _cityController.dispose();
     _localityController.dispose();
+    _addressController.dispose();
+    _configurationsController.dispose();
     _priceRangeController.dispose();
     _totalUnitsController.dispose();
+    _possessionDateController.dispose();
     _reraNumberController.dispose();
-    _paymentPlanTextController.dispose();
+    _amenitiesController.dispose();
     _descriptionController.dispose();
+    _brochureUrlController.dispose();
+    _videoUrlController.dispose();
+    _paymentPlanUrlController.dispose();
+    _homeLoanInfoController.dispose();
     super.dispose();
   }
 
@@ -88,11 +117,22 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     _developerController.text = _readString(data['developer']);
     _cityController.text = _readString(data['city']);
     _localityController.text = _readString(data['locality']);
+    _addressController.text = _readString(data['address']);
+    _configurationsController.text = _readListText(data['configurations']);
     _priceRangeController.text = _readString(data['price_range']);
     _totalUnitsController.text = _readString(data['total_units']);
+    _possessionDateController.text = _readDateText(data['possession_date']);
     _reraNumberController.text = _readString(data['rera_number']);
-    _paymentPlanTextController.text = _readString(data['home_loan_info']);
+    _amenitiesController.text = _readListText(data['amenities']);
     _descriptionController.text = _readString(data['description']);
+    _brochureUrlController.text = _readString(data['brochure_url']);
+    _videoUrlController.text = _readString(data['video_url']);
+    _paymentPlanUrlController.text = _readString(data['payment_plan_url']);
+    _homeLoanInfoController.text = _readString(data['home_loan_info']);
+    _existingUnitPlanDocs = _readDocumentPayloads(data, 'unit_plans');
+    _existingCreativeDocs = _readDocumentPayloads(data, 'creatives');
+    _existingPaymentPlanDocs = _readDocumentPayloads(data, 'payment_plans');
+    _existingVideoDocs = _readDocumentPayloads(data, 'videos');
 
     final status = _readString(data['status']).toLowerCase();
     if (_statuses.any((option) => option.value == status)) {
@@ -108,6 +148,137 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       return value.toString().trim();
     }
     return '';
+  }
+
+  String _readListText(dynamic value) {
+    if (value is List) {
+      return value
+          .where((item) => item != null)
+          .map(_readString)
+          .where((item) => item.isNotEmpty)
+          .join(', ');
+    }
+    return _readString(value);
+  }
+
+  String _readDateText(dynamic value) {
+    final raw = _readString(value);
+    if (raw.isEmpty) {
+      return '';
+    }
+    final parts = raw.split('T');
+    return parts.isNotEmpty ? parts.first : raw;
+  }
+
+  List<String> _splitCsv(String value) {
+    return value
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
+  List<Map<String, dynamic>> _buildDocumentPayloads(
+    List<PlatformFile> files,
+  ) {
+    return files
+        .where((file) => file.path != null && file.path!.trim().isNotEmpty)
+        .map(
+          (file) => <String, dynamic>{
+            'file_name': file.name.trim(),
+            'file_path': '/uploads/projects/${file.name.trim()}',
+            'file_size': file.size,
+            'mime_type': _mimeTypeForFile(file),
+          },
+        )
+        .toList();
+  }
+
+  List<Map<String, dynamic>> _readDocumentPayloads(
+    Map<String, dynamic> data,
+    String key,
+  ) {
+    final raw = data[key];
+    final documents = <Map<String, dynamic>>[];
+
+    void addDocument(Map<String, dynamic> source) {
+      final fileName = _readString(source['file_name']);
+      final filePath = _readString(source['file_path']);
+      final fileSize = source['file_size'];
+      final mimeType = _readString(source['mime_type']);
+
+      if (fileName.isEmpty || filePath.isEmpty) {
+        return;
+      }
+
+      documents.add(
+        <String, dynamic>{
+          'file_name': fileName,
+          'file_path': filePath,
+          'file_size': fileSize is num
+              ? fileSize.toInt()
+              : int.tryParse(_readString(fileSize)) ?? 0,
+          'mime_type': mimeType,
+        },
+      );
+    }
+
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          addDocument(item);
+        } else if (item is Map) {
+          addDocument(Map<String, dynamic>.from(item));
+        }
+      }
+    }
+
+    final nested = data['documents'];
+    if (nested is Map<String, dynamic>) {
+      final nestedItems = nested[key];
+      if (nestedItems is List) {
+        for (final item in nestedItems) {
+          if (item is Map<String, dynamic>) {
+            addDocument(item);
+          } else if (item is Map) {
+            addDocument(Map<String, dynamic>.from(item));
+          }
+        }
+      }
+    }
+
+    return documents;
+  }
+
+  String _mimeTypeForFile(PlatformFile file) {
+    final extension = (file.extension ?? '').toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'mp4':
+        return 'video/mp4';
+      case 'mov':
+        return 'video/quicktime';
+      case 'm4v':
+        return 'video/x-m4v';
+      case 'webm':
+        return 'video/webm';
+      case 'avi':
+        return 'video/x-msvideo';
+      default:
+        return 'application/octet-stream';
+    }
   }
 
   Future<void> _submit() async {
@@ -134,14 +305,37 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       final developer = _developerController.text.trim();
       final city = _cityController.text.trim();
       final locality = _localityController.text.trim();
+      final address = _addressController.text.trim();
+      final configurations = _splitCsv(_configurationsController.text);
       final priceRange = _priceRangeController.text.trim();
       final totalUnits = int.tryParse(_totalUnitsController.text.trim()) ?? 0;
+      final possessionDate = _possessionDateController.text.trim();
       final reraNumber = _reraNumberController.text.trim();
-      final paymentPlanText = _paymentPlanTextController.text.trim();
+      final amenities = _splitCsv(_amenitiesController.text);
       final description = _descriptionController.text.trim();
-      final derivedAddress =
-          [locality, city].where((item) => item.isNotEmpty).join(', ');
-      final resolvedAddress = derivedAddress;
+      final brochureUrl = _brochureUrlController.text.trim();
+      final videoUrl = _videoUrlController.text.trim();
+      final paymentPlanUrl = _paymentPlanUrlController.text.trim();
+      final homeLoanInfo = _homeLoanInfoController.text.trim();
+      final resolvedAddress = address.isNotEmpty
+          ? address
+          : [locality, city].where((item) => item.isNotEmpty).join(', ');
+      final unitPlans = [
+        ..._existingUnitPlanDocs,
+        ..._buildDocumentPayloads(_unitPlanFiles),
+      ];
+      final creatives = [
+        ..._existingCreativeDocs,
+        ..._buildDocumentPayloads(_creativeFiles),
+      ];
+      final paymentPlans = [
+        ..._existingPaymentPlanDocs,
+        ..._buildDocumentPayloads(_paymentPlanFiles),
+      ];
+      final videos = [
+        ..._existingVideoDocs,
+        ..._buildDocumentPayloads(_videoFiles),
+      ];
 
       if (widget.isEditMode) {
         final id = _readString(widget.projectData?['id']);
@@ -156,22 +350,22 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           city: city,
           locality: locality,
           address: resolvedAddress,
-          configurations: const <String>[],
+          configurations: configurations,
           priceRange: priceRange,
           totalUnits: totalUnits,
-          possessionDate: _readString(widget.projectData?['possession_date']),
+          possessionDate: possessionDate,
           reraNumber: reraNumber,
-          amenities: const <String>[],
+          amenities: amenities,
           status: _status,
           description: description,
-          unitPlanFilePaths: _filePaths(_unitPlanFiles),
-          creativeFilePaths: _filePaths(_creativeFiles),
-          paymentPlanFilePaths: _filePaths(_paymentPlanFiles),
-          videoFilePaths: _filePaths(_videoFiles),
-          brochureUrl: '',
-          videoUrl: '',
-          paymentPlanUrl: '',
-          homeLoanInfo: paymentPlanText,
+          unitPlans: unitPlans,
+          creatives: creatives,
+          paymentPlans: paymentPlans,
+          videos: videos,
+          brochureUrl: brochureUrl,
+          videoUrl: videoUrl,
+          paymentPlanUrl: paymentPlanUrl,
+          homeLoanInfo: homeLoanInfo,
           token: _authProvider.currentAuthToken,
         );
       } else {
@@ -181,22 +375,22 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           city: city,
           locality: locality,
           address: resolvedAddress,
-          configurations: const <String>[],
+          configurations: configurations,
           priceRange: priceRange,
           totalUnits: totalUnits,
-          possessionDate: '',
+          possessionDate: possessionDate,
           reraNumber: reraNumber,
-          amenities: const <String>[],
+          amenities: amenities,
           status: _status,
           description: description,
-          unitPlanFilePaths: _filePaths(_unitPlanFiles),
-          creativeFilePaths: _filePaths(_creativeFiles),
-          paymentPlanFilePaths: _filePaths(_paymentPlanFiles),
-          videoFilePaths: _filePaths(_videoFiles),
-          brochureUrl: '',
-          videoUrl: '',
-          paymentPlanUrl: '',
-          homeLoanInfo: paymentPlanText,
+          unitPlans: unitPlans,
+          creatives: creatives,
+          paymentPlans: paymentPlans,
+          videos: videos,
+          brochureUrl: brochureUrl,
+          videoUrl: videoUrl,
+          paymentPlanUrl: paymentPlanUrl,
+          homeLoanInfo: homeLoanInfo,
           token: _authProvider.currentAuthToken,
         );
       }
@@ -219,16 +413,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     }
   }
 
-  List<String> _filePaths(List<PlatformFile> files) {
-    return files
-        .map((file) => file.path?.trim() ?? '')
-        .where((path) => path.isNotEmpty)
-        .toList();
-  }
-
   Future<void> _pickDocuments({
     required List<PlatformFile> currentFiles,
     required ValueChanged<List<PlatformFile>> onChanged,
+    required List<String> allowedExtensions,
   }) async {
     if (_isSubmitting) {
       return;
@@ -246,7 +434,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
 
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: _documentExtensions,
+      allowedExtensions: allowedExtensions,
       allowMultiple: true,
     );
     if (!mounted || picked == null || picked.files.isEmpty) {
@@ -259,7 +447,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
         break;
       }
       final extension = (file.extension ?? '').toLowerCase();
-      if (!_documentExtensions.contains(extension)) {
+      if (!allowedExtensions.contains(extension)) {
         _showSnackBar('Unsupported file skipped: ${file.name}');
         continue;
       }
@@ -421,6 +609,34 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                             ],
                           ),
                           const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _addressController,
+                            label: 'Address *',
+                            hintText: 'Plot 14, Veera Desai Road',
+                            validator: _requiredValidator(
+                              'Address is required.',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildResponsiveRow(
+                            isNarrow: isNarrow,
+                            children: [
+                              _buildTextField(
+                                controller: _configurationsController,
+                                label: 'Configurations',
+                                hintText: '1BHK, 2BHK, 3BHK',
+                              ),
+                              _buildTextField(
+                                controller: _possessionDateController,
+                                label: 'Possession Date *',
+                                hintText: '2027-12-01',
+                                validator: _requiredValidator(
+                                  'Possession Date is required.',
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
                           _buildResponsiveRow(
                             isNarrow: isNarrow,
                             children: [
@@ -441,6 +657,12 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                             controller: _priceRangeController,
                             label: 'Price Range',
                             hintText: '80L - 1.2Cr',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _amenitiesController,
+                            label: 'Amenities',
+                            hintText: 'Swimming Pool, Gym, Clubhouse',
                           ),
                           const SizedBox(height: 12),
                           _buildResponsiveRow(
@@ -470,9 +692,27 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                           ),
                           const SizedBox(height: 12),
                           _buildTextField(
-                            controller: _paymentPlanTextController,
-                            label: 'Payment Plan Text',
-                            hintText: 'Enter payment plan details',
+                            controller: _brochureUrlController,
+                            label: 'Brochure URL',
+                            hintText: '/uploads/projects/brochure.pdf',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _videoUrlController,
+                            label: 'Video URL',
+                            hintText: 'https://youtube.com/watch?v=abc',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _paymentPlanUrlController,
+                            label: 'Payment Plan URL',
+                            hintText: '/uploads/projects/payment_plan.pdf',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _homeLoanInfoController,
+                            label: 'Home Loan Info',
+                            hintText: 'Available through HDFC, SBI, ICICI',
                             minLines: 3,
                             maxLines: 3,
                           ),
@@ -572,6 +812,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           onTap: () => _pickDocuments(
             currentFiles: _unitPlanFiles,
             onChanged: (files) => _unitPlanFiles = files,
+            allowedExtensions: _documentExtensions,
           ),
           onRemove: (file) => _removeDocument(
             currentFiles: _unitPlanFiles,
@@ -588,6 +829,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           onTap: () => _pickDocuments(
             currentFiles: _creativeFiles,
             onChanged: (files) => _creativeFiles = files,
+            allowedExtensions: _documentExtensions,
           ),
           onRemove: (file) => _removeDocument(
             currentFiles: _creativeFiles,
@@ -604,6 +846,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           onTap: () => _pickDocuments(
             currentFiles: _paymentPlanFiles,
             onChanged: (files) => _paymentPlanFiles = files,
+            allowedExtensions: _documentExtensions,
           ),
           onRemove: (file) => _removeDocument(
             currentFiles: _paymentPlanFiles,
@@ -620,6 +863,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           onTap: () => _pickDocuments(
             currentFiles: _videoFiles,
             onChanged: (files) => _videoFiles = files,
+            allowedExtensions: _videoExtensions,
           ),
           onRemove: (file) => _removeDocument(
             currentFiles: _videoFiles,

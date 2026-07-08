@@ -47,9 +47,6 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
     _fetchMemberDetails();
   }
 
-  String get _memberRole =>
-      RoleAccess.normalize(_asString(_memberData['role']));
-
   Future<void> _loadAccess() async {
     try {
       await RoleAccess.currentPermissionSet(_authProvider);
@@ -242,12 +239,6 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
       }
     });
     await _loadPerformance();
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -1083,74 +1074,6 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
       rows.add(_PipelineRow(seed.label, count, percent, seed.color));
     }
     return rows;
-  }
-
-  Widget _buildStatsSection(Map<String, dynamic> memberData) {
-    final activeLeads = _readInt(
-      memberData['active_leads'] ??
-          memberData['activeLeads'] ??
-          memberData['leads_count'],
-    );
-    final conversionRate = _readNum(
-      memberData['conversion_rate'] ?? memberData['conversionRate'],
-    );
-
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatItem(
-            label: 'Total Leads',
-            value: activeLeads.toString(),
-            color: AppColors.info,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatItem(
-            label: 'Conversion',
-            value: '${conversionRate.toStringAsFixed(1)}%',
-            color: AppColors.success,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatItem({
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildInfoSection(

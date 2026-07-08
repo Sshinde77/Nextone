@@ -2975,6 +2975,215 @@ class AuthService {
     return <String, dynamic>{'id': normalizedId, 'status': status};
   }
 
+  Future<Map<String, dynamic>> holidays({
+    int page = 1,
+    int perPage = 10,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.holidays}')
+        .replace(queryParameters: <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    });
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'holidays',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('holidays', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch holidays.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is List) {
+        return <String, dynamic>{'data': decoded};
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Holiday response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> createHoliday({
+    required String date,
+    required String name,
+    String description = '',
+    required List<String> roles,
+    required List<String> userIds,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.holidays}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final payload = <String, dynamic>{
+      'date': date.trim(),
+      'name': name.trim(),
+      'description': description.trim(),
+      'roles': roles,
+      'user_ids': userIds,
+    };
+    _logRequest(
+      endpoint: 'createHoliday',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: jsonEncode(payload),
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: jsonEncode(payload))
+        .timeout(_requestTimeout);
+    _logResponse('createHoliday', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create holiday.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    return <String, dynamic>{
+      'date': date.trim(),
+      'name': name.trim(),
+      'description': description.trim(),
+      'roles': roles,
+      'user_ids': userIds,
+    };
+  }
+
+  Future<Map<String, dynamic>> updateHoliday({
+    required String id,
+    required String date,
+    required String name,
+    String description = '',
+    required List<String> roles,
+    required List<String> userIds,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Holiday id is required.');
+    }
+    final endpoint =
+        ApiConstants.holidayDetail.replaceAll('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final payload = <String, dynamic>{
+      'date': date.trim(),
+      'name': name.trim(),
+      'description': description.trim(),
+      'roles': roles,
+      'user_ids': userIds,
+    };
+    _logRequest(
+      endpoint: 'updateHoliday',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: jsonEncode(payload),
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: jsonEncode(payload))
+        .timeout(_requestTimeout);
+    _logResponse('updateHoliday', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update holiday.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final dynamic data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      'date': date.trim(),
+      'name': name.trim(),
+      'description': description.trim(),
+      'roles': roles,
+      'user_ids': userIds,
+    };
+  }
+
+  Future<void> deleteHoliday({
+    required String id,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Holiday id is required.');
+    }
+    final endpoint =
+        ApiConstants.holidayDetail.replaceAll('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteHoliday',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteHoliday', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete holiday.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
   Future<LeadsListResult> phoneRevealMyRequests({
     int page = 1,
     int perPage = 20,
@@ -3581,6 +3790,7 @@ class AuthService {
     required String email,
     required String source,
     String projectId = '',
+    String projectName = '',
     required String assignedTo,
     String budget = '',
     String locationPreference = '',
@@ -3604,7 +3814,6 @@ class AuthService {
       'alternate_phone_number': alternatePhoneNumber.trim(),
       'email': email.trim(),
       'source': source.trim(),
-      'project_id': projectId.trim(),
       'assigned_to': assignedTo.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
@@ -3617,6 +3826,11 @@ class AuthService {
       'priority': priority.trim(),
       'notes': notes.trim(),
     };
+    _addProjectSelectionFields(
+      requestPayload,
+      projectId: projectId,
+      projectName: projectName,
+    );
     final body = jsonEncode(requestPayload);
 
     _logRequest(
@@ -4383,6 +4597,7 @@ class AuthService {
   Future<Map<String, dynamic>> createSiteVisit({
     required String leadId,
     required String projectId,
+    String projectName = '',
     required String visitDate,
     required String visitTime,
     required String assignedTo,
@@ -4394,15 +4609,20 @@ class AuthService {
     final uri =
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createsitevisits}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
-    final body = jsonEncode({
+    final requestPayload = <String, dynamic>{
       'lead_id': leadId.trim(),
-      'project_id': projectId.trim(),
       'visit_date': visitDate.trim(),
       'visit_time': visitTime.trim(),
       'assigned_to': assignedTo.trim(),
       'notes': notes.trim(),
       'transport_arranged': transportArranged,
-    });
+    };
+    _addProjectSelectionFields(
+      requestPayload,
+      projectId: projectId,
+      projectName: projectName,
+    );
+    final body = jsonEncode(requestPayload);
 
     _logRequest(
       endpoint: 'createSiteVisit',
@@ -4436,6 +4656,7 @@ class AuthService {
     return <String, dynamic>{
       'lead_id': leadId.trim(),
       'project_id': projectId.trim(),
+      if (projectName.trim().isNotEmpty) 'project_name': projectName.trim(),
       'visit_date': visitDate.trim(),
       'visit_time': visitTime.trim(),
       'assigned_to': assignedTo.trim(),
@@ -4451,6 +4672,7 @@ class AuthService {
     required String email,
     required String source,
     String projectId = '',
+    String projectName = '',
     required String assignedTo,
     String budget = '',
     String locationPreference = '',
@@ -4474,7 +4696,6 @@ class AuthService {
       'alternate_phone_number': alternatePhoneNumber.trim(),
       'email': email.trim(),
       'source': source.trim(),
-      'project_id': projectId.trim(),
       'assigned_to': assignedTo.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
@@ -4487,6 +4708,11 @@ class AuthService {
       'notes': notes.trim(),
       'transport_arranged': transportArranged,
     };
+    _addProjectSelectionFields(
+      requestPayload,
+      projectId: projectId,
+      projectName: projectName,
+    );
     final body = jsonEncode(requestPayload);
 
     _logRequest(
@@ -5749,6 +5975,7 @@ class AuthService {
     String nextFollowUpTime = '',
     required String assignedTo,
     String projectId = '',
+    String projectName = '',
     required String budget,
     required String locationPreference,
     required String notes,
@@ -5758,7 +5985,7 @@ class AuthService {
     final uri =
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createsleads}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
-    final body = jsonEncode({
+    final requestPayload = <String, dynamic>{
       'name': name.trim(),
       'phone': phone.trim(),
       'alternate_phone_number': alternatePhoneNumber.trim(),
@@ -5767,11 +5994,16 @@ class AuthService {
       'callback_time': callbackTime.trim(),
       'next_followup_time': nextFollowUpTime.trim(),
       'assigned_to': assignedTo.trim(),
-      'project_id': projectId.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
       'notes': notes.trim(),
-    });
+    };
+    _addProjectSelectionFields(
+      requestPayload,
+      projectId: projectId,
+      projectName: projectName,
+    );
+    final body = jsonEncode(requestPayload);
 
     _logRequest(
       endpoint: 'createLead',
@@ -5804,20 +6036,7 @@ class AuthService {
       // Fall through and return submitted payload as a fallback.
     }
 
-    return <String, dynamic>{
-      'name': name.trim(),
-      'phone': phone.trim(),
-      'alternate_phone_number': alternatePhoneNumber.trim(),
-      'email': email.trim(),
-      'source': source.trim(),
-      'callback_time': callbackTime.trim(),
-      'next_followup_time': nextFollowUpTime.trim(),
-      'assigned_to': assignedTo.trim(),
-      'project_id': projectId.trim(),
-      'budget': budget.trim(),
-      'location_preference': locationPreference.trim(),
-      'notes': notes.trim(),
-    };
+    return requestPayload;
   }
 
   Future<Map<String, dynamic>> editLead({
@@ -5828,6 +6047,7 @@ class AuthService {
     String nextFollowUpTime = '',
     String assignedTo = '',
     String projectId = '',
+    String projectName = '',
     required String budget,
     required String locationPreference,
     String? token,
@@ -5841,16 +6061,21 @@ class AuthService {
     final endpoint = ApiConstants.editleads.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
-    final body = jsonEncode({
+    final requestPayload = <String, dynamic>{
       'phone': phone.trim(),
       'source': source.trim(),
       'callback_time': callbackTime.trim(),
       'next_followup_time': nextFollowUpTime.trim(),
       'assigned_to': assignedTo.trim(),
-      'project_id': projectId.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
-    });
+    };
+    _addProjectSelectionFields(
+      requestPayload,
+      projectId: projectId,
+      projectName: projectName,
+    );
+    final body = jsonEncode(requestPayload);
 
     _logRequest(
       endpoint: 'editLead',
@@ -6505,10 +6730,10 @@ class AuthService {
     required List<String> amenities,
     required String status,
     required String description,
-    List<String> unitPlanFilePaths = const <String>[],
-    List<String> creativeFilePaths = const <String>[],
-    List<String> paymentPlanFilePaths = const <String>[],
-    List<String> videoFilePaths = const <String>[],
+    List<Map<String, dynamic>> unitPlans = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> creatives = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> paymentPlans = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> videos = const <Map<String, dynamic>>[],
     String brochureUrl = '',
     String videoUrl = '',
     String paymentPlanUrl = '',
@@ -6518,62 +6743,49 @@ class AuthService {
     final resolvedToken = token ?? _authToken;
     final uri =
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createprojects}');
-    final request = http.MultipartRequest('POST', uri);
-    request.headers['accept'] = 'application/json';
-    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
-      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
-    }
-    _addProjectFields(
-      request,
-      name: name,
-      developer: developer,
-      city: city,
-      locality: locality,
-      address: address,
-      configurations: configurations,
-      priceRange: priceRange,
-      totalUnits: totalUnits,
-      possessionDate: possessionDate,
-      reraNumber: reraNumber,
-      amenities: amenities,
-      status: status,
-      description: description,
-      brochureUrl: brochureUrl,
-      videoUrl: videoUrl,
-      paymentPlanUrl: paymentPlanUrl,
-      homeLoanInfo: homeLoanInfo,
-    );
-    await _addProjectFiles(
-      request,
-      fieldName: 'unit_plans',
-      filePaths: unitPlanFilePaths,
-    );
-    await _addProjectFiles(
-      request,
-      fieldName: 'creatives',
-      filePaths: creativeFilePaths,
-    );
-    await _addProjectFiles(
-      request,
-      fieldName: 'payment_plans',
-      filePaths: paymentPlanFilePaths,
-    );
-    await _addProjectFiles(
-      request,
-      fieldName: 'videos',
-      filePaths: videoFilePaths,
-    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final bodyMap = <String, dynamic>{
+      'name': name.trim(),
+      'developer': developer.trim(),
+      'city': city.trim(),
+      'locality': locality.trim(),
+      'address': address.trim(),
+      'configurations': configurations
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList(),
+      'price_range': priceRange.trim(),
+      'total_units': totalUnits,
+      'possession_date': possessionDate.trim(),
+      'rera_number': reraNumber.trim(),
+      'amenities': amenities
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList(),
+      'status': status.trim(),
+      'description': description.trim(),
+      'brochure_url': brochureUrl.trim(),
+      'video_url': videoUrl.trim(),
+      'payment_plan_url': paymentPlanUrl.trim(),
+      'home_loan_info': homeLoanInfo.trim(),
+      'unit_plans': unitPlans,
+      'creatives': creatives,
+      'payment_plans': paymentPlans,
+      'videos': videos,
+    };
+    final body = jsonEncode(bodyMap);
 
     _logRequest(
       endpoint: 'createProject',
       method: 'POST',
       uri: uri,
-      headers: request.headers,
-      body: 'multipart/form-data',
+      headers: headers,
+      body: body,
     );
 
-    final streamedResponse = await request.send().timeout(_requestTimeout);
-    final response = await http.Response.fromStream(streamedResponse);
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
     _logResponse('createProject', response);
 
     final error = _handleResponse(
@@ -6668,6 +6880,23 @@ class AuthService {
           value,
         ].whereType<String>().join(',');
       }
+    }
+  }
+
+  void _addProjectSelectionFields(
+    Map<String, dynamic> payload, {
+    String projectId = '',
+    String projectName = '',
+  }) {
+    final normalizedProjectId = projectId.trim();
+    if (normalizedProjectId.isNotEmpty) {
+      payload['project_id'] = normalizedProjectId;
+      return;
+    }
+
+    final normalizedProjectName = projectName.trim();
+    if (normalizedProjectName.isNotEmpty) {
+      payload['project_name'] = normalizedProjectName;
     }
   }
 
@@ -7252,10 +7481,10 @@ class AuthService {
     required List<String> amenities,
     required String status,
     required String description,
-    List<String> unitPlanFilePaths = const <String>[],
-    List<String> creativeFilePaths = const <String>[],
-    List<String> paymentPlanFilePaths = const <String>[],
-    List<String> videoFilePaths = const <String>[],
+    List<Map<String, dynamic>> unitPlans = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> creatives = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> paymentPlans = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> videos = const <Map<String, dynamic>>[],
     String brochureUrl = '',
     String videoUrl = '',
     String paymentPlanUrl = '',
@@ -7271,62 +7500,49 @@ class AuthService {
     final endpoint =
         ApiConstants.editprojects.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
-    final request = http.MultipartRequest('PUT', uri);
-    request.headers['accept'] = 'application/json';
-    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
-      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
-    }
-    _addProjectFields(
-      request,
-      name: name,
-      developer: developer,
-      city: city,
-      locality: locality,
-      address: address,
-      configurations: configurations,
-      priceRange: priceRange,
-      totalUnits: totalUnits,
-      possessionDate: possessionDate,
-      reraNumber: reraNumber,
-      amenities: amenities,
-      status: status,
-      description: description,
-      brochureUrl: brochureUrl,
-      videoUrl: videoUrl,
-      paymentPlanUrl: paymentPlanUrl,
-      homeLoanInfo: homeLoanInfo,
-    );
-    await _addProjectFiles(
-      request,
-      fieldName: 'unit_plans',
-      filePaths: unitPlanFilePaths,
-    );
-    await _addProjectFiles(
-      request,
-      fieldName: 'creatives',
-      filePaths: creativeFilePaths,
-    );
-    await _addProjectFiles(
-      request,
-      fieldName: 'payment_plans',
-      filePaths: paymentPlanFilePaths,
-    );
-    await _addProjectFiles(
-      request,
-      fieldName: 'videos',
-      filePaths: videoFilePaths,
-    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final bodyMap = <String, dynamic>{
+      'name': name.trim(),
+      'developer': developer.trim(),
+      'city': city.trim(),
+      'locality': locality.trim(),
+      'address': address.trim(),
+      'configurations': configurations
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList(),
+      'price_range': priceRange.trim(),
+      'total_units': totalUnits,
+      'possession_date': possessionDate.trim(),
+      'rera_number': reraNumber.trim(),
+      'amenities': amenities
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList(),
+      'status': status.trim(),
+      'description': description.trim(),
+      'brochure_url': brochureUrl.trim(),
+      'video_url': videoUrl.trim(),
+      'payment_plan_url': paymentPlanUrl.trim(),
+      'home_loan_info': homeLoanInfo.trim(),
+      'unit_plans': unitPlans,
+      'creatives': creatives,
+      'payment_plans': paymentPlans,
+      'videos': videos,
+    };
+    final body = jsonEncode(bodyMap);
 
     _logRequest(
       endpoint: 'editProject',
       method: 'PUT',
       uri: uri,
-      headers: request.headers,
-      body: 'multipart/form-data',
+      headers: headers,
+      body: body,
     );
 
-    final streamedResponse = await request.send().timeout(_requestTimeout);
-    final response = await http.Response.fromStream(streamedResponse);
+    final response = await http
+        .put(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
     _logResponse('editProject', response);
 
     final error = _handleResponse(

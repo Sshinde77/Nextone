@@ -27,7 +27,8 @@ class SearchableDropdownField<T> extends FormField<T> {
     String? errorText,
     String? helperText,
     Future<void> Function()? onRetry,
-    String? Function(T?)? validator,
+    VoidCallback? onClear,
+    String? Function(T?)? fieldValidator,
     String searchHintText = 'Search...',
     String noResultsText = 'No matches found',
     List<String>? groupOrder,
@@ -37,14 +38,13 @@ class SearchableDropdownField<T> extends FormField<T> {
     String? sheetTitle,
   }) : super(
           initialValue: value,
-          validator: validator,
+          validator: fieldValidator,
           autovalidateMode: AutovalidateMode.onUserInteraction,
           builder: (fieldState) {
             final selectedItem = _selectedItem<T>(items, fieldState.value);
             final displayLabel =
                 selectedLabel ?? selectedItem?.label ?? hintText;
-            final displaySubtitle =
-                selectedItem != null ? selectedItem.subtitle : null;
+            final displaySubtitle = selectedItem?.subtitle;
             final hasSelection = selectedItem != null ||
                 selectedLabel?.trim().isNotEmpty == true;
             final isInteractive = enabled && !isLoading && items.isNotEmpty;
@@ -124,7 +124,32 @@ class SearchableDropdownField<T> extends FormField<T> {
                           width: 1.4,
                         ),
                       ),
-                      suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded),
+                      suffixIcon: onClear != null && hasSelection
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  tooltip: 'Clear selection',
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 18,
+                                  ),
+                                  onPressed: enabled && !isLoading
+                                      ? () {
+                                          fieldState.didChange(null);
+                                          onChanged(null);
+                                          onClear();
+                                        }
+                                      : null,
+                                ),
+                                const SizedBox(width: 2),
+                                const Icon(Icons.keyboard_arrow_down_rounded),
+                              ],
+                            )
+                          : const Icon(Icons.keyboard_arrow_down_rounded),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

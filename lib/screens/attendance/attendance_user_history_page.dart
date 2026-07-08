@@ -407,14 +407,6 @@ class _AttendanceUserHistoryPageState extends State<AttendanceUserHistoryPage> {
     return fallback;
   }
 
-  double _readDouble(dynamic value, {double fallback = 0.0}) {
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value.trim()) ?? fallback;
-    return fallback;
-  }
-
   DateTime? _parseApiDate(String value) {
     if (value.trim().isEmpty) return null;
     return DateTime.tryParse(value.trim())?.toLocal();

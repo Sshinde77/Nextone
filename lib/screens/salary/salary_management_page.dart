@@ -1645,13 +1645,15 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         : result.salarySlips
             .where((s) => s.month == _mySalarySelectedMonth)
             .toList();
-    if (selected != null && selected.isNotEmpty)
+    if (selected != null && selected.isNotEmpty) {
       return selected.first.perDaySalary;
+    }
     if (result.currentMonthlySalary?.perDaySalary != null) {
       return result.currentMonthlySalary!.perDaySalary!;
     }
-    if (result.salarySlips.isNotEmpty)
+    if (result.salarySlips.isNotEmpty) {
       return result.salarySlips.first.perDaySalary;
+    }
     return 0;
   }
 
@@ -1661,12 +1663,15 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         : result.salarySlips
             .where((s) => s.month == _mySalarySelectedMonth)
             .toList();
-    if (selected != null && selected.isNotEmpty)
+    if (selected != null && selected.isNotEmpty) {
       return selected.first.monthlySalary;
-    if (result.currentMonthlySalary != null)
+    }
+    if (result.currentMonthlySalary != null) {
       return result.currentMonthlySalary!.amount;
-    if (result.salarySlips.isNotEmpty)
+    }
+    if (result.salarySlips.isNotEmpty) {
       return result.salarySlips.first.monthlySalary;
+    }
     return 0;
   }
 
@@ -1822,8 +1827,9 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
 
     final checkIn = formatOne(checkInRaw);
     final checkOut = formatOne(checkOutRaw);
-    if (checkIn.isNotEmpty && checkOut.isNotEmpty)
+    if (checkIn.isNotEmpty && checkOut.isNotEmpty) {
       return '→$checkIn   ←$checkOut';
+    }
     if (checkIn.isNotEmpty) return '→$checkIn';
     if (checkOut.isNotEmpty) return '←$checkOut';
     return '';
@@ -2420,14 +2426,12 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                ...infoBlocks
-                    .map(
-                      (block) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: block,
-                      ),
-                    )
-                    .toList(),
+                ...infoBlocks.map(
+                  (block) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: block,
+                  ),
+                ),
               ],
             );
           }

@@ -34,6 +34,7 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
   final _callbackTimeController = TextEditingController();
   final _nextFollowUpTimeController = TextEditingController();
   final _leadNotesController = TextEditingController();
+  final _projectNameController = TextEditingController();
 
   final _taskTitleController = TextEditingController();
   final _taskNotesController = TextEditingController();
@@ -43,6 +44,7 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
   bool _isLoadingLeadSources = true;
   bool _isLoadingProjects = true;
   bool _isLoadingUserContext = true;
+  bool _useManualProjectInput = false;
 
   String? _assigneeLoadError;
   String? _leadSourceLoadError;
@@ -65,6 +67,7 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
   @override
   void initState() {
     super.initState();
+    _projectNameController.addListener(_syncProjectSelectionMode);
     _loadCurrentUserContext();
     _loadAssigneeOptions();
     _loadLeadSourceOptions();
@@ -73,6 +76,7 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
 
   @override
   void dispose() {
+    _projectNameController.removeListener(_syncProjectSelectionMode);
     _nameController.dispose();
     _phoneController.dispose();
     _alternatePhoneController.dispose();
@@ -83,6 +87,7 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
     _callbackTimeController.dispose();
     _nextFollowUpTimeController.dispose();
     _leadNotesController.dispose();
+    _projectNameController.dispose();
     _taskTitleController.dispose();
     _taskNotesController.dispose();
     super.dispose();
@@ -335,6 +340,8 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
     if (!allowed) return;
 
     final assignedTo = _resolveAssignedToForCreate();
+    final projectId = _resolveSelectedProjectId();
+    final projectName = _resolveSelectedProjectName();
 
     setState(() {
       _isSubmitting = true;
@@ -347,7 +354,8 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
         alternatePhoneNumber: _alternatePhoneController.text.trim(),
         email: _emailController.text.trim(),
         source: _selectedLeadSource?.trim() ?? '',
-        projectId: _selectedProjectId?.trim() ?? '',
+        projectId: projectId,
+        projectName: projectName,
         assignedTo: assignedTo,
         budget: _budgetController.text.trim(),
         locationPreference: _locationPreferenceController.text.trim(),
@@ -452,11 +460,28 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
   }
 
   String _resolveSelectedProjectId() {
+    if (_useManualProjectInput) {
+      return '';
+    }
     return _selectedProjectId?.trim() ?? '';
   }
 
-  String _resolveSelectedLeadSource() {
-    return _selectedLeadSource?.trim() ?? '';
+  String _resolveSelectedProjectName() {
+    if (_useManualProjectInput) {
+      return _projectNameController.text.trim();
+    }
+    return '';
+  }
+
+  void _setManualProjectMode(bool enabled) {
+    setState(() {
+      _useManualProjectInput = enabled;
+      if (enabled) {
+        _selectedProjectId = null;
+      } else {
+        _projectNameController.clear();
+      }
+    });
   }
 
   String _resolveAssignedToForCreate() {
@@ -735,7 +760,44 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
                 hintText: '2BHK',
               ),
               const SizedBox(height: 12),
-              _buildProjectDropdown(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                ),
+                child: CheckboxListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  title: const Text(
+                    'Use manual project name',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _useManualProjectInput
+                        ? 'Type the project name yourself'
+                        : 'Select a project from the list',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  value: _useManualProjectInput,
+                  onChanged: _isSubmitting
+                      ? null
+                      : (value) => _setManualProjectMode(value ?? false),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_useManualProjectInput)
+                _buildProjectNameField()
+              else
+                _buildProjectDropdown(),
               const SizedBox(height: 12),
               _twoFields(
                 _buildDateTimeField(
@@ -1116,12 +1178,62 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
       isLoading: _isLoadingProjects,
       errorText: _projectLoadError,
       onRetry: _loadProjectOptions,
+      onClear: () {
+        setState(() {
+          _selectedProjectId = null;
+        });
+      },
       onChanged: (value) {
         setState(() {
           _selectedProjectId = value;
+          if (value != null && value.isNotEmpty) {
+            _projectNameController.clear();
+          }
         });
       },
     );
+  }
+
+  Widget _buildProjectNameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Manual Project Name',
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: _projectNameController,
+          enabled: !_isSubmitting,
+          validator: (value) {
+            if (!_useManualProjectInput) {
+              return null;
+            }
+            if ((value ?? '').trim().isEmpty) {
+              return 'Project name is required';
+            }
+            return null;
+          },
+          decoration: _fieldDecoration(
+            hintText: 'Type project name here',
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _syncProjectSelectionMode() {
+    if (_projectNameController.text.trim().isNotEmpty &&
+        (_selectedProjectId?.isNotEmpty ?? false)) {
+      setState(() {
+        _selectedProjectId = null;
+      });
+    }
   }
 
   InputDecoration _fieldDecoration({required String hintText}) {

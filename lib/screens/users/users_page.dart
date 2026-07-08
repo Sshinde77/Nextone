@@ -244,8 +244,12 @@ class _UsersPageState extends State<UsersPage> {
     }
     try {
       final managers = await _loadEligibleManagers(forRole: user.rawRole);
+      if (!context.mounted) {
+        return;
+      }
+      final dialogContext = context;
       final assignedId = await showDialog<String>(
-        context: context,
+        context: dialogContext,
         builder: (context) => AssignManagerDialog(
           memberName: user.name,
           memberRole: user.role,

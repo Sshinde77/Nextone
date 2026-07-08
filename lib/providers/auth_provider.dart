@@ -708,6 +708,63 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> holidays({
+    int page = 1,
+    int perPage = 10,
+    String? token,
+  }) {
+    return _authService.holidays(
+      page: page,
+      perPage: perPage,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> createHoliday({
+    required String date,
+    required String name,
+    String description = '',
+    required List<String> roles,
+    required List<String> userIds,
+    String? token,
+  }) {
+    return _authService.createHoliday(
+      date: date,
+      name: name,
+      description: description,
+      roles: roles,
+      userIds: userIds,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> updateHoliday({
+    required String id,
+    required String date,
+    required String name,
+    String description = '',
+    required List<String> roles,
+    required List<String> userIds,
+    String? token,
+  }) {
+    return _authService.updateHoliday(
+      id: id,
+      date: date,
+      name: name,
+      description: description,
+      roles: roles,
+      userIds: userIds,
+      token: token,
+    );
+  }
+
+  Future<void> deleteHoliday({
+    required String id,
+    String? token,
+  }) {
+    return _authService.deleteHoliday(id: id, token: token);
+  }
+
   Future<LeadsListResult> phoneRevealMyRequests({
     int page = 1,
     int perPage = 20,
@@ -863,6 +920,7 @@ class AuthProvider {
     required String email,
     required String source,
     String projectId = '',
+    String projectName = '',
     required String assignedTo,
     String budget = '',
     String locationPreference = '',
@@ -883,6 +941,7 @@ class AuthProvider {
       email: email,
       source: source,
       projectId: projectId,
+      projectName: projectName,
       assignedTo: assignedTo,
       budget: budget,
       locationPreference: locationPreference,
@@ -1035,6 +1094,7 @@ class AuthProvider {
   Future<Map<String, dynamic>> createSiteVisit({
     required String leadId,
     required String projectId,
+    String projectName = '',
     required String visitDate,
     required String visitTime,
     required String assignedTo,
@@ -1045,6 +1105,7 @@ class AuthProvider {
     return _authService.createSiteVisit(
       leadId: leadId,
       projectId: projectId,
+      projectName: projectName,
       visitDate: visitDate,
       visitTime: visitTime,
       assignedTo: assignedTo,
@@ -1061,6 +1122,7 @@ class AuthProvider {
     required String email,
     required String source,
     String projectId = '',
+    String projectName = '',
     required String assignedTo,
     String budget = '',
     String locationPreference = '',
@@ -1081,6 +1143,7 @@ class AuthProvider {
       email: email,
       source: source,
       projectId: projectId,
+      projectName: projectName,
       assignedTo: assignedTo,
       budget: budget,
       locationPreference: locationPreference,
@@ -1428,6 +1491,7 @@ class AuthProvider {
     String nextFollowUpTime = '',
     required String assignedTo,
     String projectId = '',
+    String projectName = '',
     required String budget,
     required String locationPreference,
     required String notes,
@@ -1443,6 +1507,7 @@ class AuthProvider {
       nextFollowUpTime: nextFollowUpTime,
       assignedTo: assignedTo,
       projectId: projectId,
+      projectName: projectName,
       budget: budget,
       locationPreference: locationPreference,
       notes: notes,
@@ -1458,6 +1523,7 @@ class AuthProvider {
     String nextFollowUpTime = '',
     String assignedTo = '',
     String projectId = '',
+    String projectName = '',
     required String budget,
     required String locationPreference,
     String? token,
@@ -1470,6 +1536,7 @@ class AuthProvider {
       nextFollowUpTime: nextFollowUpTime,
       assignedTo: assignedTo,
       projectId: projectId,
+      projectName: projectName,
       budget: budget,
       locationPreference: locationPreference,
       token: token,
@@ -1536,10 +1603,10 @@ class AuthProvider {
     required List<String> amenities,
     required String status,
     required String description,
-    List<String> unitPlanFilePaths = const <String>[],
-    List<String> creativeFilePaths = const <String>[],
-    List<String> paymentPlanFilePaths = const <String>[],
-    List<String> videoFilePaths = const <String>[],
+    List<Map<String, dynamic>> unitPlans = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> creatives = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> paymentPlans = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> videos = const <Map<String, dynamic>>[],
     String brochureUrl = '',
     String videoUrl = '',
     String paymentPlanUrl = '',
@@ -1560,10 +1627,10 @@ class AuthProvider {
       amenities: amenities,
       status: status,
       description: description,
-      unitPlanFilePaths: unitPlanFilePaths,
-      creativeFilePaths: creativeFilePaths,
-      paymentPlanFilePaths: paymentPlanFilePaths,
-      videoFilePaths: videoFilePaths,
+      unitPlans: unitPlans,
+      creatives: creatives,
+      paymentPlans: paymentPlans,
+      videos: videos,
       brochureUrl: brochureUrl,
       videoUrl: videoUrl,
       paymentPlanUrl: paymentPlanUrl,
@@ -1678,10 +1745,10 @@ class AuthProvider {
     required List<String> amenities,
     required String status,
     required String description,
-    List<String> unitPlanFilePaths = const <String>[],
-    List<String> creativeFilePaths = const <String>[],
-    List<String> paymentPlanFilePaths = const <String>[],
-    List<String> videoFilePaths = const <String>[],
+    List<Map<String, dynamic>> unitPlans = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> creatives = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> paymentPlans = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> videos = const <Map<String, dynamic>>[],
     String brochureUrl = '',
     String videoUrl = '',
     String paymentPlanUrl = '',
@@ -1703,10 +1770,10 @@ class AuthProvider {
       amenities: amenities,
       status: status,
       description: description,
-      unitPlanFilePaths: unitPlanFilePaths,
-      creativeFilePaths: creativeFilePaths,
-      paymentPlanFilePaths: paymentPlanFilePaths,
-      videoFilePaths: videoFilePaths,
+      unitPlans: unitPlans,
+      creatives: creatives,
+      paymentPlans: paymentPlans,
+      videos: videos,
       brochureUrl: brochureUrl,
       videoUrl: videoUrl,
       paymentPlanUrl: paymentPlanUrl,

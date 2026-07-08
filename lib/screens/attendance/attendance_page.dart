@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/screens/attendance/holiday_form_page.dart';
 import 'package:nextone/screens/attendance/attendance_user_history_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
@@ -62,6 +63,14 @@ class _AttendancePageState extends State<AttendancePage> {
   bool _isApprovingStatus = false;
   String? _approvalsError;
   List<Map<String, dynamic>> _approvalRows = <Map<String, dynamic>>[];
+  bool _isLoadingHolidays = false;
+  String? _holidaysError;
+  List<Map<String, dynamic>> _holidayRows = <Map<String, dynamic>>[];
+  int _holidaysCurrentPage = 1;
+  int _holidaysTotalPages = 1;
+  int _holidaysTotalItems = 0;
+  int _selectedHolidayYear = DateTime.now().year;
+  List<int> _holidayYears = <int>[];
   late DateTime _calendarMonth;
   late DateTime _dailyViewDate;
   late DateTime _summaryFromDate;
@@ -99,6 +108,8 @@ class _AttendancePageState extends State<AttendancePage> {
       _TabData('Late Reports', Icons.watch_later_rounded);
   static const _TabData _approvalTab =
       _TabData('Approvals', Icons.how_to_reg_outlined);
+  static const _TabData _holidaysTab =
+      _TabData('Holidays', Icons.event_available_outlined);
 
   @override
   void initState() {
@@ -168,6 +179,8 @@ class _AttendancePageState extends State<AttendancePage> {
       .indexWhere((tab) => tab.label == 'Late Reports');
   int get _approvalsTabIndex =>
       _tabsForRole(_currentRole).indexWhere((tab) => tab.label == 'Approvals');
+  int get _holidaysTabIndex =>
+      _tabsForRole(_currentRole).indexWhere((tab) => tab.label == 'Holidays');
   int get _dailyViewTabIndex => _tabsForRole(_currentRole)
       .indexWhere((tab) => tab.label.contains('Daily'));
   int get _summaryTabIndex => _tabsForRole(_currentRole)
@@ -204,6 +217,9 @@ class _AttendancePageState extends State<AttendancePage> {
       if (tabs.any((tab) => tab.label == 'Approvals')) {
         _loadApprovalPending();
       }
+      if (tabs.any((tab) => tab.label == 'Holidays')) {
+        _loadHolidays();
+      }
     } catch (_) {
       // Export actions stay hidden if access cannot be resolved.
     }
@@ -227,6 +243,8 @@ class _AttendancePageState extends State<AttendancePage> {
                 if (RoleAccess.isAdmin(role) || RoleAccess.isSuperAdmin(role))
                   _lateReportsTab,
                 _approvalTab,
+                if (RoleAccess.isAdmin(role) || RoleAccess.isSuperAdmin(role))
+                  _holidaysTab,
               ];
 
     if (restrictedTabs.isEmpty) {
@@ -2029,6 +2047,8 @@ class _AttendancePageState extends State<AttendancePage> {
                       _loadLateReports();
                     } else if (index == _approvalsTabIndex) {
                       _loadApprovalPending();
+                    } else if (index == _holidaysTabIndex) {
+                      _loadHolidays();
                     }
                   },
                   child: AnimatedContainer(
@@ -2112,6 +2132,9 @@ class _AttendancePageState extends State<AttendancePage> {
         }
         if (_selectedTabIndex == _approvalsTabIndex) {
           return _buildApprovalsTabContent(constraints.maxWidth);
+        }
+        if (_selectedTabIndex == _holidaysTabIndex) {
+          return _buildHolidaysTabContent(constraints.maxWidth);
         }
 
         final stacked = constraints.maxWidth < 980;
@@ -5232,6 +5255,599 @@ class _AttendancePageState extends State<AttendancePage> {
         .toList();
   }
 
+  Future<void> _loadHolidays({int? page}) async {
+    final nextPage = page ?? _holidaysCurrentPage;
+    setState(() {
+      _isLoadingHolidays = true;
+      _holidaysError = null;
+    });
+
+    try {
+      final data = await _authProvider.holidays(
+        page: nextPage,
+        perPage: 10,
+        token: _authProvider.currentAuthToken,
+      );
+      final rows = _extractHolidayRows(data);
+      final pagination = _extractPaginationMap(data);
+      final resolvedCurrentPage = _readIntValue(
+        pagination['page'],
+        _readIntValue(pagination['current_page'], nextPage),
+      ).clamp(1, 999999);
+      final resolvedTotalPages = _readIntValue(
+        pagination['total_pages'],
+        _readIntValue(pagination['last_page'], 1),
+      ).clamp(1, 999999);
+      final resolvedTotalItems = _readIntValue(
+        pagination['total'],
+        _readIntValue(pagination['total_items'], rows.length),
+      );
+      final years = _holidayYearOptions(rows);
+
+      if (!mounted) return;
+      setState(() {
+        _holidayRows = rows;
+        _holidaysCurrentPage = resolvedCurrentPage.toInt();
+        _holidaysTotalPages = resolvedTotalPages.toInt();
+        _holidaysTotalItems = resolvedTotalItems;
+        _holidayYears = years;
+        if (_holidayYears.isNotEmpty &&
+            !_holidayYears.contains(_selectedHolidayYear)) {
+          _selectedHolidayYear = _holidayYears.first;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _holidaysError = AppErrorHandler.friendlyMessage(e);
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingHolidays = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openHolidayForm({Map<String, dynamic>? holiday}) async {
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => HolidayFormPage(holidayData: holiday),
+        fullscreenDialog: true,
+      ),
+    );
+    if (result != null && mounted) {
+      await _loadHolidays(page: _holidaysCurrentPage);
+    }
+  }
+
+  Future<void> _deleteHoliday(Map<String, dynamic> holiday) async {
+    final id = _holidayId(holiday);
+    final name = _holidayName(holiday);
+    if (id.isEmpty) {
+      _showSnackBar('Holiday id is missing.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Holiday'),
+          content: Text('Delete "$name"? This cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await _authProvider.deleteHoliday(
+        id: id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      _showSnackBar('Holiday deleted.');
+      await _loadHolidays(page: _holidaysCurrentPage);
+    } catch (e) {
+      if (!mounted) return;
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
+    }
+  }
+
+  List<Map<String, dynamic>> _extractHolidayRows(Map<String, dynamic> source) {
+    dynamic list = source['records'] ??
+        source['items'] ??
+        source['rows'] ??
+        source['holidays'] ??
+        source['data'];
+    if (list is Map<String, dynamic>) {
+      list = list['records'] ??
+          list['items'] ??
+          list['rows'] ??
+          list['holidays'] ??
+          list['data'];
+    }
+    if (list is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+    return list
+        .whereType<Map>()
+        .map(
+          (entry) => Map<String, dynamic>.from(
+            entry.map((key, value) => MapEntry(key.toString(), value)),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Map<String, dynamic> _extractPaginationMap(Map<String, dynamic> source) {
+    final pagination = source['pagination'] ?? source['meta'];
+    if (pagination is Map<String, dynamic>) return pagination;
+    if (pagination is Map) {
+      return Map<String, dynamic>.from(
+        pagination.map((key, value) => MapEntry(key.toString(), value)),
+      );
+    }
+    return const <String, dynamic>{};
+  }
+
+  int? _holidayYear(Map<String, dynamic> holiday) {
+    final date = _holidayDate(holiday);
+    return date?.year;
+  }
+
+  DateTime? _holidayDate(Map<String, dynamic> holiday) {
+    return _parseApiDate(
+      _readStringFromMap(
+        holiday,
+        const [
+          'date',
+          'holiday_date',
+          'holidayDate',
+          'start_date',
+          'startDate',
+        ],
+        fallback: '',
+      ),
+    );
+  }
+
+  String _holidayId(Map<String, dynamic> holiday) {
+    return _readStringFromMap(
+      holiday,
+      const ['id', 'holiday_id', 'holidayId', 'uuid'],
+      fallback: '',
+    );
+  }
+
+  String _holidayName(Map<String, dynamic> holiday) {
+    return _readStringFromMap(
+      holiday,
+      const ['name', 'holiday_name', 'holidayName'],
+      fallback: 'Holiday',
+    );
+  }
+
+  String _holidayDescription(Map<String, dynamic> holiday) {
+    return _readStringFromMap(
+      holiday,
+      const ['description', 'notes', 'remark'],
+      fallback: '',
+    );
+  }
+
+  List<String> _holidayRoles(Map<String, dynamic> holiday) {
+    return _holidayStringList(holiday, const [
+      'roles',
+      'role_ids',
+      'roleIds',
+      'apply_to_roles',
+    ]);
+  }
+
+  List<String> _holidayUsers(Map<String, dynamic> holiday) {
+    return _holidayStringList(holiday, const [
+      'user_ids',
+      'userIds',
+      'users',
+      'specific_users',
+    ]);
+  }
+
+  List<String> _holidayStringList(
+    Map<String, dynamic> holiday,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final value = holiday[key];
+      if (value is List) {
+        return value
+            .map((entry) => entry?.toString().trim() ?? '')
+            .where((entry) => entry.isNotEmpty && entry.toLowerCase() != 'null')
+            .toList(growable: false);
+      }
+      if (value is Map) {
+        final nested = value.values
+            .map((entry) => entry?.toString().trim() ?? '')
+            .where((entry) => entry.isNotEmpty && entry.toLowerCase() != 'null')
+            .toList(growable: false);
+        if (nested.isNotEmpty) {
+          return nested;
+        }
+      }
+    }
+    return const <String>[];
+  }
+
+  List<int> _holidayYearOptions(List<Map<String, dynamic>> rows) {
+    final currentYear = DateTime.now().year;
+    final yearCount = currentYear >= 2000 ? currentYear - 2000 + 1 : 0;
+    final years = <int>{
+      for (final year in rows.map(_holidayYear).whereType<int>()) year,
+      _selectedHolidayYear,
+      currentYear,
+      ...List<int>.generate(
+        yearCount,
+        (index) => 2000 + index,
+      ),
+    }.toList()
+      ..sort((a, b) => b.compareTo(a));
+    return years;
+  }
+
+  String _holidaySelectionSummary(
+    Map<String, dynamic> holiday,
+  ) {
+    final roles = _holidayRoles(holiday);
+    final normalizedRoles =
+        roles.map(_normalizeHolidayRoleId).toList(growable: false);
+    final users = _holidayUsers(holiday);
+    final roleLabels = normalizedRoles
+        .map<String>((role) => role == 'all' ? 'All roles' : _formatRole(role))
+        .where((label) => label.trim().isNotEmpty)
+        .toList(growable: false);
+
+    if (normalizedRoles.contains('all')) {
+      return users.isEmpty
+          ? 'All roles'
+          : 'All roles + ${users.length} specific user${users.length == 1 ? '' : 's'}';
+    }
+
+    final parts = <String>[];
+    if (roleLabels.isNotEmpty) {
+      parts.add(
+        '${roleLabels.length} role${roleLabels.length == 1 ? '' : 's'}',
+      );
+    }
+    if (users.isNotEmpty) {
+      parts.add(
+        '${users.length} specific user${users.length == 1 ? '' : 's'}',
+      );
+    }
+    return parts.isEmpty ? 'No targets selected' : parts.join(' + ');
+  }
+
+  String _formatHolidayDate(DateTime? date) {
+    if (date == null) return '--';
+    return DateFormat('dd MMM yyyy').format(date);
+  }
+
+  String _formatRole(String value) {
+    return RoleAccess.label(value);
+  }
+
+  String _normalizeHolidayRoleId(String value) {
+    final normalized = RoleAccess.normalize(value);
+    if (normalized == 'all_roles' || normalized == 'allrole') {
+      return 'all';
+    }
+    return normalized;
+  }
+
+  Widget _buildHolidaysTabContent(double maxWidth) {
+    final filteredRows = _holidayRows.where((holiday) {
+      final year = _holidayYear(holiday);
+      if (year == null) return false;
+      return year == _selectedHolidayYear;
+    }).toList(growable: false);
+    final compact = maxWidth < 720;
+    final years = _holidayYears.isEmpty
+        ? <int>[_selectedHolidayYear]
+        : _holidayYears.toList(growable: false);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFD8E0EE)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x120A2548),
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF6D28D9), Color(0xFFA855F7)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+              ),
+              child: compact
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Holidays',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Declare company or team-specific holidays',
+                          style: TextStyle(
+                            color: Color(0xFFF2E9FF),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            _HolidayYearDropdown(
+                              value: _selectedHolidayYear,
+                              years: years,
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _selectedHolidayYear = value;
+                                });
+                                _loadHolidays(page: 1);
+                              },
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: () => _openHolidayForm(),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: const Color(0xFF6D28D9),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                label: const Text('New Holiday'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Holidays',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Declare company or team-specific holidays',
+                                style: TextStyle(
+                                  color: Color(0xFFF2E9FF),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _HolidayYearDropdown(
+                          value: _selectedHolidayYear,
+                          years: years,
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() {
+                              _selectedHolidayYear = value;
+                            });
+                            _loadHolidays(page: 1);
+                          },
+                        ),
+                        const SizedBox(width: 10),
+                        FilledButton.icon(
+                          onPressed: () => _openHolidayForm(),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF6D28D9),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 13,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('New Holiday'),
+                        ),
+                      ],
+                    ),
+            ),
+            Container(
+              width: double.infinity,
+              color: const Color(0xFFF8FAFD),
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+              child: _isLoadingHolidays
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : _holidaysError != null
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 28),
+                          child: Column(
+                            children: [
+                              Text(
+                                _holidaysError!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: AppColors.error,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextButton(
+                                onPressed: _loadHolidays,
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : filteredRows.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 40),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 68,
+                                    height: 68,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1E8FF),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const Icon(
+                                      Icons.event_available_outlined,
+                                      color: Color(0xFF7C3AED),
+                                      size: 34,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  const Text(
+                                    'No holidays found for this year.',
+                                    style: TextStyle(
+                                      color: Color(0xFF0F172A),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Create the first holiday to make it visible here.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Color(0xFF667085),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  FilledButton.icon(
+                                    onPressed: () => _openHolidayForm(),
+                                    icon: const Icon(Icons.add_rounded),
+                                    label: const Text('New Holiday'),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Column(
+                              children: [
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    '${filteredRows.length} holiday${filteredRows.length == 1 ? '' : 's'} in $_selectedHolidayYear'
+                                    '${_holidaysTotalItems > 0 ? ' | $_holidaysTotalItems total' : ''}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                ListView.separated(
+                                  itemCount: filteredRows.length,
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 12),
+                                  itemBuilder: (context, index) {
+                                    final holiday = filteredRows[index];
+                                    return _HolidayCard(
+                                      date: _holidayDate(holiday),
+                                      title: _holidayName(holiday),
+                                      description: _holidayDescription(holiday),
+                                      summary:
+                                          _holidaySelectionSummary(holiday),
+                                      onEdit: () =>
+                                          _openHolidayForm(holiday: holiday),
+                                      onDelete: () => _deleteHoliday(holiday),
+                                    );
+                                  },
+                                ),
+                                if (_holidaysTotalPages > 1) ...[
+                                  const SizedBox(height: 14),
+                                  PaginationWidget(
+                                    currentPage: _holidaysCurrentPage,
+                                    totalPages: _holidaysTotalPages,
+                                    totalItems: _holidaysTotalItems,
+                                    itemLabel: 'holidays',
+                                    onPageChanged: (page) => _loadHolidays(
+                                      page: page,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildApprovalsTabContent(double maxWidth) {
     final compact = maxWidth < 700;
     final displayDate = _displayDate(_approvalDate);
@@ -7244,6 +7860,233 @@ class _RoundActionButton extends StatelessWidget {
             color: const Color(0xFF637086),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _HolidayYearDropdown extends StatelessWidget {
+  const _HolidayYearDropdown({
+    required this.value,
+    required this.years,
+    required this.onChanged,
+  });
+
+  final int value;
+  final List<int> years;
+  final ValueChanged<int?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = years.isEmpty ? <int>[value] : years;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0x26FFFFFF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0x45FFFFFF)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: items.contains(value) ? value : items.first,
+          isDense: true,
+          dropdownColor: Colors.white,
+          iconEnabledColor: Colors.white,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+          items: items
+              .map(
+                (year) => DropdownMenuItem<int>(
+                  value: year,
+                  child: Text(year.toString()),
+                ),
+              )
+              .toList(growable: false),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+}
+
+class _HolidayCard extends StatelessWidget {
+  const _HolidayCard({
+    required this.date,
+    required this.title,
+    required this.description,
+    required this.summary,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final DateTime? date;
+  final String title;
+  final String description;
+  final String summary;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final month =
+        date == null ? '--' : DateFormat('MMM').format(date!).toUpperCase();
+    final day = date == null ? '--' : DateFormat('d').format(date!);
+    final dateLabel =
+        date == null ? '--' : DateFormat('dd MMM yyyy').format(date!);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F0F172A),
+            blurRadius: 14,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 54,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4E8FF),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  month,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFFB14AD5),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  day,
+                  style: const TextStyle(
+                    color: Color(0xFF7C2AE8),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF111827),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      dateLabel,
+                      style: const TextStyle(
+                        color: Color(0xFF667085),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    _HolidayMetaPill(
+                      icon: Icons.group_outlined,
+                      text: summary,
+                    ),
+                  ],
+                ),
+                if (description.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      color: Color(0xFF7C8799),
+                      fontSize: 13,
+                      height: 1.4,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _RoundActionButton(
+                icon: Icons.edit_outlined,
+                onTap: onEdit,
+              ),
+              const SizedBox(width: 8),
+              _RoundActionButton(
+                icon: Icons.delete_outline_rounded,
+                onTap: onDelete,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HolidayMetaPill extends StatelessWidget {
+  const _HolidayMetaPill({
+    required this.icon,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF667085)),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Color(0xFF667085),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

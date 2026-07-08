@@ -551,9 +551,22 @@ class _ProjectsPageState extends State<ProjectsPage> {
       _showSnackBar('You do not have permission to edit projects.');
       return;
     }
+    Map<String, dynamic> projectData = project.toPayload();
+    try {
+      final detail = await _authProvider.projectDetail(
+        id: project.id,
+        token: _authProvider.currentAuthToken,
+      );
+      projectData = <String, dynamic>{
+        ...projectData,
+        ...detail,
+      };
+    } catch (_) {
+      // Fall back to the list payload if the detail request fails.
+    }
     final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => ProjectFormPage(projectData: project.toPayload()),
+        builder: (_) => ProjectFormPage(projectData: projectData),
       ),
     );
     if (updated == true) {

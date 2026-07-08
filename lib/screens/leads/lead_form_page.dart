@@ -37,6 +37,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
   final _budgetController = TextEditingController();
   final _locationPreferenceController = TextEditingController();
   final _notesController = TextEditingController();
+  final _projectNameController = TextEditingController();
 
   bool _isSubmitting = false;
   bool _isLoadingAssignees = true;
@@ -49,6 +50,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
   String? _selectedAssigneeId;
   String? _selectedLeadSource;
   String? _selectedProjectId;
+  bool _useManualProjectInput = false;
   String _currentUserRole = '';
   String? _currentUserId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
@@ -59,6 +61,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
   void initState() {
     super.initState();
     _prefillLeadData();
+    _projectNameController.addListener(_syncProjectSelectionMode);
     _loadLeadDetails();
     _loadCurrentUserContext();
     _loadAssigneeOptions();
@@ -68,6 +71,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
 
   @override
   void dispose() {
+    _projectNameController.removeListener(_syncProjectSelectionMode);
     _nameController.dispose();
     _phoneController.dispose();
     _alternatePhoneController.dispose();
@@ -77,6 +81,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
     _budgetController.dispose();
     _locationPreferenceController.dispose();
     _notesController.dispose();
+    _projectNameController.dispose();
     super.dispose();
   }
 
@@ -132,14 +137,27 @@ class _LeadFormPageState extends State<LeadFormPage> {
             project['projectId'] ??
             project['uuid'],
       );
+      _projectNameController.text = _readString(
+        project['name'] ?? project['project_name'],
+      );
     } else {
       _selectedProjectId = _readString(
         data['project_id'] ?? data['projectId'] ?? data['project_uuid'],
+      );
+      _projectNameController.text = _readString(
+        data['project_name'] ?? data['projectName'],
       );
     }
     if (_selectedProjectId != null && _selectedProjectId!.isEmpty) {
       _selectedProjectId = null;
     }
+    if (_projectNameController.text.isEmpty) {
+      _projectNameController.text = _readString(
+        data['project_name'] ?? data['projectName'],
+      );
+    }
+    _useManualProjectInput =
+        _selectedProjectId == null || _selectedProjectId!.trim().isEmpty;
 
     final assigned = data['assigned_to'] ?? data['assignee'];
     if (assigned is Map<String, dynamic>) {
@@ -393,7 +411,38 @@ class _LeadFormPageState extends State<LeadFormPage> {
   }
 
   String _resolveSelectedProjectId() {
+    if (_useManualProjectInput) {
+      return '';
+    }
     return _selectedProjectId?.trim() ?? '';
+  }
+
+  String _resolveSelectedProjectName() {
+    if (_useManualProjectInput) {
+      return _projectNameController.text.trim();
+    }
+    return '';
+  }
+
+  void _syncProjectSelectionMode() {
+    if (_useManualProjectInput &&
+        _projectNameController.text.trim().isNotEmpty &&
+        (_selectedProjectId?.isNotEmpty ?? false)) {
+      setState(() {
+        _selectedProjectId = null;
+      });
+    }
+  }
+
+  void _setManualProjectMode(bool enabled) {
+    setState(() {
+      _useManualProjectInput = enabled;
+      if (enabled) {
+        _selectedProjectId = null;
+      } else {
+        _projectNameController.clear();
+      }
+    });
   }
 
   _AssigneeOption? _assigneeFromApi(Map<String, dynamic> user) {
@@ -519,6 +568,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
           assignedTo: _selectedAssigneeId?.trim() ?? '',
           projectId: _resolveSelectedProjectId(),
+          projectName: _resolveSelectedProjectName(),
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           token: _authProvider.currentAuthToken,
@@ -534,6 +584,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
           assignedTo: _resolveAssignedToForCreate(),
           projectId: _resolveSelectedProjectId(),
+          projectName: _resolveSelectedProjectName(),
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           notes: _notesController.text.trim(),
@@ -668,7 +719,58 @@ class _LeadFormPageState extends State<LeadFormPage> {
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 12),
-                    _buildProjectDropdown(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                      ),
+                      child: CheckboxListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                        title: const Text(
+                          'Use manual project name',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          _useManualProjectInput
+                              ? 'Type the project name yourself'
+                              : 'Select a project from the list',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        value: _useManualProjectInput,
+                        onChanged: _isSubmitting
+                            ? null
+                            : (value) => _setManualProjectMode(value ?? false),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        dense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_useManualProjectInput)
+                      _buildTextField(
+                        controller: _projectNameController,
+                        label: 'Project Name',
+                        hintText: 'Type project name here',
+                        validator: (value) {
+                          if (!_useManualProjectInput) {
+                            return null;
+                          }
+                          if ((value ?? '').trim().isEmpty) {
+                            return 'Project name is required';
+                          }
+                          return null;
+                        },
+                      )
+                    else
+                      _buildProjectDropdown(),
                     const SizedBox(height: 12),
                     SearchableDropdownField<String>(
                       label: 'Lead Source',
@@ -820,9 +922,17 @@ class _LeadFormPageState extends State<LeadFormPage> {
       isLoading: _isLoadingProjects,
       errorText: _projectLoadError,
       onRetry: _loadProjectOptions,
+      onClear: () {
+        setState(() {
+          _selectedProjectId = null;
+        });
+      },
       onChanged: (value) {
         setState(() {
           _selectedProjectId = value;
+          if (value != null && value.isNotEmpty) {
+            _projectNameController.clear();
+          }
         });
       },
     );

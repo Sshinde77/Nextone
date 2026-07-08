@@ -27,11 +27,13 @@ class SiteVisitFormPage extends StatefulWidget {
 class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _notesController = TextEditingController();
+  final _projectNameController = TextEditingController();
   final _authProvider = AuthProvider();
 
   bool _isSubmitting = false;
   bool _isLoadingDropdowns = true;
   bool _transportArranged = false;
+  bool _useManualProjectInput = false;
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
@@ -54,6 +56,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
   @override
   void dispose() {
     _notesController.dispose();
+    _projectNameController.dispose();
     super.dispose();
   }
 
@@ -88,8 +91,17 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       }
     } catch (e) {
       if (mounted) {
+        final message = AppErrorHandler.friendlyMessage(e);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
+          SnackBar(
+            content: Text(
+              message == AppErrorHandler.notFoundMessage &&
+                      _useManualProjectInput &&
+                      _projectNameController.text.trim().isNotEmpty
+                  ? 'Project not found, please select from the list'
+                  : message,
+            ),
+          ),
         );
         setState(() => _isLoadingDropdowns = false);
       }
@@ -113,6 +125,11 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       _selectedProjectId,
       fallbackName: data['project_name']?.toString(),
     );
+    if (_selectedProjectId == null &&
+        (data['project_name']?.toString().trim().isNotEmpty ?? false)) {
+      _useManualProjectInput = true;
+      _projectNameController.text = data['project_name'].toString();
+    }
     _selectedAssigneeId = _resolveAssigneeValue(
       _selectedAssigneeId,
       fallbackName: data['assignee_name']?.toString(),
@@ -130,6 +147,31 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
         );
       }
     }
+  }
+
+  String _resolveProjectIdForSubmit() {
+    if (_useManualProjectInput) {
+      return '';
+    }
+    return _selectedProjectId?.trim() ?? '';
+  }
+
+  String _resolveProjectNameForSubmit() {
+    if (_useManualProjectInput) {
+      return _projectNameController.text.trim();
+    }
+    return '';
+  }
+
+  void _setManualProjectMode(bool enabled) {
+    setState(() {
+      _useManualProjectInput = enabled;
+      if (enabled) {
+        _selectedProjectId = null;
+      } else {
+        _projectNameController.clear();
+      }
+    });
   }
 
   String? _resolveLeadValue(String? raw, {String? fallbackName}) {
@@ -353,9 +395,12 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
           token: _authProvider.currentAuthToken,
         );
       } else {
+        final projectId = _resolveProjectIdForSubmit();
+        final projectName = _resolveProjectNameForSubmit();
         responseData = await _authProvider.createSiteVisit(
           leadId: (_selectedLeadId ?? '').trim(),
-          projectId: (_selectedProjectId ?? '').trim(),
+          projectId: projectId,
+          projectName: projectName,
           visitDate: formattedDate,
           visitTime: formattedTime,
           assignedTo: (_selectedAssigneeId ?? '').trim(),
@@ -370,10 +415,19 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       }
     } catch (e) {
       if (mounted) {
+        final message = AppErrorHandler.friendlyMessage(e);
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
+            SnackBar(
+              content: Text(
+                message == AppErrorHandler.notFoundMessage &&
+                        _useManualProjectInput &&
+                        _projectNameController.text.trim().isNotEmpty
+                    ? 'Project not found, please select from the list'
+                    : message,
+              ),
+            ),
           );
       }
     } finally {
@@ -438,23 +492,84 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                         const SizedBox(height: 16),
                         _buildLabel('PROJECT *'),
                         const SizedBox(height: 8),
-                        _buildDropdown(
-                          sheetTitle: 'Project',
-                          value: _selectedProjectId,
-                          hint: 'Select project...',
-                          items: _projects
-                              .map(
-                                (e) => SearchableDropdownItem<String>(
-                                  value: e['id'].toString(),
-                                  label: (e['name'] ?? 'Unknown').toString(),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (val) =>
-                              setState(() => _selectedProjectId = val),
-                          validator: (val) =>
-                              val == null ? 'Project is required' : null,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.border),
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white,
+                          ),
+                          child: CheckboxListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 12),
+                            title: const Text(
+                              'Use manual project name',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            subtitle: Text(
+                              _useManualProjectInput
+                                  ? 'Type the project name yourself'
+                                  : 'Select a project from the list',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            value: _useManualProjectInput,
+                            onChanged: _isSubmitting
+                                ? null
+                                : (value) =>
+                                    _setManualProjectMode(value ?? false),
+                            controlAffinity: ListTileControlAffinity.leading,
+                            dense: true,
+                          ),
                         ),
+                        const SizedBox(height: 8),
+                        if (_useManualProjectInput)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('Project Name *'),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _projectNameController,
+                                enabled: !_isSubmitting,
+                                validator: (value) {
+                                  if (!_useManualProjectInput) {
+                                    return null;
+                                  }
+                                  if ((value ?? '').trim().isEmpty) {
+                                    return 'Project name is required';
+                                  }
+                                  return null;
+                                },
+                                decoration: const InputDecoration(
+                                  hintText: 'Type project name...',
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          _buildDropdown(
+                            sheetTitle: 'Project',
+                            value: _selectedProjectId,
+                            hint: 'Select project...',
+                            items: _projects
+                                .map(
+                                  (e) => SearchableDropdownItem<String>(
+                                    value: e['id'].toString(),
+                                    label: (e['name'] ?? 'Unknown').toString(),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) =>
+                                setState(() => _selectedProjectId = val),
+                            validator: (val) =>
+                                val == null ? 'Project is required' : null,
+                          ),
                         const SizedBox(height: 16),
                         Row(
                           children: [
@@ -613,7 +728,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       items: items,
       enabled: !_isSubmitting && !_isLoadingDropdowns && items.isNotEmpty,
       isLoading: _isLoadingDropdowns,
-      validator: validator,
+      fieldValidator: validator,
       onChanged: onChanged,
     );
   }
