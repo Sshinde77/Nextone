@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
@@ -635,81 +636,199 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Future<void> _openDownloadTypeSheet(_Project project) async {
-    final selected = await showModalBottomSheet<String>(
+    _ProjectDocumentAvailability? availability;
+    try {
+      availability = await _loadProjectDocumentAvailability(project);
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+      return;
+    }
+    if (!mounted || availability == null) return;
+
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 38,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
+        return StatefulBuilder(
+          builder: (context, modalSetState) {
+            Future<void> refreshAvailability() async {
+              final refreshed = await _loadProjectDocumentAvailability(project);
+              if (!mounted) return;
+              modalSetState(() {
+                availability = refreshed;
+              });
+            }
+
+            Future<void> handleDownload(
+                _ProjectDocumentCategory category) async {
+              Navigator.of(context).pop();
+              if (category == _ProjectDocumentCategory.all) {
+                await _downloadProjectDocumentArchive(project, 'all');
+                return;
+              }
+              if (category == _ProjectDocumentCategory.paymentPlans ||
+                  category == _ProjectDocumentCategory.videos) {
+                await _downloadProjectDocumentArchive(
+                  project,
+                  category.apiKey,
+                );
+                return;
+              }
+              await _downloadProjectDocumentsByType(project, category.apiKey);
+            }
+
+            Future<void> handleUpload(
+              _ProjectDocumentCategory category,
+            ) async {
+              await _uploadProjectDocumentsForCategory(project, category);
+              await refreshAvailability();
+            }
+
+            final buckets = <_ProjectDocumentBucket>[
+              _ProjectDocumentBucket(
+                category: _ProjectDocumentCategory.all,
+                documents: availability!.allDocuments,
+              ),
+              _ProjectDocumentBucket(
+                category: _ProjectDocumentCategory.unitPlans,
+                documents: availability!.unitPlans,
+              ),
+              _ProjectDocumentBucket(
+                category: _ProjectDocumentCategory.creatives,
+                documents: availability!.creatives,
+              ),
+              _ProjectDocumentBucket(
+                category: _ProjectDocumentCategory.paymentPlans,
+                documents: availability!.paymentPlans,
+              ),
+              _ProjectDocumentBucket(
+                category: _ProjectDocumentCategory.videos,
+                documents: availability!.videos,
+              ),
+            ];
+
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Download Documents',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    for (final bucket in buckets) ...[
+                      _buildDocumentActionCard(
+                        bucket: bucket,
+                        onDownload: bucket.documents.isEmpty
+                            ? null
+                            : () => handleDownload(bucket.category),
+                        onUpload:
+                            bucket.category == _ProjectDocumentCategory.all
+                                ? null
+                                : () => handleUpload(bucket.category),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 14),
-                const Text(
-                  'Download Documents',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                ListTile(
-                  leading: const Icon(Icons.folder_zip_outlined,
-                      color: AppColors.primary),
-                  title: const Text('All Documents'),
-                  onTap: () => Navigator.of(context).pop('all'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.home_work_outlined,
-                      color: AppColors.primary),
-                  title: const Text('Unit Plan'),
-                  onTap: () => Navigator.of(context).pop('unit_plans'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.collections_outlined,
-                      color: AppColors.primary),
-                  title: const Text('Creative'),
-                  onTap: () => Navigator.of(context).pop('creatives'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.payments_outlined,
-                      color: AppColors.primary),
-                  title: const Text('Payment Plan'),
-                  onTap: () => Navigator.of(context).pop('payment_plans'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.video_library_outlined,
-                      color: AppColors.primary),
-                  title: const Text('Videos'),
-                  onTap: () => Navigator.of(context).pop('videos'),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
-    if (selected == null) return;
-    if (selected == 'all' ||
-        selected == 'payment_plans' ||
-        selected == 'videos') {
-      await _downloadProjectDocumentArchive(project, selected);
+  }
+
+  Future<_ProjectDocumentAvailability> _loadProjectDocumentAvailability(
+    _Project project,
+  ) async {
+    final payload = await _authProvider.projectDocuments(
+      id: project.id,
+      token: _authProvider.currentAuthToken,
+    );
+    final unitPlans = _extractDocuments(payload, 'unit_plans');
+    final creatives = _extractDocuments(payload, 'creatives');
+    final paymentPlans = _extractDocuments(payload, 'payment_plans');
+    final videos = _extractDocuments(payload, 'videos');
+    return _ProjectDocumentAvailability(
+      unitPlans: unitPlans,
+      creatives: creatives,
+      paymentPlans: paymentPlans,
+      videos: videos,
+    );
+  }
+
+  Future<void> _uploadProjectDocumentsForCategory(
+    _Project project,
+    _ProjectDocumentCategory category,
+  ) async {
+    if (kIsWeb) {
+      _showSnackBar('Document upload is not supported on Web in this build.');
       return;
     }
-    await _downloadProjectDocumentsByType(project, selected);
+
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: category.allowedExtensions,
+      allowMultiple: true,
+    );
+    if (!mounted || picked == null || picked.files.isEmpty) {
+      return;
+    }
+
+    final filePaths = picked.files
+        .map((file) => file.path?.trim() ?? '')
+        .where((path) => path.isNotEmpty)
+        .toList();
+    if (filePaths.isEmpty) {
+      _showSnackBar('Could not read the selected file paths.');
+      return;
+    }
+
+    try {
+      final uploadPayload = <String, List<String>>{
+        'unit_plans': const <String>[],
+        'creatives': const <String>[],
+        'payment_plans': const <String>[],
+        'videos': const <String>[],
+      };
+      uploadPayload[category.apiKey] = filePaths;
+
+      await _authProvider.uploadProjectDocuments(
+        id: project.id,
+        unitPlanFilePaths: uploadPayload['unit_plans'] ?? const <String>[],
+        creativeFilePaths: uploadPayload['creatives'] ?? const <String>[],
+        paymentPlanFilePaths:
+            uploadPayload['payment_plans'] ?? const <String>[],
+        videoFilePaths: uploadPayload['videos'] ?? const <String>[],
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      _showSnackBar('${category.label} uploaded successfully.');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    }
   }
 
   Future<void> _downloadProjectDocumentArchive(
@@ -784,11 +903,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       );
       final docs = _extractDocuments(payload, category);
       if (docs.isEmpty) {
-        _showSnackBar(
-          category == 'unit_plans'
-              ? 'No unit plan documents found.'
-              : 'No creative documents found.',
-        );
+        _showSnackBar(_missingDocumentMessage(category));
         return;
       }
 
@@ -847,6 +962,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
           ).toLowerCase();
           if (category == 'unit_plans') {
             return type.contains('unit') || type.contains('plan');
+          }
+          if (category == 'payment_plans') {
+            return type.contains('payment');
+          }
+          if (category == 'videos') {
+            return type.contains('video');
           }
           return type.contains('creative');
         }).toList();
@@ -921,6 +1042,21 @@ class _ProjectsPageState extends State<ProjectsPage> {
     if (value is String) return value.trim();
     if (value is num || value is bool) return value.toString();
     return '';
+  }
+
+  String _missingDocumentMessage(String category) {
+    switch (category) {
+      case 'unit_plans':
+        return 'No unit plan documents found.';
+      case 'creatives':
+        return 'No creative documents found.';
+      case 'payment_plans':
+        return 'No payment plan documents found.';
+      case 'videos':
+        return 'No video documents found.';
+      default:
+        return 'No documents found.';
+    }
   }
 
   Future<List<String>?> _openMultiSelectSheet({
@@ -1756,6 +1892,287 @@ class _ProjectDocRef {
         'title',
         'label',
       ]),
+    );
+  }
+}
+
+class _ProjectDocumentAvailability {
+  const _ProjectDocumentAvailability({
+    required this.unitPlans,
+    required this.creatives,
+    required this.paymentPlans,
+    required this.videos,
+  });
+
+  final List<_ProjectDocRef> unitPlans;
+  final List<_ProjectDocRef> creatives;
+  final List<_ProjectDocRef> paymentPlans;
+  final List<_ProjectDocRef> videos;
+
+  List<_ProjectDocRef> get allDocuments => <_ProjectDocRef>[
+        ...unitPlans,
+        ...creatives,
+        ...paymentPlans,
+        ...videos,
+      ];
+}
+
+class _ProjectDocumentBucket {
+  const _ProjectDocumentBucket({
+    required this.category,
+    required this.documents,
+  });
+
+  final _ProjectDocumentCategory category;
+  final List<_ProjectDocRef> documents;
+}
+
+enum _ProjectDocumentCategory {
+  all,
+  unitPlans,
+  creatives,
+  paymentPlans,
+  videos,
+}
+
+extension on _ProjectDocumentCategory {
+  String get apiKey {
+    switch (this) {
+      case _ProjectDocumentCategory.all:
+        return 'all';
+      case _ProjectDocumentCategory.unitPlans:
+        return 'unit_plans';
+      case _ProjectDocumentCategory.creatives:
+        return 'creatives';
+      case _ProjectDocumentCategory.paymentPlans:
+        return 'payment_plans';
+      case _ProjectDocumentCategory.videos:
+        return 'videos';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case _ProjectDocumentCategory.all:
+        return 'All Documents';
+      case _ProjectDocumentCategory.unitPlans:
+        return 'Unit Plans';
+      case _ProjectDocumentCategory.creatives:
+        return 'Creatives';
+      case _ProjectDocumentCategory.paymentPlans:
+        return 'Payment Plans';
+      case _ProjectDocumentCategory.videos:
+        return 'Videos';
+    }
+  }
+
+  String get hint {
+    switch (this) {
+      case _ProjectDocumentCategory.all:
+        return 'Download everything uploaded for this project.';
+      case _ProjectDocumentCategory.unitPlans:
+        return 'Individual unit plan files.';
+      case _ProjectDocumentCategory.creatives:
+        return 'Individual creative files.';
+      case _ProjectDocumentCategory.paymentPlans:
+        return 'Download payment plans as an archive.';
+      case _ProjectDocumentCategory.videos:
+        return 'Download videos as an archive.';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case _ProjectDocumentCategory.all:
+        return Icons.folder_zip_outlined;
+      case _ProjectDocumentCategory.unitPlans:
+        return Icons.home_work_outlined;
+      case _ProjectDocumentCategory.creatives:
+        return Icons.collections_outlined;
+      case _ProjectDocumentCategory.paymentPlans:
+        return Icons.payments_outlined;
+      case _ProjectDocumentCategory.videos:
+        return Icons.video_library_outlined;
+    }
+  }
+
+  List<String> get allowedExtensions {
+    switch (this) {
+      case _ProjectDocumentCategory.videos:
+        return const <String>[
+          'mp4',
+          'mov',
+          'm4v',
+          'webm',
+          'avi',
+        ];
+      case _ProjectDocumentCategory.all:
+      case _ProjectDocumentCategory.unitPlans:
+      case _ProjectDocumentCategory.creatives:
+      case _ProjectDocumentCategory.paymentPlans:
+        return const <String>[
+          'pdf',
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'doc',
+          'docx',
+        ];
+    }
+  }
+}
+
+Widget _buildDocumentActionCard({
+  required _ProjectDocumentBucket bucket,
+  required VoidCallback? onDownload,
+  required VoidCallback? onUpload,
+}) {
+  final hasDocuments = bucket.documents.isNotEmpty;
+  final documentCount = bucket.documents.length;
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppColors.border),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: hasDocuments
+                    ? const Color(0xFFEFF8FF)
+                    : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                bucket.category.icon,
+                color:
+                    hasDocuments ? AppColors.primary : AppColors.textSecondary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    bucket.category.label,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasDocuments
+                        ? '$documentCount file(s) available'
+                        : 'No documents uploaded yet',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            FilledButton.icon(
+              onPressed: onDownload,
+              style: FilledButton.styleFrom(
+                backgroundColor:
+                    hasDocuments ? AppColors.primary : AppColors.border,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 38),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.download_rounded, size: 18),
+              label: const Text('Download'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          bucket.category.hint,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        if (hasDocuments) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: bucket.documents
+                .map(
+                  (document) => _DocumentPill(name: document.name),
+                )
+                .toList(),
+          ),
+        ] else if (onUpload != null) ...[
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: onUpload,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                minimumSize: const Size(0, 38),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.upload_outlined, size: 18),
+              label: Text('Upload ${bucket.category.label}'),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _DocumentPill extends StatelessWidget {
+  const _DocumentPill({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE3EAF3)),
+      ),
+      child: Text(
+        name.isEmpty ? 'Project document' : name,
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }

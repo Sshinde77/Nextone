@@ -71,6 +71,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   List<PlatformFile> _paymentPlanFiles = const <PlatformFile>[];
   List<PlatformFile> _videoFiles = const <PlatformFile>[];
   bool _isSubmitting = false;
+  bool _isLoadingExistingData = false;
 
   static const _statuses = <_SelectOption>[
     _SelectOption(value: 'active', label: 'Active'),
@@ -81,6 +82,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   void initState() {
     super.initState();
     _prefillData();
+    _loadExistingProjectData();
   }
 
   @override
@@ -107,6 +109,52 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       return;
     }
 
+    _applyProjectData(data);
+  }
+
+  Future<void> _loadExistingProjectData() async {
+    if (!widget.isEditMode) {
+      return;
+    }
+
+    final id = _readString(widget.projectData?['id']);
+    if (id.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingExistingData = true;
+    });
+
+    try {
+      final detail = await _authProvider.projectDetail(
+        id: id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      final mergedData = <String, dynamic>{};
+      final baseData = widget.projectData;
+      if (baseData != null) {
+        mergedData.addAll(baseData);
+      }
+      mergedData.addAll(detail);
+      setState(() {
+        _applyProjectData(mergedData);
+      });
+    } catch (_) {
+      // Keep the prefilled values from the list payload if detail lookup fails.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingExistingData = false;
+        });
+      }
+    }
+  }
+
+  void _applyProjectData(Map<String, dynamic> data) {
     _nameController.text = _readString(data['name']);
     _developerController.text = _readString(data['developer']);
     _cityController.text = _readString(data['city']);
@@ -193,25 +241,32 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     final documents = <Map<String, dynamic>>[];
 
     void addDocument(Map<String, dynamic> source) {
-      final fileName = _readString(source['file_name']);
-      final filePath = _readString(source['file_path']);
-      final fileSize = source['file_size'];
-      final mimeType = _readString(source['mime_type']);
+      final document = Map<String, dynamic>.from(source);
+      final fileName = _readDocumentName(source);
+      final filePath = _readDocumentPath(source);
+      final fileSize =
+          source['file_size'] ?? source['fileSize'] ?? source['size'];
+      final mimeType = _readString(source['mime_type'] ?? source['mimeType']);
 
-      if (fileName.isEmpty || filePath.isEmpty) {
+      if (fileName.isEmpty && filePath.isEmpty) {
         return;
       }
 
-      documents.add(
-        <String, dynamic>{
-          'file_name': fileName,
-          'file_path': filePath,
-          'file_size': fileSize is num
-              ? fileSize.toInt()
-              : int.tryParse(_readString(fileSize)) ?? 0,
-          'mime_type': mimeType,
-        },
-      );
+      document['file_name'] =
+          fileName.isNotEmpty ? fileName : _fileNameFromPath(filePath);
+      if (filePath.isNotEmpty) {
+        document['file_path'] = filePath;
+      }
+      if (fileSize != null) {
+        document['file_size'] = fileSize is num
+            ? fileSize.toInt()
+            : int.tryParse(_readString(fileSize)) ?? fileSize;
+      }
+      if (mimeType.isNotEmpty) {
+        document['mime_type'] = mimeType;
+      }
+
+      documents.add(document);
     }
 
     if (raw is List) {
@@ -222,6 +277,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           addDocument(Map<String, dynamic>.from(item));
         }
       }
+    } else if (raw is Map<String, dynamic>) {
+      addDocument(raw);
+    } else if (raw is Map) {
+      addDocument(Map<String, dynamic>.from(raw));
     }
 
     final nested = data['documents'];
@@ -236,9 +295,75 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           }
         }
       }
+    } else if (nested is List) {
+      for (final item in nested) {
+        if (item is! Map) {
+          continue;
+        }
+        final candidate = Map<String, dynamic>.from(item);
+        final category = _readString(
+          candidate['category'] ??
+              candidate['type'] ??
+              candidate['document_type'],
+        ).toLowerCase();
+        if (key == 'unit_plans' &&
+            !(category.contains('unit') || category.contains('plan'))) {
+          continue;
+        }
+        if (key == 'creatives' && !category.contains('creative')) {
+          continue;
+        }
+        if (key == 'payment_plans' && !category.contains('payment')) {
+          continue;
+        }
+        if (key == 'videos' && !category.contains('video')) {
+          continue;
+        }
+        addDocument(candidate);
+      }
     }
 
     return documents;
+  }
+
+  String _readDocumentName(Map<String, dynamic> source) {
+    final name = _readString(
+      source['file_name'] ??
+          source['filename'] ??
+          source['original_name'] ??
+          source['originalName'] ??
+          source['name'] ??
+          source['document_name'] ??
+          source['documentName'] ??
+          source['title'] ??
+          source['label'],
+    );
+    if (name.isNotEmpty) {
+      return name;
+    }
+    return _fileNameFromPath(_readDocumentPath(source));
+  }
+
+  String _readDocumentPath(Map<String, dynamic> source) {
+    return _readString(
+      source['file_path'] ??
+          source['filePath'] ??
+          source['path'] ??
+          source['url'] ??
+          source['file_url'] ??
+          source['fileUrl'] ??
+          source['document_url'] ??
+          source['documentUrl'],
+    );
+  }
+
+  String _fileNameFromPath(String path) {
+    if (path.isEmpty) {
+      return '';
+    }
+    final normalized = path.replaceAll('\\', '/');
+    final segments = normalized.split('/');
+    return segments.isEmpty ? path.trim() : segments.last.trim();
   }
 
   String _mimeTypeForFile(PlatformFile file) {
@@ -545,6 +670,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           child: Column(
             children: [
               _buildHeader(title),
+              if (_isLoadingExistingData)
+                const LinearProgressIndicator(minHeight: 2),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -772,6 +899,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
             file: file,
           ),
         ),
+        if (_existingUnitPlanDocs.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _buildExistingDocuments('Previously uploaded', _existingUnitPlanDocs),
+        ],
         const SizedBox(height: 16),
         _buildDocumentPicker(
           label: 'Creatives',
@@ -789,6 +920,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
             file: file,
           ),
         ),
+        if (_existingCreativeDocs.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _buildExistingDocuments('Previously uploaded', _existingCreativeDocs),
+        ],
         const SizedBox(height: 16),
         _buildDocumentPicker(
           label: 'Payment Plan Files',
@@ -806,6 +941,11 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
             file: file,
           ),
         ),
+        if (_existingPaymentPlanDocs.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _buildExistingDocuments(
+              'Previously uploaded', _existingPaymentPlanDocs),
+        ],
         const SizedBox(height: 16),
         _buildDocumentPicker(
           label: 'Video Files',
@@ -822,6 +962,41 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
             onChanged: (files) => _videoFiles = files,
             file: file,
           ),
+        ),
+        if (_existingVideoDocs.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _buildExistingDocuments('Previously uploaded', _existingVideoDocs),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildExistingDocuments(
+    String label,
+    List<Map<String, dynamic>> documents,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF98A4B4),
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: documents
+              .map(
+                (document) => _StoredDocumentChip(
+                  name: _readDocumentName(document),
+                ),
+              )
+              .toList(),
         ),
       ],
     );
@@ -1221,6 +1396,50 @@ class _DocumentChip extends StatelessWidget {
       return '${mb.toStringAsFixed(1)} MB';
     }
     return '${(bytes / 1024).toStringAsFixed(0)} KB';
+  }
+}
+
+class _StoredDocumentChip extends StatelessWidget {
+  const _StoredDocumentChip({
+    required this.name,
+  });
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 280),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F7FB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFDCE3ED)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.description_outlined,
+            size: 16,
+            color: Color(0xFF667085),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              name.isEmpty ? 'Project document' : name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF344054),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
