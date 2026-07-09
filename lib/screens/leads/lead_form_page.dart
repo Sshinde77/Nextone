@@ -1,5 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
@@ -38,9 +39,6 @@ class _LeadFormPageState extends State<LeadFormPage> {
   final _locationPreferenceController = TextEditingController();
   final _notesController = TextEditingController();
   final _projectNameController = TextEditingController();
-  final _callRecordingUrlController = TextEditingController();
-  final _callRecordingPhoneController = TextEditingController();
-  final _callRecordingNameController = TextEditingController();
 
   bool _isSubmitting = false;
   bool _isLoadingAssignees = true;
@@ -59,8 +57,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_LeadSourceOption> _leadSourceOptions = const <_LeadSourceOption>[];
   List<_ProjectOption> _projectOptions = const <_ProjectOption>[];
-  List<Map<String, dynamic>> _callRecordings =
-      const <Map<String, dynamic>>[];
+  PlatformFile? _selectedCallRecordingFile;
 
   @override
   void initState() {
@@ -87,9 +84,6 @@ class _LeadFormPageState extends State<LeadFormPage> {
     _locationPreferenceController.dispose();
     _notesController.dispose();
     _projectNameController.dispose();
-    _callRecordingUrlController.dispose();
-    _callRecordingPhoneController.dispose();
-    _callRecordingNameController.dispose();
     super.dispose();
   }
 
@@ -136,14 +130,6 @@ class _LeadFormPageState extends State<LeadFormPage> {
       data['location_preference'] ?? data['locationPreference'],
     );
     _notesController.text = _readString(data['notes']);
-    _callRecordings = _extractCallRecordings(data['call_recordings']);
-    final firstCallRecording =
-        _callRecordings.isNotEmpty ? _callRecordings.first : null;
-    _callRecordingUrlController.text =
-        _readString(firstCallRecording?['url']);
-    _callRecordingPhoneController.text =
-        _readString(firstCallRecording?['phone_number']);
-    _callRecordingNameController.text = _readString(firstCallRecording?['name']);
 
     final project = data['project'];
     if (project is Map<String, dynamic>) {
@@ -549,43 +535,55 @@ class _LeadFormPageState extends State<LeadFormPage> {
     return false;
   }
 
-  List<Map<String, dynamic>> _extractCallRecordings(dynamic value) {
-    if (value is! List) {
-      return const <Map<String, dynamic>>[];
+  Future<void> _pickCallRecordingFile() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowMultiple: false,
+      allowedExtensions: const <String>['mp3', 'wav', 'm4a', 'aac', 'ogg', 'webm'],
+    );
+    if (!mounted || picked == null || picked.files.isEmpty) {
+      return;
     }
 
-    return value
-        .whereType<Map>()
-        .map((recording) => <String, dynamic>{
-              'url': _readString(recording['url']),
-              'phone_number': _readString(
-                recording['phone_number'] ?? recording['phoneNumber'],
-              ),
-              'name': _readString(recording['name']),
-            })
-        .where((recording) =>
-            recording['url'].toString().isNotEmpty ||
-            recording['phone_number'].toString().isNotEmpty ||
-            recording['name'].toString().isNotEmpty)
-        .toList();
+    setState(() {
+      _selectedCallRecordingFile = picked.files.first;
+    });
   }
 
-  List<Map<String, dynamic>> _resolveCallRecordingsForSubmit() {
-    final url = _callRecordingUrlController.text.trim();
-    final phoneNumber = _callRecordingPhoneController.text.trim();
-    final name = _callRecordingNameController.text.trim();
+  String? _extractLeadId(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      final direct = _readString(
+        value['id'] ?? value['lead_id'] ?? value['leadId'] ?? value['uuid'],
+      );
+      if (direct.isNotEmpty) {
+        return direct;
+      }
+      final nested = value['data'];
+      if (nested is Map<String, dynamic>) {
+        return _extractLeadId(nested);
+      }
+    }
+    return null;
+  }
 
-    if (url.isEmpty && phoneNumber.isEmpty && name.isEmpty) {
-      return const <Map<String, dynamic>>[];
+  Future<void> _uploadSelectedCallRecording(String leadId) async {
+    final file = _selectedCallRecordingFile;
+    if (file == null) {
+      return;
     }
 
-    return <Map<String, dynamic>>[
-      <String, dynamic>{
-        'url': url,
-        'phone_number': phoneNumber,
-        'name': name,
-      },
-    ];
+    final path = file.path?.trim() ?? '';
+    if (path.isEmpty) {
+      throw Exception('Unable to access the selected audio file.');
+    }
+
+    await _authProvider.uploadLeadCallRecording(
+      id: leadId,
+      filePath: path,
+      phoneNumber: _phoneController.text.trim(),
+      name: file.name.trim().isEmpty ? 'Call recording' : file.name.trim(),
+      token: _authProvider.currentAuthToken,
+    );
   }
 
   Future<void> _submit() async {
@@ -626,11 +624,11 @@ class _LeadFormPageState extends State<LeadFormPage> {
           projectName: _resolveSelectedProjectName(),
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
-          callRecordings: _resolveCallRecordingsForSubmit(),
           token: _authProvider.currentAuthToken,
         );
+        await _uploadSelectedCallRecording(leadId);
       } else {
-        await _authProvider.createLead(
+        final createdLead = await _authProvider.createLead(
           name: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
           alternatePhoneNumber: _alternatePhoneController.text.trim(),
@@ -644,9 +642,13 @@ class _LeadFormPageState extends State<LeadFormPage> {
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           notes: _notesController.text.trim(),
-          callRecordings: _resolveCallRecordingsForSubmit(),
           token: _authProvider.currentAuthToken,
         );
+        final createdLeadId = _extractLeadId(createdLead);
+        if (createdLeadId == null || createdLeadId.isEmpty) {
+          throw Exception('Lead created but call recording could not be attached.');
+        }
+        await _uploadSelectedCallRecording(createdLeadId);
       }
 
       if (!mounted) {
@@ -877,35 +879,61 @@ class _LeadFormPageState extends State<LeadFormPage> {
                     const SizedBox(height: 12),
                     _buildTextField(
                       controller: _locationPreferenceController,
-                      label: 'Location Preference',
+                      label: 'Finding Location',
                       hintText: 'Andheri West',
                     ),
                     const SizedBox(height: 12),
                     _buildTextField(
                       controller: _notesController,
-                      label: 'Notes',
+                      label: 'Configuration / Notes',
                       hintText: 'Interested in 2BHK, wants sea view',
                       minLines: 3,
                       maxLines: 5,
                     ),
                     const SizedBox(height: 12),
-                    _buildTextField(
-                      controller: _callRecordingUrlController,
-                      label: 'Call Recording URL',
-                      hintText: '/uploads/leads/voice/voice_abc123.webm',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildTextField(
-                      controller: _callRecordingPhoneController,
-                      label: 'Call Recording Phone Number',
-                      hintText: '+919876543210',
-                      keyboardType: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildTextField(
-                      controller: _callRecordingNameController,
-                      label: 'Call Recording Name',
-                      hintText: 'First call - Suresh',
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Call Recording',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: _isSubmitting
+                                    ? null
+                                    : _pickCallRecordingFile,
+                                icon: const Icon(Icons.attach_file_rounded),
+                                label: const Text('Upload File'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _selectedCallRecordingFile?.name ??
+                                'No file selected',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
