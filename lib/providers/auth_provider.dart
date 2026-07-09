@@ -1495,6 +1495,7 @@ class AuthProvider {
     required String budget,
     required String locationPreference,
     required String notes,
+    List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
     String? token,
   }) {
     return _authService.createLead(
@@ -1511,6 +1512,7 @@ class AuthProvider {
       budget: budget,
       locationPreference: locationPreference,
       notes: notes,
+      callRecordings: callRecordings,
       token: token,
     );
   }
@@ -1526,6 +1528,7 @@ class AuthProvider {
     String projectName = '',
     required String budget,
     required String locationPreference,
+    List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
     String? token,
   }) {
     return _authService.editLead(
@@ -1539,6 +1542,7 @@ class AuthProvider {
       projectName: projectName,
       budget: budget,
       locationPreference: locationPreference,
+      callRecordings: callRecordings,
       token: token,
     );
   }

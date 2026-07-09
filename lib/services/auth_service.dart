@@ -5979,6 +5979,7 @@ class AuthService {
     required String budget,
     required String locationPreference,
     required String notes,
+    List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
@@ -6003,6 +6004,9 @@ class AuthService {
       projectId: projectId,
       projectName: projectName,
     );
+    if (callRecordings.isNotEmpty) {
+      requestPayload['call_recordings'] = callRecordings;
+    }
     final body = jsonEncode(requestPayload);
 
     _logRequest(
@@ -6050,6 +6054,7 @@ class AuthService {
     String projectName = '',
     required String budget,
     required String locationPreference,
+    List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
     String? token,
   }) async {
     final normalizedId = id.trim();
@@ -6075,6 +6080,9 @@ class AuthService {
       projectId: projectId,
       projectName: projectName,
     );
+    if (callRecordings.isNotEmpty) {
+      requestPayload['call_recordings'] = callRecordings;
+    }
     final body = jsonEncode(requestPayload);
 
     _logRequest(

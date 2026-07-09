@@ -38,6 +38,9 @@ class _LeadFormPageState extends State<LeadFormPage> {
   final _locationPreferenceController = TextEditingController();
   final _notesController = TextEditingController();
   final _projectNameController = TextEditingController();
+  final _callRecordingUrlController = TextEditingController();
+  final _callRecordingPhoneController = TextEditingController();
+  final _callRecordingNameController = TextEditingController();
 
   bool _isSubmitting = false;
   bool _isLoadingAssignees = true;
@@ -56,6 +59,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_LeadSourceOption> _leadSourceOptions = const <_LeadSourceOption>[];
   List<_ProjectOption> _projectOptions = const <_ProjectOption>[];
+  List<Map<String, dynamic>> _callRecordings =
+      const <Map<String, dynamic>>[];
 
   @override
   void initState() {
@@ -82,6 +87,9 @@ class _LeadFormPageState extends State<LeadFormPage> {
     _locationPreferenceController.dispose();
     _notesController.dispose();
     _projectNameController.dispose();
+    _callRecordingUrlController.dispose();
+    _callRecordingPhoneController.dispose();
+    _callRecordingNameController.dispose();
     super.dispose();
   }
 
@@ -128,6 +136,14 @@ class _LeadFormPageState extends State<LeadFormPage> {
       data['location_preference'] ?? data['locationPreference'],
     );
     _notesController.text = _readString(data['notes']);
+    _callRecordings = _extractCallRecordings(data['call_recordings']);
+    final firstCallRecording =
+        _callRecordings.isNotEmpty ? _callRecordings.first : null;
+    _callRecordingUrlController.text =
+        _readString(firstCallRecording?['url']);
+    _callRecordingPhoneController.text =
+        _readString(firstCallRecording?['phone_number']);
+    _callRecordingNameController.text = _readString(firstCallRecording?['name']);
 
     final project = data['project'];
     if (project is Map<String, dynamic>) {
@@ -533,6 +549,45 @@ class _LeadFormPageState extends State<LeadFormPage> {
     return false;
   }
 
+  List<Map<String, dynamic>> _extractCallRecordings(dynamic value) {
+    if (value is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    return value
+        .whereType<Map>()
+        .map((recording) => <String, dynamic>{
+              'url': _readString(recording['url']),
+              'phone_number': _readString(
+                recording['phone_number'] ?? recording['phoneNumber'],
+              ),
+              'name': _readString(recording['name']),
+            })
+        .where((recording) =>
+            recording['url'].toString().isNotEmpty ||
+            recording['phone_number'].toString().isNotEmpty ||
+            recording['name'].toString().isNotEmpty)
+        .toList();
+  }
+
+  List<Map<String, dynamic>> _resolveCallRecordingsForSubmit() {
+    final url = _callRecordingUrlController.text.trim();
+    final phoneNumber = _callRecordingPhoneController.text.trim();
+    final name = _callRecordingNameController.text.trim();
+
+    if (url.isEmpty && phoneNumber.isEmpty && name.isEmpty) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    return <Map<String, dynamic>>[
+      <String, dynamic>{
+        'url': url,
+        'phone_number': phoneNumber,
+        'name': name,
+      },
+    ];
+  }
+
   Future<void> _submit() async {
     final allowed = await PermissionGuard.allowModuleAction(
       context,
@@ -571,6 +626,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           projectName: _resolveSelectedProjectName(),
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
+          callRecordings: _resolveCallRecordingsForSubmit(),
           token: _authProvider.currentAuthToken,
         );
       } else {
@@ -588,6 +644,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           notes: _notesController.text.trim(),
+          callRecordings: _resolveCallRecordingsForSubmit(),
           token: _authProvider.currentAuthToken,
         );
       }
@@ -830,6 +887,25 @@ class _LeadFormPageState extends State<LeadFormPage> {
                       hintText: 'Interested in 2BHK, wants sea view',
                       minLines: 3,
                       maxLines: 5,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _callRecordingUrlController,
+                      label: 'Call Recording URL',
+                      hintText: '/uploads/leads/voice/voice_abc123.webm',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _callRecordingPhoneController,
+                      label: 'Call Recording Phone Number',
+                      hintText: '+919876543210',
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _callRecordingNameController,
+                      label: 'Call Recording Name',
+                      hintText: 'First call - Suresh',
                     ),
                   ],
                 ),
