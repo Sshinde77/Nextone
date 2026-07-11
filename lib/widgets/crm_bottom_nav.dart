@@ -87,6 +87,13 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
         icon: Icons.dashboard_outlined,
         onTap: widget.onDashboard,
       ),
+      if (widget.showProjects)
+        _NavEntry(
+          index: 5,
+          label: 'Projects',
+          icon: Icons.apartment_outlined,
+          onTap: widget.onProjects,
+        ),
       if (widget.showLeads)
         _NavEntry(
           index: 1,
@@ -94,13 +101,6 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           icon: Icons.people_alt_outlined,
           onTap: widget.onLeads,
           badgeCount: widget.leadsBadgeCount,
-        ),
-      if (widget.showProjects)
-        _NavEntry(
-          index: 5,
-          label: 'Projects',
-          icon: Icons.apartment_outlined,
-          onTap: widget.onProjects,
         ),
       if (widget.showFollowUps)
         _NavEntry(

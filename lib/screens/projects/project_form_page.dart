@@ -210,6 +210,51 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     return parts.isNotEmpty ? parts.first : raw;
   }
 
+  Future<void> _pickPossessionDate() async {
+    if (_isSubmitting) {
+      return;
+    }
+
+    final initialDate =
+        _tryParseDate(_possessionDateController.text) ?? DateTime.now();
+    final firstDate = DateTime(2000);
+    final lastDate = DateTime(2100);
+
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate.isBefore(firstDate)
+          ? firstDate
+          : initialDate.isAfter(lastDate)
+              ? lastDate
+              : initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+
+    if (pickedDate == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _possessionDateController.text = _formatDate(pickedDate);
+    });
+  }
+
+  DateTime? _tryParseDate(String value) {
+    final normalized = value.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return DateTime.tryParse(normalized);
+  }
+
+  String _formatDate(DateTime value) {
+    final year = value.year.toString().padLeft(4, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    final day = value.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
+  }
+
   String _readDocumentId(Map<String, dynamic> source) {
     return _readString(
       source['id'] ??
@@ -829,6 +874,13 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                                 controller: _possessionDateController,
                                 label: 'Possession Date',
                                 hintText: '2027-12-01',
+                                readOnly: true,
+                                onTap: _pickPossessionDate,
+                                suffixIcon: const Icon(
+                                  Icons.calendar_today_rounded,
+                                  size: 18,
+                                  color: Color(0xFF98A4B4),
+                                ),
                               ),
                             ],
                           ),
@@ -1362,6 +1414,9 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     TextInputType? keyboardType,
     int minLines = 1,
     int maxLines = 1,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    Widget? suffixIcon,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1374,18 +1429,26 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           minLines: minLines,
           maxLines: maxLines,
           enabled: !_isSubmitting,
+          readOnly: readOnly,
+          onTap: onTap,
           style: const TextStyle(
             color: Color(0xFF374151),
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
-          decoration: _fieldDecoration(hintText: hintText),
+          decoration: _fieldDecoration(
+            hintText: hintText,
+            suffixIcon: suffixIcon,
+          ),
         ),
       ],
     );
   }
 
-  InputDecoration _fieldDecoration({required String hintText}) {
+  InputDecoration _fieldDecoration({
+    required String hintText,
+    Widget? suffixIcon,
+  }) {
     return InputDecoration(
       hintText: hintText,
       hintStyle: const TextStyle(
@@ -1393,6 +1456,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
         fontSize: 13,
         fontWeight: FontWeight.w500,
       ),
+      suffixIcon: suffixIcon,
       filled: true,
       fillColor: Colors.white,
       isDense: true,

@@ -2620,6 +2620,7 @@ class _AttendancePageState extends State<AttendancePage> {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -3349,6 +3350,7 @@ class _AttendancePageState extends State<AttendancePage> {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
@@ -4277,6 +4279,7 @@ class _AttendancePageState extends State<AttendancePage> {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -4319,35 +4322,39 @@ class _AttendancePageState extends State<AttendancePage> {
                       ),
                     ],
                   )
-                : Row(
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Expanded(
-                        child: Text(
-                          'Team Summary',
-                          style: TextStyle(
-                            color: Color(0xFF172B4D),
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      const Text(
+                        'Team Summary',
+                        style: TextStyle(
+                          color: Color(0xFF172B4D),
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      _SummaryDateButton(
-                        value: _displayDate(_summaryFromDate),
-                        onTap: _pickSummaryFromDate,
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
-                        child: Text(
-                          'to',
-                          style: TextStyle(
-                            color: Color(0xFF8B98AA),
-                            fontWeight: FontWeight.w700,
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _SummaryDateButton(
+                            value: _displayDate(_summaryFromDate),
+                            onTap: _pickSummaryFromDate,
                           ),
-                        ),
-                      ),
-                      _SummaryDateButton(
-                        value: _displayDate(_summaryToDate),
-                        onTap: _pickSummaryToDate,
+                          const Text(
+                            'to',
+                            style: TextStyle(
+                              color: Color(0xFF8B98AA),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          _SummaryDateButton(
+                            value: _displayDate(_summaryToDate),
+                            onTap: _pickSummaryToDate,
+                          ),
+                        ],
                       ),
                     ],
                   ),

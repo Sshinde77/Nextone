@@ -98,6 +98,22 @@ abstract final class AppTheme {
           color: AppColors.primary,
         ),
       ),
+      dividerTheme: DividerThemeData(
+        color: AppColors.primary.withValues(alpha: 0.18),
+        thickness: 1,
+        space: 1,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: Colors.white,
+        elevation: 12,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: AppColors.primary.withValues(alpha: 0.18),
+          ),
+        ),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: const Color(0xFFF3F4F6),

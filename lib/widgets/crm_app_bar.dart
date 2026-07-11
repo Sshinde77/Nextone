@@ -174,8 +174,14 @@ class _CrmAppBarState extends State<CrmAppBar> {
     final selected = await showMenu<String>(
       context: context,
       position: const RelativeRect.fromLTRB(1000, 78, 16, 0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: AppColors.primary.withValues(alpha: 0.18),
+        ),
+      ),
       color: Colors.white,
+      surfaceTintColor: Colors.white,
       elevation: 12,
       items: [
         PopupMenuItem<String>(
@@ -208,7 +214,15 @@ class _CrmAppBarState extends State<CrmAppBar> {
             ],
           ),
         ),
-        const PopupMenuDivider(height: 1),
+        PopupMenuItem<String>(
+          enabled: false,
+          height: 1,
+          padding: EdgeInsets.zero,
+          child: Container(
+            height: 1,
+            color: AppColors.primary.withValues(alpha: 0.18),
+          ),
+        ),
         PopupMenuItem<String>(
           value: 'logout',
           height: 42,

@@ -211,6 +211,73 @@ class _ClosuresPageState extends State<ClosuresPage> {
         .toList(growable: false);
     final notesController = TextEditingController();
 
+    String? resolveLeadLinkedProjectId(String? leadId) {
+      final normalizedLeadId = (leadId ?? '').trim();
+      if (normalizedLeadId.isEmpty) {
+        return null;
+      }
+
+      Map<String, dynamic>? selectedLead;
+      for (final lead in leads) {
+        final currentLeadId = _readString(
+          lead['id'] ?? lead['lead_id'] ?? lead['leadId'],
+          fallback: '',
+        );
+        if (currentLeadId == normalizedLeadId) {
+          selectedLead = lead;
+          break;
+        }
+      }
+
+      if (selectedLead == null) {
+        return null;
+      }
+
+      final nestedProject =
+          selectedLead['project'] is Map<String, dynamic>
+              ? selectedLead['project'] as Map<String, dynamic>
+              : null;
+
+      final projectName = _readString(
+        selectedLead['project_name'] ??
+            selectedLead['projectName'] ??
+            nestedProject?['name'] ??
+            selectedLead['project_name_text'],
+        fallback: '',
+      );
+      if (projectName.isNotEmpty) {
+        final normalizedProjectName = projectName.trim().toLowerCase();
+        for (final project in projects) {
+          final currentProjectName =
+              _readString(project['name'], fallback: '').trim().toLowerCase();
+          if (currentProjectName == normalizedProjectName) {
+            final matchedProjectId = _readString(project['id'], fallback: '');
+            if (matchedProjectId.isNotEmpty) {
+              return matchedProjectId;
+            }
+          }
+        }
+      }
+
+      final directProjectId = _readString(
+        selectedLead['project_id'] ??
+            selectedLead['projectId'] ??
+            nestedProject?['id'] ??
+            nestedProject?['project_id'] ??
+            nestedProject?['projectId'],
+        fallback: '',
+      );
+      if (directProjectId.isNotEmpty &&
+          projects.any(
+            (project) =>
+                _readString(project['id'], fallback: '') == directProjectId,
+          )) {
+        return directProjectId;
+      }
+
+      return null;
+    }
+
     final created = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -326,8 +393,18 @@ class _ClosuresPageState extends State<ClosuresPage> {
                                 ),
                               )
                               .toList(),
-                          onChanged: (v) =>
-                              setLocalState(() => selectedLeadId = v),
+                          onChanged: (v) {
+                            setLocalState(() {
+                              selectedLeadId = v;
+                              final linkedProjectId =
+                                  resolveLeadLinkedProjectId(v);
+                              selectedProjectId =
+                                  (linkedProjectId != null &&
+                                          linkedProjectId.isNotEmpty)
+                                      ? linkedProjectId
+                                      : null;
+                            });
+                          },
                         ),
                         const SizedBox(height: 10),
                         _dropdownField(
@@ -675,6 +752,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
           Text(label),
           const SizedBox(height: 6),
           SearchableDropdownField<String>(
+            key: ValueKey<String>('${label}_${value ?? ''}'),
             label: label,
             sheetTitle: label,
             showFieldLabel: false,

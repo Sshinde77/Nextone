@@ -1061,6 +1061,14 @@ class _TargetInputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: Color(0xFFD5DEEB),
+        width: 1.2,
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1076,12 +1084,30 @@ class _TargetInputField extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: TextInputType.number,
+          cursorColor: AppColors.primary,
+          style: const TextStyle(
+            color: Color(0xFF0F172A),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
+            fillColor: const Color(0xFFF8FAFC),
+            hintText: 'Enter target',
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
             ),
+            border: border,
+            enabledBorder: border,
+            focusedBorder: border.copyWith(
+              borderSide: const BorderSide(
+                color: AppColors.primary,
+                width: 1.5,
+              ),
+            ),
+            disabledBorder: border,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 14,
