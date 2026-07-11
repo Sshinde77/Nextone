@@ -27,6 +27,17 @@ class LeadFormPage extends StatefulWidget {
 }
 
 class _LeadFormPageState extends State<LeadFormPage> {
+  static const List<String> _configurationOptions = <String>[
+    '1RK',
+    '1BHK',
+    '2BHK',
+    '3BHK',
+    '4BHK',
+    'Penta House / Duplex',
+    'Commercial shop',
+    'Office space',
+  ];
+
   final _authProvider = AuthProvider();
 
   final _nameController = TextEditingController();
@@ -37,6 +48,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
   final _nextFollowUpTimeController = TextEditingController();
   final _budgetController = TextEditingController();
   final _locationPreferenceController = TextEditingController();
+  final _configurationController = TextEditingController();
   final _notesController = TextEditingController();
   final _projectNameController = TextEditingController();
 
@@ -57,6 +69,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_LeadSourceOption> _leadSourceOptions = const <_LeadSourceOption>[];
   List<_ProjectOption> _projectOptions = const <_ProjectOption>[];
+  List<String> _selectedConfigurations = <String>[];
   PlatformFile? _selectedCallRecordingFile;
 
   @override
@@ -82,6 +95,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
     _nextFollowUpTimeController.dispose();
     _budgetController.dispose();
     _locationPreferenceController.dispose();
+    _configurationController.dispose();
     _notesController.dispose();
     _projectNameController.dispose();
     super.dispose();
@@ -129,6 +143,10 @@ class _LeadFormPageState extends State<LeadFormPage> {
     _locationPreferenceController.text = _readString(
       data['location_preference'] ?? data['locationPreference'],
     );
+    _selectedConfigurations = _normalizeConfigurationValues(
+      data['configuration'] ?? data['configurations'],
+    );
+    _configurationController.text = _selectedConfigurations.join(', ');
     _notesController.text = _readString(data['notes']);
 
     final project = data['project'];
@@ -521,6 +539,189 @@ class _LeadFormPageState extends State<LeadFormPage> {
     return '';
   }
 
+  List<String> _normalizeConfigurationValues(dynamic value) {
+    String? matchOption(String candidate) {
+      final normalizedCandidate = candidate.trim().toLowerCase();
+      for (final option in _configurationOptions) {
+        if (option.toLowerCase() == normalizedCandidate) {
+          return option;
+        }
+      }
+      return null;
+    }
+
+    final resolved = <String>[];
+
+    void addIfValid(String candidate) {
+      final matchedOption = matchOption(candidate);
+      if (matchedOption != null && !resolved.contains(matchedOption)) {
+        resolved.add(matchedOption);
+      }
+    }
+
+    if (value is List) {
+      for (final item in value) {
+        addIfValid(_readString(item));
+      }
+      return resolved;
+    }
+
+    final normalized = _readString(value);
+    if (normalized.isEmpty) {
+      return resolved;
+    }
+
+    for (final item in normalized.split(',')) {
+      addIfValid(item);
+    }
+    return resolved;
+  }
+
+  Future<void> _openConfigurationSheet() async {
+    final result = await showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final selected = List<String>.from(_selectedConfigurations);
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 14,
+                  bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+                ),
+                child: SizedBox(
+                  height: 420,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.border,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Configuration',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Select one or more configurations.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _configurationOptions.length,
+                          itemBuilder: (context, index) {
+                            final option = _configurationOptions[index];
+                            final isSelected = selected.contains(option);
+                            return CheckboxListTile(
+                              value: isSelected,
+                              dense: true,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              activeColor: AppColors.primary,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                option,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              onChanged: (value) {
+                                setSheetState(() {
+                                  if (value == true) {
+                                    if (!selected.contains(option)) {
+                                      selected.add(option);
+                                    }
+                                  } else {
+                                    selected.remove(option);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () =>
+                                  Navigator.of(sheetContext).pop(),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(46),
+                                side:
+                                    const BorderSide(color: AppColors.border),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () => Navigator.of(sheetContext)
+                                  .pop(List<String>.from(selected)),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(46),
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Apply'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedConfigurations = result;
+      _configurationController.text = result.join(', ');
+    });
+  }
+
   bool _readBool(dynamic value) {
     if (value is bool) {
       return value;
@@ -539,7 +740,14 @@ class _LeadFormPageState extends State<LeadFormPage> {
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowMultiple: false,
-      allowedExtensions: const <String>['mp3', 'wav', 'm4a', 'aac', 'ogg', 'webm'],
+      allowedExtensions: const <String>[
+        'mp3',
+        'wav',
+        'm4a',
+        'aac',
+        'ogg',
+        'webm'
+      ],
     );
     if (!mounted || picked == null || picked.files.isEmpty) {
       return;
@@ -624,6 +832,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           projectName: _resolveSelectedProjectName(),
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
+          configuration: _configurationController.text.trim(),
           token: _authProvider.currentAuthToken,
         );
         await _uploadSelectedCallRecording(leadId);
@@ -641,12 +850,14 @@ class _LeadFormPageState extends State<LeadFormPage> {
           projectName: _resolveSelectedProjectName(),
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
+          configuration: _configurationController.text.trim(),
           notes: _notesController.text.trim(),
           token: _authProvider.currentAuthToken,
         );
         final createdLeadId = _extractLeadId(createdLead);
         if (createdLeadId == null || createdLeadId.isEmpty) {
-          throw Exception('Lead created but call recording could not be attached.');
+          throw Exception(
+              'Lead created but call recording could not be attached.');
         }
         await _uploadSelectedCallRecording(createdLeadId);
       }
@@ -883,10 +1094,12 @@ class _LeadFormPageState extends State<LeadFormPage> {
                       hintText: 'Andheri West',
                     ),
                     const SizedBox(height: 12),
+                    _buildConfigurationDropdown(),
+                    const SizedBox(height: 12),
                     _buildTextField(
                       controller: _notesController,
-                      label: 'Configuration / Notes',
-                      hintText: 'Interested in 2BHK, wants sea view',
+                      label: 'Notes',
+                      hintText: 'Interested buyer, wants sea view',
                       minLines: 3,
                       maxLines: 5,
                     ),
@@ -1039,6 +1252,70 @@ class _LeadFormPageState extends State<LeadFormPage> {
           }
         });
       },
+    );
+  }
+
+  Widget _buildConfigurationDropdown() {
+    final hasSelection = _selectedConfigurations.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Configuration',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: _isSubmitting ? null : _openConfigurationSheet,
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: _fieldDecoration(
+              hintText: 'Select configuration',
+            ).copyWith(
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasSelection)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Clear selection',
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      onPressed: _isSubmitting
+                          ? null
+                          : () {
+                              setState(() {
+                                _selectedConfigurations = <String>[];
+                                _configurationController.clear();
+                              });
+                            },
+                    ),
+                  const SizedBox(width: 2),
+                  const Icon(Icons.keyboard_arrow_down_rounded),
+                  const SizedBox(width: 12),
+                ],
+              ),
+            ),
+            child: Text(
+              hasSelection
+                  ? _selectedConfigurations.join(', ')
+                  : 'Select configuration',
+              style: TextStyle(
+                color: hasSelection
+                    ? AppColors.textPrimary
+                    : AppColors.textSecondary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

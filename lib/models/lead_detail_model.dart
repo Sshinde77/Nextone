@@ -8,6 +8,7 @@ class LeadDetailModel {
   final String status;
   final String budget;
   final String locationPreference;
+  final List<String> configurations;
   final String callbackTime;
   final String nextFollowupTime;
   final String projectName;
@@ -23,6 +24,7 @@ class LeadDetailModel {
     required this.status,
     required this.budget,
     required this.locationPreference,
+    required this.configurations,
     required this.callbackTime,
     required this.nextFollowupTime,
     required this.projectName,
@@ -30,6 +32,23 @@ class LeadDetailModel {
   });
 
   factory LeadDetailModel.fromJson(Map<String, dynamic> json) {
+    List<String> readList(dynamic value) {
+      if (value is List) {
+        return value
+            .map((item) => item?.toString().trim() ?? '')
+            .where((item) => item.isNotEmpty)
+            .toList(growable: false);
+      }
+      if (value is String && value.trim().isNotEmpty) {
+        return value
+            .split(',')
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toList(growable: false);
+      }
+      return const <String>[];
+    }
+
     return LeadDetailModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
@@ -40,6 +59,9 @@ class LeadDetailModel {
       status: json['status']?.toString() ?? '',
       budget: json['budget']?.toString() ?? '',
       locationPreference: json['location_preference']?.toString() ?? '',
+      configurations: readList(
+        json['configurations'] ?? json['configuration'],
+      ),
       callbackTime: json['callback_time']?.toString() ?? '',
       nextFollowupTime:
           (json['next_followup_time'] ?? json['next_follow_up_time'])
@@ -56,6 +78,8 @@ class LeadDetailModel {
           : null,
     );
   }
+
+  String get configurationText => configurations.join(', ');
 }
 
 class AssignedTo {

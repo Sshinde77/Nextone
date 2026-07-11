@@ -20,6 +20,17 @@ class LeadFollowUpFormPage extends StatefulWidget {
 enum _LeadFollowUpSection { leadDetails, followUpTask }
 
 class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
+  static const List<String> _configurationOptions = <String>[
+    '1RK',
+    '1BHK',
+    '2BHK',
+    '3BHK',
+    '4BHK',
+    'Penta House / Duplex',
+    'Commercial shop',
+    'Office space',
+  ];
+
   final _authProvider = AuthProvider();
   final _leadFormKey = GlobalKey<FormState>();
   final _taskFormKey = GlobalKey<FormState>();
@@ -58,6 +69,7 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
   DateTime? _selectedCallbackTime;
   DateTime? _selectedNextFollowUpTime;
   DateTime? _selectedDueDate;
+  List<String> _selectedConfigurations = <String>[];
   _LeadFollowUpSection _selectedSection = _LeadFollowUpSection.leadDetails;
 
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
@@ -359,7 +371,7 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
         assignedTo: assignedTo,
         budget: _budgetController.text.trim(),
         locationPreference: _locationPreferenceController.text.trim(),
-        configuration: _configurationController.text.trim(),
+        configuration: _selectedConfigurations.join(', '),
         leadNotes: _leadNotesController.text.trim(),
         callbackTime: _callbackTimeController.text.trim(),
         nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
@@ -586,6 +598,151 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
     });
   }
 
+  Future<void> _openConfigurationSheet() async {
+    final result = await showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final selected = List<String>.from(_selectedConfigurations);
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 14,
+                  bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+                ),
+                child: SizedBox(
+                  height: 420,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.border,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Configuration',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Select one or more configurations.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _configurationOptions.length,
+                          itemBuilder: (context, index) {
+                            final option = _configurationOptions[index];
+                            final isSelected = selected.contains(option);
+                            return CheckboxListTile(
+                              value: isSelected,
+                              dense: true,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              activeColor: AppColors.primary,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                option,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              onChanged: (value) {
+                                setSheetState(() {
+                                  if (value == true) {
+                                    if (!selected.contains(option)) {
+                                      selected.add(option);
+                                    }
+                                  } else {
+                                    selected.remove(option);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () =>
+                                  Navigator.of(sheetContext).pop(),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(46),
+                                side:
+                                    const BorderSide(color: AppColors.border),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () => Navigator.of(sheetContext)
+                                  .pop(List<String>.from(selected)),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(46),
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text('Apply'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedConfigurations = result;
+      _configurationController.text = result.join(', ');
+    });
+  }
+
   String _readString(dynamic value) {
     if (value is String) {
       return value.trim();
@@ -754,11 +911,7 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              _buildTextField(
-                controller: _configurationController,
-                label: 'Configuration',
-                hintText: '2BHK',
-              ),
+              _buildConfigurationDropdown(),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1191,6 +1344,70 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
           }
         });
       },
+    );
+  }
+
+  Widget _buildConfigurationDropdown() {
+    final hasSelection = _selectedConfigurations.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Configuration',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: _isSubmitting ? null : _openConfigurationSheet,
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: _fieldDecoration(
+              hintText: 'Select configuration',
+            ).copyWith(
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasSelection)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Clear selection',
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      onPressed: _isSubmitting
+                          ? null
+                          : () {
+                              setState(() {
+                                _selectedConfigurations = <String>[];
+                                _configurationController.clear();
+                              });
+                            },
+                    ),
+                  const SizedBox(width: 2),
+                  const Icon(Icons.keyboard_arrow_down_rounded),
+                  const SizedBox(width: 12),
+                ],
+              ),
+            ),
+            child: Text(
+              hasSelection
+                  ? _selectedConfigurations.join(', ')
+                  : 'Select configuration',
+              style: TextStyle(
+                color: hasSelection
+                    ? AppColors.textPrimary
+                    : AppColors.textSecondary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

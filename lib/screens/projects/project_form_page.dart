@@ -70,6 +70,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   List<PlatformFile> _creativeFiles = const <PlatformFile>[];
   List<PlatformFile> _paymentPlanFiles = const <PlatformFile>[];
   List<PlatformFile> _videoFiles = const <PlatformFile>[];
+  final Set<String> _deletingDocumentIds = <String>{};
   bool _isSubmitting = false;
   bool _isLoadingExistingData = false;
 
@@ -209,6 +210,15 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     return parts.isNotEmpty ? parts.first : raw;
   }
 
+  String _readDocumentId(Map<String, dynamic> source) {
+    return _readString(
+      source['id'] ??
+          source['document_id'] ??
+          source['documentId'] ??
+          source['uuid'],
+    );
+  }
+
   List<String> _splitCsv(String value) {
     return value
         .split(',')
@@ -324,6 +334,95 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     }
 
     return documents;
+  }
+
+  bool _isDocumentDeleting(Map<String, dynamic> document) {
+    final id = _readDocumentId(document);
+    return id.isNotEmpty && _deletingDocumentIds.contains(id);
+  }
+
+  Future<void> _deleteExistingDocument({
+    required String label,
+    required List<Map<String, dynamic>> documents,
+    required ValueChanged<List<Map<String, dynamic>>> onChanged,
+    required Map<String, dynamic> document,
+  }) async {
+    if (_isSubmitting || _isLoadingExistingData) {
+      return;
+    }
+
+    final projectId = _readString(widget.projectData?['id']);
+    final documentId = _readDocumentId(document);
+    if (projectId.isEmpty ||
+        documentId.isEmpty ||
+        _isDocumentDeleting(document)) {
+      return;
+    }
+
+    final documentName = _readDocumentName(document);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete file?'),
+          content: Text(
+            documentName.isEmpty
+                ? 'Do you want to delete this file?'
+                : 'Do you want to delete "$documentName"?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _deletingDocumentIds.add(documentId);
+    });
+
+    try {
+      await _authProvider.deleteProjectDocument(
+        projectId: projectId,
+        documentId: documentId,
+        token: _authProvider.currentAuthToken,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        onChanged(
+          documents
+              .where((item) => _readDocumentId(item) != documentId)
+              .toList(),
+        );
+      });
+      _showSnackBar('File deleted successfully.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _deletingDocumentIds.remove(documentId);
+        });
+      }
+    }
   }
 
   String _readDocumentName(Map<String, dynamic> source) {
@@ -901,7 +1000,11 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
         ),
         if (_existingUnitPlanDocs.isNotEmpty) ...[
           const SizedBox(height: 10),
-          _buildExistingDocuments('Previously uploaded', _existingUnitPlanDocs),
+          _buildExistingDocuments(
+            'Previously uploaded',
+            _existingUnitPlanDocs,
+            (files) => _existingUnitPlanDocs = files,
+          ),
         ],
         const SizedBox(height: 16),
         _buildDocumentPicker(
@@ -922,7 +1025,11 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
         ),
         if (_existingCreativeDocs.isNotEmpty) ...[
           const SizedBox(height: 10),
-          _buildExistingDocuments('Previously uploaded', _existingCreativeDocs),
+          _buildExistingDocuments(
+            'Previously uploaded',
+            _existingCreativeDocs,
+            (files) => _existingCreativeDocs = files,
+          ),
         ],
         const SizedBox(height: 16),
         _buildDocumentPicker(
@@ -944,7 +1051,10 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
         if (_existingPaymentPlanDocs.isNotEmpty) ...[
           const SizedBox(height: 10),
           _buildExistingDocuments(
-              'Previously uploaded', _existingPaymentPlanDocs),
+            'Previously uploaded',
+            _existingPaymentPlanDocs,
+            (files) => _existingPaymentPlanDocs = files,
+          ),
         ],
         const SizedBox(height: 16),
         _buildDocumentPicker(
@@ -965,7 +1075,11 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
         ),
         if (_existingVideoDocs.isNotEmpty) ...[
           const SizedBox(height: 10),
-          _buildExistingDocuments('Previously uploaded', _existingVideoDocs),
+          _buildExistingDocuments(
+            'Previously uploaded',
+            _existingVideoDocs,
+            (files) => _existingVideoDocs = files,
+          ),
         ],
       ],
     );
@@ -974,6 +1088,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   Widget _buildExistingDocuments(
     String label,
     List<Map<String, dynamic>> documents,
+    ValueChanged<List<Map<String, dynamic>>> onChanged,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -994,6 +1109,15 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
               .map(
                 (document) => _StoredDocumentChip(
                   name: _readDocumentName(document),
+                  isDeleting: _isDocumentDeleting(document),
+                  onDelete: _isDocumentDeleting(document)
+                      ? null
+                      : () => _deleteExistingDocument(
+                            label: label,
+                            documents: documents,
+                            onChanged: onChanged,
+                            document: document,
+                          ),
                 ),
               )
               .toList(),
@@ -1402,9 +1526,13 @@ class _DocumentChip extends StatelessWidget {
 class _StoredDocumentChip extends StatelessWidget {
   const _StoredDocumentChip({
     required this.name,
+    required this.isDeleting,
+    required this.onDelete,
   });
 
   final String name;
+  final bool isDeleting;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1435,6 +1563,25 @@ class _StoredDocumentChip extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: onDelete,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: isDeleting
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.close,
+                      size: 14,
+                      color: Color(0xFF667085),
+                    ),
             ),
           ),
         ],

@@ -124,7 +124,7 @@ class SiteRevisitDataCard extends StatelessWidget {
               _action(Icons.remove_red_eye_outlined, onView),
               _action(Icons.edit_outlined, onEdit),
               if (!_isDoneStatus) _action(Icons.check_circle_outline, onStatus),
-              _action(Icons.delete_outline, onDelete),
+              if (onDelete != null) _action(Icons.delete_outline, onDelete),
             ],
           ),
         ],

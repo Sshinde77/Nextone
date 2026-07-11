@@ -124,6 +124,7 @@ class _LeadsPageState extends State<LeadsPage> {
 
   bool get _canExportData => RoleAccess.canExportModule('leads');
   bool get _canUseBulkLeadTools => RoleAccess.canCreateModule('leads');
+  bool get _canDeleteLeads => RoleAccess.canDeleteModule('leads');
   bool get _showLeadTabs =>
       _currentRole.isNotEmpty &&
       !RoleAccess.isAdmin(_currentRole) &&
@@ -1062,29 +1063,30 @@ class _LeadsPageState extends State<LeadsPage> {
                                                                 size: 18,
                                                               ),
                                                             ),
-                                                            IconButton(
-                                                              visualDensity:
-                                                                  VisualDensity
-                                                                      .compact,
-                                                              splashRadius: 16,
-                                                              constraints:
-                                                                  const BoxConstraints(
-                                                                minWidth: 32,
-                                                                minHeight: 32,
+                                                            if (_canDeleteLeads)
+                                                              IconButton(
+                                                                visualDensity:
+                                                                    VisualDensity
+                                                                        .compact,
+                                                                splashRadius: 16,
+                                                                constraints:
+                                                                    const BoxConstraints(
+                                                                  minWidth: 32,
+                                                                  minHeight: 32,
+                                                                ),
+                                                                onPressed: () =>
+                                                                    deleteSource(
+                                                                  source,
+                                                                  setDialogState,
+                                                                ),
+                                                                icon: const Icon(
+                                                                  Icons
+                                                                      .delete_outline,
+                                                                  color: AppColors
+                                                                      .textSecondary,
+                                                                  size: 18,
+                                                                ),
                                                               ),
-                                                              onPressed: () =>
-                                                                  deleteSource(
-                                                                source,
-                                                                setDialogState,
-                                                              ),
-                                                              icon: const Icon(
-                                                                Icons
-                                                                    .delete_outline,
-                                                                color: AppColors
-                                                                    .textSecondary,
-                                                                size: 18,
-                                                              ),
-                                                            ),
                                                           ],
                                                         ),
                                                       ),
@@ -2746,11 +2748,12 @@ class _LeadsPageState extends State<LeadsPage> {
                       icon: Icons.edit_outlined,
                       onTap: () => _openEditLead(lead),
                     ),
-                    DataCardAction(
-                      icon: Icons.delete_outline,
-                      color: const Color(0xFFD32F2F),
-                      onTap: () => _deleteLead(lead),
-                    ),
+                    if (_canDeleteLeads)
+                      DataCardAction(
+                        icon: Icons.delete_outline,
+                        color: const Color(0xFFD32F2F),
+                        onTap: () => _deleteLead(lead),
+                      ),
                   ],
                   bulkSelectionMode: _isBulkSelectionMode,
                   isSelected: _selectedLeadIds.contains(lead.id),

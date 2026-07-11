@@ -116,6 +116,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   bool get _canExportData => RoleAccess.canExportModule('site_visits');
+  bool get _canDeleteSiteVisits => RoleAccess.canDeleteModule('site_visits');
   bool get _isMyScope => _selectedScope == _VisitScope.myItems;
   bool get _showScopeTabs =>
       _currentRole.isNotEmpty &&
@@ -1205,11 +1206,13 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                   icon: Icons.visibility_outlined,
                   onTap: () => _handleVisitAction('view', visit),
                 ),
-                SizedBox(width: _s(6)),
-                _cardActionButton(
-                  icon: Icons.delete_outline,
-                  onTap: () {},
-                )
+                if (_canDeleteSiteVisits) ...[
+                  SizedBox(width: _s(6)),
+                  _cardActionButton(
+                    icon: Icons.delete_outline,
+                    onTap: () {},
+                  ),
+                ]
               ],
             ),
           ],

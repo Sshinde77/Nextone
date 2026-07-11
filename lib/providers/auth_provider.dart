@@ -1494,6 +1494,7 @@ class AuthProvider {
     String projectName = '',
     required String budget,
     required String locationPreference,
+    String configuration = '',
     required String notes,
     List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
     String? token,
@@ -1511,6 +1512,7 @@ class AuthProvider {
       projectName: projectName,
       budget: budget,
       locationPreference: locationPreference,
+      configuration: configuration,
       notes: notes,
       callRecordings: callRecordings,
       token: token,
@@ -1528,6 +1530,7 @@ class AuthProvider {
     String projectName = '',
     required String budget,
     required String locationPreference,
+    String configuration = '',
     List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
     String? token,
   }) {
@@ -1542,6 +1545,7 @@ class AuthProvider {
       projectName: projectName,
       budget: budget,
       locationPreference: locationPreference,
+      configuration: configuration,
       callRecordings: callRecordings,
       token: token,
     );

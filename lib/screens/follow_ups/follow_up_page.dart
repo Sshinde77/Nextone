@@ -59,6 +59,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
   }
 
   bool get _isMyScope => _selectedScope == _FollowUpScope.myFollowUp;
+  bool get _canDeleteFollowUps => RoleAccess.canDeleteModule('follow_ups');
   bool get _showScopeTabs =>
       _currentRole.isNotEmpty &&
       !RoleAccess.isSuperAdmin(_currentRole) &&
@@ -1359,11 +1360,12 @@ class _FollowUpPageState extends State<FollowUpPage> {
                       icon: Icons.edit_outlined,
                       onTap: () => _openEditFollowUp(followUp),
                     ),
-                    DataCardAction(
-                      icon: Icons.delete_outline,
-                      color: AppColors.error,
-                      onTap: () => _deleteFollowUp(followUp),
-                    ),
+                    if (_canDeleteFollowUps)
+                      DataCardAction(
+                        icon: Icons.delete_outline,
+                        color: AppColors.error,
+                        onTap: () => _deleteFollowUp(followUp),
+                      ),
                   ],
                   onTap: () => _viewFollowUp(followUp),
                   bulkSelectionMode: _isBulkSelectionMode,

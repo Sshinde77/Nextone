@@ -1879,6 +1879,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       _LeadInfoItem('Callback', _formatDateTimeValue(_lead!.callbackTime)),
       _LeadInfoItem(
           'Next Follow-up', _formatDateTimeValue(_lead!.nextFollowupTime)),
+      _LeadInfoItem('Configuration', _lead!.configurationText),
       _LeadInfoItem('Budget', _lead!.budget),
       _LeadInfoItem('Location', _lead!.locationPreference),
       _LeadInfoItem('Status', _prettyStatus(_normalizeStatus(_lead!.status))),
@@ -2082,26 +2083,6 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                   ),
                 ),
               ),
-              if (!_isAssociateRole &&
-                  _selectedTimelineTab == _LeadTimelineTab.reassignHistory) ...[
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: _isSubmittingReassign ? null : _openReassignSheet,
-                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                  label: const Text('Reassign Lead'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.06),
-                    side: BorderSide(
-                      color: AppColors.primary.withValues(alpha: 0.22),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    minimumSize: const Size(0, 42),
-                  ),
-                ),
-              ],
             ],
           ),
           const SizedBox(height: 14),
@@ -2655,10 +2636,23 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
           ),
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 14),
-            FilledButton.tonalIcon(
+            FilledButton.icon(
               onPressed: onAction,
               icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
               label: Text(actionLabel),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.primary.withValues(
+                  alpha: 0.45,
+                ),
+                disabledForegroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
             ),
           ],
         ],

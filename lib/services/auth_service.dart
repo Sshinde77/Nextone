@@ -5978,6 +5978,7 @@ class AuthService {
     String projectName = '',
     required String budget,
     required String locationPreference,
+    String configuration = '',
     required String notes,
     List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
     String? token,
@@ -5997,6 +5998,7 @@ class AuthService {
       'assigned_to': assignedTo.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
+      'configuration': configuration.trim(),
       'notes': notes.trim(),
     };
     _addProjectSelectionFields(
@@ -6054,6 +6056,7 @@ class AuthService {
     String projectName = '',
     required String budget,
     required String locationPreference,
+    String configuration = '',
     List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
     String? token,
   }) async {
@@ -6074,6 +6077,7 @@ class AuthService {
       'assigned_to': assignedTo.trim(),
       'budget': budget.trim(),
       'location_preference': locationPreference.trim(),
+      'configuration': configuration.trim(),
     };
     _addProjectSelectionFields(
       requestPayload,
