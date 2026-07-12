@@ -1068,7 +1068,8 @@ class _LeadsPageState extends State<LeadsPage> {
                                                                 visualDensity:
                                                                     VisualDensity
                                                                         .compact,
-                                                                splashRadius: 16,
+                                                                splashRadius:
+                                                                    16,
                                                                 constraints:
                                                                     const BoxConstraints(
                                                                   minWidth: 32,
@@ -1079,7 +1080,8 @@ class _LeadsPageState extends State<LeadsPage> {
                                                                   source,
                                                                   setDialogState,
                                                                 ),
-                                                                icon: const Icon(
+                                                                icon:
+                                                                    const Icon(
                                                                   Icons
                                                                       .delete_outline,
                                                                   color: AppColors
@@ -2534,17 +2536,17 @@ class _LeadsPageState extends State<LeadsPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _openBulkPhoneRequestSheet,
-                        icon: const Icon(Icons.phone_outlined, size: 16),
-                        label: const Text('Request Phone Access'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 40),
-                        ),
-                      ),
-                    ),
+                    // SizedBox(
+                    //   width: double.infinity,
+                    //   child: OutlinedButton.icon(
+                    //     onPressed: _openBulkPhoneRequestSheet,
+                    //     icon: const Icon(Icons.phone_outlined, size: 16),
+                    //     label: const Text('Request Phone Access'),
+                    //     style: OutlinedButton.styleFrom(
+                    //       minimumSize: const Size(double.infinity, 40),
+                    //     ),
+                    //   ),
+                    // ),
                     const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,

@@ -233,10 +233,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
         return null;
       }
 
-      final nestedProject =
-          selectedLead['project'] is Map<String, dynamic>
-              ? selectedLead['project'] as Map<String, dynamic>
-              : null;
+      final nestedProject = selectedLead['project'] is Map<String, dynamic>
+          ? selectedLead['project'] as Map<String, dynamic>
+          : null;
 
       final projectName = _readString(
         selectedLead['project_name'] ??
@@ -398,11 +397,10 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               selectedLeadId = v;
                               final linkedProjectId =
                                   resolveLeadLinkedProjectId(v);
-                              selectedProjectId =
-                                  (linkedProjectId != null &&
-                                          linkedProjectId.isNotEmpty)
-                                      ? linkedProjectId
-                                      : null;
+                              selectedProjectId = (linkedProjectId != null &&
+                                      linkedProjectId.isNotEmpty)
+                                  ? linkedProjectId
+                                  : null;
                             });
                           },
                         ),

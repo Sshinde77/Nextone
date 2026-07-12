@@ -707,12 +707,10 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: () =>
-                                  Navigator.of(sheetContext).pop(),
+                              onPressed: () => Navigator.of(sheetContext).pop(),
                               style: OutlinedButton.styleFrom(
                                 minimumSize: const Size.fromHeight(46),
-                                side:
-                                    const BorderSide(color: AppColors.border),
+                                side: const BorderSide(color: AppColors.border),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
