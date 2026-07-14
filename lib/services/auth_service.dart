@@ -1998,10 +1998,18 @@ class AuthService {
     );
   }
 
-  Future<ExportFileResult> exportSiteVisits({String? token}) async {
+  Future<ExportFileResult> exportSiteVisits({
+    required String from,
+    required String to,
+    String? token,
+  }) async {
     final resolvedToken = token ?? _authToken;
     final uri =
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportSiteVisits}');
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportSiteVisits}')
+            .replace(queryParameters: <String, String>{
+      'from': from.trim(),
+      'to': to.trim(),
+    });
     final headers = _headers(
       accept:
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -2024,8 +2032,8 @@ class AuthService {
       throw Exception(error);
     }
     final disposition = response.headers['content-disposition'] ?? '';
-    final fileName =
-        _readFileNameFromDisposition(disposition) ?? 'site_visits_export.xlsx';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'site_visits_${from}_to_$to.xlsx';
     final contentTypeHeader = response.headers['content-type'] ?? '';
     final contentType = contentTypeHeader.trim().isEmpty
         ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -2037,10 +2045,65 @@ class AuthService {
     );
   }
 
-  Future<ExportFileResult> exportFollowUps({String? token}) async {
+  Future<ExportFileResult> exportSiteRevisits({
+    required String from,
+    required String to,
+    String? token,
+  }) async {
     final resolvedToken = token ?? _authToken;
     final uri =
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportFollowUps}');
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportSiteRevisits}')
+            .replace(queryParameters: <String, String>{
+      'from': from.trim(),
+      'to': to.trim(),
+    });
+    final headers = _headers(
+      accept:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      token: resolvedToken,
+    );
+    _logRequest(
+      endpoint: 'exportSiteRevisits',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('exportSiteRevisits', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to export site re-visits.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'site_revisits_${from}_to_$to.xlsx';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    final contentType = contentTypeHeader.trim().isEmpty
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : contentTypeHeader;
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
+  Future<ExportFileResult> exportFollowUps({
+    required String from,
+    required String to,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportFollowUps}')
+            .replace(queryParameters: <String, String>{
+      'from': from.trim(),
+      'to': to.trim(),
+    });
     final headers = _headers(
       accept:
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -2063,8 +2126,8 @@ class AuthService {
       throw Exception(error);
     }
     final disposition = response.headers['content-disposition'] ?? '';
-    final fileName =
-        _readFileNameFromDisposition(disposition) ?? 'follow_ups_export.xlsx';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'follow_ups_${from}_to_$to.xlsx';
     final contentTypeHeader = response.headers['content-type'] ?? '';
     final contentType = contentTypeHeader.trim().isEmpty
         ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -2115,9 +2178,63 @@ class AuthService {
     );
   }
 
-  Future<ExportFileResult> exportUsers({String? token}) async {
+  Future<ExportFileResult> exportClosures({
+    required String from,
+    required String to,
+    String? token,
+  }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportUsers}');
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportClosures}')
+        .replace(queryParameters: <String, String>{
+      'from': from.trim(),
+      'to': to.trim(),
+    });
+    final headers = _headers(
+      accept:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      token: resolvedToken,
+    );
+    _logRequest(
+      endpoint: 'exportClosures',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('exportClosures', response);
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to export closures.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName =
+        _readFileNameFromDisposition(disposition) ?? 'closures_${from}_to_$to.xlsx';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    final contentType = contentTypeHeader.trim().isEmpty
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : contentTypeHeader;
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentType,
+    );
+  }
+
+  Future<ExportFileResult> exportUsers({
+    required String from,
+    required String to,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportUsers}')
+        .replace(queryParameters: <String, String>{
+      'from': from.trim(),
+      'to': to.trim(),
+    });
     final headers = _headers(
       accept:
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -2141,7 +2258,7 @@ class AuthService {
     }
     final disposition = response.headers['content-disposition'] ?? '';
     final fileName =
-        _readFileNameFromDisposition(disposition) ?? 'users_export.xlsx';
+        _readFileNameFromDisposition(disposition) ?? 'users_${from}_to_$to.xlsx';
     final contentTypeHeader = response.headers['content-type'] ?? '';
     final contentType = contentTypeHeader.trim().isEmpty
         ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -5971,6 +6088,7 @@ class AuthService {
     String alternatePhoneNumber = '',
     required String email,
     required String source,
+    String status = '',
     String callbackTime = '',
     String nextFollowUpTime = '',
     required String assignedTo,
@@ -5981,6 +6099,8 @@ class AuthService {
     String configuration = '',
     required String notes,
     List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> paymentProof = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> photos = const <Map<String, dynamic>>[],
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
@@ -5993,6 +6113,7 @@ class AuthService {
       'alternate_phone_number': alternatePhoneNumber.trim(),
       'email': email.trim(),
       'source': source.trim(),
+      'status': status.trim(),
       'callback_time': callbackTime.trim(),
       'next_followup_time': nextFollowUpTime.trim(),
       'assigned_to': assignedTo.trim(),
@@ -6008,6 +6129,12 @@ class AuthService {
     );
     if (callRecordings.isNotEmpty) {
       requestPayload['call_recordings'] = callRecordings;
+    }
+    if (paymentProof.isNotEmpty) {
+      requestPayload['payment_proof'] = paymentProof;
+    }
+    if (photos.isNotEmpty) {
+      requestPayload['photos'] = photos;
     }
     final body = jsonEncode(requestPayload);
 
@@ -6049,6 +6176,7 @@ class AuthService {
     required String id,
     required String phone,
     String source = '',
+    String status = '',
     String callbackTime = '',
     String nextFollowUpTime = '',
     String assignedTo = '',
@@ -6058,6 +6186,8 @@ class AuthService {
     required String locationPreference,
     String configuration = '',
     List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> paymentProof = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> photos = const <Map<String, dynamic>>[],
     String? token,
   }) async {
     final normalizedId = id.trim();
@@ -6072,6 +6202,7 @@ class AuthService {
     final requestPayload = <String, dynamic>{
       'phone': phone.trim(),
       'source': source.trim(),
+      'status': status.trim(),
       'callback_time': callbackTime.trim(),
       'next_followup_time': nextFollowUpTime.trim(),
       'assigned_to': assignedTo.trim(),
@@ -6086,6 +6217,12 @@ class AuthService {
     );
     if (callRecordings.isNotEmpty) {
       requestPayload['call_recordings'] = callRecordings;
+    }
+    if (paymentProof.isNotEmpty) {
+      requestPayload['payment_proof'] = paymentProof;
+    }
+    if (photos.isNotEmpty) {
+      requestPayload['photos'] = photos;
     }
     final body = jsonEncode(requestPayload);
 
@@ -9442,6 +9579,10 @@ class AuthService {
     final resolvedToken = token ?? _authToken;
     final uri = Uri.parse(
       '${ApiConstants.baseUrl}${ApiConstants.leadStatusesConfig}',
+    ).replace(
+      queryParameters: const <String, String>{
+        'include_inactive': 'false',
+      },
     );
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(

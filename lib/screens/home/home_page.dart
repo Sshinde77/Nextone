@@ -843,10 +843,16 @@ class _HeaderBlockState extends State<_HeaderBlock> {
             to: range.to,
             token: token,
           ),
-        _ExportModuleType.siteVisits =>
-          await _authProvider.exportSiteVisits(token: token),
-        _ExportModuleType.followUps =>
-          await _authProvider.exportFollowUps(token: token),
+        _ExportModuleType.siteVisits => await _authProvider.exportSiteVisits(
+            from: range.from,
+            to: range.to,
+            token: token,
+          ),
+        _ExportModuleType.followUps => await _authProvider.exportFollowUps(
+            from: range.from,
+            to: range.to,
+            token: token,
+          ),
         _ExportModuleType.attendance => await _authProvider.exportAttendance(
             from: range.from,
             to: range.to,
@@ -854,8 +860,11 @@ class _HeaderBlockState extends State<_HeaderBlock> {
           ),
         _ExportModuleType.projects =>
           await _authProvider.exportProjects(token: token),
-        _ExportModuleType.teamMembers =>
-          await _authProvider.exportUsers(token: token),
+        _ExportModuleType.teamMembers => await _authProvider.exportUsers(
+            from: range.from,
+            to: range.to,
+            token: token,
+          ),
         _ExportModuleType.allModules =>
           await _authProvider.exportAll(token: token),
       };

@@ -474,20 +474,68 @@ class AuthProvider {
     );
   }
 
-  Future<ExportFileResult> exportSiteVisits({String? token}) {
-    return _authService.exportSiteVisits(token: token);
+  Future<ExportFileResult> exportSiteVisits({
+    required String from,
+    required String to,
+    String? token,
+  }) {
+    return _authService.exportSiteVisits(
+      from: from,
+      to: to,
+      token: token,
+    );
   }
 
-  Future<ExportFileResult> exportFollowUps({String? token}) {
-    return _authService.exportFollowUps(token: token);
+  Future<ExportFileResult> exportSiteRevisits({
+    required String from,
+    required String to,
+    String? token,
+  }) {
+    return _authService.exportSiteRevisits(
+      from: from,
+      to: to,
+      token: token,
+    );
+  }
+
+  Future<ExportFileResult> exportFollowUps({
+    required String from,
+    required String to,
+    String? token,
+  }) {
+    return _authService.exportFollowUps(
+      from: from,
+      to: to,
+      token: token,
+    );
   }
 
   Future<ExportFileResult> exportProjects({String? token}) {
     return _authService.exportProjects(token: token);
   }
 
-  Future<ExportFileResult> exportUsers({String? token}) {
-    return _authService.exportUsers(token: token);
+  Future<ExportFileResult> exportClosures({
+    required String from,
+    required String to,
+    String? token,
+  }) {
+    return _authService.exportClosures(
+      from: from,
+      to: to,
+      token: token,
+    );
+  }
+
+  Future<ExportFileResult> exportUsers({
+    required String from,
+    required String to,
+    String? token,
+  }) {
+    return _authService.exportUsers(
+      from: from,
+      to: to,
+      token: token,
+    );
   }
 
   Future<ExportFileResult> exportAttendance({
@@ -1487,6 +1535,7 @@ class AuthProvider {
     String alternatePhoneNumber = '',
     required String email,
     required String source,
+    String status = '',
     String callbackTime = '',
     String nextFollowUpTime = '',
     required String assignedTo,
@@ -1497,6 +1546,8 @@ class AuthProvider {
     String configuration = '',
     required String notes,
     List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> paymentProof = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> photos = const <Map<String, dynamic>>[],
     String? token,
   }) {
     return _authService.createLead(
@@ -1505,6 +1556,7 @@ class AuthProvider {
       alternatePhoneNumber: alternatePhoneNumber,
       email: email,
       source: source,
+      status: status,
       callbackTime: callbackTime,
       nextFollowUpTime: nextFollowUpTime,
       assignedTo: assignedTo,
@@ -1515,6 +1567,8 @@ class AuthProvider {
       configuration: configuration,
       notes: notes,
       callRecordings: callRecordings,
+      paymentProof: paymentProof,
+      photos: photos,
       token: token,
     );
   }
@@ -1523,6 +1577,7 @@ class AuthProvider {
     required String id,
     required String phone,
     String source = '',
+    String status = '',
     String callbackTime = '',
     String nextFollowUpTime = '',
     String assignedTo = '',
@@ -1532,12 +1587,15 @@ class AuthProvider {
     required String locationPreference,
     String configuration = '',
     List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> paymentProof = const <Map<String, dynamic>>[],
+    List<Map<String, dynamic>> photos = const <Map<String, dynamic>>[],
     String? token,
   }) {
     return _authService.editLead(
       id: id,
       phone: phone,
       source: source,
+      status: status,
       callbackTime: callbackTime,
       nextFollowUpTime: nextFollowUpTime,
       assignedTo: assignedTo,
@@ -1547,6 +1605,8 @@ class AuthProvider {
       locationPreference: locationPreference,
       configuration: configuration,
       callRecordings: callRecordings,
+      paymentProof: paymentProof,
+      photos: photos,
       token: token,
     );
   }

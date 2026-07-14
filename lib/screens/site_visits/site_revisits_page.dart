@@ -1,10 +1,12 @@
 // ignore_for_file: use_build_context_synchronously
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/site_visits/site_revisit_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -30,6 +32,7 @@ enum _RevisitScope { myItems, team }
 class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   final AuthProvider _authProvider = AuthProvider();
   final TextEditingController _searchController = TextEditingController();
+  bool _isExporting = false;
   bool _isLoading = false;
   String? _error;
   List<Map<String, dynamic>> _items = const <Map<String, dynamic>>[];
@@ -55,6 +58,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   }
 
   bool get _isMyScope => _selectedScope == _RevisitScope.myItems;
+  bool get _canExportData => RoleAccess.canExportModule('revisits');
   bool get _showScopeTabs =>
       _currentRole.isNotEmpty &&
       !RoleAccess.isSuperAdmin(_currentRole) &&
@@ -146,13 +150,31 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
 
             Align(
               alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: _openScheduleRevisit,
-                icon: const Icon(Icons.add),
-                label: const Text('Schedule Re-visit'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                ),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (_canExportData)
+                    OutlinedButton.icon(
+                      onPressed: _isExporting ? null : _exportSiteRevisits,
+                      icon: _isExporting
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.download_rounded, size: 16),
+                      label: Text(_isExporting ? 'Exporting...' : 'Export'),
+                    ),
+                  FilledButton.icon(
+                    onPressed: _openScheduleRevisit,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Schedule Re-visit'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 10),
@@ -386,6 +408,174 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     );
   }
 
+  Future<DateTimeRange?> _showExportDateRangeDialog() async {
+    final now = DateTime.now();
+    DateTime? fromDate;
+    DateTime? toDate;
+
+    return showDialog<DateTimeRange>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            String formatDate(DateTime? date) =>
+                date == null ? '' : _formatDateForApi(date);
+
+            Future<void> pickFromDate() async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: fromDate ?? now,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                fromDate = DateTime(picked.year, picked.month, picked.day);
+                if (toDate != null && toDate!.isBefore(fromDate!)) {
+                  toDate = fromDate;
+                }
+              });
+            }
+
+            Future<void> pickToDate() async {
+              final baseDate = toDate ?? fromDate ?? now;
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: baseDate,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                toDate = DateTime(picked.year, picked.month, picked.day);
+              });
+            }
+
+            final isValidRange = fromDate != null &&
+                toDate != null &&
+                !toDate!.isBefore(fromDate!);
+
+            Widget dateField({
+              required String label,
+              required String value,
+              required String placeholder,
+              required VoidCallback onTap,
+            }) {
+              return InkWell(
+                onTap: onTap,
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: label,
+                    hintText: 'YYYY-MM-DD',
+                    suffixIcon: const Icon(Icons.calendar_today_outlined),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  child: Text(value.isEmpty ? placeholder : value),
+                ),
+              );
+            }
+
+            return AlertDialog(
+              title: const Text('Export Re-visits'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  dateField(
+                    label: 'Start date',
+                    value: formatDate(fromDate),
+                    placeholder: 'Select start date',
+                    onTap: pickFromDate,
+                  ),
+                  const SizedBox(height: 12),
+                  dateField(
+                    label: 'End date',
+                    value: formatDate(toDate),
+                    placeholder: 'Select end date',
+                    onTap: pickToDate,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isValidRange
+                      ? () => Navigator.of(context).pop(
+                            DateTimeRange(start: fromDate!, end: toDate!),
+                          )
+                      : null,
+                  child: const Text('Export'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatDateForApi(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
+  }
+
+  Future<void> _exportSiteRevisits() async {
+    if (!_canExportData) {
+      _showSnackBar('You do not have permission to export re-visits.');
+      return;
+    }
+    final range = await _showExportDateRangeDialog();
+    if (!mounted || range == null) {
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    final from = _formatDateForApi(range.start);
+    final to = _formatDateForApi(range.end);
+    try {
+      final exported = await _authProvider.exportSiteRevisits(
+        from: from,
+        to: to,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      final safeFileName = exported.fileName.trim().isEmpty
+          ? 'site_revisits_${from}_to_$to.xlsx'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        _showSnackBar(
+          'Export generated ($safeFileName), but direct file save is not supported on Web in this build.',
+        );
+        return;
+      }
+      await ExportFileHelper.saveToDownloadNextone(
+        fileName: safeFileName,
+        bytes: exported.bytes,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is UnsupportedError
+          ? 'This platform does not support local file save for export yet.'
+          : AppErrorHandler.friendlyMessage(error);
+      _showSnackBar(message);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
   Widget _buildCard(Map<String, dynamic> item) {
     final leadName = _readString(item['lead_name'], fallback: 'N/A');
     final leadPhone = _readString(item['lead_phone'], fallback: 'N/A');
@@ -557,6 +747,12 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
         query.isEmpty || lead.contains(query) || project.contains(query);
     final statusMatch = _statusFilter == 'all' || status == _statusFilter;
     return textMatch && statusMatch;
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   int _countByStatus(String status) {

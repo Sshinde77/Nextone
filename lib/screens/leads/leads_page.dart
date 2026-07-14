@@ -48,6 +48,19 @@ class _LeadsPageState extends State<LeadsPage> {
     'Referral',
   ];
 
+  static const List<Color> _statusColorPalette = <Color>[
+    Color(0xFFEF4444),
+    Color(0xFF3B82F6),
+    Color(0xFF8B5CF6),
+    Color(0xFFF59E0B),
+    Color(0xFF10B981),
+    Color(0xFF6B7280),
+    Color(0xFFEC4899),
+    Color(0xFF0EA5E9),
+    Color(0xFF14B8A6),
+    Color(0xFF84CC16),
+  ];
+
   static const int _myLeadsTabIndex = 0;
   static const int _teamLeadsTabIndex = 1;
 
@@ -63,6 +76,8 @@ class _LeadsPageState extends State<LeadsPage> {
   String? _selectedAssigneeId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_LeadSourceOption> _leadSources = const <_LeadSourceOption>[];
+  List<_PipelineStatusOption> _pipelineStatuses =
+      const <_PipelineStatusOption>[];
 
   Timer? _searchDebounce;
   bool _isLoadingLeads = true;
@@ -119,6 +134,7 @@ class _LeadsPageState extends State<LeadsPage> {
     _loadAccess();
     _loadAssigneeOptions();
     _loadLeadSources();
+    _loadPipelineStatuses();
     _loadLeads();
   }
 
@@ -219,6 +235,26 @@ class _LeadsPageState extends State<LeadsPage> {
       setState(() {
         _isLoadingLeadSources = false;
       });
+    }
+  }
+
+  Future<void> _loadPipelineStatuses() async {
+    try {
+      final items = await _authProvider.leadStatusesConfig(
+        token: _authProvider.currentAuthToken,
+      );
+      final statuses = items.map(_PipelineStatusOption.fromApi).toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pipelineStatuses = statuses;
+      });
+    } catch (_) {
+      // Keep page usable without status-config data.
     }
   }
 
@@ -1114,6 +1150,530 @@ class _LeadsPageState extends State<LeadsPage> {
     );
 
     createController.dispose();
+  }
+
+  Future<void> _openManagePipelineStatusesDialog() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
+    final labelController = TextEditingController();
+    final colorController = TextEditingController(text: '#3B82F6');
+    Color selectedColor = _parseHexColor(colorController.text);
+    bool isSubmitting = false;
+
+    Future<void> refresh() async {
+      await _loadPipelineStatuses();
+    }
+
+    Future<void> createStatus(StateSetter setDialogState) async {
+      final label = labelController.text.trim();
+      if (label.isEmpty) {
+        _showSnackBar('Please enter status label.');
+        return;
+      }
+      setDialogState(() => isSubmitting = true);
+      try {
+        final key = label.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+        await _authProvider.createLeadStatus(
+          key: key,
+          label: label,
+          color: _toHexColor(selectedColor),
+          sortOrder: _pipelineStatuses.length + 1,
+          token: _authProvider.currentAuthToken,
+        );
+        labelController.clear();
+        selectedColor = _parseHexColor('#3B82F6');
+        colorController.text = _toHexColor(selectedColor);
+        await refresh();
+        if (!mounted) return;
+        _showSnackBar('Pipeline status created.');
+      } catch (error) {
+        if (!mounted) return;
+        _showSnackBar(AppErrorHandler.friendlyMessage(error));
+      } finally {
+        if (mounted) {
+          setDialogState(() => isSubmitting = false);
+        }
+      }
+    }
+
+    Future<void> pickColor(StateSetter setDialogState) async {
+      final picked = await _openColorPickerDialog(selectedColor);
+      if (picked == null) return;
+      setDialogState(() {
+        selectedColor = picked;
+        colorController.text = _toHexColor(picked);
+      });
+    }
+
+    Future<void> editStatus(
+      StateSetter setDialogState,
+      _PipelineStatusOption status,
+    ) async {
+      final editLabelController = TextEditingController(text: status.label);
+      Color editColor = _parseHexColor(status.color);
+      bool editActive = status.isActive;
+      bool editSubmitting = false;
+
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setEditState) {
+              return AlertDialog(
+                title: const Text('Edit Status'),
+                content: SizedBox(
+                  width: 320,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: editLabelController,
+                        decoration: _sheetFieldDecoration('Status label'),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: TextEditingController(
+                                text: _toHexColor(editColor),
+                              ),
+                              readOnly: true,
+                              decoration: _sheetFieldDecoration('Color'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () async {
+                              final picked =
+                                  await _openColorPickerDialog(editColor);
+                              if (picked == null) return;
+                              setEditState(() => editColor = picked);
+                            },
+                            child: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: editColor,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFD5DBE8)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Text('Active'),
+                          const Spacer(),
+                          Switch(
+                            value: editActive,
+                            onChanged: (v) => setEditState(() => editActive = v),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: editSubmitting
+                        ? null
+                        : () async {
+                            final label = editLabelController.text.trim();
+                            if (label.isEmpty) return;
+                            setEditState(() => editSubmitting = true);
+                            try {
+                              await _authProvider.updateLeadStatusConfig(
+                                id: status.id,
+                                label: label,
+                                color: _toHexColor(editColor),
+                                isActive: editActive,
+                                token: _authProvider.currentAuthToken,
+                              );
+                              await refresh();
+                              if (mounted) setDialogState(() {});
+                              if (context.mounted) Navigator.of(ctx).pop();
+                            } catch (error) {
+                              if (!mounted) return;
+                              _showSnackBar(
+                                AppErrorHandler.friendlyMessage(error),
+                              );
+                              if (context.mounted) {
+                                setEditState(() => editSubmitting = false);
+                              }
+                            }
+                          },
+                    child: const Text('Save'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+      editLabelController.dispose();
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final isCompact = width < 640;
+                final dialogWidth = width < 520 ? width * 0.98 : 720.0;
+                final dialogHeight =
+                    width < 520 ? constraints.maxHeight * 0.94 : 560.0;
+
+                return Dialog(
+                  insetPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: dialogWidth,
+                      maxHeight: dialogHeight,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Manage Pipeline Statuses',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(),
+                                icon: const Icon(Icons.close),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'ADD CUSTOM STATUS',
+                            style: TextStyle(
+                              fontSize: 9,
+                              letterSpacing: 0.3,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          if (isCompact)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                TextField(
+                                  controller: labelController,
+                                  decoration:
+                                      _sheetFieldDecoration('e.g. Warm Lead'),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    InkWell(
+                                      onTap: () => pickColor(setDialogState),
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        width: 70,
+                                        height: 34,
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: AppColors.border,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(
+                                              Icons.palette_outlined,
+                                              size: 12,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Container(
+                                              width: 14,
+                                              height: 14,
+                                              decoration: BoxDecoration(
+                                                color: selectedColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                border: Border.all(
+                                                  color:
+                                                      const Color(0xFFD5DBE8),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: FilledButton.icon(
+                                        onPressed: isSubmitting
+                                            ? null
+                                            : () =>
+                                                createStatus(setDialogState),
+                                        icon: const Icon(Icons.add, size: 12),
+                                        label: Text(
+                                          isSubmitting ? 'Adding...' : 'Add',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            )
+                          else
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: labelController,
+                                    decoration: _sheetFieldDecoration(
+                                      'e.g. Warm Lead',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                InkWell(
+                                  onTap: () => pickColor(setDialogState),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    width: 70,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: AppColors.border,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(
+                                          Icons.palette_outlined,
+                                          size: 12,
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Container(
+                                          width: 14,
+                                          height: 14,
+                                          decoration: BoxDecoration(
+                                            color: selectedColor,
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                            border: Border.all(
+                                              color: const Color(0xFFD5DBE8),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                FilledButton.icon(
+                                  onPressed: isSubmitting
+                                      ? null
+                                      : () => createStatus(setDialogState),
+                                  icon: const Icon(Icons.add, size: 12),
+                                  label:
+                                      Text(isSubmitting ? 'Adding...' : 'Add'),
+                                ),
+                              ],
+                            ),
+                          const SizedBox(height: 4),
+                          Expanded(
+                            child: _pipelineStatuses.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'No statuses found.',
+                                      style: TextStyle(fontSize: 11),
+                                    ),
+                                  )
+                                : DataTable(
+                                    columnSpacing: isCompact ? 6 : 10,
+                                    horizontalMargin: 4,
+                                    headingRowHeight: 24,
+                                    dataRowMinHeight: 36,
+                                    dataRowMaxHeight: 40,
+                                    headingTextStyle: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    dataTextStyle: const TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                    columns: const [
+                                      DataColumn(label: Text('STATUS LABEL')),
+                                      DataColumn(label: Text('PREVIEW')),
+                                      DataColumn(label: Text('VISIBILITY')),
+                                      DataColumn(label: Text('ACTIONS')),
+                                    ],
+                                    rows: _pipelineStatuses
+                                        .map(
+                                          (s) => DataRow(
+                                            cells: [
+                                              DataCell(
+                                                ConstrainedBox(
+                                                  constraints:
+                                                      const BoxConstraints(
+                                                    minWidth: 110,
+                                                    maxWidth: 130,
+                                                  ),
+                                                  child: Text(
+                                                    s.label,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ),
+                                              DataCell(
+                                                Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 3,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        _parseHexColor(s.color),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                      12,
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    s.label,
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize: 9,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              DataCell(
+                                                Switch(
+                                                  value: s.isActive,
+                                                  materialTapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap,
+                                                  onChanged: (v) async {
+                                                    await _authProvider
+                                                        .updateLeadStatusConfig(
+                                                      id: s.id,
+                                                      label: s.label,
+                                                      color: s.color,
+                                                      isActive: v,
+                                                      token: _authProvider
+                                                          .currentAuthToken,
+                                                    );
+                                                    await refresh();
+                                                    setDialogState(() {});
+                                                  },
+                                                ),
+                                              ),
+                                              DataCell(
+                                                Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    IconButton(
+                                                      icon: const Icon(
+                                                        Icons.edit_outlined,
+                                                        size: 15,
+                                                      ),
+                                                      padding: EdgeInsets.zero,
+                                                      constraints:
+                                                          const BoxConstraints(
+                                                        minWidth: 24,
+                                                        minHeight: 24,
+                                                      ),
+                                                      onPressed: () =>
+                                                          editStatus(
+                                                        setDialogState,
+                                                        s,
+                                                      ),
+                                                    ),
+                                                    IconButton(
+                                                      icon: const Icon(
+                                                        Icons
+                                                            .delete_outline_rounded,
+                                                        size: 15,
+                                                      ),
+                                                      padding: EdgeInsets.zero,
+                                                      constraints:
+                                                          const BoxConstraints(
+                                                        minWidth: 24,
+                                                        minHeight: 24,
+                                                      ),
+                                                      onPressed: () async {
+                                                        await _authProvider
+                                                            .deleteLeadStatusConfig(
+                                                          id: s.id,
+                                                          token: _authProvider
+                                                              .currentAuthToken,
+                                                        );
+                                                        await refresh();
+                                                        setDialogState(() {});
+                                                      },
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+    labelController.dispose();
   }
 
   void _changePage(int page) {
@@ -2173,6 +2733,171 @@ class _LeadsPageState extends State<LeadsPage> {
     );
   }
 
+  Color _parseHexColor(String input) {
+    final normalized = input.trim().replaceAll('#', '');
+    final value = normalized.length == 6 ? 'FF$normalized' : normalized;
+    final parsed = int.tryParse(value, radix: 16);
+    if (parsed == null) return const Color(0xFF3B82F6);
+    return Color(parsed);
+  }
+
+  String _toHexColor(Color color) {
+    final value =
+        color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase();
+    return '#${value.substring(2)}';
+  }
+
+  Future<Color?> _openColorPickerDialog(Color initial) async {
+    Color temp = initial;
+    int red = ((temp.r * 255).round()).clamp(0, 255);
+    int green = ((temp.g * 255).round()).clamp(0, 255);
+    int blue = ((temp.b * 255).round()).clamp(0, 255);
+    return showDialog<Color>(
+      context: context,
+      builder: (ctx) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final dialogWidth = width < 380 ? width * 0.96 : 360.0;
+            return AlertDialog(
+              contentPadding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+              content: SizedBox(
+                width: dialogWidth,
+                child: StatefulBuilder(
+                  builder: (context, setColorState) {
+                    void applyRgb() {
+                      temp = Color.fromARGB(255, red, green, blue);
+                    }
+
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          height: 54,
+                          decoration: BoxDecoration(
+                            color: temp,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFD5DBE8)),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _statusColorPalette
+                              .map(
+                                (c) => GestureDetector(
+                                  onTap: () {
+                                    setColorState(() {
+                                      temp = c;
+                                      red = ((c.r * 255).round()).clamp(0, 255);
+                                      green =
+                                          ((c.g * 255).round()).clamp(0, 255);
+                                      blue =
+                                          ((c.b * 255).round()).clamp(0, 255);
+                                    });
+                                  },
+                                  child: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: c,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: c.toARGB32() == temp.toARGB32()
+                                            ? AppColors.primary
+                                            : const Color(0xFFD5DBE8),
+                                        width:
+                                            c.toARGB32() == temp.toARGB32() ? 2 : 1,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                        const SizedBox(height: 10),
+                        _buildRgbSlider(
+                          label: 'R',
+                          value: red.toDouble(),
+                          onChanged: (v) => setColorState(() {
+                            red = v.round();
+                            applyRgb();
+                          }),
+                          display: '$red',
+                        ),
+                        _buildRgbSlider(
+                          label: 'G',
+                          value: green.toDouble(),
+                          onChanged: (v) => setColorState(() {
+                            green = v.round();
+                            applyRgb();
+                          }),
+                          display: '$green',
+                        ),
+                        _buildRgbSlider(
+                          label: 'B',
+                          value: blue.toDouble(),
+                          onChanged: (v) => setColorState(() {
+                            blue = v.round();
+                            applyRgb();
+                          }),
+                          display: '$blue',
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '${_toHexColor(temp)}  RGB($red, $green, $blue)',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(temp),
+                  child: const Text('Use Color'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRgbSlider({
+    required String label,
+    required double value,
+    required ValueChanged<double> onChanged,
+    required String display,
+  }) {
+    return Row(
+      children: [
+        SizedBox(width: 20, child: Text(label)),
+        Expanded(
+          child: Slider(
+            value: value,
+            min: 0,
+            max: 255,
+            onChanged: onChanged,
+          ),
+        ),
+        SizedBox(width: 34, child: Text(display)),
+      ],
+    );
+  }
+
   String _readString(dynamic value) {
     if (value is String) {
       return value.trim();
@@ -2356,27 +3081,28 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
         );
 
-        final exportButton = null;
-        // final exportButton = _canExportData
-        //     ? OutlinedButton.icon(
-        //         onPressed: _isExporting ? null : _exportLeads,
-        //         icon: _isExporting
-        //             ? const SizedBox(
-        //                 width: 16,
-        //                 height: 16,
-        //                 child: CircularProgressIndicator(strokeWidth: 2),
-        //               )
-        //             : const Icon(Icons.download_rounded, size: 18),
-        //         label: Text(_isExporting ? 'Exporting...' : 'Export'),
-        //         style: OutlinedButton.styleFrom(
-        //           minimumSize: const Size(0, 48),
-        //           padding: const EdgeInsets.symmetric(horizontal: 14),
-        //           shape: RoundedRectangleBorder(
-        //             borderRadius: BorderRadius.circular(12),
-        //           ),
-        //         ),
-        //       )
-        //     : null;
+        final exportButton = _canExportData
+            ? OutlinedButton.icon(
+                onPressed: _isExporting ? null : _exportLeads,
+                icon: _isExporting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download_rounded, size: 16),
+                label: Text(_isExporting ? 'Exporting...' : 'Export'),
+                style: OutlinedButton.styleFrom(
+                  fixedSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  side: const BorderSide(color: AppColors.border),
+                  backgroundColor: AppColors.card,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              )
+            : null;
 
         final bulkButton = _canUseBulkLeadTools
             ? OutlinedButton.icon(
@@ -2426,6 +3152,29 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
         );
 
+        final manageStatusButton = OutlinedButton.icon(
+          onPressed: _openManagePipelineStatusesDialog,
+          icon: const Icon(Icons.tune_outlined, size: 16),
+          label: const FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'Manage Status',
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            fixedSize: const Size.fromHeight(48),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            side: const BorderSide(color: AppColors.border),
+            backgroundColor: AppColors.card,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+
         final addButton = FilledButton.icon(
           onPressed: _openCreateLead,
           icon: const Icon(Icons.add, size: 16),
@@ -2448,22 +3197,30 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
         );
 
-        Widget actionButtonsRow() {
+        Widget firstActionRow() {
           return Row(
             children: [
-              if (exportButton != null) ...[
-                Expanded(child: exportButton),
-                const SizedBox(width: 8),
-              ],
               if (bulkButton != null) ...[
                 Expanded(child: bulkButton),
                 const SizedBox(width: 8),
               ],
               Expanded(child: filterButton),
               const SizedBox(width: 8),
+              Expanded(child: addButton),
+            ],
+          );
+        }
+
+        Widget secondActionRow() {
+          return Row(
+            children: [
               Expanded(child: addSourceButton),
               const SizedBox(width: 8),
-              Expanded(child: addButton),
+              Expanded(child: manageStatusButton),
+              if (exportButton != null) ...[
+                const SizedBox(width: 8),
+                Expanded(child: exportButton),
+              ],
             ],
           );
         }
@@ -2473,20 +3230,37 @@ class _LeadsPageState extends State<LeadsPage> {
             children: [
               searchField,
               const SizedBox(height: 12),
-              actionButtonsRow(),
+              firstActionRow(),
+              const SizedBox(height: 8),
+              secondActionRow(),
             ],
           );
         }
 
-        return Row(
+        return Column(
           children: [
-            Expanded(child: searchField),
-            const SizedBox(width: 12),
-            Flexible(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: actionButtonsRow(),
-              ),
+            searchField,
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: firstActionRow(),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: secondActionRow(),
+                  ),
+                ),
+              ],
             ),
           ],
         );
@@ -2536,18 +3310,6 @@ class _LeadsPageState extends State<LeadsPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // SizedBox(
-                    //   width: double.infinity,
-                    //   child: OutlinedButton.icon(
-                    //     onPressed: _openBulkPhoneRequestSheet,
-                    //     icon: const Icon(Icons.phone_outlined, size: 16),
-                    //     label: const Text('Request Phone Access'),
-                    //     style: OutlinedButton.styleFrom(
-                    //       minimumSize: const Size(double.infinity, 40),
-                    //     ),
-                    //   ),
-                    // ),
-                    const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -2577,35 +3339,20 @@ class _LeadsPageState extends State<LeadsPage> {
 
               return Column(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isSubmittingReassign
-                              ? null
-                              : _openBulkAssignSheet,
-                          icon: const Icon(
-                            Icons.person_add_alt_1_outlined,
-                            size: 16,
-                          ),
-                          label: const Text('Reassign'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 40),
-                          ),
-                        ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed:
+                          _isSubmittingReassign ? null : _openBulkAssignSheet,
+                      icon: const Icon(
+                        Icons.person_add_alt_1_outlined,
+                        size: 16,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _openBulkPhoneRequestSheet,
-                          icon: const Icon(Icons.phone_outlined, size: 16),
-                          label: const Text('Request Phone Access'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 40),
-                          ),
-                        ),
+                      label: const Text('Reassign'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 40),
                       ),
-                    ],
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -3048,6 +3795,54 @@ class _LeadSourceOption {
       isActive: readBool(
         json['is_active'] ?? json['isActive'] ?? json['active'] ?? true,
       ),
+    );
+  }
+}
+
+class _PipelineStatusOption {
+  const _PipelineStatusOption({
+    required this.id,
+    required this.key,
+    required this.label,
+    required this.color,
+    required this.sortOrder,
+    required this.isActive,
+  });
+
+  final String id;
+  final String key;
+  final String label;
+  final String color;
+  final int sortOrder;
+  final bool isActive;
+
+  factory _PipelineStatusOption.fromApi(Map<String, dynamic> json) {
+    String read(dynamic value) {
+      if (value is String) return value.trim();
+      if (value is num || value is bool) return value.toString().trim();
+      return '';
+    }
+
+    int readInt(dynamic value) {
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse(read(value)) ?? 0;
+    }
+
+    bool readBool(dynamic value) {
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      final normalized = read(value).toLowerCase();
+      return normalized == 'true' || normalized == '1' || normalized == 'yes';
+    }
+
+    return _PipelineStatusOption(
+      id: read(json['id'] ?? json['status_id'] ?? json['uuid']),
+      key: read(json['key']),
+      label: read(json['label']),
+      color: read(json['color']),
+      sortOrder: readInt(json['sort_order'] ?? json['sortOrder']),
+      isActive: readBool(json['is_active'] ?? json['isActive'] ?? true),
     );
   }
 }

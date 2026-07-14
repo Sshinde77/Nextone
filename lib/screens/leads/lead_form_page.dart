@@ -55,22 +55,28 @@ class _LeadFormPageState extends State<LeadFormPage> {
   bool _isSubmitting = false;
   bool _isLoadingAssignees = true;
   bool _isLoadingLeadSources = true;
+  bool _isLoadingLeadStatuses = true;
   bool _isLoadingProjects = true;
   bool _isLoadingLeadDetails = false;
   String? _assigneeLoadError;
   String? _leadSourceLoadError;
+  String? _leadStatusLoadError;
   String? _projectLoadError;
   String? _selectedAssigneeId;
   String? _selectedLeadSource;
+  String? _selectedLeadStatus;
   String? _selectedProjectId;
   bool _useManualProjectInput = false;
   String _currentUserRole = '';
   String? _currentUserId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_LeadSourceOption> _leadSourceOptions = const <_LeadSourceOption>[];
+  List<_LeadStatusOption> _leadStatusOptions = const <_LeadStatusOption>[];
   List<_ProjectOption> _projectOptions = const <_ProjectOption>[];
   List<String> _selectedConfigurations = <String>[];
   PlatformFile? _selectedCallRecordingFile;
+  List<PlatformFile> _selectedPaymentProofFiles = const <PlatformFile>[];
+  List<PlatformFile> _selectedPhotoFiles = const <PlatformFile>[];
 
   @override
   void initState() {
@@ -81,6 +87,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
     _loadCurrentUserContext();
     _loadAssigneeOptions();
     _loadLeadSourceOptions();
+    _loadLeadStatusOptions();
     _loadProjectOptions();
   }
 
@@ -129,6 +136,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
     );
     _emailController.text = _readString(data['email']);
     _selectedLeadSource = _readString(data['source']);
+    _selectedLeadStatus = _readString(data['status'] ?? data['stage']);
     _callbackTimeController.text = _readString(
       data['callback_time'] ?? data['callbackTime'],
     );
@@ -315,6 +323,51 @@ class _LeadFormPageState extends State<LeadFormPage> {
         _isLoadingLeadSources = false;
         _leadSourceOptions = const <_LeadSourceOption>[];
         _leadSourceLoadError = AppErrorHandler.friendlyMessage(error);
+      });
+    }
+  }
+
+  Future<void> _loadLeadStatusOptions() async {
+    setState(() {
+      _isLoadingLeadStatuses = true;
+      _leadStatusLoadError = null;
+    });
+
+    try {
+      final items = await _authProvider.leadStatusesConfig(
+        token: _authProvider.currentAuthToken,
+      );
+      final options = items
+          .map(_LeadStatusOption.fromApi)
+          .where((option) => option.isActive && option.label.isNotEmpty)
+          .toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _leadStatusOptions = options;
+        _isLoadingLeadStatuses = false;
+        if (_selectedLeadStatus != null &&
+            _selectedLeadStatus!.isNotEmpty &&
+            !options.any(
+              (option) =>
+                  option.key == _selectedLeadStatus ||
+                  option.label == _selectedLeadStatus,
+            )) {
+          _selectedLeadStatus = null;
+        }
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingLeadStatuses = false;
+        _leadStatusOptions = const <_LeadStatusOption>[];
+        _leadStatusLoadError = AppErrorHandler.friendlyMessage(error);
       });
     }
   }
@@ -756,6 +809,69 @@ class _LeadFormPageState extends State<LeadFormPage> {
     });
   }
 
+  Future<void> _pickPaymentProofFiles() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowMultiple: true,
+      allowedExtensions: const <String>[
+        'pdf',
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+      ],
+    );
+    if (!mounted || picked == null || picked.files.isEmpty) {
+      return;
+    }
+    setState(() {
+      _selectedPaymentProofFiles = List<PlatformFile>.from(picked.files);
+    });
+  }
+
+  Future<void> _pickPhotoFiles() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: true,
+    );
+    if (!mounted || picked == null || picked.files.isEmpty) {
+      return;
+    }
+    setState(() {
+      _selectedPhotoFiles = List<PlatformFile>.from(picked.files);
+    });
+  }
+
+  bool get _isEoiStatus {
+    final normalized = (_selectedLeadStatus ?? '').trim().toLowerCase();
+    return normalized == 'eoi';
+  }
+
+  List<Map<String, dynamic>> _buildPaymentProofPayload() {
+    return _selectedPaymentProofFiles
+        .map(
+          (file) => <String, dynamic>{
+            'url': file.path?.trim() ?? '',
+            'name': file.name.trim(),
+            'amount': '',
+          },
+        )
+        .where((item) => (_readString(item['url'])).isNotEmpty)
+        .toList(growable: false);
+  }
+
+  List<Map<String, dynamic>> _buildPhotoPayload() {
+    return _selectedPhotoFiles
+        .map(
+          (file) => <String, dynamic>{
+            'url': file.path?.trim() ?? '',
+            'name': file.name.trim(),
+          },
+        )
+        .where((item) => (_readString(item['url'])).isNotEmpty)
+        .toList(growable: false);
+  }
+
   String? _extractLeadId(dynamic value) {
     if (value is Map<String, dynamic>) {
       final direct = _readString(
@@ -823,6 +939,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           id: leadId,
           phone: _phoneController.text.trim(),
           source: _resolveSelectedLeadSource(),
+          status: _selectedLeadStatus?.trim() ?? '',
           callbackTime: _callbackTimeController.text.trim(),
           nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
           assignedTo: _selectedAssigneeId?.trim() ?? '',
@@ -831,6 +948,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           configuration: _configurationController.text.trim(),
+          paymentProof: _isEoiStatus ? _buildPaymentProofPayload() : const [],
+          photos: _isEoiStatus ? _buildPhotoPayload() : const [],
           token: _authProvider.currentAuthToken,
         );
         await _uploadSelectedCallRecording(leadId);
@@ -841,6 +960,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           alternatePhoneNumber: _alternatePhoneController.text.trim(),
           email: _emailController.text.trim(),
           source: _resolveSelectedLeadSource(),
+          status: _selectedLeadStatus?.trim() ?? '',
           callbackTime: _callbackTimeController.text.trim(),
           nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
           assignedTo: _resolveAssignedToForCreate(),
@@ -850,6 +970,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
           locationPreference: _locationPreferenceController.text.trim(),
           configuration: _configurationController.text.trim(),
           notes: _notesController.text.trim(),
+          paymentProof: _isEoiStatus ? _buildPaymentProofPayload() : const [],
+          photos: _isEoiStatus ? _buildPhotoPayload() : const [],
           token: _authProvider.currentAuthToken,
         );
         final createdLeadId = _extractLeadId(createdLead);
@@ -1066,6 +1188,55 @@ class _LeadFormPageState extends State<LeadFormPage> {
                       },
                     ),
                     const SizedBox(height: 12),
+                    SearchableDropdownField<String>(
+                      label: 'Status',
+                      value: _selectedLeadStatus,
+                      hintText: _isLoadingLeadStatuses
+                          ? 'Loading statuses...'
+                          : _leadStatusOptions.isEmpty
+                              ? 'No statuses available'
+                              : 'Select status',
+                      items: _leadStatusOptions
+                          .map(
+                            (option) => SearchableDropdownItem<String>(
+                              value: option.key,
+                              label: option.label,
+                            ),
+                          )
+                          .toList(),
+                      isLoading: _isLoadingLeadStatuses,
+                      errorText: _leadStatusLoadError,
+                      onRetry: _loadLeadStatusOptions,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedLeadStatus = value;
+                          if (!_isEoiStatus) {
+                            _selectedPaymentProofFiles =
+                                const <PlatformFile>[];
+                            _selectedPhotoFiles = const <PlatformFile>[];
+                          }
+                        });
+                      },
+                    ),
+                    if (_isEoiStatus) ...[
+                      const SizedBox(height: 12),
+                      _buildFilePickerCard(
+                        title: 'Payment Proof',
+                        buttonLabel: 'Upload Document',
+                        emptyText: 'No payment proof selected',
+                        files: _selectedPaymentProofFiles,
+                        onPick: _pickPaymentProofFiles,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildFilePickerCard(
+                        title: 'Photos',
+                        buttonLabel: 'Upload Photos',
+                        emptyText: 'No photos selected',
+                        files: _selectedPhotoFiles,
+                        onPick: _pickPhotoFiles,
+                      ),
+                    ],
+                    const SizedBox(height: 12),
                     _buildDateTimeField(
                       controller: _callbackTimeController,
                       label: 'Callback Time',
@@ -1096,7 +1267,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
                     const SizedBox(height: 12),
                     _buildTextField(
                       controller: _notesController,
-                      label: 'Notes',
+                      label: 'Remark',
                       hintText: 'Interested buyer, wants sea view',
                       minLines: 3,
                       maxLines: 5,
@@ -1383,6 +1554,70 @@ class _LeadFormPageState extends State<LeadFormPage> {
     );
   }
 
+  Widget _buildFilePickerCard({
+    required String title,
+    required String buttonLabel,
+    required String emptyText,
+    required List<PlatformFile> files,
+    required VoidCallback onPick,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _isSubmitting ? null : onPick,
+                icon: const Icon(Icons.attach_file_rounded),
+                label: Text(buttonLabel),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (files.isEmpty)
+            Text(
+              emptyText,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            )
+          else
+            ...files.map(
+              (file) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  file.name,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   InputDecoration _fieldDecoration({required String hintText}) {
     return InputDecoration(
       hintText: hintText,
@@ -1457,6 +1692,63 @@ class _LeadSourceOption {
       isActive: readBool(
         json['is_active'] ?? json['isActive'] ?? json['active'] ?? true,
       ),
+    );
+  }
+}
+
+class _LeadStatusOption {
+  const _LeadStatusOption({
+    required this.key,
+    required this.label,
+    required this.sortOrder,
+    required this.isActive,
+  });
+
+  final String key;
+  final String label;
+  final int sortOrder;
+  final bool isActive;
+
+  factory _LeadStatusOption.fromApi(Map<String, dynamic> json) {
+    String readString(dynamic value) {
+      if (value is String) {
+        return value.trim();
+      }
+      if (value is num || value is bool) {
+        return value.toString().trim();
+      }
+      return '';
+    }
+
+    bool readBool(dynamic value) {
+      if (value is bool) {
+        return value;
+      }
+      if (value is num) {
+        return value != 0;
+      }
+      final normalized = readString(value).toLowerCase();
+      return normalized == 'true' || normalized == '1' || normalized == 'yes';
+    }
+
+    int readInt(dynamic value) {
+      if (value is int) {
+        return value;
+      }
+      if (value is num) {
+        return value.toInt();
+      }
+      return int.tryParse(readString(value)) ?? 0;
+    }
+
+    final key = readString(json['key']);
+    final label = readString(json['label']);
+
+    return _LeadStatusOption(
+      key: key,
+      label: label.isEmpty ? key : label,
+      sortOrder: readInt(json['sort_order'] ?? json['sortOrder']),
+      isActive: readBool(json['is_active'] ?? json['isActive'] ?? true),
     );
   }
 }

@@ -1,5 +1,6 @@
 // ignore_for_file: use_build_context_synchronously, unused_element
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
@@ -7,6 +8,7 @@ import 'package:nextone/screens/site_visits/lead_site_visit_form_page.dart';
 import 'package:nextone/screens/site_visits/site_revisits_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -91,6 +93,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   ];
 
   bool _isCalendarView = false;
+  bool _isExporting = false;
   bool _isLoadingVisits = false;
   String? _loadError;
   String _currentRole = '';
@@ -552,30 +555,152 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     if (!_canExportData) {
       return const SizedBox.shrink();
     }
-    return const SizedBox.shrink();
-    // return InkWell(
-    //   onTap: _isExporting ? null : _exportSiteVisits,
-    //   borderRadius: BorderRadius.circular(_s(10)),
-    //   child: Container(
-    //     width: _s(36),
-    //     height: _s(36),
-    //     decoration: BoxDecoration(
-    //       color: Colors.white,
-    //       borderRadius: BorderRadius.circular(_s(10)),
-    //       border: Border.all(color: AppColors.border),
-    //     ),
-    //     child: _isExporting
-    //         ? Padding(
-    //             padding: EdgeInsets.all(_s(8)),
-    //             child: const CircularProgressIndicator(strokeWidth: 2),
-    //           )
-    //         : Icon(
-    //             Icons.download_rounded,
-    //             size: _s(18),
-    //             color: AppColors.primary,
-    //           ),
-    //   ),
-    // );
+    return OutlinedButton.icon(
+      onPressed: _isExporting ? null : _exportSiteVisits,
+      icon: _isExporting
+          ? SizedBox(
+              width: _s(16),
+              height: _s(16),
+              child: const CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(
+              Icons.download_rounded,
+              size: _s(18),
+            ),
+      label: Text(_isExporting ? 'Exporting...' : 'Export'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.primary,
+        backgroundColor: Colors.white,
+        side: const BorderSide(color: AppColors.border),
+        minimumSize: Size(0, _s(40)),
+        padding: EdgeInsets.symmetric(horizontal: _s(12), vertical: _s(8)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_s(10)),
+        ),
+        textStyle: TextStyle(
+          fontSize: _fs(12),
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Future<DateTimeRange?> _showExportDateRangeDialog() async {
+    final now = DateTime.now();
+    DateTime? fromDate;
+    DateTime? toDate;
+
+    return showDialog<DateTimeRange>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            String formatDate(DateTime? date) =>
+                date == null ? '' : _formatDateForApi(date);
+
+            Future<void> pickFromDate() async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: fromDate ?? now,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                fromDate = DateTime(picked.year, picked.month, picked.day);
+                if (toDate != null && toDate!.isBefore(fromDate!)) {
+                  toDate = fromDate;
+                }
+              });
+            }
+
+            Future<void> pickToDate() async {
+              final baseDate = toDate ?? fromDate ?? now;
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: baseDate,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                toDate = DateTime(picked.year, picked.month, picked.day);
+              });
+            }
+
+            final isValidRange = fromDate != null &&
+                toDate != null &&
+                !toDate!.isBefore(fromDate!);
+
+            Widget dateField({
+              required String label,
+              required String value,
+              required String placeholder,
+              required VoidCallback onTap,
+            }) {
+              return InkWell(
+                onTap: onTap,
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: label,
+                    hintText: 'YYYY-MM-DD',
+                    suffixIcon: const Icon(Icons.calendar_today_outlined),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  child: Text(value.isEmpty ? placeholder : value),
+                ),
+              );
+            }
+
+            return AlertDialog(
+              title: const Text('Export Site Visits'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  dateField(
+                    label: 'Start date',
+                    value: formatDate(fromDate),
+                    placeholder: 'Select start date',
+                    onTap: pickFromDate,
+                  ),
+                  const SizedBox(height: 12),
+                  dateField(
+                    label: 'End date',
+                    value: formatDate(toDate),
+                    placeholder: 'Select end date',
+                    onTap: pickToDate,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isValidRange
+                      ? () => Navigator.of(context).pop(
+                            DateTimeRange(start: fromDate!, end: toDate!),
+                          )
+                      : null,
+                  child: const Text('Export'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatDateForApi(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
   }
 
   Widget _buildKpiTile({
@@ -2289,5 +2414,60 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _exportSiteVisits() async {
+    if (!_canExportData) {
+      _showSnackBar('You do not have permission to export site visits.');
+      return;
+    }
+    final range = await _showExportDateRangeDialog();
+    if (!mounted || range == null) {
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    final from = _formatDateForApi(range.start);
+    final to = _formatDateForApi(range.end);
+    try {
+      final exported = await _authProvider.exportSiteVisits(
+        from: from,
+        to: to,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      final safeFileName = exported.fileName.trim().isEmpty
+          ? 'site_visits_${from}_to_$to.xlsx'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        _showSnackBar(
+          'Export generated ($safeFileName), but direct file save is not supported on Web in this build.',
+        );
+        return;
+      }
+      await ExportFileHelper.saveToDownloadNextone(
+        fileName: safeFileName,
+        bytes: exported.bytes,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final message = error is UnsupportedError
+          ? 'This platform does not support local file save for export yet.'
+          : AppErrorHandler.friendlyMessage(error);
+      _showSnackBar(message);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
   }
 }

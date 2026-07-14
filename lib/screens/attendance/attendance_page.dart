@@ -14,6 +14,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/attendance/holiday_form_page.dart';
 import 'package:nextone/screens/attendance/attendance_user_history_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -32,6 +33,7 @@ class _AttendancePageState extends State<AttendancePage> {
   final ScrollController _monthGridHorizontalController = ScrollController();
   String _currentRole = '';
   bool _isAttendanceSubmitting = false;
+  bool _isExporting = false;
   bool _isCheckedIn = false;
   bool _isLoadingToday = false;
   String? _todayError;
@@ -314,34 +316,34 @@ class _AttendancePageState extends State<AttendancePage> {
             icon: Icons.refresh_rounded,
             onTap: _loadTodayAttendance,
           ),
-          // if (_canExportData)
-          //   OutlinedButton.icon(
-          //     onPressed: _isExporting ? null : _exportAttendance,
-          //     style: OutlinedButton.styleFrom(
-          //       foregroundColor: const Color(0xFF1C3159),
-          //       backgroundColor: Colors.white,
-          //       side: const BorderSide(color: Color(0xFFD4DBEA)),
-          //       shape: RoundedRectangleBorder(
-          //         borderRadius: BorderRadius.circular(12),
-          //       ),
-          //       padding:
-          //           const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          //     ),
-          //     icon: _isExporting
-          //         ? const SizedBox(
-          //             width: 16,
-          //             height: 16,
-          //             child: CircularProgressIndicator(strokeWidth: 2),
-          //           )
-          //         : const Icon(Icons.download_rounded, size: 18),
-          //     label: Text(
-          //       _isExporting ? 'Exporting...' : 'Export Excel',
-          //       style: const TextStyle(
-          //         fontWeight: FontWeight.w600,
-          //         fontSize: 12,
-          //       ),
-          //     ),
-          //   ),
+          if (_canExportData)
+            OutlinedButton.icon(
+              onPressed: _isExporting ? null : _exportAttendance,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF1C3159),
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: Color(0xFFD4DBEA)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              icon: _isExporting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_rounded, size: 18),
+              label: Text(
+                _isExporting ? 'Exporting...' : 'Export Excel',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ),
         ];
 
         if (isCompact) {
@@ -2009,6 +2011,61 @@ class _AttendancePageState extends State<AttendancePage> {
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');
     return '$year-$month-$day';
+  }
+
+  Future<void> _exportAttendance() async {
+    if (!_canExportData) {
+      _showSnackBar('You do not have permission to export attendance.');
+      return;
+    }
+    final range = await _showExportDateRangeDialog();
+    if (!mounted || range == null) {
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    final from = _formatDateForApi(range.start);
+    final to = _formatDateForApi(range.end);
+    try {
+      final exported = await _authProvider.exportAttendance(
+        from: from,
+        to: to,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      final safeFileName = exported.fileName.trim().isEmpty
+          ? 'attendance_${from}_to_$to.xlsx'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        _showSnackBar(
+          'Export generated ($safeFileName), but direct file save is not supported on Web in this build.',
+        );
+        return;
+      }
+      await ExportFileHelper.saveToDownloadNextone(
+        fileName: safeFileName,
+        bytes: exported.bytes,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final message = error is UnsupportedError
+          ? 'This platform does not support local file save for export yet.'
+          : AppErrorHandler.friendlyMessage(error);
+      _showSnackBar(message);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
   }
 
   Widget _buildTopTabs() {

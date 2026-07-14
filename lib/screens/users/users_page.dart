@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/team/add_team_member_page.dart';
 import 'package:nextone/screens/team/team_member_details_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/assign_manager_dialog.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -30,6 +32,7 @@ class _UsersPageState extends State<UsersPage> {
   String? _error;
   List<_UserItem> _users = <_UserItem>[];
   String _currentRole = '';
+  bool _isExporting = false;
 
   static const List<String> _fallbackRoleFilters = <String>[
     'All Roles',
@@ -58,6 +61,7 @@ class _UsersPageState extends State<UsersPage> {
   bool get _canCreateUsers => RoleAccess.canCreateUsers(_currentRole);
   bool get _canEditUsers => RoleAccess.canEditUsers(_currentRole);
   bool get _canDeleteUsers => RoleAccess.canDeleteUsers(_currentRole);
+  bool get _canExportData => RoleAccess.canExportModule('users');
 
   Future<void> _loadAccess() async {
     try {
@@ -354,6 +358,179 @@ class _UsersPageState extends State<UsersPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<DateTimeRange?> _showExportDateRangeDialog() async {
+    final now = DateTime.now();
+    DateTime? fromDate;
+    DateTime? toDate;
+
+    return showDialog<DateTimeRange>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            String formatDate(DateTime? date) =>
+                date == null ? '' : _formatDateForApi(date);
+
+            Future<void> pickFromDate() async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: fromDate ?? now,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                fromDate = DateTime(picked.year, picked.month, picked.day);
+                if (toDate != null && toDate!.isBefore(fromDate!)) {
+                  toDate = fromDate;
+                }
+              });
+            }
+
+            Future<void> pickToDate() async {
+              final baseDate = toDate ?? fromDate ?? now;
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: baseDate,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                toDate = DateTime(picked.year, picked.month, picked.day);
+              });
+            }
+
+            final isValidRange = fromDate != null &&
+                toDate != null &&
+                !toDate!.isBefore(fromDate!);
+
+            Widget dateField({
+              required String label,
+              required String value,
+              required String placeholder,
+              required VoidCallback onTap,
+            }) {
+              return InkWell(
+                onTap: onTap,
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: label,
+                    hintText: 'YYYY-MM-DD',
+                    suffixIcon: const Icon(Icons.calendar_today_outlined),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  child: Text(value.isEmpty ? placeholder : value),
+                ),
+              );
+            }
+
+            return AlertDialog(
+              title: const Text('Export Users'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  dateField(
+                    label: 'Start date',
+                    value: formatDate(fromDate),
+                    placeholder: 'Select start date',
+                    onTap: pickFromDate,
+                  ),
+                  const SizedBox(height: 12),
+                  dateField(
+                    label: 'End date',
+                    value: formatDate(toDate),
+                    placeholder: 'Select end date',
+                    onTap: pickToDate,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isValidRange
+                      ? () => Navigator.of(context).pop(
+                            DateTimeRange(start: fromDate!, end: toDate!),
+                          )
+                      : null,
+                  child: const Text('Export'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatDateForApi(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
+  }
+
+  Future<void> _exportUsers() async {
+    if (!_canExportData) {
+      _showSnackBar('You do not have permission to export users.');
+      return;
+    }
+    final range = await _showExportDateRangeDialog();
+    if (!mounted || range == null) {
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    final from = _formatDateForApi(range.start);
+    final to = _formatDateForApi(range.end);
+    try {
+      final exported = await _authProvider.exportUsers(
+        from: from,
+        to: to,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      final safeFileName = exported.fileName.trim().isEmpty
+          ? 'users_${from}_to_$to.xlsx'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        _showSnackBar(
+          'Export generated ($safeFileName), but direct file save is not supported on Web in this build.',
+        );
+        return;
+      }
+      await ExportFileHelper.saveToDownloadNextone(
+        fileName: safeFileName,
+        bytes: exported.bytes,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final message = error is UnsupportedError
+          ? 'This platform does not support local file save for export yet.'
+          : AppErrorHandler.friendlyMessage(error);
+      _showSnackBar(message);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final users = _filteredUsers;
@@ -405,19 +582,19 @@ class _UsersPageState extends State<UsersPage> {
                   alignment:
                       isCompact ? WrapAlignment.start : WrapAlignment.end,
                   children: [
-                    // if (_canExportData)
-                    //   OutlinedButton.icon(
-                    //     onPressed: _isExporting ? null : _exportUsers,
-                    //     icon: _isExporting
-                    //         ? const SizedBox(
-                    //             width: 14,
-                    //             height: 14,
-                    //             child:
-                    //                 CircularProgressIndicator(strokeWidth: 2),
-                    //           )
-                    //         : const Icon(Icons.download_rounded, size: 16),
-                    //     label: const Text('Export'),
-                    //   ),
+                    if (_canExportData)
+                      OutlinedButton.icon(
+                        onPressed: _isExporting ? null : _exportUsers,
+                        icon: _isExporting
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.download_rounded, size: 16),
+                        label: Text(_isExporting ? 'Exporting...' : 'Export'),
+                      ),
                     if (_canCreateUsers)
                       FilledButton.icon(
                         onPressed: _openCreateUser,

@@ -108,8 +108,10 @@ class ApiConstants {
   // Export Endpoints
   static const String exportLeads = '/export/leads';
   static const String exportSiteVisits = '/export/site-visits';
+  static const String exportSiteRevisits = '/export/site-revisits';
   static const String exportFollowUps = '/export/follow-ups';
   static const String exportProjects = '/export/projects';
+  static const String exportClosures = '/export/closures';
   static const String exportUsers = '/export/users';
   static const String exportAttendance = '/export/attendance';
   static const String exportAll = '/export/all';

@@ -9,8 +9,10 @@ import 'package:nextone/screens/leads/leads_page.dart';
 import 'package:nextone/screens/notifications/notifications_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visits_page.dart';
+import 'package:nextone/screens/startup/startup_page.dart';
 
 class AppRoutes {
+  static const String startup = '/startup';
   static const String login = '/';
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
@@ -24,6 +26,8 @@ class AppRoutes {
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case startup:
+        return MaterialPageRoute(builder: (_) => const StartupPage());
       case login:
         return MaterialPageRoute(builder: (_) => const LoginPage());
       case register:

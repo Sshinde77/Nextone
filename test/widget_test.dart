@@ -3,7 +3,7 @@ import 'package:nextone/main.dart';
 
 void main() {
   testWidgets('renders app root', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp(isLoggedIn: false));
+    await tester.pumpWidget(const MyApp());
 
     expect(find.byType(MyApp), findsOneWidget);
   });

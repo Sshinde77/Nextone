@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/closures/closure_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/permission_guard.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/closure_data_card.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
@@ -32,6 +36,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
   final AuthProvider _authProvider = AuthProvider();
   final TextEditingController _searchController = TextEditingController();
   String _statusFilter = 'all';
+  bool _isExporting = false;
   bool _isLoading = false;
   String? _error;
   List<Map<String, dynamic>> _items = const <Map<String, dynamic>>[];
@@ -51,6 +56,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
     _searchController.dispose();
     super.dispose();
   }
+
+  bool get _canExportData => RoleAccess.canExportModule('closures');
 
   Future<void> _loadClosures({int? page}) async {
     final nextPage = page ?? _currentPage;
@@ -98,28 +105,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
           children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Booking records when leads are converted',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: _openCreateClosureDialog,
-                  style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Book Lead'),
-                ),
-              ],
-            ),
+            _buildHeader(),
             const SizedBox(height: 12),
-            _buildKpiRow(),
+            _buildKpiRow(visibleItems),
             const SizedBox(height: 10),
             _buildSearchAndFilter(),
             const SizedBox(height: 10),
@@ -141,6 +129,264 @@ class _ClosuresPageState extends State<ClosuresPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildHeader() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 520;
+        final exportButton = _canExportData
+            ? OutlinedButton.icon(
+                onPressed: _isExporting ? null : _exportClosures,
+                icon: _isExporting
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download_rounded, size: 16),
+                label: Text(_isExporting ? 'Exporting...' : 'Export'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 46),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              )
+            : null;
+        final bookLeadButton = FilledButton.icon(
+          onPressed: _openCreateClosureDialog,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            minimumSize: const Size(0, 46),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          icon: const Icon(Icons.add),
+          label: const Text('Book Lead'),
+        );
+
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Booking records when leads are converted',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  if (exportButton != null) ...[
+                    Expanded(child: exportButton),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(child: bookLeadButton),
+                ],
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Booking records when leads are converted',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (exportButton != null) exportButton,
+                bookLeadButton,
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<DateTimeRange?> _showExportDateRangeDialog() async {
+    final now = DateTime.now();
+    DateTime? fromDate;
+    DateTime? toDate;
+
+    return showDialog<DateTimeRange>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            String formatDate(DateTime? date) =>
+                date == null ? '' : _formatDateForApi(date);
+
+            Future<void> pickFromDate() async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: fromDate ?? now,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                fromDate = DateTime(picked.year, picked.month, picked.day);
+                if (toDate != null && toDate!.isBefore(fromDate!)) {
+                  toDate = fromDate;
+                }
+              });
+            }
+
+            Future<void> pickToDate() async {
+              final baseDate = toDate ?? fromDate ?? now;
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: baseDate,
+                firstDate: DateTime(2000, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setDialogState(() {
+                toDate = DateTime(picked.year, picked.month, picked.day);
+              });
+            }
+
+            final isValidRange = fromDate != null &&
+                toDate != null &&
+                !toDate!.isBefore(fromDate!);
+
+            Widget dateField({
+              required String label,
+              required String value,
+              required String placeholder,
+              required VoidCallback onTap,
+            }) {
+              return InkWell(
+                onTap: onTap,
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: label,
+                    hintText: 'YYYY-MM-DD',
+                    suffixIcon: const Icon(Icons.calendar_today_outlined),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  child: Text(value.isEmpty ? placeholder : value),
+                ),
+              );
+            }
+
+            return AlertDialog(
+              title: const Text('Export Closures'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  dateField(
+                    label: 'Start date',
+                    value: formatDate(fromDate),
+                    placeholder: 'Select start date',
+                    onTap: pickFromDate,
+                  ),
+                  const SizedBox(height: 12),
+                  dateField(
+                    label: 'End date',
+                    value: formatDate(toDate),
+                    placeholder: 'Select end date',
+                    onTap: pickToDate,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isValidRange
+                      ? () => Navigator.of(context).pop(
+                            DateTimeRange(start: fromDate!, end: toDate!),
+                          )
+                      : null,
+                  child: const Text('Export'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatDateForApi(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
+  }
+
+  Future<void> _exportClosures() async {
+    if (!_canExportData) {
+      _showSnackBar('You do not have permission to export closures.');
+      return;
+    }
+    final range = await _showExportDateRangeDialog();
+    if (!mounted || range == null) {
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    final from = _formatDateForApi(range.start);
+    final to = _formatDateForApi(range.end);
+    try {
+      final exported = await _authProvider.exportClosures(
+        from: from,
+        to: to,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      final safeFileName = exported.fileName.trim().isEmpty
+          ? 'closures_${from}_to_$to.xlsx'
+          : exported.fileName.trim();
+      if (kIsWeb) {
+        _showSnackBar(
+          'Export generated ($safeFileName), but direct file save is not supported on Web in this build.',
+        );
+        return;
+      }
+      await ExportFileHelper.saveToDownloadNextone(
+        fileName: safeFileName,
+        bytes: exported.bytes,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is UnsupportedError
+          ? 'This platform does not support local file save for export yet.'
+          : AppErrorHandler.friendlyMessage(error);
+      _showSnackBar(message);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
   }
 
   Future<void> _openCreateClosureDialog() async {
@@ -1054,83 +1300,208 @@ class _ClosuresPageState extends State<ClosuresPage> {
     );
   }
 
-  Widget _buildKpiRow() {
-    final total = _items.length;
+  Widget _buildKpiRow(List<Map<String, dynamic>> items) {
+    final totalClosures = items.length;
     final totalDealValue =
-        _items.fold<double>(0, (sum, e) => sum + _toDouble(e['agreed_price']));
-    final totalCommission = _items.fold<double>(
-        0, (sum, e) => sum + _toDouble(e['commission_amount']));
-    final commissionPaid =
-        _items.where((e) => e['commission_paid'] == true).length;
-    final commissionPending = total - commissionPaid;
+        items.fold<double>(0, (sum, e) => sum + _toDouble(e['agreed_price']));
+    final commissionPaidValue = items.fold<double>(
+      0,
+      (sum, e) => sum + (_readBool(e['commission_paid']) ? _toDouble(e['commission_amount']) : 0),
+    );
+    final commissionPendingValue = items.fold<double>(
+      0,
+      (sum, e) => sum + (_readBool(e['commission_paid']) ? 0 : _toDouble(e['commission_amount'])),
+    );
 
-    return SizedBox(
-      height: 92,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          _kpiTile('Total Closures', total.toString(), const Color(0xFF2563EB)),
-          _kpiTile('Total Deal Value', _rupee(totalDealValue),
-              const Color(0xFF0A9A55)),
-          _kpiTile('Commission Paid', _rupee(totalCommission),
-              const Color(0xFF16A34A)),
-          _kpiTile('Comm. Pending', commissionPending.toString(),
-              const Color(0xFFD97706)),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 360;
+        final spacing = isCompact ? 10.0 : 12.0;
+        final cardWidth = isCompact
+            ? constraints.maxWidth
+            : (constraints.maxWidth - spacing) / 2;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            _kpiTile(
+              label: 'Total Closures',
+              value: '$totalClosures',
+              subtitle: '$totalClosures records',
+              color: const Color(0xFF2F80ED),
+              icon: Icons.verified_outlined,
+              width: cardWidth,
+            ),
+            _kpiTile(
+              label: 'Total Deal Value',
+              value: _formatCurrency(totalDealValue),
+              subtitle: _formatCompactCurrency(totalDealValue),
+              color: const Color(0xFF1BA97F),
+              icon: Icons.currency_rupee,
+              width: cardWidth,
+            ),
+            _kpiTile(
+              label: 'Commission Paid',
+              value: commissionPaidValue <= 0
+                  ? '—'
+                  : _formatCurrency(commissionPaidValue),
+              subtitle: commissionPaidValue <= 0
+                  ? 'No paid commission'
+                  : _formatCompactCurrency(commissionPaidValue),
+              color: const Color(0xFF25B05B),
+              icon: Icons.payments_outlined,
+              width: cardWidth,
+            ),
+            _kpiTile(
+              label: 'Comm. Pending',
+              value: commissionPendingValue <= 0
+                  ? '—'
+                  : _formatCurrency(commissionPendingValue),
+              subtitle: commissionPendingValue <= 0
+                  ? 'No pending commission'
+                  : _formatCompactCurrency(commissionPendingValue),
+              color: const Color(0xFFC48A12),
+              icon: Icons.access_time,
+              width: cardWidth,
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _kpiTile(String label, String value, Color color) {
+  Widget _kpiTile({
+    required String label,
+    required String value,
+    required String subtitle,
+    required Color color,
+    required IconData icon,
+    required double width,
+  }) {
     return Container(
-      width: 175,
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: width,
+      constraints: const BoxConstraints(minHeight: 122),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE9EDF5)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(value,
-              style: TextStyle(
-                  color: color, fontSize: 20, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text(label,
-              style: const TextStyle(
-                  color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildSearchAndFilter() {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _searchController,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              isDense: true,
-              hintText: 'Search lead, project, unit...',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 560;
+        final searchField = TextField(
+          controller: _searchController,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: 'Search lead, project, unit...',
+            prefixIcon: const Icon(Icons.search),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(width: 180, child: _buildStatusDropdown()),
-        IconButton(
+        );
+        final refreshButton = IconButton(
           onPressed: _refreshClosures,
           icon: const Icon(Icons.refresh),
-        ),
-      ],
+        );
+
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              searchField,
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: _buildStatusDropdown()),
+                  const SizedBox(width: 8),
+                  refreshButton,
+                ],
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: searchField),
+            const SizedBox(width: 8),
+            SizedBox(width: 180, child: _buildStatusDropdown()),
+            refreshButton,
+          ],
+        );
+      },
     );
   }
 
@@ -1964,6 +2335,12 @@ class _ClosuresPageState extends State<ClosuresPage> {
         unit.contains(query);
   }
 
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   String _readString(dynamic value, {required String fallback}) {
     final text = value?.toString().trim() ?? '';
     return text.isEmpty || text.toLowerCase() == 'null' ? fallback : text;
@@ -2086,6 +2463,32 @@ class _ClosuresPageState extends State<ClosuresPage> {
   String _rupee(double value) {
     if (value <= 0) return 'Rs 0';
     return 'Rs ${value.toStringAsFixed(0)}';
+  }
+
+  String _formatCurrency(double value) {
+    if (value <= 0) return '₹0';
+    return '₹${NumberFormat('#,##,##0').format(value)}';
+  }
+
+  String _formatCompactCurrency(double value) {
+    if (value <= 0) return '₹0';
+    if (value >= 10000000) {
+      return '₹${_trimDecimal(value / 10000000)} Cr';
+    }
+    if (value >= 100000) {
+      return '₹${_trimDecimal(value / 100000)} L';
+    }
+    if (value >= 1000) {
+      return '₹${_trimDecimal(value / 1000)} K';
+    }
+    return _formatCurrency(value);
+  }
+
+  String _trimDecimal(double value) {
+    final formatted = value.toStringAsFixed(value >= 100 ? 0 : 2);
+    return formatted.contains('.')
+        ? formatted.replaceFirst(RegExp(r'\.?0+$'), '')
+        : formatted;
   }
 
   String _toYmd(DateTime date) {
