@@ -13,6 +13,8 @@ class LeadDetailModel {
   final String nextFollowupTime;
   final String projectName;
   final AssignedTo? assignedTo;
+  final List<Map<String, dynamic>> paymentProofs;
+  final List<Map<String, dynamic>> photos;
 
   LeadDetailModel({
     required this.id,
@@ -29,6 +31,8 @@ class LeadDetailModel {
     required this.nextFollowupTime,
     required this.projectName,
     this.assignedTo,
+    this.paymentProofs = const <Map<String, dynamic>>[],
+    this.photos = const <Map<String, dynamic>>[],
   });
 
   factory LeadDetailModel.fromJson(Map<String, dynamic> json) {
@@ -47,6 +51,20 @@ class LeadDetailModel {
             .toList(growable: false);
       }
       return const <String>[];
+    }
+
+    List<Map<String, dynamic>> readMapList(dynamic value) {
+      if (value is List) {
+        return value
+            .whereType<Map>()
+            .map(
+              (item) => item.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ),
+            )
+            .toList(growable: false);
+      }
+      return const <Map<String, dynamic>>[];
     }
 
     return LeadDetailModel(
@@ -76,6 +94,8 @@ class LeadDetailModel {
       assignedTo: json['assigned_to'] != null
           ? AssignedTo.fromJson(json['assigned_to'])
           : null,
+      paymentProofs: readMapList(json['payment_proofs']),
+      photos: readMapList(json['photos']),
     );
   }
 

@@ -5812,6 +5812,371 @@ class AuthService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> leadPaymentProofs({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.leadPaymentProofs.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'leadPaymentProofs',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('leadPaymentProofs', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch payment proofs.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      if (body is Map<String, dynamic>) {
+        final data = body['data'];
+        if (data is Map<String, dynamic>) {
+          final proofs =
+              data['payment_proofs'] ?? data['paymentProofs'] ?? data['proofs'];
+          if (proofs is List) {
+            return proofs
+                .whereType<Map>()
+                .map((item) => item.map(
+                      (key, value) => MapEntry(key.toString(), value),
+                    ))
+                .toList();
+          }
+        }
+      }
+      return _extractLeadsItems(body);
+    } catch (_) {
+      throw Exception('Payment proofs response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> uploadLeadPaymentProof({
+    required String id,
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String name = '',
+    String amount = '',
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final normalizedPath = filePath.trim();
+    final normalizedFileName = fileName.trim();
+    final hasBytes = fileBytes != null && fileBytes.isNotEmpty;
+    if (normalizedPath.isEmpty && !hasBytes) {
+      throw Exception('Select a payment proof to upload.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.leadPaymentProofs.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['accept'] = 'application/json';
+    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    if (name.trim().isNotEmpty) {
+      request.fields['name'] = name.trim();
+    }
+    if (amount.trim().isNotEmpty) {
+      request.fields['amount'] = amount.trim();
+    }
+    request.files.add(
+      hasBytes
+          ? http.MultipartFile.fromBytes(
+              'payment_proof',
+              fileBytes,
+              filename: normalizedFileName.isEmpty
+                  ? 'payment_proof'
+                  : normalizedFileName,
+              contentType: _documentMediaType(
+                normalizedFileName.isEmpty ? normalizedPath : normalizedFileName,
+              ),
+            )
+          : await http.MultipartFile.fromPath(
+              'payment_proof',
+              normalizedPath,
+              contentType: _documentMediaType(normalizedPath),
+            ),
+    );
+
+    _logRequest(
+      endpoint: 'uploadLeadPaymentProof',
+      method: 'POST',
+      uri: uri,
+      headers: request.headers,
+      body: 'multipart/form-data',
+    );
+
+    final streamedResponse = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    _logResponse('uploadLeadPaymentProof', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to upload payment proof.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final leadMap = _extractLeadMap(decoded);
+      if (leadMap != null) {
+        return leadMap;
+      }
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      'url': normalizedPath,
+      'name': name.trim(),
+      'amount': amount.trim(),
+    };
+  }
+
+  Future<void> deleteLeadPaymentProof({
+    required String leadId,
+    required String proofId,
+    String? token,
+  }) async {
+    final normalizedLeadId = leadId.trim();
+    final normalizedProofId = proofId.trim();
+    if (normalizedLeadId.isEmpty || normalizedProofId.isEmpty) {
+      throw Exception('Payment proof id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.leadPaymentProofDetail
+        .replaceFirst('{id}', normalizedLeadId)
+        .replaceFirst('{proofId}', normalizedProofId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteLeadPaymentProof',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteLeadPaymentProof', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete payment proof.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> leadPhotos({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.leadPhotos.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'leadPhotos',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('leadPhotos', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch lead photos.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      if (body is Map<String, dynamic>) {
+        final data = body['data'];
+        if (data is Map<String, dynamic>) {
+          final photos = data['photos'];
+          if (photos is List) {
+            return photos
+                .whereType<Map>()
+                .map((item) => item.map(
+                      (key, value) => MapEntry(key.toString(), value),
+                    ))
+                .toList();
+          }
+        }
+      }
+      return _extractLeadsItems(body);
+    } catch (_) {
+      throw Exception('Lead photos response format is not valid.');
+    }
+  }
+
+  Future<Map<String, dynamic>> uploadLeadPhoto({
+    required String id,
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String name = '',
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final normalizedPath = filePath.trim();
+    final normalizedFileName = fileName.trim();
+    final hasBytes = fileBytes != null && fileBytes.isNotEmpty;
+    if (normalizedPath.isEmpty && !hasBytes) {
+      throw Exception('Select a photo to upload.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.leadPhotos.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['accept'] = 'application/json';
+    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    if (name.trim().isNotEmpty) {
+      request.fields['name'] = name.trim();
+    }
+    request.files.add(
+      hasBytes
+          ? http.MultipartFile.fromBytes(
+              'photo',
+              fileBytes,
+              filename:
+                  normalizedFileName.isEmpty ? 'photo' : normalizedFileName,
+              contentType: _imageMediaType(
+                normalizedFileName.isEmpty ? normalizedPath : normalizedFileName,
+              ),
+            )
+          : await http.MultipartFile.fromPath(
+              'photo',
+              normalizedPath,
+              contentType: _imageMediaType(normalizedPath),
+            ),
+    );
+
+    _logRequest(
+      endpoint: 'uploadLeadPhoto',
+      method: 'POST',
+      uri: uri,
+      headers: request.headers,
+      body: 'multipart/form-data',
+    );
+
+    final streamedResponse = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    _logResponse('uploadLeadPhoto', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to upload lead photo.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final leadMap = _extractLeadMap(decoded);
+      if (leadMap != null) {
+        return leadMap;
+      }
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'id': normalizedId,
+      'url': normalizedPath,
+      'name': name.trim(),
+    };
+  }
+
+  Future<void> deleteLeadPhoto({
+    required String leadId,
+    required String photoId,
+    String? token,
+  }) async {
+    final normalizedLeadId = leadId.trim();
+    final normalizedPhotoId = photoId.trim();
+    if (normalizedLeadId.isEmpty || normalizedPhotoId.isEmpty) {
+      throw Exception('Photo id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.leadPhotoDetail
+        .replaceFirst('{id}', normalizedLeadId)
+        .replaceFirst('{photoId}', normalizedPhotoId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteLeadPhoto',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteLeadPhoto', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete lead photo.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
   Future<Map<String, dynamic>> uploadLeadCallRecording({
     required String id,
     required String filePath,

@@ -68,9 +68,18 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       const <_PipelineStatusOption>[];
   List<_LeadActivityItem> _activityItems = const <_LeadActivityItem>[];
   List<_LeadRecordingItem> _recordingItems = const <_LeadRecordingItem>[];
+  List<_LeadAttachmentItem> _paymentProofItems =
+      const <_LeadAttachmentItem>[];
+  List<_LeadAttachmentItem> _photoItems = const <_LeadAttachmentItem>[];
   List<_LeadReassignmentItem> _reassignmentItems =
       const <_LeadReassignmentItem>[];
   String? _selectedPipelineStatusKey;
+  bool _isLoadingAttachments = false;
+  bool _isUploadingPaymentProof = false;
+  bool _isUploadingPhoto = false;
+  String? _attachmentsError;
+  final Set<String> _deletingPaymentProofIds = <String>{};
+  final Set<String> _deletingPhotoIds = <String>{};
 
   @override
   void initState() {
@@ -80,6 +89,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     _loadAssigneeOptions();
     _loadPipelineStatuses();
     _loadLeadTimelineData();
+    _loadLeadAttachments();
   }
 
   @override
@@ -101,7 +111,15 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
 
       setState(() {
         _lead = lead;
-        _selectedNextStatus ??= _firstStatusAfter(normalizedCurrent);
+        _selectedPipelineStatusKey = normalizedCurrent;
+        if (lead.paymentProofs.isNotEmpty) {
+          _paymentProofItems = lead.paymentProofs
+              .map(_LeadAttachmentItem.fromPaymentProofApi)
+              .toList();
+        }
+        if (lead.photos.isNotEmpty) {
+          _photoItems = lead.photos.map(_LeadAttachmentItem.fromPhotoApi).toList();
+        }
         _isPhoneVisible = false;
         _isLoading = false;
       });
@@ -117,6 +135,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   Future<void> _refreshPage() async {
     await _fetchLeadDetails();
     await _loadLeadTimelineData();
+    await _loadLeadAttachments(showLoader: false);
   }
 
   Future<void> _loadAccess() async {
@@ -493,6 +512,623 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         });
       }
     }
+  }
+
+  Future<void> _loadLeadAttachments({bool showLoader = true}) async {
+    if (showLoader && mounted) {
+      setState(() {
+        _isLoadingAttachments = true;
+        _attachmentsError = null;
+      });
+    }
+
+    List<_LeadAttachmentItem>? paymentProofs;
+    List<_LeadAttachmentItem>? photos;
+    String? errorMessage;
+
+    try {
+      final result = await _authProvider.leadPaymentProofs(
+        id: widget.leadId,
+        token: _authProvider.currentAuthToken,
+      );
+      paymentProofs = result.map(_LeadAttachmentItem.fromPaymentProofApi).toList();
+    } catch (error) {
+      errorMessage = AppErrorHandler.friendlyMessage(error);
+    }
+
+    try {
+      final result = await _authProvider.leadPhotos(
+        id: widget.leadId,
+        token: _authProvider.currentAuthToken,
+      );
+      photos = result.map(_LeadAttachmentItem.fromPhotoApi).toList();
+    } catch (error) {
+      errorMessage ??= AppErrorHandler.friendlyMessage(error);
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      if (paymentProofs != null) {
+        _paymentProofItems = paymentProofs!.isNotEmpty || _paymentProofItems.isEmpty
+            ? paymentProofs
+            : _paymentProofItems;
+      }
+      if (photos != null) {
+        _photoItems = photos!.isNotEmpty || _photoItems.isEmpty
+            ? photos
+            : _photoItems;
+      }
+      _attachmentsError = errorMessage;
+      _isLoadingAttachments = false;
+    });
+  }
+
+  Future<void> _uploadPaymentProof() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed || _isUploadingPaymentProof) {
+      return;
+    }
+    final nameController = TextEditingController();
+    final amountController = TextEditingController();
+    PlatformFile? selectedFile;
+    var shouldUpload = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !_isUploadingPaymentProof,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (sheetContext, setDialogState) => AlertDialog(
+          title: const Text('Upload Payment Proof'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: _fieldDecoration('e.g. 50000').copyWith(
+                    labelText: 'Amount',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameController,
+                  decoration: _fieldDecoration(
+                    'e.g. Booking token receipt',
+                  ).copyWith(
+                    labelText: 'Name',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'File *',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      OutlinedButton(
+                        onPressed: _isUploadingPaymentProof
+                            ? null
+                            : () async {
+                                final picked =
+                                    await FilePicker.platform.pickFiles(
+                                  type: FileType.custom,
+                                  allowMultiple: false,
+                                  allowedExtensions: const <String>[
+                                    'jpg',
+                                    'jpeg',
+                                    'png',
+                                    'webp',
+                                    'pdf',
+                                  ],
+                                );
+                                if (picked == null ||
+                                    picked.files.isEmpty ||
+                                    !dialogContext.mounted) {
+                                  return;
+                                }
+                                selectedFile = picked.files.first;
+                                if (nameController.text.trim().isEmpty) {
+                                  nameController.text =
+                                      selectedFile!.name.trim();
+                                }
+                                setDialogState(() {});
+                              },
+                        child: const Text('Choose File'),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          selectedFile?.name ?? 'No file chosen',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: _isUploadingPaymentProof
+                  ? null
+                  : () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: _isUploadingPaymentProof
+                  ? null
+                  : () {
+                      if (amountController.text.trim().isEmpty) {
+                        _showSnackBar('Please enter amount.');
+                        return;
+                      }
+                      if (nameController.text.trim().isEmpty) {
+                        _showSnackBar('Please enter document name.');
+                        return;
+                      }
+                      if (!_hasSelectedUploadFile(selectedFile)) {
+                        _showSnackBar('Please choose a file.');
+                        return;
+                      }
+                      shouldUpload = true;
+                      Navigator.of(dialogContext).pop();
+                    },
+              child: const Text('Upload'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || !shouldUpload || !_hasSelectedUploadFile(selectedFile)) {
+      nameController.dispose();
+      amountController.dispose();
+      return;
+    }
+
+    setState(() {
+      _isUploadingPaymentProof = true;
+    });
+    try {
+      await _authProvider.uploadLeadPaymentProof(
+        id: widget.leadId,
+        filePath: _platformFilePath(selectedFile),
+        fileBytes: selectedFile?.bytes,
+        fileName: selectedFile?.name.trim() ?? '',
+        name: nameController.text.trim(),
+        amount: amountController.text.trim(),
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('EOI document uploaded successfully.');
+      await _fetchLeadDetails();
+      await _loadLeadAttachments(showLoader: false);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      nameController.dispose();
+      amountController.dispose();
+      if (mounted) {
+        setState(() {
+          _isUploadingPaymentProof = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _uploadLeadPhoto() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed || _isUploadingPhoto) {
+      return;
+    }
+    final nameController = TextEditingController();
+    PlatformFile? selectedFile;
+    var shouldUpload = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !_isUploadingPhoto,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (sheetContext, setDialogState) => AlertDialog(
+          title: const Text('Upload Photo'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: _fieldDecoration(
+                    'e.g. Booking form front page',
+                  ).copyWith(
+                    labelText: 'Name',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'File *',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      OutlinedButton(
+                        onPressed: _isUploadingPhoto
+                            ? null
+                            : () async {
+                                final picked =
+                                    await FilePicker.platform.pickFiles(
+                                  type: FileType.image,
+                                  allowMultiple: false,
+                                );
+                                if (picked == null ||
+                                    picked.files.isEmpty ||
+                                    !dialogContext.mounted) {
+                                  return;
+                                }
+                                selectedFile = picked.files.first;
+                                if (nameController.text.trim().isEmpty) {
+                                  nameController.text =
+                                      selectedFile!.name.trim();
+                                }
+                                setDialogState(() {});
+                              },
+                        child: const Text('Choose File'),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          selectedFile?.name ?? 'No file chosen',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: _isUploadingPhoto
+                  ? null
+                  : () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: _isUploadingPhoto
+                  ? null
+                  : () {
+                      if (nameController.text.trim().isEmpty) {
+                        _showSnackBar('Please enter photo name.');
+                        return;
+                      }
+                      if (!_hasSelectedUploadFile(selectedFile)) {
+                        _showSnackBar('Please choose a file.');
+                        return;
+                      }
+                      shouldUpload = true;
+                      Navigator.of(dialogContext).pop();
+                    },
+              child: const Text('Upload'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || !shouldUpload || !_hasSelectedUploadFile(selectedFile)) {
+      nameController.dispose();
+      return;
+    }
+
+    setState(() {
+      _isUploadingPhoto = true;
+    });
+    try {
+      await _authProvider.uploadLeadPhoto(
+        id: widget.leadId,
+        filePath: _platformFilePath(selectedFile),
+        fileBytes: selectedFile?.bytes,
+        fileName: selectedFile?.name.trim() ?? '',
+        name: nameController.text.trim(),
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Booking form photo uploaded successfully.');
+      await _fetchLeadDetails();
+      await _loadLeadAttachments(showLoader: false);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      nameController.dispose();
+      if (mounted) {
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deletePaymentProof(_LeadAttachmentItem item) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete EOI Document'),
+          content: Text('Delete "${item.title}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _deletingPaymentProofIds.add(item.id);
+    });
+    try {
+      await _authProvider.deleteLeadPaymentProof(
+        leadId: widget.leadId,
+        proofId: item.id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('EOI document deleted successfully.');
+      setState(() {
+        _paymentProofItems =
+            _paymentProofItems.where((proof) => proof.id != item.id).toList();
+      });
+      await _fetchLeadDetails();
+      await _loadLeadAttachments(showLoader: false);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _deletingPaymentProofIds.remove(item.id);
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteLeadPhoto(_LeadAttachmentItem item) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Booking Form Photo'),
+          content: Text('Delete "${item.title}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _deletingPhotoIds.add(item.id);
+    });
+    try {
+      await _authProvider.deleteLeadPhoto(
+        leadId: widget.leadId,
+        photoId: item.id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Booking form photo deleted successfully.');
+      setState(() {
+        _photoItems = _photoItems.where((photo) => photo.id != item.id).toList();
+      });
+      await _fetchLeadDetails();
+      await _loadLeadAttachments(showLoader: false);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _deletingPhotoIds.remove(item.id);
+        });
+      }
+    }
+  }
+
+  Future<void> _openAttachment(_LeadAttachmentItem item) async {
+    final url = item.url.trim();
+    if (url.isEmpty) {
+      _showSnackBar('File is not available.');
+      return;
+    }
+
+    if (_isImageUrl(url)) {
+      await showDialog<void>(
+        context: context,
+        barrierColor: Colors.black87,
+        builder: (dialogContext) {
+          return Dialog(
+            backgroundColor: Colors.black,
+            insetPadding: const EdgeInsets.all(16),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    child: InteractiveViewer(
+                      minScale: 0.8,
+                      maxScale: 4,
+                      child: Image.network(
+                        url,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) {
+                          return const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text(
+                              'Unable to preview this image.',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      return;
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      _showSnackBar('File link is not valid.');
+      return;
+    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _openEditRecordingSheet(_LeadRecordingItem item) async {
@@ -1060,7 +1696,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         colorController.text = _toHexColor(selectedColor);
         await refresh();
         if (!mounted) return;
-        _showSnackBar('Pipeline status created.');
+        _showSnackBar('Lead status created.');
       } catch (e) {
         if (!mounted) return;
         _showSnackBar(AppErrorHandler.friendlyMessage(e));
@@ -1217,7 +1853,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                             children: [
                               const Expanded(
                                 child: Text(
-                                  'Manage Pipeline Statuses',
+                                  'Manage Lead Status',
                                   style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w800),
@@ -1809,6 +2445,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                             const SizedBox(height: 14),
                             _buildPipelineStatusCard(),
                             const SizedBox(height: 14),
+                            _buildLeadAttachmentsCard(),
+                            const SizedBox(height: 14),
                             _buildAssignCard(),
                             const SizedBox(height: 14),
                             _buildLeadHistorySection(),
@@ -2034,6 +2672,233 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeadAttachmentsCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Lead Documents',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildAttachmentGroup(
+            title: 'EOI Documents',
+            icon: Icons.description_outlined,
+            items: _paymentProofItems,
+            isLoading: _isLoadingAttachments,
+            isUploading: _isUploadingPaymentProof,
+            deletingIds: _deletingPaymentProofIds,
+            emptyMessage: 'No EOI documents found.',
+            uploadLabel: 'Upload EOI',
+            onUpload: _uploadPaymentProof,
+            onDelete: _deletePaymentProof,
+          ),
+          const SizedBox(height: 12),
+          _buildAttachmentGroup(
+            title: 'Booking Form Photos',
+            icon: Icons.image_outlined,
+            items: _photoItems,
+            isLoading: _isLoadingAttachments,
+            isUploading: _isUploadingPhoto,
+            deletingIds: _deletingPhotoIds,
+            emptyMessage: 'No booking form photos found.',
+            uploadLabel: 'Upload Photo',
+            onUpload: _uploadLeadPhoto,
+            onDelete: _deleteLeadPhoto,
+          ),
+          if (_attachmentsError != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _attachmentsError!,
+              style: const TextStyle(
+                color: AppColors.error,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttachmentGroup({
+    required String title,
+    required IconData icon,
+    required List<_LeadAttachmentItem> items,
+    required bool isLoading,
+    required bool isUploading,
+    required Set<String> deletingIds,
+    required String emptyMessage,
+    required String uploadLabel,
+    required VoidCallback onUpload,
+    required Future<void> Function(_LeadAttachmentItem item) onDelete,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFD),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(icon, size: 18, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: isUploading ? null : onUpload,
+                icon: isUploading
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.upload_file_rounded, size: 18),
+                label: Text(isUploading ? 'Uploading...' : uploadLabel),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (isLoading && items.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            )
+          else if (items.isEmpty)
+            Text(
+              emptyMessage,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            )
+          else
+            ...items.map((item) {
+              final isDeleting = deletingIds.contains(item.id);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          _isImageUrl(item.url)
+                              ? Icons.image_outlined
+                              : Icons.insert_drive_file_outlined,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            InkWell(
+                              onTap: () => _openAttachment(item),
+                              child: Text(
+                                item.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                            if (item.subtitle.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                item.subtitle,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (isDeleting)
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        IconButton(
+                          onPressed: () => onDelete(item),
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          color: AppColors.error,
+                          tooltip: 'Delete',
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }),
         ],
       ),
     );
@@ -2690,20 +3555,27 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
             children: [
               const Expanded(
                 child: Text(
-                  'Pipeline Status',
+                  'Lead Status',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                 ),
               ),
-              IconButton(
+              OutlinedButton.icon(
                 onPressed: _openManagePipelineStatusesDialog,
-                icon: const Icon(Icons.tune),
+                icon: const Icon(Icons.tune, size: 18),
+                label: const Text('Manage Status'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(
+                    color: AppColors.primary.withValues(alpha: 0.24),
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
           SearchableDropdownField<String>(
-            label: 'Pipeline Status',
-            sheetTitle: 'Pipeline Status',
+            label: 'Lead Status',
+            sheetTitle: 'Lead Status',
             showFieldLabel: false,
             value: selectedKey,
             hintText: 'Select stage',
@@ -2771,9 +3643,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
           ),
           const SizedBox(height: 10),
           _buildPremiumActionButton(
-            label: 'Add Status',
+            label: 'Manage Status',
             icon: Icons.playlist_add_check_circle_outlined,
-            onTap: () {},
+            onTap: _openManagePipelineStatusesDialog,
           ),
           const SizedBox(height: 10),
           Row(
@@ -3486,6 +4358,42 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         .join(' ');
   }
 
+  bool _isImageUrl(String value) {
+    final lower = value.trim().toLowerCase();
+    return lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.gif');
+  }
+
+  bool _hasSelectedUploadFile(PlatformFile? file) {
+    if (file == null) {
+      return false;
+    }
+    final bytes = file.bytes;
+    if (bytes != null && bytes.isNotEmpty) {
+      return true;
+    }
+    try {
+      final path = file.path;
+      return path != null && path.trim().isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _platformFilePath(PlatformFile? file) {
+    if (file == null) {
+      return '';
+    }
+    try {
+      return file.path?.trim() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   String? _firstStatusAfter(String current) {
     final next = _allowedTransitions(current);
     if (next.isEmpty) {
@@ -3602,6 +4510,88 @@ class _PipelineStatusOption {
       sortOrder: readInt(json['sort_order'] ?? json['sortOrder']),
       isActive: readBool(json['is_active'] ?? json['isActive'] ?? true),
     );
+  }
+}
+
+class _LeadAttachmentItem {
+  static const String _baseUrl = 'https://api.nextonerealty.in/';
+
+  const _LeadAttachmentItem({
+    required this.id,
+    required this.title,
+    required this.url,
+    required this.subtitle,
+  });
+
+  final String id;
+  final String title;
+  final String url;
+  final String subtitle;
+
+  factory _LeadAttachmentItem.fromPaymentProofApi(Map<String, dynamic> json) {
+    String read(dynamic value) {
+      if (value is String) return value.trim();
+      if (value is num || value is bool) return value.toString().trim();
+      return '';
+    }
+
+    final amount = read(json['amount']);
+    return _LeadAttachmentItem(
+      id: read(json['id'] ?? json['payment_proof_id']),
+      title: read(json['name'] ?? json['title'] ?? json['file_name']).isEmpty
+          ? 'EOI document'
+          : read(json['name'] ?? json['title'] ?? json['file_name']),
+      url: _resolveUrl(
+        read(
+          json['url'] ??
+              json['payment_proof_url'] ??
+              json['file_url'] ??
+              json['path'] ??
+              json['file_path'],
+        ),
+      ),
+      subtitle: amount.isEmpty ? '' : 'Amount: $amount',
+    );
+  }
+
+  factory _LeadAttachmentItem.fromPhotoApi(Map<String, dynamic> json) {
+    String read(dynamic value) {
+      if (value is String) return value.trim();
+      if (value is num || value is bool) return value.toString().trim();
+      return '';
+    }
+
+    return _LeadAttachmentItem(
+      id: read(json['id'] ?? json['photo_id']),
+      title: read(json['name'] ?? json['title'] ?? json['file_name']).isEmpty
+          ? 'Booking form photo'
+          : read(json['name'] ?? json['title'] ?? json['file_name']),
+      url: _resolveUrl(
+        read(
+          json['url'] ??
+              json['photo_url'] ??
+              json['image_url'] ??
+              json['file_url'] ??
+              json['path'] ??
+              json['file_path'],
+        ),
+      ),
+      subtitle: '',
+    );
+  }
+
+  static String _resolveUrl(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    final parsed = Uri.tryParse(trimmed);
+    if (parsed != null && parsed.hasScheme) {
+      return trimmed;
+    }
+    final normalizedPath =
+        trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+    return '$_baseUrl$normalizedPath';
   }
 }
 

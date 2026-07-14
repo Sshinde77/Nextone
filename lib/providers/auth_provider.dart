@@ -1487,6 +1487,82 @@ class AuthProvider {
     );
   }
 
+  Future<List<Map<String, dynamic>>> leadPaymentProofs({
+    required String id,
+    String? token,
+  }) {
+    return _authService.leadPaymentProofs(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> uploadLeadPaymentProof({
+    required String id,
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String name = '',
+    String amount = '',
+    String? token,
+  }) {
+    return _authService.uploadLeadPaymentProof(
+      id: id,
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      name: name,
+      amount: amount,
+      token: token,
+    );
+  }
+
+  Future<void> deleteLeadPaymentProof({
+    required String leadId,
+    required String proofId,
+    String? token,
+  }) {
+    return _authService.deleteLeadPaymentProof(
+      leadId: leadId,
+      proofId: proofId,
+      token: token,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> leadPhotos({
+    required String id,
+    String? token,
+  }) {
+    return _authService.leadPhotos(id: id, token: token);
+  }
+
+  Future<Map<String, dynamic>> uploadLeadPhoto({
+    required String id,
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String name = '',
+    String? token,
+  }) {
+    return _authService.uploadLeadPhoto(
+      id: id,
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      name: name,
+      token: token,
+    );
+  }
+
+  Future<void> deleteLeadPhoto({
+    required String leadId,
+    required String photoId,
+    String? token,
+  }) {
+    return _authService.deleteLeadPhoto(
+      leadId: leadId,
+      photoId: photoId,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> updateLeadCallRecording({
     required String leadId,
     required String recordingId,

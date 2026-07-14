@@ -46,6 +46,11 @@ class ApiConstants {
   static const String leadSourceConfigDetail = '/config/lead-sources/{id}';
   static const String leadStatusesConfig = '/config/lead-statuses';
   static const String leadStatusConfigDetail = '/config/lead-statuses/{id}';
+  static const String leadPaymentProofs = '/leads/{id}/payment-proofs';
+  static const String leadPaymentProofDetail =
+      '/leads/{id}/payment-proofs/{proofId}';
+  static const String leadPhotos = '/leads/{id}/photos';
+  static const String leadPhotoDetail = '/leads/{id}/photos/{photoId}';
 
   // Phone Reveal Endpoints
   static const String phoneRevealMyRequests = '/phone-reveal/my-requests';
