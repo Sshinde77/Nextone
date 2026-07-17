@@ -36,6 +36,7 @@ class _AttendanceUserHistoryPageState extends State<AttendanceUserHistoryPage> {
   int _currentPage = 1;
   int _totalPages = 1;
   int _totalItems = 0;
+  String? _selectedStatusFilter;
 
   @override
   void initState() {
@@ -251,6 +252,17 @@ class _AttendanceUserHistoryPageState extends State<AttendanceUserHistoryPage> {
         .toList(growable: false);
     entries.sort((a, b) => b.date.compareTo(a.date));
     return entries;
+  }
+
+  List<_AttendanceHistoryEntry> _filteredHistoryEntries() {
+    final entries = _historyEntries();
+    final selected = _selectedStatusFilter;
+    if (selected == null || selected.isEmpty) {
+      return entries;
+    }
+    return entries
+        .where((entry) => entry.status.toLowerCase() == selected)
+        .toList(growable: false);
   }
 
   _AttendanceHistoryEntry? _mapHistoryEntry(Map<String, dynamic> row) {
@@ -539,6 +551,78 @@ class _AttendanceUserHistoryPageState extends State<AttendanceUserHistoryPage> {
     ).replaceAll('_', ' ');
   }
 
+  int _statusCountFromEntries(String status) {
+    return _historyEntries()
+        .where((entry) => entry.status.toLowerCase() == status)
+        .length;
+  }
+
+  List<_StatusFilterChipData> _statusFilterTiles() {
+    final presentCount =
+        _summaryValue(const ['present', 'present_count', 'presentCount']);
+    final absentCount =
+        _summaryValue(const ['absent', 'absent_count', 'absentCount']);
+    final lateCount = _summaryValue(const ['late', 'late_count', 'lateCount']);
+    final leaveCount = _summaryValue(
+      const ['leave', 'on_leave', 'onLeave', 'leave_count', 'leaveCount'],
+    );
+
+    final primaryTiles = <_StatusFilterChipData>[
+      _StatusFilterChipData(
+        statusKey: 'present',
+        label: 'Present',
+        value: presentCount > 0
+            ? presentCount
+            : _statusCountFromEntries('present'),
+        color: const Color(0xFF0F9D71),
+      ),
+      _StatusFilterChipData(
+        statusKey: 'absent',
+        label: 'Absent',
+        value:
+            absentCount > 0 ? absentCount : _statusCountFromEntries('absent'),
+        color: const Color(0xFFF04452),
+      ),
+      _StatusFilterChipData(
+        statusKey: 'late',
+        label: 'Late',
+        value: lateCount > 0 ? lateCount : _statusCountFromEntries('late'),
+        color: const Color(0xFFE07900),
+      ),
+      _StatusFilterChipData(
+        statusKey: 'leave',
+        label: 'Leave',
+        value: leaveCount > 0 ? leaveCount : _statusCountFromEntries('leave'),
+        color: const Color(0xFF4F46E5),
+      ),
+    ];
+
+    const known = <String>{'present', 'absent', 'late', 'leave'};
+    final extraStatusCounts = <String, int>{};
+    for (final entry in _historyEntries()) {
+      final status = entry.status.toLowerCase();
+      if (known.contains(status)) {
+        continue;
+      }
+      extraStatusCounts.update(status, (value) => value + 1, ifAbsent: () => 1);
+    }
+
+    final extraTiles = extraStatusCounts.entries.map((entry) {
+      final style = _statusStyle(entry.key);
+      return _StatusFilterChipData(
+        statusKey: entry.key,
+        label: _statusLabel(entry.key),
+        value: entry.value,
+        color: style.accent,
+      );
+    });
+
+    return <_StatusFilterChipData>[
+      ...primaryTiles,
+      ...extraTiles,
+    ].where((tile) => tile.value > 0).toList(growable: false);
+  }
+
   String _summaryEmail() {
     return _readString(_userMap(), const ['email']);
   }
@@ -561,7 +645,7 @@ class _AttendanceUserHistoryPageState extends State<AttendanceUserHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final entries = _historyEntries();
+    final entries = _filteredHistoryEntries();
     final summary = _summaryMap();
 
     return Scaffold(
@@ -600,15 +684,17 @@ class _AttendanceUserHistoryPageState extends State<AttendanceUserHistoryPage> {
                                         const EdgeInsets.fromLTRB(0, 0, 0, 18),
                                     children: [
                                       _buildFilters(),
-                                      _buildSummaryStrip(summary),
+                                      _buildSummaryStrip(),
                                       _buildHoursBar(summary),
                                       if (entries.isEmpty)
-                                        const Padding(
-                                          padding: EdgeInsets.all(24),
+                                        Padding(
+                                          padding: const EdgeInsets.all(24),
                                           child: Text(
-                                            'No attendance history available for the selected period.',
+                                            _selectedStatusFilter == null
+                                                ? 'No attendance history available for the selected period.'
+                                                : 'No ${_statusLabel(_selectedStatusFilter!)} records found for the selected period.',
                                             textAlign: TextAlign.center,
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                               color: Color(0xFF71809A),
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -776,32 +862,8 @@ class _AttendanceUserHistoryPageState extends State<AttendanceUserHistoryPage> {
     );
   }
 
-  Widget _buildSummaryStrip(Map<String, dynamic> summary) {
-    final tiles = [
-      _SummaryTile(
-        value:
-            _summaryValue(const ['present', 'present_count', 'presentCount']),
-        label: 'Present',
-        color: const Color(0xFF0F9D71),
-      ),
-      _SummaryTile(
-        value: _summaryValue(const ['absent', 'absent_count', 'absentCount']),
-        label: 'Absent',
-        color: const Color(0xFFF04452),
-      ),
-      _SummaryTile(
-        value: _summaryValue(const ['late', 'late_count', 'lateCount']),
-        label: 'Late',
-        color: const Color(0xFFE07900),
-      ),
-      _SummaryTile(
-        value: _summaryValue(
-          const ['leave', 'on_leave', 'onLeave', 'leave_count', 'leaveCount'],
-        ),
-        label: 'Leave',
-        color: const Color(0xFF4F46E5),
-      ),
-    ];
+  Widget _buildSummaryStrip() {
+    final tiles = _statusFilterTiles();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -819,14 +881,44 @@ class _AttendanceUserHistoryPageState extends State<AttendanceUserHistoryPage> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               childAspectRatio: 2.2,
-              children: tiles,
+              children: tiles
+                  .map(
+                    (tile) => _SummaryTile(
+                      value: tile.value,
+                      label: tile.label,
+                      color: tile.color,
+                      isSelected: _selectedStatusFilter == tile.statusKey,
+                      onTap: () => _toggleStatusFilter(tile.statusKey),
+                    ),
+                  )
+                  .toList(growable: false),
             );
           }
           return Row(
-              children: tiles.map((tile) => Expanded(child: tile)).toList());
+            children: tiles
+                .map(
+                  (tile) => Expanded(
+                    child: _SummaryTile(
+                      value: tile.value,
+                      label: tile.label,
+                      color: tile.color,
+                      isSelected: _selectedStatusFilter == tile.statusKey,
+                      onTap: () => _toggleStatusFilter(tile.statusKey),
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+          );
         },
       ),
     );
+  }
+
+  void _toggleStatusFilter(String statusKey) {
+    setState(() {
+      _selectedStatusFilter =
+          _selectedStatusFilter == statusKey ? null : statusKey;
+    });
   }
 
   Widget _buildHoursBar(Map<String, dynamic> summary) {
@@ -1214,46 +1306,71 @@ class _SummaryTile extends StatelessWidget {
     required this.value,
     required this.label,
     required this.color,
+    required this.isSelected,
+    required this.onTap,
   });
 
   final int value;
   final String label;
   final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 18),
-      decoration: const BoxDecoration(
-        border: Border(
-          right: BorderSide(color: Color(0xFFE8EDF5)),
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 18),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.08) : null,
+          border: Border(
+            right: const BorderSide(color: Color(0xFFE8EDF5)),
+            bottom: isSelected
+                ? BorderSide(color: color, width: 2)
+                : BorderSide.none,
+          ),
         ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '$value',
-            style: TextStyle(
-              color: color,
-              fontSize: 30,
-              fontWeight: FontWeight.w900,
-              height: 1,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$value',
+              style: TextStyle(
+                color: color,
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                height: 1,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF7C8DA6),
-              fontWeight: FontWeight.w700,
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? color : const Color(0xFF7C8DA6),
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+class _StatusFilterChipData {
+  const _StatusFilterChipData({
+    required this.statusKey,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String statusKey;
+  final String label;
+  final int value;
+  final Color color;
 }
 
 class _CheckPointCard extends StatelessWidget {

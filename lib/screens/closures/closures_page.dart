@@ -62,6 +62,7 @@ class ClosuresPage extends StatefulWidget {
 class _ClosuresPageState extends State<ClosuresPage> {
   final AuthProvider _authProvider = AuthProvider();
   final TextEditingController _searchController = TextEditingController();
+  String _currentRole = '';
   String _statusFilter = 'all';
   bool _isExporting = false;
   bool _isLoading = false;
@@ -109,7 +110,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
   String _documentTypeValue(String labelOrValue) {
     final normalized = labelOrValue.trim().toLowerCase();
     for (final option in _documentTypeOptions) {
-      if (option.key == normalized || option.value.toLowerCase() == normalized) {
+      if (option.key == normalized ||
+          option.value.toLowerCase() == normalized) {
         return option.key;
       }
     }
@@ -164,21 +166,19 @@ class _ClosuresPageState extends State<ClosuresPage> {
   List<Map<String, dynamic>> _buildClosureDocumentPayloads(
     List<_ClosureDocumentDraft> documents,
   ) {
-    return documents
-        .map((document) => document.toPayload())
-        .where((document) {
-          final url = _readString(document['url'], fallback: '').trim();
-          final documentType =
-              _readString(document['document_type'], fallback: '').trim();
-          final name = _readString(document['name'], fallback: '').trim();
-          return url.isNotEmpty && documentType.isNotEmpty && name.isNotEmpty;
-        })
-        .toList(growable: false);
+    return documents.map((document) => document.toPayload()).where((document) {
+      final url = _readString(document['url'], fallback: '').trim();
+      final documentType =
+          _readString(document['document_type'], fallback: '').trim();
+      final name = _readString(document['name'], fallback: '').trim();
+      return url.isNotEmpty && documentType.isNotEmpty && name.isNotEmpty;
+    }).toList(growable: false);
   }
 
   @override
   void initState() {
     super.initState();
+    _loadAccess();
     _loadClosures();
   }
 
@@ -189,6 +189,20 @@ class _ClosuresPageState extends State<ClosuresPage> {
   }
 
   bool get _canExportData => RoleAccess.canExportModule('closures');
+  bool get _showExportButton =>
+      _canExportData && RoleAccess.isAdminOrSuperAdmin(_currentRole);
+
+  Future<void> _loadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      if (!mounted) return;
+      setState(() {
+        _currentRole = role;
+      });
+    } catch (_) {
+      // Keep export action hidden if role lookup fails.
+    }
+  }
 
   Future<void> _loadClosures({int? page}) async {
     final nextPage = page ?? _currentPage;
@@ -266,7 +280,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 520;
-        final exportButton = _canExportData
+        final exportButton = _showExportButton
             ? OutlinedButton.icon(
                 onPressed: _isExporting ? null : _exportClosures,
                 icon: _isExporting
@@ -501,9 +515,13 @@ class _ClosuresPageState extends State<ClosuresPage> {
         );
         return;
       }
-      await ExportFileHelper.saveToDownloadNextone(
+      final outFile = await ExportFileHelper.saveToDownloadNextone(
         fileName: safeFileName,
         bytes: exported.bytes,
+      );
+      if (!mounted) return;
+      _showSnackBar(
+        'Closures export downloaded and saved to: ${outFile.path}',
       );
     } catch (error) {
       if (!mounted) return;
@@ -698,12 +716,14 @@ class _ClosuresPageState extends State<ClosuresPage> {
         return StatefulBuilder(
           builder: (context, setLocalState) {
             Future<void> addDocument() async {
-              final documentType = _documentTypeValue(selectedDocumentType ?? '');
+              final documentType =
+                  _documentTypeValue(selectedDocumentType ?? '');
               final documentName = documentNameController.text.trim();
               if (documentType.isEmpty || documentName.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Select document type and enter document name.'),
+                    content:
+                        Text('Select document type and enter document name.'),
                   ),
                 );
                 return;
@@ -793,18 +813,19 @@ class _ClosuresPageState extends State<ClosuresPage> {
                   bookingAmount:
                       double.tryParse(bookingAmountController.text.trim()) ?? 0,
                   paymentPlan:
-                      (selectedPaymentPlan ?? paymentPlanController.text).trim(),
+                      (selectedPaymentPlan ?? paymentPlanController.text)
+                          .trim(),
                   loanRequired: loanRequired,
                   loanBank: loanBankController.text.trim(),
                   commissionPercent: double.tryParse(
                           commissionPercentController.text.trim()) ??
                       0,
-                   commissionPaid: commissionPaid,
-                   closedByManagerIds: selectedManagerIds,
-                   closureNotes: notesController.text.trim(),
-                   documents: documentPayloads,
-                   token: _authProvider.currentAuthToken,
-                 );
+                  commissionPaid: commissionPaid,
+                  closedByManagerIds: selectedManagerIds,
+                  closureNotes: notesController.text.trim(),
+                  documents: documentPayloads,
+                  token: _authProvider.currentAuthToken,
+                );
                 if (!context.mounted) return;
                 Navigator.of(context).pop(true);
               } catch (e) {
@@ -836,476 +857,492 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Create Closure - Book Lead',
-                              style: TextStyle(
-                                  fontSize: narrowDialog ? 16 : (compactDialog ? 20 : 26),
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: isSubmitting
-                                ? null
-                                : () => Navigator.of(context).pop(false),
-                            padding: EdgeInsets.zero,
-                            constraints: BoxConstraints(
-                              minWidth: narrowDialog ? 32 : 40,
-                              minHeight: narrowDialog ? 32 : 40,
-                            ),
-                            icon: Icon(Icons.close, size: narrowDialog ? 20 : 24),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      _stepTabs(
-                        step,
-                        (v) => setLocalState(() => step = v),
-                        compact: compactDialog,
-                        narrow: narrowDialog,
-                      ),
-                      const SizedBox(height: 14),
-                      if (step == 'booking') ...[
-                        _dropdownField(
-                          label: 'Lead *',
-                          value: selectedLeadId,
-                          hint: 'Select lead to book...',
-                          items: const <DropdownMenuItem<String>>[],
-                          searchable: true,
-                          searchableItems: leads
-                              .map(
-                                (e) => SearchableDropdownItem<String>(
-                                  value: _readString(e['id'], fallback: ''),
-                                  label:
-                                      _readString(e['name'], fallback: 'Lead'),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) {
-                            setLocalState(() {
-                              selectedLeadId = v;
-                              final linkedProjectId =
-                                  resolveLeadLinkedProjectId(v);
-                              selectedProjectId = (linkedProjectId != null &&
-                                      linkedProjectId.isNotEmpty)
-                                  ? linkedProjectId
-                                  : null;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        _dropdownField(
-                          label: 'Project *',
-                          value: selectedProjectId,
-                          hint: 'Select project...',
-                          items: const <DropdownMenuItem<String>>[],
-                          searchable: true,
-                          searchableItems: projects
-                              .map(
-                                (e) => SearchableDropdownItem<String>(
-                                  value: _readString(e['id'], fallback: ''),
-                                  label: _readString(e['name'],
-                                      fallback: 'Project'),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) =>
-                              setLocalState(() => selectedProjectId = v),
-                        ),
-                        const SizedBox(height: 10),
-                        _dateField('Booking Date *', bookingDate, pickDate),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                                child: _textField(
-                                    'Unit Number *', unitNumberController)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                                child: _textField(
-                                    'Tower / Block', towerController)),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _textField(
-                                'Floor *',
-                                floorController,
-                                keyboardType: TextInputType.number,
-                                hintText: 'Floor',
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: _textField(
-                                'Unit Type *',
-                                unitTypeController,
-                                hintText: 'Unit Type',
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: _textField(
-                                'Carpet Area (sqft)',
-                                carpetAreaController,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                        decimal: true),
-                                hintText: 'Carpet',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        _textField(
-                          'Super Area (sqft)',
-                          superAreaController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                        ),
-                        const SizedBox(height: 10),
-                        _textField('Closure Notes', notesController,
-                            maxLines: 3),
-                      ] else if (step == 'financials') ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _textField(
-                                'Agreed Price (Rs) *',
-                                agreedPriceController,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                        decimal: true),
-                                hintText: '9500000',
-                                prefixText: 'Rs ',
-                                onChanged: (_) => setLocalState(() {}),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _textField(
-                                'Booking Amount (Rs)',
-                                bookingAmountController,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                        decimal: true),
-                                hintText: '500000',
-                                prefixText: 'Rs ',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        _dropdownField(
-                          label: 'Payment Plan',
-                          value: selectedPaymentPlan,
-                          hint: 'Select payment plan...',
-                          items: _paymentPlans
-                              .map(
-                                (e) => DropdownMenuItem<String>(
-                                  value: e,
-                                  child:
-                                      Text(e, overflow: TextOverflow.ellipsis),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) {
-                            setLocalState(() {
-                              selectedPaymentPlan = v;
-                              paymentPlanController.text = v ?? '';
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        CheckboxListTile(
-                          value: loanRequired,
-                          onChanged: (v) =>
-                              setLocalState(() => loanRequired = v ?? false),
-                          title: const Text(
-                            'Home loan required',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 8),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: const BorderSide(color: AppColors.border),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        _textField('Loan Bank', loanBankController),
-                      ] else if (step == 'commission') ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _textField(
-                                'Commission % (auto-calcs amount)',
-                                commissionPercentController,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                        decimal: true),
-                                hintText: '2',
-                                prefixText: '% ',
-                                onChanged: (_) => setLocalState(() {}),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _readOnlyField(
-                                'Commission Amount (Rs)',
-                                _rupee(
-                                  (double.tryParse(agreedPriceController.text
-                                              .trim()) ??
-                                          0) *
-                                      (double.tryParse(
-                                            commissionPercentController.text
-                                                .trim(),
-                                          ) ??
-                                          0) /
-                                      100,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Create Closure - Book Lead',
+                                  style: TextStyle(
+                                      fontSize: narrowDialog
+                                          ? 16
+                                          : (compactDialog ? 20 : 26),
+                                      fontWeight: FontWeight.w700),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        _selectionField(
-                          label: 'Reporting Manager',
-                          hint: 'Select one or more managers...',
-                          value: _formatSelectionSummary(
-                            managerOptions,
-                            selectedManagerIds,
-                          ),
-                          onTap: isSubmitting
-                              ? null
-                              : () async {
-                                  final selected = await _openMultiSelectSheet(
-                                    title: 'Reporting Manager',
-                                    options: managerOptions,
-                                    initialSelectedIds: selectedManagerIds,
-                                  );
-                                  if (selected == null) return;
-                                  setLocalState(
-                                    () => selectedManagerIds = selected,
-                                  );
-                                },
-                        ),
-                        const SizedBox(height: 10),
-                        CheckboxListTile(
-                          value: commissionPaid,
-                          onChanged: (v) =>
-                              setLocalState(() => commissionPaid = v ?? false),
-                          title: const Text(
-                            'Commission already paid',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 8),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: const BorderSide(color: AppColors.border),
-                          ),
-                        ),
-                      ] else ...[
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final stackFields = constraints.maxWidth < 520;
-                            final documentTypeField = _dropdownField(
-                              label: 'Document Type',
-                              value: selectedDocumentType,
-                              hint: 'Select document type...',
-                              items: _documentTypeOptions
-                                  .map(
-                                    (option) => DropdownMenuItem<String>(
-                                      value: option.value,
-                                      child: Text(
-                                        option.value,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: narrowDialog ? 13 : 14,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (value) => setLocalState(
-                                () => selectedDocumentType = value,
-                              ),
-                            );
-                            final documentNameField = _textField(
-                              'Document Name',
-                              documentNameController,
-                              hintText: 'Cost Sheet - Tower B',
-                            );
-                            if (stackFields) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  documentTypeField,
-                                  const SizedBox(height: 10),
-                                  documentNameField,
-                                ],
-                              );
-                            }
-                            return Row(
-                              children: [
-                                Expanded(child: documentTypeField),
-                                const SizedBox(width: 10),
-                                Expanded(child: documentNameField),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: OutlinedButton.icon(
-                            onPressed: isSubmitting ? null : addDocument,
-                            icon: Icon(
-                              Icons.upload_file_outlined,
-                              size: narrowDialog ? 16 : 18,
-                            ),
-                            label: Text(
-                              'Upload Document',
-                              style: TextStyle(fontSize: narrowDialog ? 13 : 15),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        if (documents.isEmpty)
-                          Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: narrowDialog ? 20 : 28,
-                            ),
-                            child: Center(
-                              child: Text(
-                                'No documents yet',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: narrowDialog ? 13 : 15,
-                                ),
-                              ),
-                            ),
-                          )
-                        else
-                          Column(
-                            children: List<Widget>.generate(documents.length,
-                                (index) {
-                              final document = documents[index];
-                              return Container(
-                                margin: EdgeInsets.only(
-                                  bottom: index == documents.length - 1 ? 0 : 10,
-                                ),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border:
-                                      Border.all(color: AppColors.border),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            document.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: AppColors.textPrimary,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: narrowDialog ? 13 : 14,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            document.documentTypeLabel,
-                                            style: TextStyle(
-                                              color: AppColors.textSecondary,
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: narrowDialog ? 12 : 13,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed: isSubmitting
-                                          ? null
-                                          : () => setLocalState(
-                                                () => documents = documents
-                                                    .where((item) =>
-                                                        !identical(item, document))
-                                                    .toList(growable: false),
-                                              ),
-                                      icon: const Icon(
-                                        Icons.delete_outline,
-                                        color: Colors.redAccent,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }),
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
+                              IconButton(
                                 onPressed: isSubmitting
                                     ? null
                                     : () => Navigator.of(context).pop(false),
-                                child: const Text('Cancel'),
+                                padding: EdgeInsets.zero,
+                                constraints: BoxConstraints(
+                                  minWidth: narrowDialog ? 32 : 40,
+                                  minHeight: narrowDialog ? 32 : 40,
+                                ),
+                                icon: Icon(Icons.close,
+                                    size: narrowDialog ? 20 : 24),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _stepTabs(
+                            step,
+                            (v) => setLocalState(() => step = v),
+                            compact: compactDialog,
+                            narrow: narrowDialog,
+                          ),
+                          const SizedBox(height: 14),
+                          if (step == 'booking') ...[
+                            _dropdownField(
+                              label: 'Lead *',
+                              value: selectedLeadId,
+                              hint: 'Select lead to book...',
+                              items: const <DropdownMenuItem<String>>[],
+                              searchable: true,
+                              searchableItems: leads
+                                  .map(
+                                    (e) => SearchableDropdownItem<String>(
+                                      value: _readString(e['id'], fallback: ''),
+                                      label: _readString(e['name'],
+                                          fallback: 'Lead'),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) {
+                                setLocalState(() {
+                                  selectedLeadId = v;
+                                  final linkedProjectId =
+                                      resolveLeadLinkedProjectId(v);
+                                  selectedProjectId =
+                                      (linkedProjectId != null &&
+                                              linkedProjectId.isNotEmpty)
+                                          ? linkedProjectId
+                                          : null;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            _dropdownField(
+                              label: 'Project *',
+                              value: selectedProjectId,
+                              hint: 'Select project...',
+                              items: const <DropdownMenuItem<String>>[],
+                              searchable: true,
+                              searchableItems: projects
+                                  .map(
+                                    (e) => SearchableDropdownItem<String>(
+                                      value: _readString(e['id'], fallback: ''),
+                                      label: _readString(e['name'],
+                                          fallback: 'Project'),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setLocalState(() => selectedProjectId = v),
+                            ),
+                            const SizedBox(height: 10),
+                            _dateField('Booking Date *', bookingDate, pickDate),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                    child: _textField(
+                                        'Unit Number *', unitNumberController)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                    child: _textField(
+                                        'Tower / Block', towerController)),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _textField(
+                                    'Floor *',
+                                    floorController,
+                                    keyboardType: TextInputType.number,
+                                    hintText: 'Floor',
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: _textField(
+                                    'Unit Type *',
+                                    unitTypeController,
+                                    hintText: 'Unit Type',
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: _textField(
+                                    'Carpet Area (sqft)',
+                                    carpetAreaController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                    hintText: 'Carpet',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            _textField(
+                              'Super Area (sqft)',
+                              superAreaController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                            ),
+                            const SizedBox(height: 10),
+                            _textField('Closure Notes', notesController,
+                                maxLines: 3),
+                          ] else if (step == 'financials') ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _textField(
+                                    'Agreed Price (Rs) *',
+                                    agreedPriceController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                    hintText: '9500000',
+                                    prefixText: 'Rs ',
+                                    onChanged: (_) => setLocalState(() {}),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _textField(
+                                    'Booking Amount (Rs)',
+                                    bookingAmountController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                    hintText: '500000',
+                                    prefixText: 'Rs ',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            _dropdownField(
+                              label: 'Payment Plan',
+                              value: selectedPaymentPlan,
+                              hint: 'Select payment plan...',
+                              items: _paymentPlans
+                                  .map(
+                                    (e) => DropdownMenuItem<String>(
+                                      value: e,
+                                      child: Text(e,
+                                          overflow: TextOverflow.ellipsis),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) {
+                                setLocalState(() {
+                                  selectedPaymentPlan = v;
+                                  paymentPlanController.text = v ?? '';
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            CheckboxListTile(
+                              value: loanRequired,
+                              onChanged: (v) => setLocalState(
+                                  () => loanRequired = v ?? false),
+                              title: const Text(
+                                'Home loan required',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              controlAffinity: ListTileControlAffinity.leading,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: const BorderSide(color: AppColors.border),
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: isSubmitting ? null : submit,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
+                            const SizedBox(height: 4),
+                            _textField('Loan Bank', loanBankController),
+                          ] else if (step == 'commission') ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _textField(
+                                    'Commission % (auto-calcs amount)',
+                                    commissionPercentController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                    hintText: '2',
+                                    prefixText: '% ',
+                                    onChanged: (_) => setLocalState(() {}),
+                                  ),
                                 ),
-                                child: isSubmitting
-                                    ? const SizedBox(
-                                        height: 18,
-                                        width: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _readOnlyField(
+                                    'Commission Amount (Rs)',
+                                    _rupee(
+                                      (double.tryParse(agreedPriceController
+                                                  .text
+                                                  .trim()) ??
+                                              0) *
+                                          (double.tryParse(
+                                                commissionPercentController.text
+                                                    .trim(),
+                                              ) ??
+                                              0) /
+                                          100,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            _selectionField(
+                              label: 'Reporting Manager',
+                              hint: 'Select one or more managers...',
+                              value: _formatSelectionSummary(
+                                managerOptions,
+                                selectedManagerIds,
+                              ),
+                              onTap: isSubmitting
+                                  ? null
+                                  : () async {
+                                      final selected =
+                                          await _openMultiSelectSheet(
+                                        title: 'Reporting Manager',
+                                        options: managerOptions,
+                                        initialSelectedIds: selectedManagerIds,
+                                      );
+                                      if (selected == null) return;
+                                      setLocalState(
+                                        () => selectedManagerIds = selected,
+                                      );
+                                    },
+                            ),
+                            const SizedBox(height: 10),
+                            CheckboxListTile(
+                              value: commissionPaid,
+                              onChanged: (v) => setLocalState(
+                                  () => commissionPaid = v ?? false),
+                              title: const Text(
+                                'Commission already paid',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              controlAffinity: ListTileControlAffinity.leading,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: const BorderSide(color: AppColors.border),
+                              ),
+                            ),
+                          ] else ...[
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final stackFields = constraints.maxWidth < 520;
+                                final documentTypeField = _dropdownField(
+                                  label: 'Document Type',
+                                  value: selectedDocumentType,
+                                  hint: 'Select document type...',
+                                  items: _documentTypeOptions
+                                      .map(
+                                        (option) => DropdownMenuItem<String>(
+                                          value: option.value,
+                                          child: Text(
+                                            option.value,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: narrowDialog ? 13 : 14,
+                                            ),
+                                          ),
                                         ),
                                       )
-                                    : Text(
-                                        'Book Lead',
-                                        style: TextStyle(
-                                          fontSize: narrowDialog ? 14 : 16,
-                                        ),
-                                      ),
+                                      .toList(),
+                                  onChanged: (value) => setLocalState(
+                                    () => selectedDocumentType = value,
+                                  ),
+                                );
+                                final documentNameField = _textField(
+                                  'Document Name',
+                                  documentNameController,
+                                  hintText: 'Cost Sheet - Tower B',
+                                );
+                                if (stackFields) {
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      documentTypeField,
+                                      const SizedBox(height: 10),
+                                      documentNameField,
+                                    ],
+                                  );
+                                }
+                                return Row(
+                                  children: [
+                                    Expanded(child: documentTypeField),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: documentNameField),
+                                  ],
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: OutlinedButton.icon(
+                                onPressed: isSubmitting ? null : addDocument,
+                                icon: Icon(
+                                  Icons.upload_file_outlined,
+                                  size: narrowDialog ? 16 : 18,
+                                ),
+                                label: Text(
+                                  'Upload Document',
+                                  style: TextStyle(
+                                      fontSize: narrowDialog ? 13 : 15),
+                                ),
                               ),
                             ),
+                            const SizedBox(height: 16),
+                            if (documents.isEmpty)
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: narrowDialog ? 20 : 28,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'No documents yet',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: narrowDialog ? 13 : 15,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else
+                              Column(
+                                children: List<Widget>.generate(
+                                    documents.length, (index) {
+                                  final document = documents[index];
+                                  return Container(
+                                    margin: EdgeInsets.only(
+                                      bottom: index == documents.length - 1
+                                          ? 0
+                                          : 10,
+                                    ),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border:
+                                          Border.all(color: AppColors.border),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                document.name,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: AppColors.textPrimary,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize:
+                                                      narrowDialog ? 13 : 14,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                document.documentTypeLabel,
+                                                style: TextStyle(
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                  fontWeight: FontWeight.w500,
+                                                  fontSize:
+                                                      narrowDialog ? 12 : 13,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        IconButton(
+                                          onPressed: isSubmitting
+                                              ? null
+                                              : () => setLocalState(
+                                                    () => documents = documents
+                                                        .where((item) =>
+                                                            !identical(
+                                                                item, document))
+                                                        .toList(
+                                                            growable: false),
+                                                  ),
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.redAccent,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ),
                           ],
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: isSubmitting
+                                      ? null
+                                      : () => Navigator.of(context).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: isSubmitting ? null : submit,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                  ),
+                                  child: isSubmitting
+                                      ? const SizedBox(
+                                          height: 18,
+                                          width: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Text(
+                                          'Book Lead',
+                                          style: TextStyle(
+                                            fontSize: narrowDialog ? 14 : 16,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   );
                 },
               ),
@@ -1719,11 +1756,19 @@ class _ClosuresPageState extends State<ClosuresPage> {
         items.fold<double>(0, (sum, e) => sum + _toDouble(e['agreed_price']));
     final commissionPaidValue = items.fold<double>(
       0,
-      (sum, e) => sum + (_readBool(e['commission_paid']) ? _toDouble(e['commission_amount']) : 0),
+      (sum, e) =>
+          sum +
+          (_readBool(e['commission_paid'])
+              ? _toDouble(e['commission_amount'])
+              : 0),
     );
     final commissionPendingValue = items.fold<double>(
       0,
-      (sum, e) => sum + (_readBool(e['commission_paid']) ? 0 : _toDouble(e['commission_amount'])),
+      (sum, e) =>
+          sum +
+          (_readBool(e['commission_paid'])
+              ? 0
+              : _toDouble(e['commission_amount'])),
     );
 
     return LayoutBuilder(
@@ -2063,12 +2108,14 @@ class _ClosuresPageState extends State<ClosuresPage> {
         return StatefulBuilder(
           builder: (context, setLocalState) {
             Future<void> addDocument() async {
-              final documentType = _documentTypeValue(selectedDocumentType ?? '');
+              final documentType =
+                  _documentTypeValue(selectedDocumentType ?? '');
               final documentName = documentNameController.text.trim();
               if (documentType.isEmpty || documentName.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Select document type and enter document name.'),
+                    content:
+                        Text('Select document type and enter document name.'),
                   ),
                 );
                 return;
@@ -2160,15 +2207,15 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           commissionPercentController.text.trim()) ??
                       0,
                   commissionPaid: commissionPaid,
-                   commissionPaidDate:
-                       commissionPaid && commissionPaidDate != null
-                           ? _toYmd(commissionPaidDate!)
-                           : null,
-                   closedByManagerIds: selectedManagerIds,
-                   closureNotes: notesController.text.trim(),
-                    documents: documentPayloads,
-                    token: _authProvider.currentAuthToken,
-                  );
+                  commissionPaidDate:
+                      commissionPaid && commissionPaidDate != null
+                          ? _toYmd(commissionPaidDate!)
+                          : null,
+                  closedByManagerIds: selectedManagerIds,
+                  closureNotes: notesController.text.trim(),
+                  documents: documentPayloads,
+                  token: _authProvider.currentAuthToken,
+                );
                 if (!context.mounted) return;
                 Navigator.of(context).pop(true);
               } catch (e) {
@@ -2200,449 +2247,466 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Edit Closure',
-                              style: TextStyle(
-                                  fontSize: narrowDialog ? 16 : (compactDialog ? 20 : 26),
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: isSubmitting
-                                ? null
-                                : () => Navigator.of(context).pop(false),
-                            padding: EdgeInsets.zero,
-                            constraints: BoxConstraints(
-                              minWidth: narrowDialog ? 32 : 40,
-                              minHeight: narrowDialog ? 32 : 40,
-                            ),
-                            icon: Icon(Icons.close, size: narrowDialog ? 20 : 24),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      _stepTabs(
-                        step,
-                        (v) => setLocalState(() => step = v),
-                        compact: compactDialog,
-                        narrow: narrowDialog,
-                      ),
-                      const SizedBox(height: 14),
-                      if (step == 'booking') ...[
-                        _dateField('Booking Date *', bookingDate, pickDate),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                                child: _textField(
-                                    'Unit Number', unitNumberController)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                                child: _textField(
-                                    'Tower / Block', towerController)),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _textField(
-                                'Floor',
-                                floorController,
-                                keyboardType: TextInputType.number,
-                                hintText: 'Floor',
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: _textField(
-                                'Unit Type',
-                                unitTypeController,
-                                hintText: 'Unit Type',
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: _textField(
-                                'Carpet Area (sqft)',
-                                carpetAreaController,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                        decimal: true),
-                                hintText: 'Carpet',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        _textField(
-                          'Super Area (sqft)',
-                          superAreaController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                        ),
-                        const SizedBox(height: 10),
-                        _textField('Closure Notes', notesController,
-                            maxLines: 3),
-                      ] else if (step == 'financials') ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _textField(
-                                'Agreed Price (Rs) *',
-                                agreedPriceController,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                        decimal: true),
-                                hintText: '9500000',
-                                prefixText: 'Rs ',
-                                onChanged: (_) => setLocalState(() {}),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _textField(
-                                'Booking Amount (Rs)',
-                                bookingAmountController,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                        decimal: true),
-                                hintText: '500000',
-                                prefixText: 'Rs ',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        _dropdownField(
-                          label: 'Payment Plan',
-                          value: (selectedPaymentPlan ?? '').isEmpty
-                              ? null
-                              : selectedPaymentPlan,
-                          hint: 'Select payment plan...',
-                          items: _paymentPlans
-                              .map(
-                                (e) => DropdownMenuItem<String>(
-                                  value: e,
-                                  child:
-                                      Text(e, overflow: TextOverflow.ellipsis),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) =>
-                              setLocalState(() => selectedPaymentPlan = v),
-                        ),
-                        const SizedBox(height: 10),
-                        CheckboxListTile(
-                          value: loanRequired,
-                          onChanged: (v) =>
-                              setLocalState(() => loanRequired = v ?? false),
-                          title: const Text(
-                            'Home loan required',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 8),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: const BorderSide(color: AppColors.border),
-                          ),
-                        ),
-                      ] else if (step == 'commission') ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _textField(
-                                'Commission % (auto-calcs amount)',
-                                commissionPercentController,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                        decimal: true),
-                                hintText: '2',
-                                prefixText: '% ',
-                                onChanged: (_) => setLocalState(() {}),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _readOnlyField(
-                                'Commission Amount (Rs)',
-                                _rupee(
-                                  (double.tryParse(agreedPriceController.text
-                                              .trim()) ??
-                                          0) *
-                                      (double.tryParse(
-                                            commissionPercentController.text
-                                                .trim(),
-                                          ) ??
-                                          0) /
-                                      100,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Edit Closure',
+                                  style: TextStyle(
+                                      fontSize: narrowDialog
+                                          ? 16
+                                          : (compactDialog ? 20 : 26),
+                                      fontWeight: FontWeight.w700),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        _selectionField(
-                          label: 'Reporting Manager',
-                          hint: 'Select one or more managers...',
-                          value: _formatSelectionSummary(
-                            managerOptions,
-                            selectedManagerIds,
-                          ),
-                          onTap: isSubmitting
-                              ? null
-                              : () async {
-                                  final selected = await _openMultiSelectSheet(
-                                    title: 'Reporting Manager',
-                                    options: managerOptions,
-                                    initialSelectedIds: selectedManagerIds,
-                                  );
-                                  if (selected == null) return;
-                                  setLocalState(
-                                    () => selectedManagerIds = selected,
-                                  );
-                                },
-                        ),
-                        const SizedBox(height: 10),
-                        if (commissionPaid) ...[
-                          _dateField(
-                            'Commission Paid Date',
-                            commissionPaidDate ?? DateTime.now(),
-                            () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate:
-                                    commissionPaidDate ?? DateTime.now(),
-                                firstDate: DateTime.now()
-                                    .subtract(const Duration(days: 3650)),
-                                lastDate: DateTime.now()
-                                    .add(const Duration(days: 3650)),
-                              );
-                              if (picked == null) return;
-                              setLocalState(() => commissionPaidDate = picked);
-                            },
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                        CheckboxListTile(
-                          value: commissionPaid,
-                          onChanged: (v) => setLocalState(() {
-                            commissionPaid = v ?? false;
-                            if (commissionPaid && commissionPaidDate == null) {
-                              commissionPaidDate = DateTime.now();
-                            }
-                          }),
-                          title: const Text(
-                            'Commission already paid',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 8),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: const BorderSide(color: AppColors.border),
-                          ),
-                        ),
-                      ] else ...[
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final stackFields = constraints.maxWidth < 520;
-                            final documentTypeField = _dropdownField(
-                              label: 'Document Type',
-                              value: selectedDocumentType,
-                              hint: 'Select document type...',
-                              items: _documentTypeOptions
-                                  .map(
-                                    (option) => DropdownMenuItem<String>(
-                                      value: option.value,
-                                      child: Text(
-                                        option.value,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: narrowDialog ? 13 : 14,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (value) => setLocalState(
-                                () => selectedDocumentType = value,
-                              ),
-                            );
-                            final documentNameField = _textField(
-                              'Document Name',
-                              documentNameController,
-                              hintText: 'Cost Sheet - Tower B',
-                            );
-                            if (stackFields) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  documentTypeField,
-                                  const SizedBox(height: 10),
-                                  documentNameField,
-                                ],
-                              );
-                            }
-                            return Row(
-                              children: [
-                                Expanded(child: documentTypeField),
-                                const SizedBox(width: 10),
-                                Expanded(child: documentNameField),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: OutlinedButton.icon(
-                            onPressed: isSubmitting ? null : addDocument,
-                            icon: Icon(
-                              Icons.upload_file_outlined,
-                              size: narrowDialog ? 16 : 18,
-                            ),
-                            label: Text(
-                              'Upload Document',
-                              style: TextStyle(fontSize: narrowDialog ? 13 : 15),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        if (documents.isEmpty)
-                          Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: narrowDialog ? 20 : 28,
-                            ),
-                            child: Center(
-                              child: Text(
-                                'No documents yet',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: narrowDialog ? 13 : 15,
-                                ),
-                              ),
-                            ),
-                          )
-                        else
-                          Column(
-                            children: List<Widget>.generate(documents.length,
-                                (index) {
-                              final document = documents[index];
-                              return Container(
-                                margin: EdgeInsets.only(
-                                  bottom: index == documents.length - 1 ? 0 : 10,
-                                ),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border:
-                                      Border.all(color: AppColors.border),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            document.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: AppColors.textPrimary,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: narrowDialog ? 13 : 14,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            document.documentTypeLabel,
-                                            style: TextStyle(
-                                              color: AppColors.textSecondary,
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: narrowDialog ? 12 : 13,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed: isSubmitting
-                                          ? null
-                                          : () => setLocalState(
-                                                () => documents = documents
-                                                    .where((item) =>
-                                                        !identical(item, document))
-                                                    .toList(growable: false),
-                                              ),
-                                      icon: const Icon(
-                                        Icons.delete_outline,
-                                        color: Colors.redAccent,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }),
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
+                              IconButton(
                                 onPressed: isSubmitting
                                     ? null
                                     : () => Navigator.of(context).pop(false),
-                                child: const Text('Cancel'),
+                                padding: EdgeInsets.zero,
+                                constraints: BoxConstraints(
+                                  minWidth: narrowDialog ? 32 : 40,
+                                  minHeight: narrowDialog ? 32 : 40,
+                                ),
+                                icon: Icon(Icons.close,
+                                    size: narrowDialog ? 20 : 24),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _stepTabs(
+                            step,
+                            (v) => setLocalState(() => step = v),
+                            compact: compactDialog,
+                            narrow: narrowDialog,
+                          ),
+                          const SizedBox(height: 14),
+                          if (step == 'booking') ...[
+                            _dateField('Booking Date *', bookingDate, pickDate),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                    child: _textField(
+                                        'Unit Number', unitNumberController)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                    child: _textField(
+                                        'Tower / Block', towerController)),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _textField(
+                                    'Floor',
+                                    floorController,
+                                    keyboardType: TextInputType.number,
+                                    hintText: 'Floor',
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: _textField(
+                                    'Unit Type',
+                                    unitTypeController,
+                                    hintText: 'Unit Type',
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: _textField(
+                                    'Carpet Area (sqft)',
+                                    carpetAreaController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                    hintText: 'Carpet',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            _textField(
+                              'Super Area (sqft)',
+                              superAreaController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                            ),
+                            const SizedBox(height: 10),
+                            _textField('Closure Notes', notesController,
+                                maxLines: 3),
+                          ] else if (step == 'financials') ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _textField(
+                                    'Agreed Price (Rs) *',
+                                    agreedPriceController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                    hintText: '9500000',
+                                    prefixText: 'Rs ',
+                                    onChanged: (_) => setLocalState(() {}),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _textField(
+                                    'Booking Amount (Rs)',
+                                    bookingAmountController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                    hintText: '500000',
+                                    prefixText: 'Rs ',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            _dropdownField(
+                              label: 'Payment Plan',
+                              value: (selectedPaymentPlan ?? '').isEmpty
+                                  ? null
+                                  : selectedPaymentPlan,
+                              hint: 'Select payment plan...',
+                              items: _paymentPlans
+                                  .map(
+                                    (e) => DropdownMenuItem<String>(
+                                      value: e,
+                                      child: Text(e,
+                                          overflow: TextOverflow.ellipsis),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setLocalState(() => selectedPaymentPlan = v),
+                            ),
+                            const SizedBox(height: 10),
+                            CheckboxListTile(
+                              value: loanRequired,
+                              onChanged: (v) => setLocalState(
+                                  () => loanRequired = v ?? false),
+                              title: const Text(
+                                'Home loan required',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              controlAffinity: ListTileControlAffinity.leading,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: const BorderSide(color: AppColors.border),
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: isSubmitting ? null : submit,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
+                          ] else if (step == 'commission') ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _textField(
+                                    'Commission % (auto-calcs amount)',
+                                    commissionPercentController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                    hintText: '2',
+                                    prefixText: '% ',
+                                    onChanged: (_) => setLocalState(() {}),
+                                  ),
                                 ),
-                                child: isSubmitting
-                                    ? const SizedBox(
-                                        height: 18,
-                                        width: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _readOnlyField(
+                                    'Commission Amount (Rs)',
+                                    _rupee(
+                                      (double.tryParse(agreedPriceController
+                                                  .text
+                                                  .trim()) ??
+                                              0) *
+                                          (double.tryParse(
+                                                commissionPercentController.text
+                                                    .trim(),
+                                              ) ??
+                                              0) /
+                                          100,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            _selectionField(
+                              label: 'Reporting Manager',
+                              hint: 'Select one or more managers...',
+                              value: _formatSelectionSummary(
+                                managerOptions,
+                                selectedManagerIds,
+                              ),
+                              onTap: isSubmitting
+                                  ? null
+                                  : () async {
+                                      final selected =
+                                          await _openMultiSelectSheet(
+                                        title: 'Reporting Manager',
+                                        options: managerOptions,
+                                        initialSelectedIds: selectedManagerIds,
+                                      );
+                                      if (selected == null) return;
+                                      setLocalState(
+                                        () => selectedManagerIds = selected,
+                                      );
+                                    },
+                            ),
+                            const SizedBox(height: 10),
+                            if (commissionPaid) ...[
+                              _dateField(
+                                'Commission Paid Date',
+                                commissionPaidDate ?? DateTime.now(),
+                                () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate:
+                                        commissionPaidDate ?? DateTime.now(),
+                                    firstDate: DateTime.now()
+                                        .subtract(const Duration(days: 3650)),
+                                    lastDate: DateTime.now()
+                                        .add(const Duration(days: 3650)),
+                                  );
+                                  if (picked == null) return;
+                                  setLocalState(
+                                      () => commissionPaidDate = picked);
+                                },
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            CheckboxListTile(
+                              value: commissionPaid,
+                              onChanged: (v) => setLocalState(() {
+                                commissionPaid = v ?? false;
+                                if (commissionPaid &&
+                                    commissionPaidDate == null) {
+                                  commissionPaidDate = DateTime.now();
+                                }
+                              }),
+                              title: const Text(
+                                'Commission already paid',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              controlAffinity: ListTileControlAffinity.leading,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: const BorderSide(color: AppColors.border),
+                              ),
+                            ),
+                          ] else ...[
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final stackFields = constraints.maxWidth < 520;
+                                final documentTypeField = _dropdownField(
+                                  label: 'Document Type',
+                                  value: selectedDocumentType,
+                                  hint: 'Select document type...',
+                                  items: _documentTypeOptions
+                                      .map(
+                                        (option) => DropdownMenuItem<String>(
+                                          value: option.value,
+                                          child: Text(
+                                            option.value,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: narrowDialog ? 13 : 14,
+                                            ),
+                                          ),
                                         ),
                                       )
-                                    : Text(
-                                        'Update Closure',
-                                        style: TextStyle(
-                                          fontSize: narrowDialog ? 14 : 16,
-                                        ),
-                                      ),
+                                      .toList(),
+                                  onChanged: (value) => setLocalState(
+                                    () => selectedDocumentType = value,
+                                  ),
+                                );
+                                final documentNameField = _textField(
+                                  'Document Name',
+                                  documentNameController,
+                                  hintText: 'Cost Sheet - Tower B',
+                                );
+                                if (stackFields) {
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      documentTypeField,
+                                      const SizedBox(height: 10),
+                                      documentNameField,
+                                    ],
+                                  );
+                                }
+                                return Row(
+                                  children: [
+                                    Expanded(child: documentTypeField),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: documentNameField),
+                                  ],
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: OutlinedButton.icon(
+                                onPressed: isSubmitting ? null : addDocument,
+                                icon: Icon(
+                                  Icons.upload_file_outlined,
+                                  size: narrowDialog ? 16 : 18,
+                                ),
+                                label: Text(
+                                  'Upload Document',
+                                  style: TextStyle(
+                                      fontSize: narrowDialog ? 13 : 15),
+                                ),
                               ),
                             ),
+                            const SizedBox(height: 16),
+                            if (documents.isEmpty)
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: narrowDialog ? 20 : 28,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'No documents yet',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: narrowDialog ? 13 : 15,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else
+                              Column(
+                                children: List<Widget>.generate(
+                                    documents.length, (index) {
+                                  final document = documents[index];
+                                  return Container(
+                                    margin: EdgeInsets.only(
+                                      bottom: index == documents.length - 1
+                                          ? 0
+                                          : 10,
+                                    ),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border:
+                                          Border.all(color: AppColors.border),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                document.name,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: AppColors.textPrimary,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize:
+                                                      narrowDialog ? 13 : 14,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                document.documentTypeLabel,
+                                                style: TextStyle(
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                  fontWeight: FontWeight.w500,
+                                                  fontSize:
+                                                      narrowDialog ? 12 : 13,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        IconButton(
+                                          onPressed: isSubmitting
+                                              ? null
+                                              : () => setLocalState(
+                                                    () => documents = documents
+                                                        .where((item) =>
+                                                            !identical(
+                                                                item, document))
+                                                        .toList(
+                                                            growable: false),
+                                                  ),
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.redAccent,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ),
                           ],
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: isSubmitting
+                                      ? null
+                                      : () => Navigator.of(context).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: isSubmitting ? null : submit,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                  ),
+                                  child: isSubmitting
+                                      ? const SizedBox(
+                                          height: 18,
+                                          width: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Text(
+                                          'Update Closure',
+                                          style: TextStyle(
+                                            fontSize: narrowDialog ? 14 : 16,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   );
                 },
               ),

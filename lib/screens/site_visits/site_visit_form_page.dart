@@ -563,9 +563,9 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                         const SizedBox(height: 20),
                         _buildLabel('LEAD *'),
                         const SizedBox(height: 8),
-                          _buildDropdown(
-                            sheetTitle: 'Lead',
-                            value: _selectedLeadId,
+                        _buildDropdown(
+                          sheetTitle: 'Lead',
+                          value: _selectedLeadId,
                           hint: 'Select lead...',
                           items: _leads
                               .map(
@@ -575,15 +575,15 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                                 ),
                               )
                               .toList(),
-                            onChanged: (val) => setState(() {
-                              _selectedLeadId = val;
-                              if (_canKeepCurrentAssignedUser) {
-                                _keepCurrentAssignedUser = true;
-                              }
-                            }),
-                            validator: (val) =>
-                                val == null ? 'Lead is required' : null,
-                          ),
+                          onChanged: (val) => setState(() {
+                            _selectedLeadId = val;
+                            if (_canKeepCurrentAssignedUser) {
+                              _keepCurrentAssignedUser = true;
+                            }
+                          }),
+                          validator: (val) =>
+                              val == null ? 'Lead is required' : null,
+                        ),
                         const SizedBox(height: 16),
                         _buildLabel('PROJECT *'),
                         const SizedBox(height: 8),
@@ -704,7 +704,8 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        if (!widget.isEditMode && _canKeepCurrentAssignedUser) ...[
+                        if (!widget.isEditMode &&
+                            _canKeepCurrentAssignedUser) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             decoration: BoxDecoration(
@@ -735,11 +736,10 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                               onChanged: _isSubmitting
                                   ? null
                                   : (value) => setState(
-                                      () => _keepCurrentAssignedUser =
-                                          value ?? false,
-                                    ),
-                              controlAffinity:
-                                  ListTileControlAffinity.leading,
+                                        () => _keepCurrentAssignedUser =
+                                            value ?? false,
+                                      ),
+                              controlAffinity: ListTileControlAffinity.leading,
                               dense: true,
                             ),
                           ),

@@ -369,7 +369,8 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
               children: List<Widget>.generate(documents.length, (index) {
                 final document = documents[index];
                 final documentId = _readString(document['id'], fallback: '');
-                final name = _readString(document['name'], fallback: 'Document');
+                final name =
+                    _readString(document['name'], fallback: 'Document');
                 final type = _documentTypeLabel(
                   _readString(document['document_type'], fallback: '-'),
                 );
@@ -451,14 +452,16 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
                           tooltip: 'Preview document',
                         ),
                       IconButton(
-                        onPressed: isRenaming || isDeleting || _isUploadingDocument
-                            ? null
-                            : () => _editClosureDocument(document),
+                        onPressed:
+                            isRenaming || isDeleting || _isUploadingDocument
+                                ? null
+                                : () => _editClosureDocument(document),
                         icon: isRenaming
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(
                                 Icons.edit_outlined,
@@ -468,14 +471,16 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
                         tooltip: 'Edit document name',
                       ),
                       IconButton(
-                        onPressed: isRenaming || isDeleting || _isUploadingDocument
-                            ? null
-                            : () => _deleteClosureDocument(document),
+                        onPressed:
+                            isRenaming || isDeleting || _isUploadingDocument
+                                ? null
+                                : () => _deleteClosureDocument(document),
                         icon: isDeleting
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(
                                 Icons.delete_outline,

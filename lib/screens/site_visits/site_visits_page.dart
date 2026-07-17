@@ -119,6 +119,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   bool get _canExportData => RoleAccess.canExportModule('site_visits');
+  bool get _showExportButton =>
+      _canExportData && RoleAccess.isAdminOrSuperAdmin(_currentRole);
   bool get _canDeleteSiteVisits => RoleAccess.canDeleteModule('site_visits');
   bool get _isMyScope => _selectedScope == _VisitScope.myItems;
   bool get _showScopeTabs =>
@@ -552,7 +554,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   Widget _buildExportButton() {
-    if (!_canExportData) {
+    if (!_showExportButton) {
       return const SizedBox.shrink();
     }
     return OutlinedButton.icon(
@@ -2450,9 +2452,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         );
         return;
       }
-      await ExportFileHelper.saveToDownloadNextone(
+      final outFile = await ExportFileHelper.saveToDownloadNextone(
         fileName: safeFileName,
         bytes: exported.bytes,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(
+        'Site visits export downloaded and saved to: ${outFile.path}',
       );
     } catch (error) {
       if (!mounted) {

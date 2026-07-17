@@ -63,6 +63,8 @@ class _FollowUpPageState extends State<FollowUpPage> {
 
   bool get _isMyScope => _selectedScope == _FollowUpScope.myFollowUp;
   bool get _canExportData => RoleAccess.canExportModule('follow_ups');
+  bool get _showExportButton =>
+      _canExportData && RoleAccess.isAdminOrSuperAdmin(_currentRole);
   bool get _canDeleteFollowUps => RoleAccess.canDeleteModule('follow_ups');
   bool get _showScopeTabs =>
       _currentRole.isNotEmpty &&
@@ -874,9 +876,15 @@ class _FollowUpPageState extends State<FollowUpPage> {
         );
         return;
       }
-      await ExportFileHelper.saveToDownloadNextone(
+      final outFile = await ExportFileHelper.saveToDownloadNextone(
         fileName: safeFileName,
         bytes: exported.bytes,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(
+        'Follow-ups export downloaded and saved to: ${outFile.path}',
       );
     } catch (error) {
       if (!mounted) {
@@ -1222,7 +1230,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
           ),
         );
 
-        final exportButton = _canExportData
+        final exportButton = _showExportButton
             ? OutlinedButton.icon(
                 onPressed: _isExporting ? null : _exportFollowUps,
                 icon: _isExporting

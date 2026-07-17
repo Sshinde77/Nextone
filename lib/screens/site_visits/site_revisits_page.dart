@@ -59,6 +59,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
 
   bool get _isMyScope => _selectedScope == _RevisitScope.myItems;
   bool get _canExportData => RoleAccess.canExportModule('revisits');
+  bool get _showExportButton =>
+      _canExportData && RoleAccess.isAdminOrSuperAdmin(_currentRole);
   bool get _showScopeTabs =>
       _currentRole.isNotEmpty &&
       !RoleAccess.isSuperAdmin(_currentRole) &&
@@ -154,7 +156,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  if (_canExportData)
+                  if (_showExportButton)
                     OutlinedButton.icon(
                       onPressed: _isExporting ? null : _exportSiteRevisits,
                       icon: _isExporting
@@ -557,9 +559,13 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
         );
         return;
       }
-      await ExportFileHelper.saveToDownloadNextone(
+      final outFile = await ExportFileHelper.saveToDownloadNextone(
         fileName: safeFileName,
         bytes: exported.bytes,
+      );
+      if (!mounted) return;
+      _showSnackBar(
+        'Re-visits export downloaded and saved to: ${outFile.path}',
       );
     } catch (error) {
       if (!mounted) return;

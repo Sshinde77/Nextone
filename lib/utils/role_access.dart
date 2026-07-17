@@ -48,6 +48,8 @@ class RoleAccess {
 
   static bool isSuperAdmin(String role) => normalize(role) == superAdmin;
   static bool isAdmin(String role) => normalize(role) == admin;
+  static bool isAdminOrSuperAdmin(String role) =>
+      isAdmin(role) || isSuperAdmin(role);
   static bool isSalesManager(String role) => normalize(role) == salesManager;
   static bool isTierFour(String role) {
     final normalized = normalize(role);

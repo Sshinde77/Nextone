@@ -68,8 +68,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       const <_PipelineStatusOption>[];
   List<_LeadActivityItem> _activityItems = const <_LeadActivityItem>[];
   List<_LeadRecordingItem> _recordingItems = const <_LeadRecordingItem>[];
-  List<_LeadAttachmentItem> _paymentProofItems =
-      const <_LeadAttachmentItem>[];
+  List<_LeadAttachmentItem> _paymentProofItems = const <_LeadAttachmentItem>[];
   List<_LeadAttachmentItem> _photoItems = const <_LeadAttachmentItem>[];
   List<_LeadReassignmentItem> _reassignmentItems =
       const <_LeadReassignmentItem>[];
@@ -118,7 +117,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
               .toList();
         }
         if (lead.photos.isNotEmpty) {
-          _photoItems = lead.photos.map(_LeadAttachmentItem.fromPhotoApi).toList();
+          _photoItems =
+              lead.photos.map(_LeadAttachmentItem.fromPhotoApi).toList();
         }
         _isPhoneVisible = false;
         _isLoading = false;
@@ -531,7 +531,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         id: widget.leadId,
         token: _authProvider.currentAuthToken,
       );
-      paymentProofs = result.map(_LeadAttachmentItem.fromPaymentProofApi).toList();
+      paymentProofs =
+          result.map(_LeadAttachmentItem.fromPaymentProofApi).toList();
     } catch (error) {
       errorMessage = AppErrorHandler.friendlyMessage(error);
     }
@@ -551,14 +552,14 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     }
     setState(() {
       if (paymentProofs != null) {
-        _paymentProofItems = paymentProofs!.isNotEmpty || _paymentProofItems.isEmpty
-            ? paymentProofs
-            : _paymentProofItems;
+        _paymentProofItems =
+            paymentProofs!.isNotEmpty || _paymentProofItems.isEmpty
+                ? paymentProofs
+                : _paymentProofItems;
       }
       if (photos != null) {
-        _photoItems = photos!.isNotEmpty || _photoItems.isEmpty
-            ? photos
-            : _photoItems;
+        _photoItems =
+            photos!.isNotEmpty || _photoItems.isEmpty ? photos : _photoItems;
       }
       _attachmentsError = errorMessage;
       _isLoadingAttachments = false;
@@ -1035,7 +1036,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       }
       _showSnackBar('Booking form photo deleted successfully.');
       setState(() {
-        _photoItems = _photoItems.where((photo) => photo.id != item.id).toList();
+        _photoItems =
+            _photoItems.where((photo) => photo.id != item.id).toList();
       });
       await _fetchLeadDetails();
       await _loadLeadAttachments(showLoader: false);

@@ -2184,8 +2184,9 @@ class AuthService {
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportClosures}')
-        .replace(queryParameters: <String, String>{
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportClosures}')
+            .replace(queryParameters: <String, String>{
       'from': from.trim(),
       'to': to.trim(),
     });
@@ -2211,8 +2212,8 @@ class AuthService {
       throw Exception(error);
     }
     final disposition = response.headers['content-disposition'] ?? '';
-    final fileName =
-        _readFileNameFromDisposition(disposition) ?? 'closures_${from}_to_$to.xlsx';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'closures_${from}_to_$to.xlsx';
     final contentTypeHeader = response.headers['content-type'] ?? '';
     final contentType = contentTypeHeader.trim().isEmpty
         ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -2257,8 +2258,8 @@ class AuthService {
       throw Exception(error);
     }
     final disposition = response.headers['content-disposition'] ?? '';
-    final fileName =
-        _readFileNameFromDisposition(disposition) ?? 'users_${from}_to_$to.xlsx';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'users_${from}_to_$to.xlsx';
     final contentTypeHeader = response.headers['content-type'] ?? '';
     final contentType = contentTypeHeader.trim().isEmpty
         ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -5305,11 +5306,12 @@ class AuthService {
           ? http.MultipartFile.fromBytes(
               'document',
               fileBytes,
-              filename: normalizedFileName.isEmpty
-                  ? 'document'
-                  : normalizedFileName,
+              filename:
+                  normalizedFileName.isEmpty ? 'document' : normalizedFileName,
               contentType: _documentMediaType(
-                normalizedFileName.isEmpty ? normalizedPath : normalizedFileName,
+                normalizedFileName.isEmpty
+                    ? normalizedPath
+                    : normalizedFileName,
               ),
             )
           : await http.MultipartFile.fromPath(
@@ -6152,7 +6154,9 @@ class AuthService {
                   ? 'payment_proof'
                   : normalizedFileName,
               contentType: _documentMediaType(
-                normalizedFileName.isEmpty ? normalizedPath : normalizedFileName,
+                normalizedFileName.isEmpty
+                    ? normalizedPath
+                    : normalizedFileName,
               ),
             )
           : await http.MultipartFile.fromPath(
@@ -6331,7 +6335,9 @@ class AuthService {
               filename:
                   normalizedFileName.isEmpty ? 'photo' : normalizedFileName,
               contentType: _imageMediaType(
-                normalizedFileName.isEmpty ? normalizedPath : normalizedFileName,
+                normalizedFileName.isEmpty
+                    ? normalizedPath
+                    : normalizedFileName,
               ),
             )
           : await http.MultipartFile.fromPath(
@@ -6702,6 +6708,8 @@ class AuthService {
     required String locationPreference,
     String configuration = '',
     required String notes,
+    String paymentProofUrl = '',
+    String paymentProofAmount = '',
     List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> paymentProof = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> photos = const <Map<String, dynamic>>[],
@@ -6726,6 +6734,12 @@ class AuthService {
       'configuration': configuration.trim(),
       'notes': notes.trim(),
     };
+    if (paymentProofUrl.trim().isNotEmpty) {
+      requestPayload['payment_proof_url'] = paymentProofUrl.trim();
+    }
+    if (paymentProofAmount.trim().isNotEmpty) {
+      requestPayload['payment_proof_amount'] = paymentProofAmount.trim();
+    }
     _addProjectSelectionFields(
       requestPayload,
       projectId: projectId,
@@ -6789,6 +6803,8 @@ class AuthService {
     required String budget,
     required String locationPreference,
     String configuration = '',
+    String paymentProofUrl = '',
+    String paymentProofAmount = '',
     List<Map<String, dynamic>> callRecordings = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> paymentProof = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> photos = const <Map<String, dynamic>>[],
@@ -6814,6 +6830,12 @@ class AuthService {
       'location_preference': locationPreference.trim(),
       'configuration': configuration.trim(),
     };
+    if (paymentProofUrl.trim().isNotEmpty) {
+      requestPayload['payment_proof_url'] = paymentProofUrl.trim();
+    }
+    if (paymentProofAmount.trim().isNotEmpty) {
+      requestPayload['payment_proof_amount'] = paymentProofAmount.trim();
+    }
     _addProjectSelectionFields(
       requestPayload,
       projectId: projectId,

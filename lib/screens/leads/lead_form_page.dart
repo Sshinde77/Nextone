@@ -49,6 +49,9 @@ class _LeadFormPageState extends State<LeadFormPage> {
   final _budgetController = TextEditingController();
   final _locationPreferenceController = TextEditingController();
   final _configurationController = TextEditingController();
+  final _followUpTaskTitleController = TextEditingController();
+  final _paymentProofUrlController = TextEditingController();
+  final _paymentProofAmountController = TextEditingController();
   final _notesController = TextEditingController();
   final _projectNameController = TextEditingController();
 
@@ -77,6 +80,11 @@ class _LeadFormPageState extends State<LeadFormPage> {
   PlatformFile? _selectedCallRecordingFile;
   List<PlatformFile> _selectedPaymentProofFiles = const <PlatformFile>[];
   List<PlatformFile> _selectedPhotoFiles = const <PlatformFile>[];
+  DateTime? _selectedSiteVisitDate;
+  TimeOfDay? _selectedSiteVisitTime;
+  bool _transportArranged = false;
+  DateTime? _selectedFollowUpDueDate;
+  String _selectedFollowUpPriority = 'medium';
 
   @override
   void initState() {
@@ -103,6 +111,9 @@ class _LeadFormPageState extends State<LeadFormPage> {
     _budgetController.dispose();
     _locationPreferenceController.dispose();
     _configurationController.dispose();
+    _followUpTaskTitleController.dispose();
+    _paymentProofUrlController.dispose();
+    _paymentProofAmountController.dispose();
     _notesController.dispose();
     _projectNameController.dispose();
     super.dispose();
@@ -145,6 +156,27 @@ class _LeadFormPageState extends State<LeadFormPage> {
           data['next_follow_up_time'] ??
           data['nextFollowUpTime'],
     );
+    _selectedSiteVisitDate = _tryParseDate(
+      data['visit_date'] ?? data['visitDate'],
+    );
+    _selectedSiteVisitTime = _tryParseTime(
+      data['visit_time'] ?? data['visitTime'],
+    );
+    _transportArranged =
+        _readBool(data['transport_arranged'] ?? data['transportArranged']);
+    _followUpTaskTitleController.text = _readString(
+      data['title'] ?? data['task_title'] ?? data['taskTitle'],
+    );
+    _selectedFollowUpDueDate = _tryParseDateTime(
+      _readString(data['due_date'] ?? data['dueDate']),
+    );
+    final normalizedPriority =
+        _readString(data['priority']).trim().toLowerCase();
+    if (normalizedPriority == 'high' ||
+        normalizedPriority == 'medium' ||
+        normalizedPriority == 'low') {
+      _selectedFollowUpPriority = normalizedPriority;
+    }
     _budgetController.text = _readString(
       data['budget'] ?? data['budget_value'] ?? data['budget_range'],
     );
@@ -155,7 +187,46 @@ class _LeadFormPageState extends State<LeadFormPage> {
       data['configuration'] ?? data['configurations'],
     );
     _configurationController.text = _selectedConfigurations.join(', ');
+    _paymentProofUrlController.text = _readString(
+      data['payment_proof_url'] ??
+          data['paymentProofUrl'] ??
+          data['payment_proof'],
+    );
+    _paymentProofAmountController.text = _readString(
+      data['payment_proof_amount'] ??
+          data['paymentProofAmount'] ??
+          data['amount'],
+    );
     _notesController.text = _readString(data['notes']);
+
+    final paymentProofs = data['payment_proofs'] ?? data['paymentProofs'];
+    if (_paymentProofUrlController.text.isEmpty && paymentProofs is List) {
+      for (final item in paymentProofs.whereType<Map>()) {
+        final proof = item.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+        final proofUrl = _readString(
+          proof['url'] ??
+              proof['payment_proof_url'] ??
+              proof['file_url'] ??
+              proof['path'],
+        );
+        if (proofUrl.isNotEmpty) {
+          _paymentProofUrlController.text = proofUrl;
+        }
+        final proofAmount = _readString(
+          proof['amount'] ?? proof['payment_proof_amount'],
+        );
+        if (_paymentProofAmountController.text.isEmpty &&
+            proofAmount.isNotEmpty) {
+          _paymentProofAmountController.text = proofAmount;
+        }
+        if (_paymentProofUrlController.text.isNotEmpty ||
+            _paymentProofAmountController.text.isNotEmpty) {
+          break;
+        }
+      }
+    }
 
     final project = data['project'];
     if (project is Map<String, dynamic>) {
@@ -812,7 +883,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
   Future<void> _pickPaymentProofFiles() async {
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowMultiple: true,
+      allowMultiple: false,
       allowedExtensions: const <String>[
         'pdf',
         'jpg',
@@ -826,6 +897,10 @@ class _LeadFormPageState extends State<LeadFormPage> {
     }
     setState(() {
       _selectedPaymentProofFiles = List<PlatformFile>.from(picked.files);
+      if (_paymentProofUrlController.text.trim().isEmpty) {
+        _paymentProofUrlController.text =
+            picked.files.first.path?.trim() ?? _paymentProofUrlController.text;
+      }
     });
   }
 
@@ -847,13 +922,53 @@ class _LeadFormPageState extends State<LeadFormPage> {
     return normalized == 'eoi';
   }
 
+  String get _normalizedSelectedStatusLabel {
+    final selectedValue = (_selectedLeadStatus ?? '').trim();
+    if (selectedValue.isEmpty) {
+      return '';
+    }
+
+    for (final option in _leadStatusOptions) {
+      if (option.key == selectedValue || option.label == selectedValue) {
+        return option.label.trim().toLowerCase();
+      }
+    }
+
+    return selectedValue.toLowerCase();
+  }
+
+  bool get _isSiteVisitScheduledStatus {
+    final normalizedKey = (_selectedLeadStatus ?? '').trim().toLowerCase();
+    final normalizedLabel = _normalizedSelectedStatusLabel;
+    return (normalizedKey.contains('site') &&
+            normalizedKey.contains('visit') &&
+            (normalizedKey.contains('schedule') ||
+                normalizedKey.contains('scheduled'))) ||
+        (normalizedLabel.contains('site') &&
+            normalizedLabel.contains('visit') &&
+            (normalizedLabel.contains('schedule') ||
+                normalizedLabel.contains('scheduled')));
+  }
+
+  bool get _isFollowUpStatus {
+    final normalizedKey = (_selectedLeadStatus ?? '').trim().toLowerCase();
+    final normalizedLabel = _normalizedSelectedStatusLabel;
+    return normalizedKey == 'followup' ||
+        normalizedKey.contains('follow_up') ||
+        normalizedKey.contains('follow-up') ||
+        normalizedKey.contains('follow up') ||
+        normalizedLabel == 'followup' ||
+        normalizedLabel.contains('follow-up') ||
+        normalizedLabel.contains('follow up');
+  }
+
   List<Map<String, dynamic>> _buildPaymentProofPayload() {
     return _selectedPaymentProofFiles
         .map(
           (file) => <String, dynamic>{
             'url': file.path?.trim() ?? '',
             'name': file.name.trim(),
-            'amount': '',
+            'amount': _paymentProofAmountController.text.trim(),
           },
         )
         .where((item) => (_readString(item['url'])).isNotEmpty)
@@ -929,6 +1044,12 @@ class _LeadFormPageState extends State<LeadFormPage> {
     });
 
     try {
+      final assignedTo = widget.isEditMode
+          ? _selectedAssigneeId?.trim() ?? ''
+          : _resolveAssignedToForCreate();
+      final projectId = _resolveSelectedProjectId();
+      final projectName = _resolveSelectedProjectName();
+
       if (widget.isEditMode) {
         final leadId = widget.leadId?.trim();
         if (leadId == null || leadId.isEmpty) {
@@ -942,17 +1063,95 @@ class _LeadFormPageState extends State<LeadFormPage> {
           status: _selectedLeadStatus?.trim() ?? '',
           callbackTime: _callbackTimeController.text.trim(),
           nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
-          assignedTo: _selectedAssigneeId?.trim() ?? '',
-          projectId: _resolveSelectedProjectId(),
-          projectName: _resolveSelectedProjectName(),
+          assignedTo: assignedTo,
+          projectId: projectId,
+          projectName: projectName,
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           configuration: _configurationController.text.trim(),
+          paymentProofUrl:
+              _isEoiStatus ? _paymentProofUrlController.text.trim() : '',
+          paymentProofAmount:
+              _isEoiStatus ? _paymentProofAmountController.text.trim() : '',
           paymentProof: _isEoiStatus ? _buildPaymentProofPayload() : const [],
           photos: _isEoiStatus ? _buildPhotoPayload() : const [],
           token: _authProvider.currentAuthToken,
         );
         await _uploadSelectedCallRecording(leadId);
+      } else if (_isSiteVisitScheduledStatus) {
+        if (_selectedSiteVisitDate == null) {
+          _showSnackBar('Please select the visit date.');
+          return;
+        }
+        if (_selectedSiteVisitTime == null) {
+          _showSnackBar('Please select the visit time.');
+          return;
+        }
+
+        final createdLead = await _authProvider.createSiteVisitWithLead(
+          name: _nameController.text.trim(),
+          phone: _phoneController.text.trim(),
+          alternatePhoneNumber: _alternatePhoneController.text.trim(),
+          email: _emailController.text.trim(),
+          source: _resolveSelectedLeadSource(),
+          projectId: projectId,
+          projectName: projectName,
+          assignedTo: assignedTo,
+          budget: _budgetController.text.trim(),
+          locationPreference: _locationPreferenceController.text.trim(),
+          configuration: _configurationController.text.trim(),
+          leadNotes: _notesController.text.trim(),
+          callbackTime: _callbackTimeController.text.trim(),
+          nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
+          visitDate: _formatDateOnly(_selectedSiteVisitDate!),
+          visitTime: _formatTimeOfDay(_selectedSiteVisitTime!),
+          notes: _notesController.text.trim(),
+          transportArranged: _transportArranged,
+          token: _authProvider.currentAuthToken,
+        );
+        final createdLeadId = _extractLeadId(createdLead);
+        if (createdLeadId == null || createdLeadId.isEmpty) {
+          throw Exception(
+              'Lead created but call recording could not be attached.');
+        }
+        await _uploadSelectedCallRecording(createdLeadId);
+      } else if (_isFollowUpStatus) {
+        if (_followUpTaskTitleController.text.trim().isEmpty) {
+          _showSnackBar('Please enter the follow-up task title.');
+          return;
+        }
+        if (_selectedFollowUpDueDate == null) {
+          _showSnackBar('Please select the follow-up due date and time.');
+          return;
+        }
+
+        final createdLead = await _authProvider.createLeadWithFollowUp(
+          name: _nameController.text.trim(),
+          phone: _phoneController.text.trim(),
+          alternatePhoneNumber: _alternatePhoneController.text.trim(),
+          email: _emailController.text.trim(),
+          source: _resolveSelectedLeadSource(),
+          projectId: projectId,
+          projectName: projectName,
+          assignedTo: assignedTo,
+          budget: _budgetController.text.trim(),
+          locationPreference: _locationPreferenceController.text.trim(),
+          configuration: _configurationController.text.trim(),
+          leadNotes: _notesController.text.trim(),
+          callbackTime: _callbackTimeController.text.trim(),
+          nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
+          title: _followUpTaskTitleController.text.trim(),
+          dueDate: _formatDateTime(_selectedFollowUpDueDate!),
+          priority: _selectedFollowUpPriority,
+          notes: _notesController.text.trim(),
+          token: _authProvider.currentAuthToken,
+        );
+        final createdLeadId = _extractLeadId(createdLead);
+        if (createdLeadId == null || createdLeadId.isEmpty) {
+          throw Exception(
+              'Lead created but call recording could not be attached.');
+        }
+        await _uploadSelectedCallRecording(createdLeadId);
       } else {
         final createdLead = await _authProvider.createLead(
           name: _nameController.text.trim(),
@@ -963,13 +1162,17 @@ class _LeadFormPageState extends State<LeadFormPage> {
           status: _selectedLeadStatus?.trim() ?? '',
           callbackTime: _callbackTimeController.text.trim(),
           nextFollowUpTime: _nextFollowUpTimeController.text.trim(),
-          assignedTo: _resolveAssignedToForCreate(),
-          projectId: _resolveSelectedProjectId(),
-          projectName: _resolveSelectedProjectName(),
+          assignedTo: assignedTo,
+          projectId: projectId,
+          projectName: projectName,
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           configuration: _configurationController.text.trim(),
           notes: _notesController.text.trim(),
+          paymentProofUrl:
+              _isEoiStatus ? _paymentProofUrlController.text.trim() : '',
+          paymentProofAmount:
+              _isEoiStatus ? _paymentProofAmountController.text.trim() : '',
           paymentProof: _isEoiStatus ? _buildPaymentProofPayload() : const [],
           photos: _isEoiStatus ? _buildPhotoPayload() : const [],
           token: _authProvider.currentAuthToken,
@@ -1061,8 +1264,141 @@ class _LeadFormPageState extends State<LeadFormPage> {
     return DateTime.tryParse(trimmed);
   }
 
+  DateTime? _tryParseDate(dynamic value) {
+    final raw = _readString(value);
+    if (raw.isEmpty) {
+      return null;
+    }
+    return DateTime.tryParse(raw);
+  }
+
+  TimeOfDay? _tryParseTime(dynamic value) {
+    final raw = _readString(value);
+    if (raw.isEmpty) {
+      return null;
+    }
+    final parts = raw.split(':');
+    if (parts.length < 2) {
+      return null;
+    }
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) {
+      return null;
+    }
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
   String _formatDateTime(DateTime value) {
     return value.toUtc().toIso8601String();
+  }
+
+  String _formatDateOnly(DateTime value) {
+    final localDate = DateTime(value.year, value.month, value.day);
+    final month = localDate.month.toString().padLeft(2, '0');
+    final day = localDate.day.toString().padLeft(2, '0');
+    return '${localDate.year}-$month-$day';
+  }
+
+  String _formatTimeOfDay(TimeOfDay value) {
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  Future<void> _pickSiteVisitDate() async {
+    final now = DateTime.now();
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedSiteVisitDate ?? now,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(2100),
+    );
+    if (pickedDate == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _selectedSiteVisitDate = pickedDate;
+    });
+  }
+
+  Future<void> _pickSiteVisitTime() async {
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: _selectedSiteVisitTime ?? const TimeOfDay(hour: 10, minute: 0),
+    );
+    if (pickedTime == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _selectedSiteVisitTime = pickedTime;
+    });
+  }
+
+  Future<void> _pickFollowUpDueDateTime() async {
+    final now = DateTime.now();
+    final seed = _selectedFollowUpDueDate ?? now.add(const Duration(hours: 1));
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: seed.isBefore(now) ? now : seed,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(2100),
+    );
+    if (pickedDate == null || !mounted) {
+      return;
+    }
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(seed),
+    );
+    if (pickedTime == null || !mounted) {
+      return;
+    }
+
+    final dueDate = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+    if (dueDate.isBefore(now)) {
+      _showSnackBar('Please select a future date and time.');
+      return;
+    }
+
+    setState(() {
+      _selectedFollowUpDueDate = dueDate;
+      _nextFollowUpTimeController.text = _formatDateTime(dueDate);
+    });
+  }
+
+  String _formatDisplayDate(DateTime? value) {
+    if (value == null) {
+      return 'Select date';
+    }
+    final day = value.day.toString().padLeft(2, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    return '$day/$month/${value.year}';
+  }
+
+  String _formatDisplayTime(TimeOfDay? value) {
+    if (value == null) {
+      return '10:00';
+    }
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  void _resetConditionalStatusFields() {
+    _selectedSiteVisitDate = null;
+    _selectedSiteVisitTime = null;
+    _transportArranged = false;
+    _selectedFollowUpDueDate = null;
+    _selectedFollowUpPriority = 'medium';
+    _followUpTaskTitleController.clear();
   }
 
   @override
@@ -1209,45 +1545,106 @@ class _LeadFormPageState extends State<LeadFormPage> {
                       onRetry: _loadLeadStatusOptions,
                       onChanged: (value) {
                         setState(() {
+                          final previousIsSiteVisit = _isSiteVisitScheduledStatus;
+                          final previousIsFollowUp = _isFollowUpStatus;
                           _selectedLeadStatus = value;
+                          final nextIsSiteVisit = _isSiteVisitScheduledStatus;
+                          final nextIsFollowUp = _isFollowUpStatus;
+                          if ((!nextIsSiteVisit && previousIsSiteVisit) ||
+                              (!nextIsFollowUp && previousIsFollowUp)) {
+                            _resetConditionalStatusFields();
+                          }
                           if (!_isEoiStatus) {
-                            _selectedPaymentProofFiles =
-                                const <PlatformFile>[];
+                            _paymentProofUrlController.clear();
+                            _paymentProofAmountController.clear();
+                            _selectedPaymentProofFiles = const <PlatformFile>[];
                             _selectedPhotoFiles = const <PlatformFile>[];
                           }
                         });
                       },
                     ),
+                    if (_isSiteVisitScheduledStatus) ...[
+                      const SizedBox(height: 12),
+                      _buildSiteVisitDetailsCard(),
+                    ],
+                    if (_isFollowUpStatus) ...[
+                      const SizedBox(height: 12),
+                      _buildFollowUpDetailsCard(),
+                    ],
                     if (_isEoiStatus) ...[
                       const SizedBox(height: 12),
-                      _buildFilePickerCard(
-                        title: 'Payment Proof',
-                        buttonLabel: 'Upload Document',
-                        emptyText: 'No payment proof selected',
-                        files: _selectedPaymentProofFiles,
-                        onPick: _pickPaymentProofFiles,
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF8E8),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0xFFFFE3A3),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'EOI Documents',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFB45309),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            _buildFilePickerCard(
+                              title: 'EOI Front Page Photo',
+                              subtitle: 'Optional',
+                              buttonLabel: 'Upload EOI Front Page Photo',
+                              emptyText: 'No front page photo selected',
+                              files: _selectedPhotoFiles,
+                              onPick: _pickPhotoFiles,
+                            ),
+                            const SizedBox(height: 14),
+                            _buildTextField(
+                              controller: _paymentProofUrlController,
+                              label: 'Payment Proof URL',
+                              hintText:
+                                  '/uploads/payment-proofs/payment_proof_receipt_123.jpg',
+                            ),
+                            const SizedBox(height: 12),
+                            _buildTextField(
+                              controller: _paymentProofAmountController,
+                              label: 'Payment Proof Amount',
+                              hintText: '50000',
+                              keyboardType: TextInputType.number,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildFilePickerCard(
+                              title: 'Payment Proof',
+                              subtitle: 'Optional',
+                              buttonLabel: 'Upload Payment Proof',
+                              emptyText: 'No payment proof selected',
+                              files: _selectedPaymentProofFiles,
+                              onPick: _pickPaymentProofFiles,
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 12),
-                      _buildFilePickerCard(
-                        title: 'Photos',
-                        buttonLabel: 'Upload Photos',
-                        emptyText: 'No photos selected',
-                        files: _selectedPhotoFiles,
-                        onPick: _pickPhotoFiles,
+                    ],
+                    if (!_isSiteVisitScheduledStatus && !_isFollowUpStatus) ...[
+                      const SizedBox(height: 12),
+                      _buildDateTimeField(
+                        controller: _callbackTimeController,
+                        label: 'Callback Time',
+                        hintText: 'Select callback date & time',
+                      ),
+                      const SizedBox(height: 12),
+                      _buildDateTimeField(
+                        controller: _nextFollowUpTimeController,
+                        label: 'Next Follow-up Time',
+                        hintText: 'Select next follow-up date & time',
                       ),
                     ],
-                    const SizedBox(height: 12),
-                    _buildDateTimeField(
-                      controller: _callbackTimeController,
-                      label: 'Callback Time',
-                      hintText: 'Select callback date & time',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDateTimeField(
-                      controller: _nextFollowUpTimeController,
-                      label: 'Next Follow-up Time',
-                      hintText: 'Select next follow-up date & time',
-                    ),
                     const SizedBox(height: 12),
                     _buildAssigneeDropdown(),
                     const SizedBox(height: 12),
@@ -1424,6 +1821,163 @@ class _LeadFormPageState extends State<LeadFormPage> {
     );
   }
 
+  Widget _buildSiteVisitDetailsCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F7FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD4E3FF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.calendar_month_rounded,
+                  size: 18, color: Color(0xFF2563EB)),
+              SizedBox(width: 8),
+              Text(
+                'Site Visit Details',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2563EB),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _buildPickerField(
+                  label: 'Visit Date *',
+                  value: _formatDisplayDate(_selectedSiteVisitDate),
+                  isPlaceholder: _selectedSiteVisitDate == null,
+                  onTap: _pickSiteVisitDate,
+                  icon: Icons.calendar_today_rounded,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPickerField(
+                  label: 'Visit Time',
+                  value: _formatDisplayTime(_selectedSiteVisitTime),
+                  isPlaceholder: _selectedSiteVisitTime == null,
+                  onTap: _pickSiteVisitTime,
+                  icon: Icons.access_time_rounded,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          CheckboxListTile(
+            value: _transportArranged,
+            onChanged: _isSubmitting
+                ? null
+                : (value) {
+                    setState(() {
+                      _transportArranged = value ?? false;
+                    });
+                  },
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text(
+              'Transport arranged for client',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFollowUpDetailsCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBF3FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE8D5FF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.call_rounded, size: 18, color: Color(0xFF9333EA)),
+              SizedBox(width: 8),
+              Text(
+                'Follow-up Details',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF9333EA),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _buildTextField(
+            controller: _followUpTaskTitleController,
+            label: 'Task Title',
+            hintText: 'Follow up with lead',
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildPickerField(
+                  label: 'Due Date *',
+                  value: _formatDisplayDate(_selectedFollowUpDueDate),
+                  isPlaceholder: _selectedFollowUpDueDate == null,
+                  onTap: _pickFollowUpDueDateTime,
+                  icon: Icons.calendar_today_rounded,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPickerField(
+                  label: 'Due Time',
+                  value: _selectedFollowUpDueDate == null
+                      ? '10:00'
+                      : _formatDisplayTime(
+                          TimeOfDay.fromDateTime(_selectedFollowUpDueDate!),
+                        ),
+                  isPlaceholder: _selectedFollowUpDueDate == null,
+                  onTap: _pickFollowUpDueDateTime,
+                  icon: Icons.access_time_rounded,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SearchableDropdownField<String>(
+            label: 'Priority',
+            value: _selectedFollowUpPriority,
+            hintText: 'Select priority',
+            items: const <SearchableDropdownItem<String>>[
+              SearchableDropdownItem<String>(value: 'high', label: 'High'),
+              SearchableDropdownItem<String>(value: 'medium', label: 'Medium'),
+              SearchableDropdownItem<String>(value: 'low', label: 'Low'),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _selectedFollowUpPriority = value ?? 'medium';
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildConfigurationDropdown() {
     final hasSelection = _selectedConfigurations.isNotEmpty;
     return Column(
@@ -1522,6 +2076,48 @@ class _LeadFormPageState extends State<LeadFormPage> {
     );
   }
 
+  Widget _buildPickerField({
+    required String label,
+    required String value,
+    required bool isPlaceholder,
+    required VoidCallback onTap,
+    required IconData icon,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: _isSubmitting ? null : onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: _fieldDecoration(hintText: value).copyWith(
+              suffixIcon: Icon(icon, size: 18),
+            ),
+            child: Text(
+              value,
+              style: TextStyle(
+                color: isPlaceholder
+                    ? AppColors.textSecondary
+                    : AppColors.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDateTimeField({
     required TextEditingController controller,
     required String label,
@@ -1560,6 +2156,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
     required String emptyText,
     required List<PlatformFile> files,
     required VoidCallback onPick,
+    String? subtitle,
   }) {
     return Container(
       width: double.infinity,
@@ -1575,13 +2172,29 @@ class _LeadFormPageState extends State<LeadFormPage> {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    if (subtitle != null && subtitle.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle.trim(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               TextButton.icon(

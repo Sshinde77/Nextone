@@ -140,6 +140,8 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   bool get _canExportData => RoleAccess.canExportModule('leads');
+  bool get _showExportButton =>
+      _canExportData && RoleAccess.isAdminOrSuperAdmin(_currentRole);
   bool get _canUseBulkLeadTools => RoleAccess.canCreateModule('leads');
   bool get _canDeleteLeads => RoleAccess.canDeleteModule('leads');
   bool get _showLeadTabs =>
@@ -1264,7 +1266,8 @@ class _LeadsPageState extends State<LeadsPage> {
                               decoration: BoxDecoration(
                                 color: editColor,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFD5DBE8)),
+                                border:
+                                    Border.all(color: const Color(0xFFD5DBE8)),
                               ),
                             ),
                           ),
@@ -1277,7 +1280,8 @@ class _LeadsPageState extends State<LeadsPage> {
                           const Spacer(),
                           Switch(
                             value: editActive,
-                            onChanged: (v) => setEditState(() => editActive = v),
+                            onChanged: (v) =>
+                                setEditState(() => editActive = v),
                           ),
                         ],
                       ),
@@ -2550,15 +2554,15 @@ class _LeadsPageState extends State<LeadsPage> {
       if (!mounted) {
         return;
       }
-      // ScaffoldMessenger.of(context)
-      //   ..hideCurrentSnackBar()
-      //   ..showSnackBar(
-      //     SnackBar(
-      //       content: Text(
-      //         'Leads export downloaded: ${outFile.path}',
-      //       ),
-      //     ),
-      //   );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Leads export downloaded and saved to: ${outFile.path}',
+            ),
+          ),
+        );
     } catch (error) {
       if (!mounted) {
         return;
@@ -2875,8 +2879,9 @@ class _LeadsPageState extends State<LeadsPage> {
                                         color: c.toARGB32() == temp.toARGB32()
                                             ? AppColors.primary
                                             : const Color(0xFFD5DBE8),
-                                        width:
-                                            c.toARGB32() == temp.toARGB32() ? 2 : 1,
+                                        width: c.toARGB32() == temp.toARGB32()
+                                            ? 2
+                                            : 1,
                                       ),
                                     ),
                                   ),
@@ -3149,7 +3154,7 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
         );
 
-        final exportButton = _canExportData
+        final exportButton = _showExportButton
             ? OutlinedButton.icon(
                 onPressed: _isExporting ? null : _exportLeads,
                 icon: _isExporting
@@ -3197,51 +3202,58 @@ class _LeadsPageState extends State<LeadsPage> {
               )
             : null;
 
-        final addSourceButton = OutlinedButton.icon(
-          onPressed: _openManageLeadSourcesDialog,
-          icon: const Icon(Icons.add_circle_outline, size: 16),
-          label: const FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              'Manage Source',
-              maxLines: 1,
-              softWrap: false,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-          ),
-          style: OutlinedButton.styleFrom(
-            fixedSize: const Size.fromHeight(48),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            side: const BorderSide(color: AppColors.border),
-            backgroundColor: AppColors.card,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        final canManageLeadMetadata =
+            RoleAccess.isAdminOrSuperAdmin(_currentRole);
 
-        final manageStatusButton = OutlinedButton.icon(
-          onPressed: _openManagePipelineStatusesDialog,
-          icon: const Icon(Icons.tune_outlined, size: 16),
-          label: const FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              'Manage Status',
-              maxLines: 1,
-              softWrap: false,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-          ),
-          style: OutlinedButton.styleFrom(
-            fixedSize: const Size.fromHeight(48),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            side: const BorderSide(color: AppColors.border),
-            backgroundColor: AppColors.card,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        final addSourceButton = canManageLeadMetadata
+            ? OutlinedButton.icon(
+                onPressed: _openManageLeadSourcesDialog,
+                icon: const Icon(Icons.add_circle_outline, size: 16),
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Manage Source',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  fixedSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  side: const BorderSide(color: AppColors.border),
+                  backgroundColor: AppColors.card,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              )
+            : null;
+
+        final manageStatusButton = canManageLeadMetadata
+            ? OutlinedButton.icon(
+                onPressed: _openManagePipelineStatusesDialog,
+                icon: const Icon(Icons.tune_outlined, size: 16),
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Manage Status',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  fixedSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  side: const BorderSide(color: AppColors.border),
+                  backgroundColor: AppColors.card,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              )
+            : null;
 
         final addButton = FilledButton.icon(
           onPressed: _openCreateLead,
@@ -3280,16 +3292,25 @@ class _LeadsPageState extends State<LeadsPage> {
         }
 
         Widget secondActionRow() {
-          return Row(
-            children: [
-              Expanded(child: addSourceButton),
-              const SizedBox(width: 8),
+          final widgets = <Widget>[
+            if (addSourceButton != null) Expanded(child: addSourceButton),
+            if (manageStatusButton != null) ...[
+              if (addSourceButton != null) const SizedBox(width: 8),
               Expanded(child: manageStatusButton),
-              if (exportButton != null) ...[
-                const SizedBox(width: 8),
-                Expanded(child: exportButton),
-              ],
             ],
+            if (exportButton != null) ...[
+              if (addSourceButton != null || manageStatusButton != null)
+                const SizedBox(width: 8),
+              Expanded(child: exportButton),
+            ],
+          ];
+
+          if (widgets.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
+          return Row(
+            children: widgets,
           );
         }
 
@@ -3299,8 +3320,10 @@ class _LeadsPageState extends State<LeadsPage> {
               searchField,
               const SizedBox(height: 12),
               firstActionRow(),
-              const SizedBox(height: 8),
-              secondActionRow(),
+              if (canManageLeadMetadata || exportButton != null) ...[
+                const SizedBox(height: 8),
+                secondActionRow(),
+              ],
             ],
           );
         }
@@ -3319,17 +3342,19 @@ class _LeadsPageState extends State<LeadsPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 460),
-                    child: secondActionRow(),
+            if (canManageLeadMetadata || exportButton != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 460),
+                      child: secondActionRow(),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ],
         );
       },
@@ -3562,9 +3587,8 @@ class _LeadsPageState extends State<LeadsPage> {
                           color: const Color(0xFF2E7D32),
                           onTap: () {
                             setState(() {
-                              _expandedQuickActionLeadId = isQuickActionsOpen
-                                  ? null
-                                  : lead.id;
+                              _expandedQuickActionLeadId =
+                                  isQuickActionsOpen ? null : lead.id;
                             });
                           },
                         ),

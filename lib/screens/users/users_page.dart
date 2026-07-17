@@ -62,6 +62,8 @@ class _UsersPageState extends State<UsersPage> {
   bool get _canEditUsers => RoleAccess.canEditUsers(_currentRole);
   bool get _canDeleteUsers => RoleAccess.canDeleteUsers(_currentRole);
   bool get _canExportData => RoleAccess.canExportModule('users');
+  bool get _showExportButton =>
+      _canExportData && RoleAccess.isAdminOrSuperAdmin(_currentRole);
 
   Future<void> _loadAccess() async {
     try {
@@ -510,10 +512,14 @@ class _UsersPageState extends State<UsersPage> {
         );
         return;
       }
-      await ExportFileHelper.saveToDownloadNextone(
+      final outFile = await ExportFileHelper.saveToDownloadNextone(
         fileName: safeFileName,
         bytes: exported.bytes,
       );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Users export downloaded and saved to: ${outFile.path}');
     } catch (error) {
       if (!mounted) {
         return;
@@ -582,7 +588,7 @@ class _UsersPageState extends State<UsersPage> {
                   alignment:
                       isCompact ? WrapAlignment.start : WrapAlignment.end,
                   children: [
-                    if (_canExportData)
+                    if (_showExportButton)
                       OutlinedButton.icon(
                         onPressed: _isExporting ? null : _exportUsers,
                         icon: _isExporting

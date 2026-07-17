@@ -137,6 +137,8 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   bool get _canExportData => RoleAccess.canExportModule('attendance');
+  bool get _showExportButton =>
+      _canExportData && RoleAccess.isAdminOrSuperAdmin(_currentRole);
   bool get _canViewWorkingHours =>
       RoleAccess.isAdmin(_currentRole) || RoleAccess.isSuperAdmin(_currentRole);
   bool get _canViewLateReports =>
@@ -316,7 +318,7 @@ class _AttendancePageState extends State<AttendancePage> {
             icon: Icons.refresh_rounded,
             onTap: _loadTodayAttendance,
           ),
-          if (_canExportData)
+          if (_showExportButton)
             OutlinedButton.icon(
               onPressed: _isExporting ? null : _exportAttendance,
               style: OutlinedButton.styleFrom(
@@ -2047,9 +2049,15 @@ class _AttendancePageState extends State<AttendancePage> {
         );
         return;
       }
-      await ExportFileHelper.saveToDownloadNextone(
+      final outFile = await ExportFileHelper.saveToDownloadNextone(
         fileName: safeFileName,
         bytes: exported.bytes,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(
+        'Attendance export downloaded and saved to: ${outFile.path}',
       );
     } catch (error) {
       if (!mounted) {
