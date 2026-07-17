@@ -1,8 +1,13 @@
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:nextone/constants/api_constants.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ClosureDetailPage extends StatefulWidget {
   const ClosureDetailPage({
@@ -18,14 +23,32 @@ class ClosureDetailPage extends StatefulWidget {
 
 class _ClosureDetailPageState extends State<ClosureDetailPage> {
   final AuthProvider _authProvider = AuthProvider();
+  final TextEditingController _documentNameController = TextEditingController();
   bool _isLoading = false;
+  bool _isUploadingDocument = false;
   String? _error;
   Map<String, dynamic>? _data;
+  String? _selectedDocumentType;
+  final Set<String> _renamingDocumentIds = <String>{};
+  final Set<String> _deletingDocumentIds = <String>{};
+
+  static const List<MapEntry<String, String>> _documentTypeOptions =
+      <MapEntry<String, String>>[
+    MapEntry<String, String>('cost_sheet', 'Cost Sheet'),
+    MapEntry<String, String>('payment_proof', 'Payment Proof'),
+    MapEntry<String, String>('booking_form', 'Booking Form'),
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadDetail();
+  }
+
+  @override
+  void dispose() {
+    _documentNameController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDetail() async {
@@ -89,6 +112,8 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
               _closedByCard(),
               const SizedBox(height: 10),
               _notesCard(),
+              const SizedBox(height: 10),
+              _documentsCard(),
             ],
           ],
         ),
@@ -277,6 +302,198 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
     );
   }
 
+  Widget _documentsCard() {
+    final documents = _readDocuments();
+    return _sectionCard(
+      title: 'Documents',
+      icon: Icons.description_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 640;
+              final typeField = _documentDropdownField();
+              final nameField = _documentNameField();
+              if (compact) {
+                return Column(
+                  children: [
+                    typeField,
+                    const SizedBox(height: 12),
+                    nameField,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: typeField),
+                  const SizedBox(width: 12),
+                  Expanded(child: nameField),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: _isUploadingDocument ? null : _uploadClosureDocument,
+            icon: _isUploadingDocument
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.upload_file_outlined),
+            label: Text(
+              _isUploadingDocument ? 'Uploading...' : 'Upload Document',
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (documents.isEmpty)
+            const Text(
+              'No documents available.',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          else
+            Column(
+              children: List<Widget>.generate(documents.length, (index) {
+                final document = documents[index];
+                final documentId = _readString(document['id'], fallback: '');
+                final name = _readString(document['name'], fallback: 'Document');
+                final type = _documentTypeLabel(
+                  _readString(document['document_type'], fallback: '-'),
+                );
+                final url = _readString(document['url'], fallback: '');
+                final previewUrl = _closureDocumentPreviewUrl(url);
+                final isRenaming = _renamingDocumentIds.contains(documentId);
+                final isDeleting = _deletingDocumentIds.contains(documentId);
+                return Container(
+                  margin: EdgeInsets.only(
+                    bottom: index == documents.length - 1 ? 0 : 10,
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: const Icon(
+                          Icons.insert_drive_file_outlined,
+                          color: AppColors.textSecondary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            InkWell(
+                              onTap: previewUrl.isEmpty
+                                  ? null
+                                  : () => _openDocumentPreview(previewUrl),
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: previewUrl.isEmpty
+                                      ? AppColors.textPrimary
+                                      : AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                  decoration: previewUrl.isEmpty
+                                      ? TextDecoration.none
+                                      : TextDecoration.underline,
+                                  decorationColor: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              type.toUpperCase(),
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (previewUrl.isNotEmpty)
+                        IconButton(
+                          onPressed: () => _openDocumentPreview(previewUrl),
+                          icon: const Icon(
+                            Icons.open_in_new_rounded,
+                            color: AppColors.textSecondary,
+                            size: 20,
+                          ),
+                          tooltip: 'Preview document',
+                        ),
+                      IconButton(
+                        onPressed: isRenaming || isDeleting || _isUploadingDocument
+                            ? null
+                            : () => _editClosureDocument(document),
+                        icon: isRenaming
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(
+                                Icons.edit_outlined,
+                                color: AppColors.textSecondary,
+                                size: 20,
+                              ),
+                        tooltip: 'Edit document name',
+                      ),
+                      IconButton(
+                        onPressed: isRenaming || isDeleting || _isUploadingDocument
+                            ? null
+                            : () => _deleteClosureDocument(document),
+                        icon: isDeleting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(
+                                Icons.delete_outline,
+                                color: AppColors.textSecondary,
+                                size: 20,
+                              ),
+                        tooltip: 'Delete document',
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _sectionCard({
     required String title,
     required IconData icon,
@@ -434,6 +651,379 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
   String _readString(dynamic value, {required String fallback}) {
     final text = value?.toString().trim() ?? '';
     return text.isEmpty || text.toLowerCase() == 'null' ? fallback : text;
+  }
+
+  List<Map<String, dynamic>> _readDocuments() {
+    final data = _data;
+    if (data == null) {
+      return const <Map<String, dynamic>>[];
+    }
+    final raw = data['documents'];
+    if (raw is List) {
+      return raw.whereType<Map>().map((item) {
+        return item.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }).toList(growable: false);
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
+  String _documentTypeLabel(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'cost_sheet':
+        return 'Cost Sheet';
+      case 'payment_proof':
+        return 'Payment Proof';
+      case 'booking_form':
+        return 'Booking Form';
+      default:
+        return value.trim().isEmpty ? '-' : value.trim().replaceAll('_', ' ');
+    }
+  }
+
+  Future<void> _uploadClosureDocument() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'closures',
+      action: 'edit',
+      moduleLabel: 'closures',
+    );
+    if (!allowed || _isUploadingDocument) {
+      return;
+    }
+
+    final closureId = _closureId;
+    if (closureId.isEmpty) {
+      _showSnackBar('Closure id is not available.');
+      return;
+    }
+
+    final documentType = (_selectedDocumentType ?? '').trim();
+    final documentName = _documentNameController.text.trim();
+    if (documentType.isEmpty) {
+      _showSnackBar('Please select document type.');
+      return;
+    }
+    if (documentName.isEmpty) {
+      _showSnackBar('Please enter document name.');
+      return;
+    }
+
+    final picked = await FilePicker.platform.pickFiles(
+      withData: kIsWeb,
+      allowMultiple: false,
+    );
+    if (!mounted || picked == null || picked.files.isEmpty) {
+      return;
+    }
+
+    final file = picked.files.first;
+    if (!_hasSelectedUploadFile(file)) {
+      _showSnackBar('Please choose a valid document.');
+      return;
+    }
+
+    setState(() {
+      _isUploadingDocument = true;
+    });
+
+    try {
+      await _authProvider.uploadClosureDocument(
+        closureId: closureId,
+        filePath: _platformFilePath(file),
+        fileBytes: file.bytes,
+        fileName: file.name.trim(),
+        documentType: documentType,
+        name: documentName,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Document uploaded successfully.');
+      _documentNameController.clear();
+      setState(() {
+        _selectedDocumentType = null;
+      });
+      await _loadDetail();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingDocument = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _editClosureDocument(Map<String, dynamic> document) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'closures',
+      action: 'edit',
+      moduleLabel: 'closures',
+    );
+    if (!allowed) {
+      return;
+    }
+
+    final closureId = _closureId;
+    final documentId = _readString(document['id'], fallback: '');
+    if (closureId.isEmpty || documentId.isEmpty) {
+      _showSnackBar('Document id is not available.');
+      return;
+    }
+
+    final nameController = TextEditingController(
+      text: _readString(document['name'], fallback: ''),
+    );
+    var shouldUpdate = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Edit Document Name'),
+          content: TextField(
+            controller: nameController,
+            decoration: const InputDecoration(
+              labelText: 'Document Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (nameController.text.trim().isEmpty) {
+                  _showSnackBar('Please enter document name.');
+                  return;
+                }
+                shouldUpdate = true;
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || !shouldUpdate) {
+      nameController.dispose();
+      return;
+    }
+
+    setState(() {
+      _renamingDocumentIds.add(documentId);
+    });
+    try {
+      await _authProvider.updateClosureDocument(
+        closureId: closureId,
+        documentId: documentId,
+        name: nameController.text.trim(),
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Document updated successfully.');
+      await _loadDetail();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      nameController.dispose();
+      if (mounted) {
+        setState(() {
+          _renamingDocumentIds.remove(documentId);
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteClosureDocument(Map<String, dynamic> document) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'closures',
+      action: 'edit',
+      moduleLabel: 'closures',
+    );
+    if (!allowed) {
+      return;
+    }
+
+    final closureId = _closureId;
+    final documentId = _readString(document['id'], fallback: '');
+    final documentName = _readString(document['name'], fallback: 'document');
+    if (closureId.isEmpty || documentId.isEmpty) {
+      _showSnackBar('Document id is not available.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Document'),
+          content: Text('Delete "$documentName"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _deletingDocumentIds.add(documentId);
+    });
+    try {
+      await _authProvider.deleteClosureDocument(
+        closureId: closureId,
+        documentId: documentId,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Document deleted successfully.');
+      await _loadDetail();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _deletingDocumentIds.remove(documentId);
+        });
+      }
+    }
+  }
+
+  String _closureDocumentPreviewUrl(String path) {
+    final normalizedPath = path.trim();
+    if (normalizedPath.isEmpty) {
+      return '';
+    }
+    if (normalizedPath.startsWith('http://') ||
+        normalizedPath.startsWith('https://')) {
+      return normalizedPath;
+    }
+    return '${ApiConstants.baseUrl.replaceFirst('/api/v1', '')}$normalizedPath';
+  }
+
+  Future<void> _openDocumentPreview(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to preview this document.')),
+      );
+      return;
+    }
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to preview this document.')),
+      );
+    }
+  }
+
+  String get _closureId {
+    return _readString(_data?['id'] ?? widget.lookupId, fallback: '').trim();
+  }
+
+  Widget _documentDropdownField() {
+    return DropdownButtonFormField<String>(
+      value: _selectedDocumentType,
+      decoration: const InputDecoration(
+        labelText: 'Document Type',
+        border: OutlineInputBorder(),
+      ),
+      items: _documentTypeOptions
+          .map(
+            (option) => DropdownMenuItem<String>(
+              value: option.key,
+              child: Text(option.value),
+            ),
+          )
+          .toList(growable: false),
+      onChanged: _isUploadingDocument
+          ? null
+          : (value) {
+              setState(() {
+                _selectedDocumentType = value;
+              });
+            },
+    );
+  }
+
+  Widget _documentNameField() {
+    return TextField(
+      controller: _documentNameController,
+      enabled: !_isUploadingDocument,
+      decoration: const InputDecoration(
+        labelText: 'Document Name',
+        hintText: 'Cost Sheet - Tower B',
+        border: OutlineInputBorder(),
+      ),
+    );
+  }
+
+  bool _hasSelectedUploadFile(PlatformFile? file) {
+    if (file == null) {
+      return false;
+    }
+    if (!kIsWeb) {
+      return (file.path?.trim().isNotEmpty ?? false);
+    }
+    return file.bytes != null && file.bytes!.isNotEmpty;
+  }
+
+  String _platformFilePath(PlatformFile? file) {
+    if (file == null || kIsWeb) {
+      return '';
+    }
+    return file.path?.trim() ?? '';
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   double _toDouble(dynamic value) {

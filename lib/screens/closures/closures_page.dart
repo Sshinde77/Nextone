@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -23,6 +24,32 @@ class _SelectionOption {
   final String label;
 }
 
+class _ClosureDocumentDraft {
+  const _ClosureDocumentDraft({
+    required this.documentType,
+    required this.documentTypeLabel,
+    required this.name,
+    required this.url,
+    this.localPath,
+    this.fileBytes,
+    this.sourceFileName,
+  });
+
+  final String documentType;
+  final String documentTypeLabel;
+  final String name;
+  final String url;
+  final String? localPath;
+  final List<int>? fileBytes;
+  final String? sourceFileName;
+
+  Map<String, dynamic> toPayload() => <String, dynamic>{
+        'url': url,
+        'document_type': documentType,
+        'name': name,
+      };
+}
+
 class ClosuresPage extends StatefulWidget {
   const ClosuresPage({super.key, this.showBackButton = false});
 
@@ -44,6 +71,110 @@ class _ClosuresPageState extends State<ClosuresPage> {
   int _totalPages = 1;
   int _totalItems = 0;
   final int _perPage = 10;
+  static const List<String> _paymentPlans = <String>[
+    'Construction Linked Plan',
+    'Down Payment Plan',
+    'Time Linked Plan',
+    'Flexi Pay Plan',
+    'Subvention Scheme',
+    'Custom',
+  ];
+  static const List<MapEntry<String, String>> _documentTypeOptions =
+      <MapEntry<String, String>>[
+    MapEntry<String, String>('cost_sheet', 'Cost Sheet'),
+    MapEntry<String, String>('payment_proof', 'Payment Proof'),
+    MapEntry<String, String>('booking_form', 'Booking Form'),
+  ];
+
+  String _normalizePaymentPlan(String value) {
+    switch (value.trim()) {
+      case 'Flexi Payment Plan':
+        return 'Flexi Pay Plan';
+      case 'Subvention Plan':
+        return 'Subvention Scheme';
+      default:
+        return value.trim();
+    }
+  }
+
+  String _documentTypeLabel(String value) {
+    for (final option in _documentTypeOptions) {
+      if (option.key == value.trim()) {
+        return option.value;
+      }
+    }
+    return value.trim();
+  }
+
+  String _documentTypeValue(String labelOrValue) {
+    final normalized = labelOrValue.trim().toLowerCase();
+    for (final option in _documentTypeOptions) {
+      if (option.key == normalized || option.value.toLowerCase() == normalized) {
+        return option.key;
+      }
+    }
+    return normalized.replaceAll(' ', '_');
+  }
+
+  List<_ClosureDocumentDraft> _readClosureDocuments(Map<String, dynamic> item) {
+    final raw = item['documents'];
+    final documents = <_ClosureDocumentDraft>[];
+
+    void addDraft(Map<String, dynamic> source) {
+      final documentType = _documentTypeValue(
+        _readString(
+          source['document_type'] ?? source['documentType'],
+          fallback: '',
+        ),
+      );
+      final name = _readString(
+        source['name'] ?? source['document_name'] ?? source['documentName'],
+        fallback: '',
+      );
+      final url = _readString(
+        source['url'] ?? source['file_path'] ?? source['filePath'],
+        fallback: '',
+      );
+      if (documentType.isEmpty || name.isEmpty || url.isEmpty) {
+        return;
+      }
+      documents.add(
+        _ClosureDocumentDraft(
+          documentType: documentType,
+          documentTypeLabel: _documentTypeLabel(documentType),
+          name: name,
+          url: url,
+        ),
+      );
+    }
+
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          addDraft(item);
+        } else if (item is Map) {
+          addDraft(Map<String, dynamic>.from(item));
+        }
+      }
+    }
+
+    return documents;
+  }
+
+  List<Map<String, dynamic>> _buildClosureDocumentPayloads(
+    List<_ClosureDocumentDraft> documents,
+  ) {
+    return documents
+        .map((document) => document.toPayload())
+        .where((document) {
+          final url = _readString(document['url'], fallback: '').trim();
+          final documentType =
+              _readString(document['document_type'], fallback: '').trim();
+          final name = _readString(document['name'], fallback: '').trim();
+          return url.isNotEmpty && documentType.isNotEmpty && name.isNotEmpty;
+        })
+        .toList(growable: false);
+  }
 
   @override
   void initState() {
@@ -439,12 +570,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
     final bookingAmountController = TextEditingController();
     final paymentPlanController = TextEditingController();
     String? selectedPaymentPlan;
-    const paymentPlans = <String>[
-      'Construction Linked Plan',
-      'Down Payment Plan',
-      'Flexi Payment Plan',
-      'Subvention Plan',
-    ];
+    String? selectedDocumentType;
+    final documentNameController = TextEditingController();
+    List<_ClosureDocumentDraft> documents = <_ClosureDocumentDraft>[];
     bool loanRequired = false;
     final loanBankController = TextEditingController();
     final commissionPercentController = TextEditingController();
@@ -523,11 +651,96 @@ class _ClosuresPageState extends State<ClosuresPage> {
       return null;
     }
 
+    String? resolveLeadSiteVisitId(String? leadId) {
+      final normalizedLeadId = (leadId ?? '').trim();
+      if (normalizedLeadId.isEmpty) {
+        return null;
+      }
+
+      Map<String, dynamic>? selectedLead;
+      for (final lead in leads) {
+        final currentLeadId = _readString(
+          lead['id'] ?? lead['lead_id'] ?? lead['leadId'],
+          fallback: '',
+        );
+        if (currentLeadId == normalizedLeadId) {
+          selectedLead = lead;
+          break;
+        }
+      }
+
+      if (selectedLead == null) {
+        return null;
+      }
+
+      final nestedSiteVisit = selectedLead['site_visit'] is Map<String, dynamic>
+          ? selectedLead['site_visit'] as Map<String, dynamic>
+          : selectedLead['siteVisit'] is Map<String, dynamic>
+              ? selectedLead['siteVisit'] as Map<String, dynamic>
+              : null;
+
+      final siteVisitId = _readString(
+        selectedLead['site_visit_id'] ??
+            selectedLead['siteVisitId'] ??
+            selectedLead['latest_site_visit_id'] ??
+            selectedLead['latestSiteVisitId'] ??
+            nestedSiteVisit?['id'] ??
+            nestedSiteVisit?['site_visit_id'] ??
+            nestedSiteVisit?['siteVisitId'],
+        fallback: '',
+      );
+      return siteVisitId.isEmpty ? null : siteVisitId;
+    }
+
     final created = await showDialog<bool>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setLocalState) {
+            Future<void> addDocument() async {
+              final documentType = _documentTypeValue(selectedDocumentType ?? '');
+              final documentName = documentNameController.text.trim();
+              if (documentType.isEmpty || documentName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Select document type and enter document name.'),
+                  ),
+                );
+                return;
+              }
+
+              final picked = await FilePicker.platform.pickFiles(
+                withData: kIsWeb,
+              );
+              if (picked == null || picked.files.isEmpty) return;
+
+              final file = picked.files.first;
+              final safeFileName = file.name.trim();
+              if (safeFileName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Selected file is not valid.')),
+                );
+                return;
+              }
+
+              setLocalState(() {
+                documents = <_ClosureDocumentDraft>[
+                  ...documents,
+                  _ClosureDocumentDraft(
+                    documentType: documentType,
+                    documentTypeLabel: _documentTypeLabel(documentType),
+                    name: documentName,
+                    url: '/uploads/closures/documents/$safeFileName',
+                    localPath: kIsWeb ? null : file.path,
+                    fileBytes: file.bytes,
+                    sourceFileName: safeFileName,
+                  ),
+                ];
+                selectedDocumentType = null;
+                documentNameController.clear();
+              });
+            }
+
             Future<void> pickDate() async {
               final picked = await showDatePicker(
                 context: context,
@@ -540,6 +753,16 @@ class _ClosuresPageState extends State<ClosuresPage> {
             }
 
             Future<void> submit() async {
+              final documentPayloads = _buildClosureDocumentPayloads(documents);
+              if (selectedDocumentType != null ||
+                  documentNameController.text.trim().isNotEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Upload the document before submitting.'),
+                  ),
+                );
+                return;
+              }
               if ((selectedLeadId ?? '').isEmpty ||
                   (selectedProjectId ?? '').isEmpty ||
                   unitNumberController.text.trim().isEmpty ||
@@ -555,7 +778,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 await _authProvider.createClosure(
                   leadId: selectedLeadId!,
                   projectId: selectedProjectId!,
-                  siteVisitId: null,
+                  siteVisitId: resolveLeadSiteVisitId(selectedLeadId),
                   bookingDate: _toYmd(bookingDate),
                   unitNumber: unitNumberController.text.trim(),
                   towerBlock: towerController.text.trim(),
@@ -569,17 +792,19 @@ class _ClosuresPageState extends State<ClosuresPage> {
                       double.tryParse(agreedPriceController.text.trim()) ?? 0,
                   bookingAmount:
                       double.tryParse(bookingAmountController.text.trim()) ?? 0,
-                  paymentPlan: paymentPlanController.text.trim(),
+                  paymentPlan:
+                      (selectedPaymentPlan ?? paymentPlanController.text).trim(),
                   loanRequired: loanRequired,
                   loanBank: loanBankController.text.trim(),
                   commissionPercent: double.tryParse(
                           commissionPercentController.text.trim()) ??
                       0,
-                  commissionPaid: commissionPaid,
-                  closedByManagerIds: selectedManagerIds,
-                  closureNotes: notesController.text.trim(),
-                  token: _authProvider.currentAuthToken,
-                );
+                   commissionPaid: commissionPaid,
+                   closedByManagerIds: selectedManagerIds,
+                   closureNotes: notesController.text.trim(),
+                   documents: documentPayloads,
+                   token: _authProvider.currentAuthToken,
+                 );
                 if (!context.mounted) return;
                 Navigator.of(context).pop(true);
               } catch (e) {
@@ -592,35 +817,55 @@ class _ClosuresPageState extends State<ClosuresPage> {
             }
 
             return Dialog(
+              insetPadding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.of(context).size.width < 560 ? 12 : 24,
+                vertical: 24,
+              ),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16)),
-              child: SizedBox(
-                width: 650,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+              child: Builder(
+                builder: (dialogContext) {
+                  final screenWidth = MediaQuery.of(dialogContext).size.width;
+                  final compactDialog = screenWidth < 720;
+                  final narrowDialog = screenWidth < 560;
+                  return SizedBox(
+                    width: narrowDialog ? screenWidth - 24 : 650,
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(narrowDialog ? 12 : 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                       Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'Create Closure - Book Lead',
                               style: TextStyle(
-                                  fontSize: 26, fontWeight: FontWeight.w700),
+                                  fontSize: narrowDialog ? 16 : (compactDialog ? 20 : 26),
+                                  fontWeight: FontWeight.w700),
                             ),
                           ),
                           IconButton(
                             onPressed: isSubmitting
                                 ? null
                                 : () => Navigator.of(context).pop(false),
-                            icon: const Icon(Icons.close),
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(
+                              minWidth: narrowDialog ? 32 : 40,
+                              minHeight: narrowDialog ? 32 : 40,
+                            ),
+                            icon: Icon(Icons.close, size: narrowDialog ? 20 : 24),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      _stepTabs(step, (v) => setLocalState(() => step = v)),
+                      _stepTabs(
+                        step,
+                        (v) => setLocalState(() => step = v),
+                        compact: compactDialog,
+                        narrow: narrowDialog,
+                      ),
                       const SizedBox(height: 14),
                       if (step == 'booking') ...[
                         _dropdownField(
@@ -759,7 +1004,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           label: 'Payment Plan',
                           value: selectedPaymentPlan,
                           hint: 'Select payment plan...',
-                          items: paymentPlans
+                          items: _paymentPlans
                               .map(
                                 (e) => DropdownMenuItem<String>(
                                   value: e,
@@ -797,7 +1042,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                         ),
                         const SizedBox(height: 4),
                         _textField('Loan Bank', loanBankController),
-                      ] else ...[
+                      ] else if (step == 'commission') ...[
                         Row(
                           children: [
                             Expanded(
@@ -873,39 +1118,196 @@ class _ClosuresPageState extends State<ClosuresPage> {
                             side: const BorderSide(color: AppColors.border),
                           ),
                         ),
-                      ],
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: isSubmitting
-                                  ? null
-                                  : () => Navigator.of(context).pop(false),
-                              child: const Text('Cancel'),
+                      ] else ...[
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final stackFields = constraints.maxWidth < 520;
+                            final documentTypeField = _dropdownField(
+                              label: 'Document Type',
+                              value: selectedDocumentType,
+                              hint: 'Select document type...',
+                              items: _documentTypeOptions
+                                  .map(
+                                    (option) => DropdownMenuItem<String>(
+                                      value: option.value,
+                                      child: Text(
+                                        option.value,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: narrowDialog ? 13 : 14,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) => setLocalState(
+                                () => selectedDocumentType = value,
+                              ),
+                            );
+                            final documentNameField = _textField(
+                              'Document Name',
+                              documentNameController,
+                              hintText: 'Cost Sheet - Tower B',
+                            );
+                            if (stackFields) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  documentTypeField,
+                                  const SizedBox(height: 10),
+                                  documentNameField,
+                                ],
+                              );
+                            }
+                            return Row(
+                              children: [
+                                Expanded(child: documentTypeField),
+                                const SizedBox(width: 10),
+                                Expanded(child: documentNameField),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: isSubmitting ? null : addDocument,
+                            icon: Icon(
+                              Icons.upload_file_outlined,
+                              size: narrowDialog ? 16 : 18,
+                            ),
+                            label: Text(
+                              'Upload Document',
+                              style: TextStyle(fontSize: narrowDialog ? 13 : 15),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: FilledButton(
-                              onPressed: isSubmitting ? null : submit,
-                              style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.primary),
-                              child: isSubmitting
-                                  ? const SizedBox(
-                                      height: 18,
-                                      width: 18,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Text('Book Lead'),
+                        ),
+                        const SizedBox(height: 16),
+                        if (documents.isEmpty)
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: narrowDialog ? 20 : 28,
                             ),
+                            child: Center(
+                              child: Text(
+                                'No documents yet',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: narrowDialog ? 13 : 15,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          Column(
+                            children: List<Widget>.generate(documents.length,
+                                (index) {
+                              final document = documents[index];
+                              return Container(
+                                margin: EdgeInsets.only(
+                                  bottom: index == documents.length - 1 ? 0 : 10,
+                                ),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border:
+                                      Border.all(color: AppColors.border),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            document.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: narrowDialog ? 13 : 14,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            document.documentTypeLabel,
+                                            style: TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: narrowDialog ? 12 : 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: isSubmitting
+                                          ? null
+                                          : () => setLocalState(
+                                                () => documents = documents
+                                                    .where((item) =>
+                                                        !identical(item, document))
+                                                    .toList(growable: false),
+                                              ),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.redAccent,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
                           ),
                         ],
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () => Navigator.of(context).pop(false),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: isSubmitting ? null : submit,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                ),
+                                child: isSubmitting
+                                    ? const SizedBox(
+                                        height: 18,
+                                        width: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : Text(
+                                        'Book Lead',
+                                        style: TextStyle(
+                                          fontSize: narrowDialog ? 14 : 16,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  );
+                },
               ),
             );
           },
@@ -922,6 +1324,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
     agreedPriceController.dispose();
     bookingAmountController.dispose();
     paymentPlanController.dispose();
+    documentNameController.dispose();
     loanBankController.dispose();
     commissionPercentController.dispose();
     notesController.dispose();
@@ -935,7 +1338,12 @@ class _ClosuresPageState extends State<ClosuresPage> {
     }
   }
 
-  Widget _stepTabs(String step, ValueChanged<String> onChanged) {
+  Widget _stepTabs(
+    String step,
+    ValueChanged<String> onChanged, {
+    bool compact = false,
+    bool narrow = false,
+  }) {
     Widget tab(String value, String label) {
       final selected = value == step;
       return Expanded(
@@ -943,7 +1351,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
           onTap: () => onChanged(value),
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: EdgeInsets.symmetric(vertical: narrow ? 6 : 8),
             decoration: BoxDecoration(
               color: selected ? Colors.white : const Color(0xFFF3F4F6),
               borderRadius: BorderRadius.circular(8),
@@ -951,8 +1359,11 @@ class _ClosuresPageState extends State<ClosuresPage> {
             alignment: Alignment.center,
             child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
+                fontSize: narrow ? 11 : (compact ? 12 : 14),
                 color:
                     selected ? AppColors.textPrimary : AppColors.textSecondary,
               ),
@@ -975,6 +1386,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
           tab('financials', 'Financials'),
           const SizedBox(width: 4),
           tab('commission', 'Commission'),
+          const SizedBox(width: 4),
+          tab('documents', 'Documents'),
         ],
       ),
     );
@@ -1621,13 +2034,10 @@ class _ClosuresPageState extends State<ClosuresPage> {
       text: _readString(item['booking_amount'], fallback: ''),
     );
     String? selectedPaymentPlan =
-        _readString(item['payment_plan'], fallback: '');
-    const paymentPlans = <String>[
-      'Construction Linked Plan',
-      'Down Payment Plan',
-      'Flexi Payment Plan',
-      'Subvention Plan',
-    ];
+        _normalizePaymentPlan(_readString(item['payment_plan'], fallback: ''));
+    String? selectedDocumentType;
+    final documentNameController = TextEditingController();
+    List<_ClosureDocumentDraft> documents = _readClosureDocuments(item);
     bool loanRequired = item['loan_required'] == true;
     final loanBankController = TextEditingController(
         text: _readString(item['loan_bank'], fallback: ''));
@@ -1652,6 +2062,50 @@ class _ClosuresPageState extends State<ClosuresPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setLocalState) {
+            Future<void> addDocument() async {
+              final documentType = _documentTypeValue(selectedDocumentType ?? '');
+              final documentName = documentNameController.text.trim();
+              if (documentType.isEmpty || documentName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Select document type and enter document name.'),
+                  ),
+                );
+                return;
+              }
+
+              final picked = await FilePicker.platform.pickFiles(
+                withData: kIsWeb,
+              );
+              if (picked == null || picked.files.isEmpty) return;
+
+              final file = picked.files.first;
+              final safeFileName = file.name.trim();
+              if (safeFileName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Selected file is not valid.')),
+                );
+                return;
+              }
+
+              setLocalState(() {
+                documents = <_ClosureDocumentDraft>[
+                  ...documents,
+                  _ClosureDocumentDraft(
+                    documentType: documentType,
+                    documentTypeLabel: _documentTypeLabel(documentType),
+                    name: documentName,
+                    url: '/uploads/closures/documents/$safeFileName',
+                    localPath: kIsWeb ? null : file.path,
+                    fileBytes: file.bytes,
+                    sourceFileName: safeFileName,
+                  ),
+                ];
+                selectedDocumentType = null;
+                documentNameController.clear();
+              });
+            }
+
             Future<void> pickDate() async {
               final picked = await showDatePicker(
                 context: context,
@@ -1664,6 +2118,16 @@ class _ClosuresPageState extends State<ClosuresPage> {
             }
 
             Future<void> submit() async {
+              final documentPayloads = _buildClosureDocumentPayloads(documents);
+              if (selectedDocumentType != null ||
+                  documentNameController.text.trim().isNotEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Upload the document before submitting.'),
+                  ),
+                );
+                return;
+              }
               if (unitNumberController.text.trim().isEmpty ||
                   floorController.text.trim().isEmpty ||
                   unitTypeController.text.trim().isEmpty) {
@@ -1696,14 +2160,15 @@ class _ClosuresPageState extends State<ClosuresPage> {
                           commissionPercentController.text.trim()) ??
                       0,
                   commissionPaid: commissionPaid,
-                  commissionPaidDate:
-                      commissionPaid && commissionPaidDate != null
-                          ? _toYmd(commissionPaidDate!)
-                          : null,
-                  closedByManagerIds: selectedManagerIds,
-                  closureNotes: notesController.text.trim(),
-                  token: _authProvider.currentAuthToken,
-                );
+                   commissionPaidDate:
+                       commissionPaid && commissionPaidDate != null
+                           ? _toYmd(commissionPaidDate!)
+                           : null,
+                   closedByManagerIds: selectedManagerIds,
+                   closureNotes: notesController.text.trim(),
+                    documents: documentPayloads,
+                    token: _authProvider.currentAuthToken,
+                  );
                 if (!context.mounted) return;
                 Navigator.of(context).pop(true);
               } catch (e) {
@@ -1716,35 +2181,55 @@ class _ClosuresPageState extends State<ClosuresPage> {
             }
 
             return Dialog(
+              insetPadding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.of(context).size.width < 560 ? 12 : 24,
+                vertical: 24,
+              ),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16)),
-              child: SizedBox(
-                width: 650,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+              child: Builder(
+                builder: (dialogContext) {
+                  final screenWidth = MediaQuery.of(dialogContext).size.width;
+                  final compactDialog = screenWidth < 720;
+                  final narrowDialog = screenWidth < 560;
+                  return SizedBox(
+                    width: narrowDialog ? screenWidth - 24 : 650,
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(narrowDialog ? 12 : 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                       Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'Edit Closure',
                               style: TextStyle(
-                                  fontSize: 26, fontWeight: FontWeight.w700),
+                                  fontSize: narrowDialog ? 16 : (compactDialog ? 20 : 26),
+                                  fontWeight: FontWeight.w700),
                             ),
                           ),
                           IconButton(
                             onPressed: isSubmitting
                                 ? null
                                 : () => Navigator.of(context).pop(false),
-                            icon: const Icon(Icons.close),
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(
+                              minWidth: narrowDialog ? 32 : 40,
+                              minHeight: narrowDialog ? 32 : 40,
+                            ),
+                            icon: Icon(Icons.close, size: narrowDialog ? 20 : 24),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      _stepTabs(step, (v) => setLocalState(() => step = v)),
+                      _stepTabs(
+                        step,
+                        (v) => setLocalState(() => step = v),
+                        compact: compactDialog,
+                        narrow: narrowDialog,
+                      ),
                       const SizedBox(height: 14),
                       if (step == 'booking') ...[
                         _dateField('Booking Date *', bookingDate, pickDate),
@@ -1838,7 +2323,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                               ? null
                               : selectedPaymentPlan,
                           hint: 'Select payment plan...',
-                          items: paymentPlans
+                          items: _paymentPlans
                               .map(
                                 (e) => DropdownMenuItem<String>(
                                   value: e,
@@ -1870,7 +2355,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                             side: const BorderSide(color: AppColors.border),
                           ),
                         ),
-                      ] else ...[
+                      ] else if (step == 'commission') ...[
                         Row(
                           children: [
                             Expanded(
@@ -1970,39 +2455,196 @@ class _ClosuresPageState extends State<ClosuresPage> {
                             side: const BorderSide(color: AppColors.border),
                           ),
                         ),
-                      ],
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: isSubmitting
-                                  ? null
-                                  : () => Navigator.of(context).pop(false),
-                              child: const Text('Cancel'),
+                      ] else ...[
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final stackFields = constraints.maxWidth < 520;
+                            final documentTypeField = _dropdownField(
+                              label: 'Document Type',
+                              value: selectedDocumentType,
+                              hint: 'Select document type...',
+                              items: _documentTypeOptions
+                                  .map(
+                                    (option) => DropdownMenuItem<String>(
+                                      value: option.value,
+                                      child: Text(
+                                        option.value,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: narrowDialog ? 13 : 14,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) => setLocalState(
+                                () => selectedDocumentType = value,
+                              ),
+                            );
+                            final documentNameField = _textField(
+                              'Document Name',
+                              documentNameController,
+                              hintText: 'Cost Sheet - Tower B',
+                            );
+                            if (stackFields) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  documentTypeField,
+                                  const SizedBox(height: 10),
+                                  documentNameField,
+                                ],
+                              );
+                            }
+                            return Row(
+                              children: [
+                                Expanded(child: documentTypeField),
+                                const SizedBox(width: 10),
+                                Expanded(child: documentNameField),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: isSubmitting ? null : addDocument,
+                            icon: Icon(
+                              Icons.upload_file_outlined,
+                              size: narrowDialog ? 16 : 18,
+                            ),
+                            label: Text(
+                              'Upload Document',
+                              style: TextStyle(fontSize: narrowDialog ? 13 : 15),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: FilledButton(
-                              onPressed: isSubmitting ? null : submit,
-                              style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.primary),
-                              child: isSubmitting
-                                  ? const SizedBox(
-                                      height: 18,
-                                      width: 18,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Text('Update Closure'),
+                        ),
+                        const SizedBox(height: 16),
+                        if (documents.isEmpty)
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: narrowDialog ? 20 : 28,
                             ),
+                            child: Center(
+                              child: Text(
+                                'No documents yet',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: narrowDialog ? 13 : 15,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          Column(
+                            children: List<Widget>.generate(documents.length,
+                                (index) {
+                              final document = documents[index];
+                              return Container(
+                                margin: EdgeInsets.only(
+                                  bottom: index == documents.length - 1 ? 0 : 10,
+                                ),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border:
+                                      Border.all(color: AppColors.border),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            document.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: narrowDialog ? 13 : 14,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            document.documentTypeLabel,
+                                            style: TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: narrowDialog ? 12 : 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: isSubmitting
+                                          ? null
+                                          : () => setLocalState(
+                                                () => documents = documents
+                                                    .where((item) =>
+                                                        !identical(item, document))
+                                                    .toList(growable: false),
+                                              ),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.redAccent,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
                           ),
                         ],
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () => Navigator.of(context).pop(false),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: isSubmitting ? null : submit,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                ),
+                                child: isSubmitting
+                                    ? const SizedBox(
+                                        height: 18,
+                                        width: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : Text(
+                                        'Update Closure',
+                                        style: TextStyle(
+                                          fontSize: narrowDialog ? 14 : 16,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  );
+                },
               ),
             );
           },
@@ -2016,6 +2658,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
     unitTypeController.dispose();
     carpetAreaController.dispose();
     superAreaController.dispose();
+    documentNameController.dispose();
     agreedPriceController.dispose();
     bookingAmountController.dispose();
     loanBankController.dispose();

@@ -4926,6 +4926,49 @@ class AuthService {
     };
   }
 
+  List<Map<String, dynamic>>? _sanitizeClosureDocuments(
+    List<Map<String, dynamic>>? documents,
+  ) {
+    if (documents == null) {
+      return null;
+    }
+
+    String readString(dynamic value) {
+      if (value == null) {
+        return '';
+      }
+      if (value is String) {
+        return value;
+      }
+      return value.toString();
+    }
+
+    final sanitized = documents
+        .map((item) {
+          final url = readString(item['url']).trim();
+          final documentType = readString(
+            item['document_type'] ?? item['documentType'],
+          ).trim();
+          final name = readString(
+            item['name'] ?? item['document_name'] ?? item['documentName'],
+          ).trim();
+
+          if (url.isEmpty || documentType.isEmpty || name.isEmpty) {
+            return null;
+          }
+
+          return <String, dynamic>{
+            'url': url,
+            'document_type': documentType,
+            'name': name,
+          };
+        })
+        .whereType<Map<String, dynamic>>()
+        .toList(growable: false);
+
+    return sanitized.isEmpty ? null : sanitized;
+  }
+
   Future<Map<String, dynamic>> createClosure({
     required String leadId,
     required String projectId,
@@ -4946,6 +4989,7 @@ class AuthService {
     required bool commissionPaid,
     List<String>? closedByManagerIds,
     required String closureNotes,
+    List<Map<String, dynamic>>? documents,
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
@@ -4978,6 +5022,7 @@ class AuthService {
               .where((id) => id.isNotEmpty)
               .toList(growable: false),
       'closure_notes': closureNotes.trim(),
+      'documents': _sanitizeClosureDocuments(documents),
     };
     final body = jsonEncode(payload);
 
@@ -5032,6 +5077,7 @@ class AuthService {
     String? commissionPaidDate,
     List<String>? closedByManagerIds,
     required String closureNotes,
+    List<Map<String, dynamic>>? documents,
     String? token,
   }) async {
     final normalizedId = id.trim();
@@ -5070,6 +5116,7 @@ class AuthService {
               .where((id) => id.isNotEmpty)
               .toList(growable: false),
       'closure_notes': closureNotes.trim(),
+      'documents': _sanitizeClosureDocuments(documents),
     };
     final body = jsonEncode(payload);
 
@@ -5208,6 +5255,198 @@ class AuthService {
     } catch (_) {}
 
     throw Exception('Closure detail response format is not valid.');
+  }
+
+  Future<Map<String, dynamic>> uploadClosureDocument({
+    required String closureId,
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    required String documentType,
+    required String name,
+    String? token,
+  }) async {
+    final normalizedClosureId = closureId.trim();
+    if (normalizedClosureId.isEmpty) {
+      throw Exception('Closure id is required.');
+    }
+
+    final normalizedPath = filePath.trim();
+    final normalizedFileName = fileName.trim();
+    final normalizedDocumentType = documentType.trim();
+    final normalizedName = name.trim();
+    final hasBytes = fileBytes != null && fileBytes.isNotEmpty;
+
+    if (normalizedPath.isEmpty && !hasBytes) {
+      throw Exception('Select a document to upload.');
+    }
+    if (normalizedDocumentType.isEmpty) {
+      throw Exception('Document type is required.');
+    }
+    if (normalizedName.isEmpty) {
+      throw Exception('Document name is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.closureDocuments.replaceFirst(
+      '{id}',
+      normalizedClosureId,
+    );
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['accept'] = 'application/json';
+    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    request.fields['document_type'] = normalizedDocumentType;
+    request.fields['name'] = normalizedName;
+    request.files.add(
+      hasBytes
+          ? http.MultipartFile.fromBytes(
+              'document',
+              fileBytes,
+              filename: normalizedFileName.isEmpty
+                  ? 'document'
+                  : normalizedFileName,
+              contentType: _documentMediaType(
+                normalizedFileName.isEmpty ? normalizedPath : normalizedFileName,
+              ),
+            )
+          : await http.MultipartFile.fromPath(
+              'document',
+              normalizedPath,
+              contentType: _documentMediaType(normalizedPath),
+            ),
+    );
+
+    _logRequest(
+      endpoint: 'uploadClosureDocument',
+      method: 'POST',
+      uri: uri,
+      headers: request.headers,
+      body: 'multipart/form-data',
+    );
+
+    final streamedResponse = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    _logResponse('uploadClosureDocument', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to upload closure document.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'closure_id': normalizedClosureId,
+      'document_type': normalizedDocumentType,
+      'name': normalizedName,
+    };
+  }
+
+  Future<Map<String, dynamic>> updateClosureDocument({
+    required String closureId,
+    required String documentId,
+    required String name,
+    String? token,
+  }) async {
+    final normalizedClosureId = closureId.trim();
+    final normalizedDocumentId = documentId.trim();
+    final normalizedName = name.trim();
+    if (normalizedClosureId.isEmpty || normalizedDocumentId.isEmpty) {
+      throw Exception('Document id is required.');
+    }
+    if (normalizedName.isEmpty) {
+      throw Exception('Document name is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.closureDocumentDetail
+        .replaceFirst('{id}', normalizedClosureId)
+        .replaceFirst('{documentId}', normalizedDocumentId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    final body = jsonEncode(<String, dynamic>{'name': normalizedName});
+
+    _logRequest(
+      endpoint: 'updateClosureDocument',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('updateClosureDocument', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update closure document.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'closure_id': normalizedClosureId,
+      'document_id': normalizedDocumentId,
+      'name': normalizedName,
+    };
+  }
+
+  Future<void> deleteClosureDocument({
+    required String closureId,
+    required String documentId,
+    String? token,
+  }) async {
+    final normalizedClosureId = closureId.trim();
+    final normalizedDocumentId = documentId.trim();
+    if (normalizedClosureId.isEmpty || normalizedDocumentId.isEmpty) {
+      throw Exception('Document id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.closureDocumentDetail
+        .replaceFirst('{id}', normalizedClosureId)
+        .replaceFirst('{documentId}', normalizedDocumentId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteClosureDocument',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteClosureDocument', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete closure document.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
   }
 
   Future<Map<String, dynamic>> editSiteRevisit({

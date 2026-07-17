@@ -73,6 +73,7 @@ class _LeadsPageState extends State<LeadsPage> {
   bool _isSubmittingReassign = false;
   bool _isLoadingLeadSources = false;
   String? _visiblePhoneLeadId;
+  String? _expandedQuickActionLeadId;
   String? _selectedAssigneeId;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_LeadSourceOption> _leadSources = const <_LeadSourceOption>[];
@@ -1879,6 +1880,73 @@ class _LeadsPageState extends State<LeadsPage> {
     await _callLead(lead.phone);
   }
 
+  Widget _buildLeadQuickActionsTray(_LeadModel lead) {
+    return Container(
+      key: ValueKey<String>('quick-actions-${lead.id}'),
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFD),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildQuickActionIcon(
+            tooltip: 'WhatsApp',
+            icon: Icons.chat_outlined,
+            color: const Color(0xFF25D366),
+            onTap: () => _sendLeadDetailsViaWhatsApp(lead),
+          ),
+          const SizedBox(width: 10),
+          _buildQuickActionIcon(
+            tooltip: 'Email',
+            icon: Icons.email_outlined,
+            color: const Color(0xFF1976D2),
+            onTap: () => _sendLeadDetailsViaEmail(lead),
+          ),
+          const SizedBox(width: 10),
+          _buildQuickActionIcon(
+            tooltip: 'Call',
+            icon: Icons.call_outlined,
+            color: const Color(0xFF2E7D32),
+            onTap: () => _handleCallAction(lead),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionIcon({
+    required String tooltip,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _openPhoneRequestSheet(_LeadModel lead) async {
     final reasonController = TextEditingController();
     bool isSubmitting = false;
@@ -3465,63 +3533,83 @@ class _LeadsPageState extends State<LeadsPage> {
             )
           else
             ...leads.map((lead) {
+              final isQuickActionsOpen = _expandedQuickActionLeadId == lead.id;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: DataCard(
-                  name: lead.name,
-                  leadId: '',
-                  status: lead.status,
-                  priority: lead.priority,
-                  priorityColor: lead.priorityColor,
-                  nextFollowUpDate: lead.nextFollowUpDate,
-                  leftMetaLabel: 'Callback Time',
-                  rightMetaLabel: 'Next Follow-up',
-                  budget: lead.budget,
-                  phone: _displayPhoneForLead(lead),
-                  phoneAction: _phoneRevealAction(lead),
-                  profileImageUrl: lead.profileImageUrl,
-                  assigneeName: lead.assignee.name,
-                  assigneeImageUrl: lead.assignee.imageUrl,
-                  onTap: () => _viewLeadDetail(lead.id),
-                  actions: [
-                    DataCardAction(
-                      icon: Icons.call_outlined,
-                      onTap: () => _handleCallAction(lead),
+                child: Column(
+                  children: [
+                    DataCard(
+                      name: lead.name,
+                      leadId: '',
+                      status: lead.status,
+                      priority: lead.priority,
+                      priorityColor: lead.priorityColor,
+                      nextFollowUpDate: lead.nextFollowUpDate,
+                      leftMetaLabel: 'Callback Time',
+                      rightMetaLabel: 'Next Follow-up',
+                      budget: lead.budget,
+                      phone: _displayPhoneForLead(lead),
+                      phoneAction: _phoneRevealAction(lead),
+                      profileImageUrl: lead.profileImageUrl,
+                      assigneeName: lead.assignee.name,
+                      assigneeImageUrl: lead.assignee.imageUrl,
+                      onTap: () => _viewLeadDetail(lead.id),
+                      actions: [
+                        DataCardAction(
+                          icon: isQuickActionsOpen
+                              ? Icons.close_rounded
+                              : Icons.phone_outlined,
+                          color: const Color(0xFF2E7D32),
+                          onTap: () {
+                            setState(() {
+                              _expandedQuickActionLeadId = isQuickActionsOpen
+                                  ? null
+                                  : lead.id;
+                            });
+                          },
+                        ),
+                        DataCardAction(
+                          icon: Icons.person_add_alt_1_outlined,
+                          color: AppColors.primary,
+                          onTap: () => _openReassignSheet(lead),
+                        ),
+                        DataCardAction(
+                          icon: Icons.edit_outlined,
+                          onTap: () => _openEditLead(lead),
+                        ),
+                        if (_canDeleteLeads)
+                          DataCardAction(
+                            icon: Icons.delete_outline,
+                            color: const Color(0xFFD32F2F),
+                            onTap: () => _deleteLead(lead),
+                          ),
+                      ],
+                      bulkSelectionMode: _isBulkSelectionMode,
+                      isSelected: _selectedLeadIds.contains(lead.id),
+                      onLongPress: () {
+                        setState(() {
+                          _isBulkSelectionMode = true;
+                          _selectedLeadIds.add(lead.id);
+                        });
+                      },
+                      onSelectionChanged: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedLeadIds.add(lead.id);
+                          } else {
+                            _selectedLeadIds.remove(lead.id);
+                          }
+                          _syncBulkSelectionMode();
+                        });
+                      },
                     ),
-                    DataCardAction(
-                      icon: Icons.person_add_alt_1_outlined,
-                      color: AppColors.primary,
-                      onTap: () => _openReassignSheet(lead),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: isQuickActionsOpen
+                          ? _buildLeadQuickActionsTray(lead)
+                          : const SizedBox.shrink(),
                     ),
-                    DataCardAction(
-                      icon: Icons.edit_outlined,
-                      onTap: () => _openEditLead(lead),
-                    ),
-                    if (_canDeleteLeads)
-                      DataCardAction(
-                        icon: Icons.delete_outline,
-                        color: const Color(0xFFD32F2F),
-                        onTap: () => _deleteLead(lead),
-                      ),
                   ],
-                  bulkSelectionMode: _isBulkSelectionMode,
-                  isSelected: _selectedLeadIds.contains(lead.id),
-                  onLongPress: () {
-                    setState(() {
-                      _isBulkSelectionMode = true;
-                      _selectedLeadIds.add(lead.id);
-                    });
-                  },
-                  onSelectionChanged: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedLeadIds.add(lead.id);
-                      } else {
-                        _selectedLeadIds.remove(lead.id);
-                      }
-                      _syncBulkSelectionMode();
-                    });
-                  },
                 ),
               );
             }),

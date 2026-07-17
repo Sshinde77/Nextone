@@ -109,6 +109,9 @@ class ApiConstants {
   static const String closuresDetail = '/closures/{id}';
   static const String closuresStatus = '/closures/{id}/status';
   static const String closuresLeadDetail = '/closures/lead/{id}';
+  static const String closureDocuments = '/closures/{id}/documents';
+  static const String closureDocumentDetail =
+      '/closures/{id}/documents/{documentId}';
 
   // Export Endpoints
   static const String exportLeads = '/export/leads';

@@ -3,6 +3,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/searchable_dropdown_field.dart';
 
@@ -34,6 +35,8 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
   bool _isLoadingDropdowns = true;
   bool _transportArranged = false;
   bool _useManualProjectInput = false;
+  bool _keepCurrentAssignedUser = false;
+  String _currentRole = '';
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
@@ -64,6 +67,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
     setState(() => _isLoadingDropdowns = true);
     try {
       final token = _authProvider.currentAuthToken;
+      final currentRole = await RoleAccess.currentRole(_authProvider);
       final leadsResult = await _authProvider.leads(token: token, perPage: 100);
       final projectsResult =
           await _authProvider.projects(token: token, perPage: 100);
@@ -73,6 +77,8 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
         _leads = leadsResult.items;
         _projects = projectsResult.items;
         _teamMembers = usersList;
+        _currentRole = currentRole;
+        _keepCurrentAssignedUser = _canKeepCurrentAssignedUser;
         _isLoadingDropdowns = false;
       });
 
@@ -161,6 +167,91 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       return _projectNameController.text.trim();
     }
     return '';
+  }
+
+  bool get _canKeepCurrentAssignedUser {
+    final normalizedRole = RoleAccess.normalize(_currentRole);
+    return normalizedRole == RoleAccess.admin ||
+        normalizedRole == RoleAccess.superAdmin;
+  }
+
+  Map<String, dynamic>? _selectedLeadRecord() {
+    final selectedLeadId = (_selectedLeadId ?? '').trim();
+    if (selectedLeadId.isEmpty) {
+      return null;
+    }
+    for (final lead in _leads) {
+      if ((lead['id'] ?? '').toString().trim() == selectedLeadId) {
+        return lead;
+      }
+    }
+    return null;
+  }
+
+  String _selectedLeadAssignedUserId() {
+    final lead = _selectedLeadRecord();
+    if (lead == null) {
+      return '';
+    }
+    final assigned = lead['assigned_to'] ?? lead['assignee'];
+    if (assigned is Map<String, dynamic>) {
+      return (assigned['id'] ??
+              assigned['user_id'] ??
+              assigned['userId'] ??
+              assigned['uuid'] ??
+              '')
+          .toString()
+          .trim();
+    }
+    return (lead['assigned_to_id'] ??
+            lead['assignedToId'] ??
+            lead['assigned_to'] ??
+            '')
+        .toString()
+        .trim();
+  }
+
+  String _selectedLeadAssignedUserLabel() {
+    final lead = _selectedLeadRecord();
+    if (lead == null) {
+      return 'Current lead assignee';
+    }
+    final assigned = lead['assigned_to'] ?? lead['assignee'];
+    if (assigned is Map<String, dynamic>) {
+      final first = (assigned['first_name'] ?? assigned['firstName'] ?? '')
+          .toString()
+          .trim();
+      final last = (assigned['last_name'] ?? assigned['lastName'] ?? '')
+          .toString()
+          .trim();
+      final combined = [
+        if (first.isNotEmpty) first,
+        if (last.isNotEmpty) last,
+      ].join(' ').trim();
+      if (combined.isNotEmpty) {
+        return combined;
+      }
+      final fallback = (assigned['full_name'] ??
+              assigned['fullName'] ??
+              assigned['name'] ??
+              assigned['email'] ??
+              '')
+          .toString()
+          .trim();
+      if (fallback.isNotEmpty) {
+        return fallback;
+      }
+    }
+    return (lead['assigned_to_name'] ?? lead['assignedToName'] ?? 'Unassigned')
+        .toString()
+        .trim();
+  }
+
+  String _resolveAssignedToForSubmit() {
+    if (_canKeepCurrentAssignedUser && _keepCurrentAssignedUser) {
+      return _selectedLeadAssignedUserId();
+    }
+    return (_selectedAssigneeId ?? '').trim();
   }
 
   void _setManualProjectMode(bool enabled) {
@@ -403,7 +494,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
           projectName: projectName,
           visitDate: formattedDate,
           visitTime: formattedTime,
-          assignedTo: (_selectedAssigneeId ?? '').trim(),
+          assignedTo: _resolveAssignedToForSubmit(),
           notes: _notesController.text.trim(),
           transportArranged: _transportArranged,
           token: _authProvider.currentAuthToken,
@@ -472,9 +563,9 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                         const SizedBox(height: 20),
                         _buildLabel('LEAD *'),
                         const SizedBox(height: 8),
-                        _buildDropdown(
-                          sheetTitle: 'Lead',
-                          value: _selectedLeadId,
+                          _buildDropdown(
+                            sheetTitle: 'Lead',
+                            value: _selectedLeadId,
                           hint: 'Select lead...',
                           items: _leads
                               .map(
@@ -484,11 +575,15 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                                 ),
                               )
                               .toList(),
-                          onChanged: (val) =>
-                              setState(() => _selectedLeadId = val),
-                          validator: (val) =>
-                              val == null ? 'Lead is required' : null,
-                        ),
+                            onChanged: (val) => setState(() {
+                              _selectedLeadId = val;
+                              if (_canKeepCurrentAssignedUser) {
+                                _keepCurrentAssignedUser = true;
+                              }
+                            }),
+                            validator: (val) =>
+                                val == null ? 'Lead is required' : null,
+                          ),
                         const SizedBox(height: 16),
                         _buildLabel('PROJECT *'),
                         const SizedBox(height: 8),
@@ -609,16 +704,81 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                           ],
                         ),
                         const SizedBox(height: 16),
+                        if (!widget.isEditMode && _canKeepCurrentAssignedUser) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.border),
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white,
+                            ),
+                            child: CheckboxListTile(
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              title: const Text(
+                                'Keep currently assigned user',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              subtitle: Text(
+                                _keepCurrentAssignedUser
+                                    ? 'Site visit will stay with ${_selectedLeadAssignedUserLabel()}'
+                                    : 'Select a different team member below',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              value: _keepCurrentAssignedUser,
+                              onChanged: _isSubmitting
+                                  ? null
+                                  : (value) => setState(
+                                      () => _keepCurrentAssignedUser =
+                                          value ?? false,
+                                    ),
+                              controlAffinity:
+                                  ListTileControlAffinity.leading,
+                              dense: true,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         _buildLabel('ASSIGN TO'),
                         const SizedBox(height: 8),
-                        _buildDropdown(
-                          sheetTitle: 'Assign To',
-                          value: _selectedAssigneeId,
-                          hint: 'Select team member...',
-                          items: _buildAssigneeOptions(),
-                          onChanged: (val) =>
-                              setState(() => _selectedAssigneeId = val),
-                        ),
+                        if (_canKeepCurrentAssignedUser &&
+                            _keepCurrentAssignedUser &&
+                            !widget.isEditMode)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 14,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFD),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Text(
+                              _selectedLeadAssignedUserLabel(),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          )
+                        else
+                          _buildDropdown(
+                            sheetTitle: 'Assign To',
+                            value: _selectedAssigneeId,
+                            hint: 'Select team member...',
+                            items: _buildAssigneeOptions(),
+                            onChanged: (val) =>
+                                setState(() => _selectedAssigneeId = val),
+                          ),
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 4),

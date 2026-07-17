@@ -1247,6 +1247,7 @@ class AuthProvider {
     required bool commissionPaid,
     List<String>? closedByManagerIds,
     required String closureNotes,
+    List<Map<String, dynamic>>? documents,
     String? token,
   }) {
     return _authService.createClosure(
@@ -1269,6 +1270,7 @@ class AuthProvider {
       commissionPaid: commissionPaid,
       closedByManagerIds: closedByManagerIds,
       closureNotes: closureNotes,
+      documents: documents,
       token: token,
     );
   }
@@ -1292,6 +1294,7 @@ class AuthProvider {
     String? commissionPaidDate,
     List<String>? closedByManagerIds,
     required String closureNotes,
+    List<Map<String, dynamic>>? documents,
     String? token,
   }) {
     return _authService.editClosure(
@@ -1313,6 +1316,7 @@ class AuthProvider {
       commissionPaidDate: commissionPaidDate,
       closedByManagerIds: closedByManagerIds,
       closureNotes: closureNotes,
+      documents: documents,
       token: token,
     );
   }
@@ -1337,6 +1341,52 @@ class AuthProvider {
   }) {
     return _authService.closureLeadDetail(
       id: id,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadClosureDocument({
+    required String closureId,
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    required String documentType,
+    required String name,
+    String? token,
+  }) {
+    return _authService.uploadClosureDocument(
+      closureId: closureId,
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      documentType: documentType,
+      name: name,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> updateClosureDocument({
+    required String closureId,
+    required String documentId,
+    required String name,
+    String? token,
+  }) {
+    return _authService.updateClosureDocument(
+      closureId: closureId,
+      documentId: documentId,
+      name: name,
+      token: token,
+    );
+  }
+
+  Future<void> deleteClosureDocument({
+    required String closureId,
+    required String documentId,
+    String? token,
+  }) {
+    return _authService.deleteClosureDocument(
+      closureId: closureId,
+      documentId: documentId,
       token: token,
     );
   }
