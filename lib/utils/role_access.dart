@@ -227,6 +227,12 @@ class RoleAccess {
         return 'closures';
       case 11:
         return 'targets';
+      case 12:
+        return 'leads';
+      case 13:
+        return 'leads';
+      case 14:
+        return 'attendance';
       default:
         return null;
     }
@@ -258,6 +264,12 @@ class RoleAccess {
         return 'Closures';
       case 11:
         return 'Targets';
+      case 12:
+        return 'EOI';
+      case 13:
+        return 'Site Visit Done';
+      case 14:
+        return 'Leaves';
       default:
         return 'Module';
     }

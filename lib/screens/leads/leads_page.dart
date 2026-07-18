@@ -23,7 +23,16 @@ import 'package:nextone/widgets/pagination_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LeadsPage extends StatefulWidget {
-  const LeadsPage({super.key});
+  const LeadsPage({
+    super.key,
+    this.title = 'Lead Management',
+    this.fixedStatus,
+    this.lockStatusFilter = false,
+  });
+
+  final String title;
+  final String? fixedStatus;
+  final bool lockStatusFilter;
 
   @override
   State<LeadsPage> createState() => _LeadsPageState();
@@ -98,6 +107,19 @@ class _LeadsPageState extends State<LeadsPage> {
   final Map<String, _LeadPhoneAccess> _leadPhoneAccessById =
       <String, _LeadPhoneAccess>{};
 
+  String? get _resolvedStatus {
+    final fixedStatus = widget.fixedStatus?.trim();
+    if (fixedStatus != null && fixedStatus.isNotEmpty) {
+      return fixedStatus;
+    }
+    return _selectedStatus;
+  }
+
+  bool get _isStatusFilterLocked =>
+      widget.lockStatusFilter &&
+      widget.fixedStatus != null &&
+      widget.fixedStatus!.trim().isNotEmpty;
+
   List<String> get _sourceOptions {
     final values = <String>{
       ..._defaultSourceOptions,
@@ -132,6 +154,9 @@ class _LeadsPageState extends State<LeadsPage> {
   @override
   void initState() {
     super.initState();
+    if (_isStatusFilterLocked) {
+      _selectedStatus = widget.fixedStatus!.trim();
+    }
     _loadAccess();
     _loadAssigneeOptions();
     _loadLeadSources();
@@ -329,7 +354,7 @@ class _LeadsPageState extends State<LeadsPage> {
       final result = _isMyLeadsTab
           ? await _authProvider.myLeads(
               token: _authProvider.currentAuthToken,
-              status: _selectedStatus,
+              status: _resolvedStatus,
               source: _selectedSource,
               search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
               page: _currentPage,
@@ -337,7 +362,7 @@ class _LeadsPageState extends State<LeadsPage> {
             )
           : await _authProvider.leads(
               token: _authProvider.currentAuthToken,
-              status: _selectedStatus,
+              status: _resolvedStatus,
               source: _selectedSource,
               assignedTo: _selectedTeamId,
               search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
@@ -471,7 +496,7 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Future<void> _openFiltersSheet() async {
-    String? tempStatus = _selectedStatus;
+    String? tempStatus = _resolvedStatus;
     String? tempSource = _selectedSource;
     String? tempTeamId = _isMyLeadsTab ? null : _selectedTeamId;
 
@@ -488,28 +513,30 @@ class _LeadsPageState extends State<LeadsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  DropdownButtonFormField<String?>(
-                    initialValue: tempStatus,
-                    decoration: _sheetFieldDecoration('Select status'),
-                    items: <DropdownMenuItem<String?>>[
-                      const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('All'),
-                      ),
-                      ..._statusOptions.map(
-                        (status) => DropdownMenuItem<String?>(
-                          value: status,
-                          child: Text(_formatLeadStatusLabel(status)),
+                  if (!_isStatusFilterLocked) ...[
+                    DropdownButtonFormField<String?>(
+                      initialValue: tempStatus,
+                      decoration: _sheetFieldDecoration('Select status'),
+                      items: <DropdownMenuItem<String?>>[
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('All'),
                         ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      setSheetState(() {
-                        tempStatus = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 12),
+                        ..._statusOptions.map(
+                          (status) => DropdownMenuItem<String?>(
+                            value: status,
+                            child: Text(_formatLeadStatusLabel(status)),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setSheetState(() {
+                          tempStatus = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   SearchableDropdownField<String>(
                     label: 'Source',
                     sheetTitle: 'Select source',
@@ -570,7 +597,9 @@ class _LeadsPageState extends State<LeadsPage> {
                         child: OutlinedButton(
                           onPressed: () {
                             setState(() {
-                              _selectedStatus = null;
+                              _selectedStatus = _isStatusFilterLocked
+                                  ? _resolvedStatus
+                                  : null;
                               _selectedSource = null;
                               _selectedTeamId = null;
                               _currentPage = 1;
@@ -588,7 +617,9 @@ class _LeadsPageState extends State<LeadsPage> {
                         child: FilledButton(
                           onPressed: () {
                             setState(() {
-                              _selectedStatus = tempStatus;
+                              _selectedStatus = _isStatusFilterLocked
+                                  ? _resolvedStatus
+                                  : tempStatus;
                               _selectedSource = tempSource;
                               _selectedTeamId =
                                   _isMyLeadsTab ? null : tempTeamId;
@@ -833,319 +864,538 @@ class _LeadsPageState extends State<LeadsPage> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return Dialog(
-              insetPadding:
-                  const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: ConstrainedBox(
-                constraints:
-                    const BoxConstraints(maxWidth: 620, maxHeight: 560),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final isCompact = width < 640;
+                final dialogWidth = width < 520 ? width * 0.98 : 620.0;
+                final dialogHeight =
+                    width < 520 ? constraints.maxHeight * 0.9 : 560.0;
+
+                return Dialog(
+                  insetPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: dialogWidth,
+                      maxHeight: dialogHeight,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Expanded(
-                            child: Text(
-                              'Manage Lead Sources',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.of(dialogContext).pop(),
-                            visualDensity: VisualDensity.compact,
-                            splashRadius: 18,
-                            icon: const Icon(Icons.close, size: 20),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: createController,
-                              decoration: InputDecoration(
-                                hintText: 'New source name (e.g. LinkedIn)',
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 12,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide:
-                                      const BorderSide(color: AppColors.border),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                      color: AppColors.primary),
-                                ),
-                              ),
-                              onSubmitted: (_) => createSource(setDialogState),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            height: 40,
-                            child: FilledButton.icon(
-                              onPressed: isSubmitting
-                                  ? null
-                                  : () => createSource(setDialogState),
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              icon: const Icon(Icons.add, size: 16),
-                              label: Text(isSubmitting ? 'Adding...' : 'Add'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: Column(
+                          Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: const BoxDecoration(
-                                  border: Border(
-                                    bottom: BorderSide(color: AppColors.border),
+                              const Expanded(
+                                child: Text(
+                                  'Manage Lead Sources',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
-                                child: const Row(
-                                  children: [
-                                    Expanded(
-                                      flex: 4,
-                                      child: Text(
-                                        'Source Name',
-                                        style: TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      flex: 2,
-                                      child: Text(
-                                        'Status',
-                                        style: TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      flex: 2,
-                                      child: Align(
-                                        alignment: Alignment.centerRight,
-                                        child: Text(
-                                          'Actions',
-                                          style: TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
                               ),
-                              Expanded(
-                                child: isRefreshing || _isLoadingLeadSources
-                                    ? const Center(
-                                        child: CircularProgressIndicator(),
-                                      )
-                                    : _leadSources.isEmpty
-                                        ? const Center(
-                                            child: Text(
-                                              'No lead sources found.',
-                                              style: TextStyle(
-                                                color: AppColors.textSecondary,
-                                              ),
-                                            ),
-                                          )
-                                        : ListView.separated(
-                                            itemCount: _leadSources.length,
-                                            separatorBuilder: (_, __) =>
-                                                const Divider(height: 1),
-                                            itemBuilder: (context, index) {
-                                              final source =
-                                                  _leadSources[index];
-                                              return Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                  horizontal: 14,
-                                                  vertical: 10,
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    Expanded(
-                                                      flex: 4,
-                                                      child: Text(
-                                                        source.name,
-                                                        style: const TextStyle(
-                                                          color: AppColors
-                                                              .textPrimary,
-                                                          fontSize: 14,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    Expanded(
-                                                      flex: 2,
-                                                      child: Align(
-                                                        alignment: Alignment
-                                                            .centerLeft,
-                                                        child: Container(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                            horizontal: 8,
-                                                            vertical: 5,
-                                                          ),
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            color: source
-                                                                    .isActive
-                                                                ? const Color(
-                                                                    0xFFDDF7E7,
-                                                                  )
-                                                                : const Color(
-                                                                    0xFFF1F5F9,
-                                                                  ),
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                              999,
-                                                            ),
-                                                          ),
-                                                          child: Text(
-                                                            source.isActive
-                                                                ? 'ACTIVE'
-                                                                : 'INACTIVE',
-                                                            style: TextStyle(
-                                                              color: source
-                                                                      .isActive
-                                                                  ? const Color(
-                                                                      0xFF1E8E4A,
-                                                                    )
-                                                                  : AppColors
-                                                                      .textSecondary,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w800,
-                                                              fontSize: 10,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    Expanded(
-                                                      flex: 2,
-                                                      child: Align(
-                                                        alignment: Alignment
-                                                            .centerRight,
-                                                        child: Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.min,
-                                                          children: [
-                                                            IconButton(
-                                                              visualDensity:
-                                                                  VisualDensity
-                                                                      .compact,
-                                                              splashRadius: 16,
-                                                              constraints:
-                                                                  const BoxConstraints(
-                                                                minWidth: 32,
-                                                                minHeight: 32,
-                                                              ),
-                                                              onPressed: () =>
-                                                                  editSource(
-                                                                source,
-                                                                setDialogState,
-                                                              ),
-                                                              icon: const Icon(
-                                                                Icons
-                                                                    .edit_outlined,
-                                                                color: AppColors
-                                                                    .textSecondary,
-                                                                size: 18,
-                                                              ),
-                                                            ),
-                                                            if (_canDeleteLeads)
-                                                              IconButton(
-                                                                visualDensity:
-                                                                    VisualDensity
-                                                                        .compact,
-                                                                splashRadius:
-                                                                    16,
-                                                                constraints:
-                                                                    const BoxConstraints(
-                                                                  minWidth: 32,
-                                                                  minHeight: 32,
-                                                                ),
-                                                                onPressed: () =>
-                                                                    deleteSource(
-                                                                  source,
-                                                                  setDialogState,
-                                                                ),
-                                                                icon:
-                                                                    const Icon(
-                                                                  Icons
-                                                                      .delete_outline,
-                                                                  color: AppColors
-                                                                      .textSecondary,
-                                                                  size: 18,
-                                                                ),
-                                                              ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              );
-                                            },
-                                          ),
+                              IconButton(
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(),
+                                visualDensity: VisualDensity.compact,
+                                splashRadius: 18,
+                                icon: const Icon(Icons.close, size: 20),
                               ),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 10),
+                          if (isCompact)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                TextField(
+                                  controller: createController,
+                                  decoration: InputDecoration(
+                                    hintText: 'New source name (e.g. LinkedIn)',
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                          color: AppColors.border),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                  onSubmitted: (_) =>
+                                      createSource(setDialogState),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  height: 42,
+                                  child: FilledButton.icon(
+                                    onPressed: isSubmitting
+                                        ? null
+                                        : () => createSource(setDialogState),
+                                    style: FilledButton.styleFrom(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: Text(
+                                        isSubmitting ? 'Adding...' : 'Add'),
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: createController,
+                                    decoration: InputDecoration(
+                                      hintText:
+                                          'New source name (e.g. LinkedIn)',
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 12,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: AppColors.border,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                    onSubmitted: (_) =>
+                                        createSource(setDialogState),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                SizedBox(
+                                  height: 40,
+                                  child: FilledButton.icon(
+                                    onPressed: isSubmitting
+                                        ? null
+                                        : () => createSource(setDialogState),
+                                    style: FilledButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: Text(
+                                        isSubmitting ? 'Adding...' : 'Add'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Column(
+                                children: [
+                                  if (!isCompact)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
+                                      decoration: const BoxDecoration(
+                                        border: Border(
+                                          bottom: BorderSide(
+                                              color: AppColors.border),
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 4,
+                                            child: Text(
+                                              'Source Name',
+                                              style: TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              'Status',
+                                              style: TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Align(
+                                              alignment: Alignment.centerRight,
+                                              child: Text(
+                                                'Actions',
+                                                style: TextStyle(
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  Expanded(
+                                    child: isRefreshing || _isLoadingLeadSources
+                                        ? const Center(
+                                            child: CircularProgressIndicator(),
+                                          )
+                                        : _leadSources.isEmpty
+                                            ? const Center(
+                                                child: Text(
+                                                  'No lead sources found.',
+                                                  style: TextStyle(
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
+                                                ),
+                                              )
+                                            : ListView.separated(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  vertical: 4,
+                                                ),
+                                                itemCount: _leadSources.length,
+                                                separatorBuilder: (_, __) =>
+                                                    const Divider(height: 1),
+                                                itemBuilder: (context, index) {
+                                                  final source =
+                                                      _leadSources[index];
+                                                  return Padding(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                      horizontal: 14,
+                                                      vertical: 10,
+                                                    ),
+                                                    child: isCompact
+                                                        ? Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            children: [
+                                                              Text(
+                                                                source.name,
+                                                                style:
+                                                                    const TextStyle(
+                                                                  color: AppColors
+                                                                      .textPrimary,
+                                                                  fontSize: 14,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(
+                                                                  height: 8),
+                                                              Row(
+                                                                children: [
+                                                                  Container(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .symmetric(
+                                                                      horizontal:
+                                                                          8,
+                                                                      vertical:
+                                                                          5,
+                                                                    ),
+                                                                    decoration:
+                                                                        BoxDecoration(
+                                                                      color: source
+                                                                              .isActive
+                                                                          ? const Color(
+                                                                              0xFFDDF7E7,
+                                                                            )
+                                                                          : const Color(
+                                                                              0xFFF1F5F9,
+                                                                            ),
+                                                                      borderRadius:
+                                                                          BorderRadius
+                                                                              .circular(
+                                                                        999,
+                                                                      ),
+                                                                    ),
+                                                                    child: Text(
+                                                                      source.isActive
+                                                                          ? 'ACTIVE'
+                                                                          : 'INACTIVE',
+                                                                      style:
+                                                                          TextStyle(
+                                                                        color: source.isActive
+                                                                            ? const Color(
+                                                                                0xFF1E8E4A,
+                                                                              )
+                                                                            : AppColors.textSecondary,
+                                                                        fontWeight:
+                                                                            FontWeight.w800,
+                                                                        fontSize:
+                                                                            10,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  const Spacer(),
+                                                                  IconButton(
+                                                                    visualDensity:
+                                                                        VisualDensity
+                                                                            .compact,
+                                                                    splashRadius:
+                                                                        16,
+                                                                    constraints:
+                                                                        const BoxConstraints(
+                                                                      minWidth:
+                                                                          32,
+                                                                      minHeight:
+                                                                          32,
+                                                                    ),
+                                                                    onPressed: () =>
+                                                                        editSource(
+                                                                      source,
+                                                                      setDialogState,
+                                                                    ),
+                                                                    icon:
+                                                                        const Icon(
+                                                                      Icons
+                                                                          .edit_outlined,
+                                                                      color: AppColors
+                                                                          .textSecondary,
+                                                                      size: 18,
+                                                                    ),
+                                                                  ),
+                                                                  if (_canDeleteLeads)
+                                                                    IconButton(
+                                                                      visualDensity:
+                                                                          VisualDensity
+                                                                              .compact,
+                                                                      splashRadius:
+                                                                          16,
+                                                                      constraints:
+                                                                          const BoxConstraints(
+                                                                        minWidth:
+                                                                            32,
+                                                                        minHeight:
+                                                                            32,
+                                                                      ),
+                                                                      onPressed:
+                                                                          () =>
+                                                                              deleteSource(
+                                                                        source,
+                                                                        setDialogState,
+                                                                      ),
+                                                                      icon:
+                                                                          const Icon(
+                                                                        Icons
+                                                                            .delete_outline,
+                                                                        color: AppColors
+                                                                            .textSecondary,
+                                                                        size:
+                                                                            18,
+                                                                      ),
+                                                                    ),
+                                                                ],
+                                                              ),
+                                                            ],
+                                                          )
+                                                        : Row(
+                                                            children: [
+                                                              Expanded(
+                                                                flex: 4,
+                                                                child: Text(
+                                                                  source.name,
+                                                                  style:
+                                                                      const TextStyle(
+                                                                    color: AppColors
+                                                                        .textPrimary,
+                                                                    fontSize:
+                                                                        14,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                              Expanded(
+                                                                flex: 2,
+                                                                child: Align(
+                                                                  alignment:
+                                                                      Alignment
+                                                                          .centerLeft,
+                                                                  child:
+                                                                      Container(
+                                                                    padding:
+                                                                        const EdgeInsets
+                                                                            .symmetric(
+                                                                      horizontal:
+                                                                          8,
+                                                                      vertical:
+                                                                          5,
+                                                                    ),
+                                                                    decoration:
+                                                                        BoxDecoration(
+                                                                      color: source
+                                                                              .isActive
+                                                                          ? const Color(
+                                                                              0xFFDDF7E7,
+                                                                            )
+                                                                          : const Color(
+                                                                              0xFFF1F5F9,
+                                                                            ),
+                                                                      borderRadius:
+                                                                          BorderRadius
+                                                                              .circular(
+                                                                        999,
+                                                                      ),
+                                                                    ),
+                                                                    child: Text(
+                                                                      source.isActive
+                                                                          ? 'ACTIVE'
+                                                                          : 'INACTIVE',
+                                                                      style:
+                                                                          TextStyle(
+                                                                        color: source.isActive
+                                                                            ? const Color(
+                                                                                0xFF1E8E4A,
+                                                                              )
+                                                                            : AppColors.textSecondary,
+                                                                        fontWeight:
+                                                                            FontWeight.w800,
+                                                                        fontSize:
+                                                                            10,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                              Expanded(
+                                                                flex: 2,
+                                                                child: Align(
+                                                                  alignment:
+                                                                      Alignment
+                                                                          .centerRight,
+                                                                  child: Row(
+                                                                    mainAxisSize:
+                                                                        MainAxisSize
+                                                                            .min,
+                                                                    children: [
+                                                                      IconButton(
+                                                                        visualDensity:
+                                                                            VisualDensity.compact,
+                                                                        splashRadius:
+                                                                            16,
+                                                                        constraints:
+                                                                            const BoxConstraints(
+                                                                          minWidth:
+                                                                              32,
+                                                                          minHeight:
+                                                                              32,
+                                                                        ),
+                                                                        onPressed:
+                                                                            () =>
+                                                                                editSource(
+                                                                          source,
+                                                                          setDialogState,
+                                                                        ),
+                                                                        icon:
+                                                                            const Icon(
+                                                                          Icons
+                                                                              .edit_outlined,
+                                                                          color:
+                                                                              AppColors.textSecondary,
+                                                                          size:
+                                                                              18,
+                                                                        ),
+                                                                      ),
+                                                                      if (_canDeleteLeads)
+                                                                        IconButton(
+                                                                          visualDensity:
+                                                                              VisualDensity.compact,
+                                                                          splashRadius:
+                                                                              16,
+                                                                          constraints:
+                                                                              const BoxConstraints(
+                                                                            minWidth:
+                                                                                32,
+                                                                            minHeight:
+                                                                                32,
+                                                                          ),
+                                                                          onPressed: () =>
+                                                                              deleteSource(
+                                                                            source,
+                                                                            setDialogState,
+                                                                          ),
+                                                                          icon:
+                                                                              const Icon(
+                                                                            Icons.delete_outline,
+                                                                            color:
+                                                                                AppColors.textSecondary,
+                                                                            size:
+                                                                                18,
+                                                                          ),
+                                                                        ),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                  );
+                                                },
+                                              ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             );
           },
         );
@@ -1527,144 +1777,183 @@ class _LeadsPageState extends State<LeadsPage> {
                                       style: TextStyle(fontSize: 11),
                                     ),
                                   )
-                                : DataTable(
-                                    columnSpacing: isCompact ? 6 : 10,
-                                    horizontalMargin: 4,
-                                    headingRowHeight: 24,
-                                    dataRowMinHeight: 36,
-                                    dataRowMaxHeight: 40,
-                                    headingTextStyle: const TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                    dataTextStyle: const TextStyle(
-                                      fontSize: 10,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                    columns: const [
-                                      DataColumn(label: Text('STATUS LABEL')),
-                                      DataColumn(label: Text('PREVIEW')),
-                                      DataColumn(label: Text('VISIBILITY')),
-                                      DataColumn(label: Text('ACTIONS')),
-                                    ],
-                                    rows: _pipelineStatuses
-                                        .map(
-                                          (s) => DataRow(
-                                            cells: [
-                                              DataCell(
-                                                ConstrainedBox(
-                                                  constraints:
-                                                      const BoxConstraints(
-                                                    minWidth: 110,
-                                                    maxWidth: 130,
-                                                  ),
-                                                  child: Text(
-                                                    s.label,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
+                                : Scrollbar(
+                                    thumbVisibility:
+                                        _pipelineStatuses.length > 6,
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          minWidth: isCompact ? 560 : 0,
+                                        ),
+                                        child: SingleChildScrollView(
+                                          child: DataTable(
+                                            columnSpacing: isCompact ? 6 : 10,
+                                            horizontalMargin: 4,
+                                            headingRowHeight: 24,
+                                            dataRowMinHeight: 36,
+                                            dataRowMaxHeight: 40,
+                                            headingTextStyle: const TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                            dataTextStyle: const TextStyle(
+                                              fontSize: 10,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                            columns: const [
+                                              DataColumn(
+                                                label: Text('STATUS LABEL'),
                                               ),
-                                              DataCell(
-                                                Container(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 3,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color:
-                                                        _parseHexColor(s.color),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                      12,
-                                                    ),
-                                                  ),
-                                                  child: Text(
-                                                    s.label,
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      fontSize: 9,
-                                                    ),
-                                                  ),
-                                                ),
+                                              DataColumn(
+                                                label: Text('PREVIEW'),
                                               ),
-                                              DataCell(
-                                                Switch(
-                                                  value: s.isActive,
-                                                  materialTapTargetSize:
-                                                      MaterialTapTargetSize
-                                                          .shrinkWrap,
-                                                  onChanged: (v) async {
-                                                    await _authProvider
-                                                        .updateLeadStatusConfig(
-                                                      id: s.id,
-                                                      label: s.label,
-                                                      color: s.color,
-                                                      isActive: v,
-                                                      token: _authProvider
-                                                          .currentAuthToken,
-                                                    );
-                                                    await refresh();
-                                                    setDialogState(() {});
-                                                  },
-                                                ),
+                                              DataColumn(
+                                                label: Text('VISIBILITY'),
                                               ),
-                                              DataCell(
-                                                Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    IconButton(
-                                                      icon: const Icon(
-                                                        Icons.edit_outlined,
-                                                        size: 15,
-                                                      ),
-                                                      padding: EdgeInsets.zero,
-                                                      constraints:
-                                                          const BoxConstraints(
-                                                        minWidth: 24,
-                                                        minHeight: 24,
-                                                      ),
-                                                      onPressed: () =>
-                                                          editStatus(
-                                                        setDialogState,
-                                                        s,
-                                                      ),
-                                                    ),
-                                                    IconButton(
-                                                      icon: const Icon(
-                                                        Icons
-                                                            .delete_outline_rounded,
-                                                        size: 15,
-                                                      ),
-                                                      padding: EdgeInsets.zero,
-                                                      constraints:
-                                                          const BoxConstraints(
-                                                        minWidth: 24,
-                                                        minHeight: 24,
-                                                      ),
-                                                      onPressed: () async {
-                                                        await _authProvider
-                                                            .deleteLeadStatusConfig(
-                                                          id: s.id,
-                                                          token: _authProvider
-                                                              .currentAuthToken,
-                                                        );
-                                                        await refresh();
-                                                        setDialogState(() {});
-                                                      },
-                                                    ),
-                                                  ],
-                                                ),
+                                              DataColumn(
+                                                label: Text('ACTIONS'),
                                               ),
                                             ],
+                                            rows: _pipelineStatuses
+                                                .map(
+                                                  (s) => DataRow(
+                                                    cells: [
+                                                      DataCell(
+                                                        ConstrainedBox(
+                                                          constraints:
+                                                              const BoxConstraints(
+                                                            minWidth: 110,
+                                                            maxWidth: 130,
+                                                          ),
+                                                          child: Text(
+                                                            s.label,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      DataCell(
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 3,
+                                                          ),
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color:
+                                                                _parseHexColor(
+                                                              s.color,
+                                                            ),
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                              12,
+                                                            ),
+                                                          ),
+                                                          child: Text(
+                                                            s.label,
+                                                            style:
+                                                                const TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              fontSize: 9,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      DataCell(
+                                                        Switch(
+                                                          value: s.isActive,
+                                                          materialTapTargetSize:
+                                                              MaterialTapTargetSize
+                                                                  .shrinkWrap,
+                                                          onChanged: (v) async {
+                                                            await _authProvider
+                                                                .updateLeadStatusConfig(
+                                                              id: s.id,
+                                                              label: s.label,
+                                                              color: s.color,
+                                                              isActive: v,
+                                                              token: _authProvider
+                                                                  .currentAuthToken,
+                                                            );
+                                                            await refresh();
+                                                            setDialogState(
+                                                                () {});
+                                                          },
+                                                        ),
+                                                      ),
+                                                      DataCell(
+                                                        Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            IconButton(
+                                                              icon: const Icon(
+                                                                Icons
+                                                                    .edit_outlined,
+                                                                size: 15,
+                                                              ),
+                                                              padding:
+                                                                  EdgeInsets
+                                                                      .zero,
+                                                              constraints:
+                                                                  const BoxConstraints(
+                                                                minWidth: 24,
+                                                                minHeight: 24,
+                                                              ),
+                                                              onPressed: () =>
+                                                                  editStatus(
+                                                                setDialogState,
+                                                                s,
+                                                              ),
+                                                            ),
+                                                            IconButton(
+                                                              icon: const Icon(
+                                                                Icons
+                                                                    .delete_outline_rounded,
+                                                                size: 15,
+                                                              ),
+                                                              padding:
+                                                                  EdgeInsets
+                                                                      .zero,
+                                                              constraints:
+                                                                  const BoxConstraints(
+                                                                minWidth: 24,
+                                                                minHeight: 24,
+                                                              ),
+                                                              onPressed:
+                                                                  () async {
+                                                                await _authProvider
+                                                                    .deleteLeadStatusConfig(
+                                                                  id: s.id,
+                                                                  token: _authProvider
+                                                                      .currentAuthToken,
+                                                                );
+                                                                await refresh();
+                                                                setDialogState(
+                                                                    () {});
+                                                              },
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                )
+                                                .toList(),
                                           ),
-                                        )
-                                        .toList(),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                           ),
                         ],
@@ -3008,7 +3297,7 @@ class _LeadsPageState extends State<LeadsPage> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const CrmAppBar(title: 'Lead Management'),
+      appBar: CrmAppBar(title: widget.title),
       body: RefreshIndicator(
         onRefresh: _loadLeads,
         child: SingleChildScrollView(

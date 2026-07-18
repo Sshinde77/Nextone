@@ -141,6 +141,10 @@ class ApiConstants {
   static const String attendanceLate = '/attendance/late';
   static const String attendancePending = '/attendance/pending';
   static const String attendanceapprove = '/attendance/{id}/approve';
+  static const String attendanceLeaveMark = '/attendance/leave';
+  static const String attendanceLeaveApply = '/attendance/leave/apply';
+  static const String attendanceLeaves = '/attendance/leaves';
+  static const String attendanceLeavesToday = '/attendance/leaves/today';
   static const String holidays = '/holidays';
   static const String holidayDetail = '/holidays/{id}';
 

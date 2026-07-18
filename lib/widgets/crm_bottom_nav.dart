@@ -6,7 +6,9 @@ class CRMAppBottomNav extends StatefulWidget {
   final VoidCallback onDashboard;
   final VoidCallback onLeads;
   final VoidCallback onFollowUps;
+  final VoidCallback onEoi;
   final VoidCallback onSiteVisits;
+  final VoidCallback? onSiteVisitDone;
   final VoidCallback onRevisits;
   final VoidCallback onProjects;
   final VoidCallback onTeam;
@@ -16,6 +18,7 @@ class CRMAppBottomNav extends StatefulWidget {
   final VoidCallback? onNotifications;
   final VoidCallback? onSalary;
   final VoidCallback? onClosures;
+  final VoidCallback? onLeaves;
   final VoidCallback onMore;
   final VoidCallback onLess;
   final int? leadsBadgeCount;
@@ -23,7 +26,9 @@ class CRMAppBottomNav extends StatefulWidget {
   final double height;
   final bool showLeads;
   final bool showFollowUps;
+  final bool showEoi;
   final bool showSiteVisits;
+  final bool showSiteVisitDone;
   final bool showRevisits;
   final bool showProjects;
   final bool showTeam;
@@ -32,6 +37,7 @@ class CRMAppBottomNav extends StatefulWidget {
   final bool showSalary;
   final bool showAttendance;
   final bool showTargets;
+  final bool showLeaves;
 
   const CRMAppBottomNav({
     super.key,
@@ -39,7 +45,9 @@ class CRMAppBottomNav extends StatefulWidget {
     required this.onDashboard,
     required this.onLeads,
     required this.onFollowUps,
+    required this.onEoi,
     required this.onSiteVisits,
+    this.onSiteVisitDone,
     required this.onRevisits,
     required this.onProjects,
     required this.onTeam,
@@ -49,6 +57,7 @@ class CRMAppBottomNav extends StatefulWidget {
     this.onNotifications,
     this.onSalary,
     this.onClosures,
+    this.onLeaves,
     required this.onMore,
     required this.onLess,
     this.leadsBadgeCount,
@@ -56,7 +65,9 @@ class CRMAppBottomNav extends StatefulWidget {
     this.height = 76,
     this.showLeads = true,
     this.showFollowUps = true,
+    this.showEoi = true,
     this.showSiteVisits = true,
+    this.showSiteVisitDone = true,
     this.showRevisits = true,
     this.showProjects = true,
     this.showTeam = true,
@@ -65,6 +76,7 @@ class CRMAppBottomNav extends StatefulWidget {
     this.showSalary = false,
     this.showAttendance = true,
     this.showTargets = false,
+    this.showLeaves = true,
   });
 
   @override
@@ -110,12 +122,26 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           onTap: widget.onFollowUps,
           badgeCount: widget.followUpsBadgeCount,
         ),
+      if (widget.showEoi)
+        _NavEntry(
+          index: 12,
+          label: 'EOI',
+          icon: Icons.inventory_2_outlined,
+          onTap: widget.onEoi,
+        ),
       if (widget.showSiteVisits)
         _NavEntry(
           index: 3,
           label: 'Site Visits',
           icon: Icons.location_on_outlined,
           onTap: widget.onSiteVisits,
+        ),
+      if (widget.showSiteVisitDone && widget.onSiteVisitDone != null)
+        _NavEntry(
+          index: 13,
+          label: 'Site Visit Done',
+          icon: Icons.how_to_reg_outlined,
+          onTap: widget.onSiteVisitDone!,
         ),
       if (widget.showRevisits)
         _NavEntry(
@@ -137,6 +163,13 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           label: 'Attendance',
           icon: Icons.fact_check,
           onTap: widget.onReports,
+        ),
+      if (widget.showLeaves && widget.onLeaves != null)
+        _NavEntry(
+          index: 14,
+          label: 'Leaves',
+          icon: Icons.event_busy_outlined,
+          onTap: widget.onLeaves!,
         ),
       if (widget.showTargets && widget.onTargets != null)
         _NavEntry(

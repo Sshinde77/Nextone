@@ -1325,7 +1325,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
   Future<void> _pickSiteVisitTime() async {
     final pickedTime = await showTimePicker(
       context: context,
-      initialTime: _selectedSiteVisitTime ?? const TimeOfDay(hour: 10, minute: 0),
+      initialTime:
+          _selectedSiteVisitTime ?? const TimeOfDay(hour: 10, minute: 0),
     );
     if (pickedTime == null || !mounted) {
       return;
@@ -1545,7 +1546,8 @@ class _LeadFormPageState extends State<LeadFormPage> {
                       onRetry: _loadLeadStatusOptions,
                       onChanged: (value) {
                         setState(() {
-                          final previousIsSiteVisit = _isSiteVisitScheduledStatus;
+                          final previousIsSiteVisit =
+                              _isSiteVisitScheduledStatus;
                           final previousIsFollowUp = _isFollowUpStatus;
                           _selectedLeadStatus = value;
                           final nextIsSiteVisit = _isSiteVisitScheduledStatus;

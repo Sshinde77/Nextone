@@ -3139,6 +3139,220 @@ class AuthService {
     throw Exception('Holiday response is not valid JSON.');
   }
 
+  Future<Map<String, dynamic>> attendanceLeavesToday({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+        '${ApiConstants.baseUrl}${ApiConstants.attendanceLeavesToday}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'attendanceLeavesToday',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('attendanceLeavesToday', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch today leaves.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+      if (decoded is List) {
+        return <String, dynamic>{'data': decoded};
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Today leaves response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> attendanceLeaves({
+    int page = 1,
+    int perPage = 10,
+    String? from,
+    String? to,
+    String? userId,
+    String? leaveType,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    if (from != null && from.trim().isNotEmpty) {
+      query['from'] = from.trim();
+    }
+    if (to != null && to.trim().isNotEmpty) {
+      query['to'] = to.trim();
+    }
+    if (userId != null && userId.trim().isNotEmpty) {
+      query['user_id'] = userId.trim();
+    }
+    if (leaveType != null && leaveType.trim().isNotEmpty) {
+      query['leave_type'] = leaveType.trim();
+    }
+
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceLeaves}')
+            .replace(queryParameters: query);
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'attendanceLeaves',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('attendanceLeaves', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch leaves.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+      if (decoded is List) {
+        return <String, dynamic>{'data': decoded};
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    throw Exception('Leaves response is not valid JSON.');
+  }
+
+  Future<Map<String, dynamic>> markAttendanceLeave({
+    required String userId,
+    required String date,
+    required String leaveType,
+    required String reason,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.attendanceLeaveMark}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final payload = <String, dynamic>{
+      'user_id': userId.trim(),
+      'date': date.trim(),
+      'leave_type': leaveType.trim(),
+      'reason': reason.trim(),
+    };
+    _logRequest(
+      endpoint: 'markAttendanceLeave',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: jsonEncode(payload),
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: jsonEncode(payload))
+        .timeout(_requestTimeout);
+    _logResponse('markAttendanceLeave', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to mark leave.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> applyAttendanceLeave({
+    required String date,
+    required String leaveType,
+    required String reason,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+        '${ApiConstants.baseUrl}${ApiConstants.attendanceLeaveApply}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final payload = <String, dynamic>{
+      'date': date.trim(),
+      'leave_type': leaveType.trim(),
+      'reason': reason.trim(),
+    };
+    _logRequest(
+      endpoint: 'applyAttendanceLeave',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: jsonEncode(payload),
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: jsonEncode(payload))
+        .timeout(_requestTimeout);
+    _logResponse('applyAttendanceLeave', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to apply leave.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {
+      // handled below
+    }
+
+    return payload;
+  }
+
   Future<Map<String, dynamic>> createHoliday({
     required String date,
     required String name,
@@ -7497,7 +7711,7 @@ class AuthService {
     required String city,
     required String locality,
     required String address,
-    required List<String> configurations,
+    required List<Map<String, dynamic>> configurations,
     required String priceRange,
     required int totalUnits,
     required String possessionDate,
@@ -7505,6 +7719,8 @@ class AuthService {
     required List<String> amenities,
     required String status,
     required String description,
+    List<Map<String, dynamic>> photos = const <Map<String, dynamic>>[],
+    Map<String, dynamic>? developerLogo,
     List<Map<String, dynamic>> unitPlans = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> creatives = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> paymentPlans = const <Map<String, dynamic>>[],
@@ -7519,6 +7735,16 @@ class AuthService {
     final uri =
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.createprojects}');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
+    String normalizeConfigValue(dynamic value) {
+      if (value == null) {
+        return '';
+      }
+      if (value is String) {
+        return value.trim();
+      }
+      return value.toString().trim();
+    }
+
     final bodyMap = <String, dynamic>{
       'name': name.trim(),
       'developer': developer.trim(),
@@ -7526,8 +7752,20 @@ class AuthService {
       'locality': locality.trim(),
       'address': address.trim(),
       'configurations': configurations
-          .map((value) => value.trim())
-          .where((value) => value.isNotEmpty)
+          .where((item) => item.isNotEmpty)
+          .map(
+            (item) => <String, dynamic>{
+              'configuration': normalizeConfigValue(item['configuration']),
+              'carpet_area': normalizeConfigValue(item['carpet_area']),
+              'price': normalizeConfigValue(item['price']),
+            },
+          )
+          .where(
+            (item) =>
+                item['configuration'].toString().trim().isNotEmpty ||
+                item['carpet_area'].toString().trim().isNotEmpty ||
+                item['price'].toString().trim().isNotEmpty,
+          )
           .toList(),
       'price_range': priceRange.trim(),
       'total_units': totalUnits,
@@ -7540,11 +7778,15 @@ class AuthService {
       'status': status.trim(),
       'description': description.trim(),
       'home_loan_info': homeLoanInfo.trim(),
+      'photos': photos,
       'unit_plans': unitPlans,
       'creatives': creatives,
       'payment_plans': paymentPlans,
       'videos': videos,
     };
+    if (developerLogo != null && developerLogo.isNotEmpty) {
+      bodyMap['developer_logo'] = developerLogo;
+    }
     final trimmedBrochureUrl = brochureUrl.trim();
     if (trimmedBrochureUrl.isNotEmpty) {
       bodyMap['brochure_url'] = trimmedBrochureUrl;
@@ -7602,69 +7844,13 @@ class AuthService {
       'amenities': amenities,
       'status': status.trim(),
       'description': description.trim(),
+      'photos': photos,
+      'developer_logo': developerLogo,
       'brochure_url': brochureUrl.trim(),
       'video_url': videoUrl.trim(),
       'payment_plan_url': paymentPlanUrl.trim(),
       'home_loan_info': homeLoanInfo.trim(),
     };
-  }
-
-  void _addProjectFields(
-    http.MultipartRequest request, {
-    required String name,
-    required String developer,
-    required String city,
-    required String locality,
-    required String address,
-    required List<String> configurations,
-    required String priceRange,
-    required int totalUnits,
-    required String possessionDate,
-    required String reraNumber,
-    required List<String> amenities,
-    required String status,
-    required String description,
-    required String brochureUrl,
-    required String videoUrl,
-    required String paymentPlanUrl,
-    required String homeLoanInfo,
-  }) {
-    request.fields.addAll({
-      'name': name.trim(),
-      'developer': developer.trim(),
-      'city': city.trim(),
-      'locality': locality.trim(),
-      'address': address.trim(),
-      'price_range': priceRange.trim(),
-      'total_units': totalUnits.toString(),
-      'possession_date': possessionDate.trim(),
-      'rera_number': reraNumber.trim(),
-      'status': status.trim(),
-      'description': description.trim(),
-      'brochure_url': brochureUrl.trim(),
-      'video_url': videoUrl.trim(),
-      'payment_plan_url': paymentPlanUrl.trim(),
-      'home_loan_info': homeLoanInfo.trim(),
-    });
-
-    for (final configuration in configurations) {
-      final value = configuration.trim();
-      if (value.isNotEmpty) {
-        request.fields['configurations'] = [
-          request.fields['configurations'],
-          value,
-        ].whereType<String>().join(',');
-      }
-    }
-    for (final amenity in amenities) {
-      final value = amenity.trim();
-      if (value.isNotEmpty) {
-        request.fields['amenities'] = [
-          request.fields['amenities'],
-          value,
-        ].whereType<String>().join(',');
-      }
-    }
   }
 
   void _addProjectSelectionFields(
@@ -8257,7 +8443,7 @@ class AuthService {
     required String city,
     required String locality,
     required String address,
-    required List<String> configurations,
+    required List<Map<String, dynamic>> configurations,
     required String priceRange,
     required int totalUnits,
     required String possessionDate,
@@ -8265,6 +8451,8 @@ class AuthService {
     required List<String> amenities,
     required String status,
     required String description,
+    List<Map<String, dynamic>> photos = const <Map<String, dynamic>>[],
+    Map<String, dynamic>? developerLogo,
     List<Map<String, dynamic>> unitPlans = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> creatives = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> paymentPlans = const <Map<String, dynamic>>[],
@@ -8285,6 +8473,16 @@ class AuthService {
         ApiConstants.editprojects.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
+    String normalizeConfigValue(dynamic value) {
+      if (value == null) {
+        return '';
+      }
+      if (value is String) {
+        return value.trim();
+      }
+      return value.toString().trim();
+    }
+
     final bodyMap = <String, dynamic>{
       'name': name.trim(),
       'developer': developer.trim(),
@@ -8292,8 +8490,20 @@ class AuthService {
       'locality': locality.trim(),
       'address': address.trim(),
       'configurations': configurations
-          .map((value) => value.trim())
-          .where((value) => value.isNotEmpty)
+          .where((item) => item.isNotEmpty)
+          .map(
+            (item) => <String, dynamic>{
+              'configuration': normalizeConfigValue(item['configuration']),
+              'carpet_area': normalizeConfigValue(item['carpet_area']),
+              'price': normalizeConfigValue(item['price']),
+            },
+          )
+          .where(
+            (item) =>
+                item['configuration'].toString().trim().isNotEmpty ||
+                item['carpet_area'].toString().trim().isNotEmpty ||
+                item['price'].toString().trim().isNotEmpty,
+          )
           .toList(),
       'price_range': priceRange.trim(),
       'total_units': totalUnits,
@@ -8306,11 +8516,15 @@ class AuthService {
       'status': status.trim(),
       'description': description.trim(),
       'home_loan_info': homeLoanInfo.trim(),
+      'photos': photos,
       'unit_plans': unitPlans,
       'creatives': creatives,
       'payment_plans': paymentPlans,
       'videos': videos,
     };
+    if (developerLogo != null && developerLogo.isNotEmpty) {
+      bodyMap['developer_logo'] = developerLogo;
+    }
     final trimmedBrochureUrl = brochureUrl.trim();
     if (trimmedBrochureUrl.isNotEmpty) {
       bodyMap['brochure_url'] = trimmedBrochureUrl;

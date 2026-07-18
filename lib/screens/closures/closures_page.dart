@@ -733,6 +733,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 withData: kIsWeb,
               );
               if (picked == null || picked.files.isEmpty) return;
+              if (!context.mounted) return;
 
               final file = picked.files.first;
               final safeFileName = file.name.trim();
@@ -2125,6 +2126,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                 withData: kIsWeb,
               );
               if (picked == null || picked.files.isEmpty) return;
+              if (!context.mounted) return;
 
               final file = picked.files.first;
               final safeFileName = file.name.trim();

@@ -768,6 +768,60 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> attendanceLeavesToday({String? token}) {
+    return _authService.attendanceLeavesToday(token: token);
+  }
+
+  Future<Map<String, dynamic>> attendanceLeaves({
+    int page = 1,
+    int perPage = 10,
+    String? from,
+    String? to,
+    String? userId,
+    String? leaveType,
+    String? token,
+  }) {
+    return _authService.attendanceLeaves(
+      page: page,
+      perPage: perPage,
+      from: from,
+      to: to,
+      userId: userId,
+      leaveType: leaveType,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> markAttendanceLeave({
+    required String userId,
+    required String date,
+    required String leaveType,
+    required String reason,
+    String? token,
+  }) {
+    return _authService.markAttendanceLeave(
+      userId: userId,
+      date: date,
+      leaveType: leaveType,
+      reason: reason,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> applyAttendanceLeave({
+    required String date,
+    required String leaveType,
+    required String reason,
+    String? token,
+  }) {
+    return _authService.applyAttendanceLeave(
+      date: date,
+      leaveType: leaveType,
+      reason: reason,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> createHoliday({
     required String date,
     required String name,
@@ -1797,7 +1851,7 @@ class AuthProvider {
     required String city,
     required String locality,
     required String address,
-    required List<String> configurations,
+    required List<Map<String, dynamic>> configurations,
     required String priceRange,
     required int totalUnits,
     required String possessionDate,
@@ -1805,6 +1859,8 @@ class AuthProvider {
     required List<String> amenities,
     required String status,
     required String description,
+    List<Map<String, dynamic>> photos = const <Map<String, dynamic>>[],
+    Map<String, dynamic>? developerLogo,
     List<Map<String, dynamic>> unitPlans = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> creatives = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> paymentPlans = const <Map<String, dynamic>>[],
@@ -1829,6 +1885,8 @@ class AuthProvider {
       amenities: amenities,
       status: status,
       description: description,
+      photos: photos,
+      developerLogo: developerLogo,
       unitPlans: unitPlans,
       creatives: creatives,
       paymentPlans: paymentPlans,
@@ -1939,7 +1997,7 @@ class AuthProvider {
     required String city,
     required String locality,
     required String address,
-    required List<String> configurations,
+    required List<Map<String, dynamic>> configurations,
     required String priceRange,
     required int totalUnits,
     required String possessionDate,
@@ -1947,6 +2005,8 @@ class AuthProvider {
     required List<String> amenities,
     required String status,
     required String description,
+    List<Map<String, dynamic>> photos = const <Map<String, dynamic>>[],
+    Map<String, dynamic>? developerLogo,
     List<Map<String, dynamic>> unitPlans = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> creatives = const <Map<String, dynamic>>[],
     List<Map<String, dynamic>> paymentPlans = const <Map<String, dynamic>>[],
@@ -1972,6 +2032,8 @@ class AuthProvider {
       amenities: amenities,
       status: status,
       description: description,
+      photos: photos,
+      developerLogo: developerLogo,
       unitPlans: unitPlans,
       creatives: creatives,
       paymentPlans: paymentPlans,

@@ -687,12 +687,15 @@ class _HomePageState extends State<HomePage> {
               currentIndex: _currentIndex,
               showLeads: RoleAccess.canViewModule('leads'),
               showFollowUps: RoleAccess.canViewModule('follow_ups'),
+              showEoi: RoleAccess.canViewModule('leads'),
               showSiteVisits: RoleAccess.canViewModule('site_visits'),
+              showSiteVisitDone: RoleAccess.canViewModule('leads'),
               showRevisits: RoleAccess.canViewModule('revisits'),
               showProjects: RoleAccess.canViewProjects(_currentRole),
               showTeam: RoleAccess.canViewTeam(_currentRole),
               showAttendance: RoleAccess.canViewModule('attendance'),
               showTargets: RoleAccess.canViewModule('targets'),
+              showLeaves: RoleAccess.canViewModule('attendance'),
               showUsers: RoleAccess.canViewUsers(_currentRole),
               showNotifications: RoleAccess.canViewModule('notifications'),
               onDashboard: () {
@@ -704,8 +707,14 @@ class _HomePageState extends State<HomePage> {
               onFollowUps: () {
                 _openMainTab(2);
               },
+              onEoi: () {
+                _openMainTab(12);
+              },
               onSiteVisits: () {
                 _openMainTab(3);
+              },
+              onSiteVisitDone: () {
+                _openMainTab(13);
               },
               onRevisits: () {
                 _openMainTab(4);
@@ -727,6 +736,9 @@ class _HomePageState extends State<HomePage> {
                       _openMainTab(11);
                     }
                   : null,
+              onLeaves: () {
+                _openMainTab(14);
+              },
               onNotifications: () {
                 Navigator.pushNamed(context, '/notifications');
               },

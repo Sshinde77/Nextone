@@ -13,6 +13,45 @@ class DataCardAction {
   final Color? color;
 }
 
+class DataCardShell extends StatelessWidget {
+  const DataCardShell({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(16),
+    this.backgroundColor = Colors.white,
+    this.borderColor = AppColors.border,
+    this.borderRadius = 18,
+    this.boxShadow = const <BoxShadow>[
+      BoxShadow(
+        color: Color(0x14000000),
+        blurRadius: 14,
+        offset: Offset(0, 4),
+      ),
+    ],
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final Color backgroundColor;
+  final Color borderColor;
+  final double borderRadius;
+  final List<BoxShadow> boxShadow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(color: borderColor),
+        boxShadow: boxShadow,
+      ),
+      child: child,
+    );
+  }
+}
+
 class DataCard extends StatelessWidget {
   const DataCard({
     super.key,

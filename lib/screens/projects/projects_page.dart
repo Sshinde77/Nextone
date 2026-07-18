@@ -566,6 +566,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
     } catch (_) {
       // Fall back to the list payload if the detail request fails.
     }
+    if (!mounted) return;
     final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => ProjectFormPage(projectData: projectData),
@@ -645,7 +646,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       _showSnackBar(AppErrorHandler.friendlyMessage(error));
       return;
     }
-    if (!mounted || availability == null) return;
+    if (!mounted) return;
 
     await showModalBottomSheet<void>(
       context: context,

@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:nextone/screens/attendance/attendance_page.dart';
+import 'package:nextone/screens/attendance/leave_management_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nextone/screens/closures/closures_page.dart';
+import 'package:nextone/screens/eoi/eoi_page.dart';
 import 'package:nextone/screens/follow_ups/follow_up_page.dart';
 import 'package:nextone/screens/home/home_page.dart';
 import 'package:nextone/screens/leads/leads_page.dart';
+import 'package:nextone/screens/leads/site_visit_done_page.dart';
 import 'package:nextone/screens/projects/projects_page.dart';
 import 'package:nextone/screens/salary/salary_management_page.dart';
 import 'package:nextone/screens/site_visits/site_visits_page.dart';
@@ -40,7 +43,7 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     final index = widget.initialIndex;
-    _currentIndex = index < 0 ? 0 : (index >= 12 ? 11 : index);
+    _currentIndex = index < 0 ? 0 : (index >= 15 ? 14 : index);
     _loadAccess();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(NotificationNavigationService.flushPendingNavigation());
@@ -150,6 +153,12 @@ class _MainScreenState extends State<MainScreen> {
         return const ClosuresPage();
       case 11:
         return const TargetsPage();
+      case 12:
+        return const EoiPage();
+      case 13:
+        return const SiteVisitDonePage();
+      case 14:
+        return const LeaveManagementPage();
       default:
         return const HomePage(showBottomNav: false);
     }
@@ -206,25 +215,31 @@ class _MainScreenState extends State<MainScreen> {
           currentIndex: _currentIndex,
           showLeads: RoleAccess.canViewModule('leads'),
           showFollowUps: RoleAccess.canViewModule('follow_ups'),
+          showEoi: RoleAccess.canViewModule('leads'),
           showSiteVisits: RoleAccess.canViewModule('site_visits'),
+          showSiteVisitDone: RoleAccess.canViewModule('leads'),
           showRevisits: RoleAccess.canViewModule('revisits'),
           showProjects: RoleAccess.canViewProjects(_currentRole),
           showTeam: RoleAccess.canViewTeam(_currentRole),
           showAttendance: RoleAccess.canViewModule('attendance'),
           showTargets: RoleAccess.canViewModule('targets'),
+          showLeaves: RoleAccess.canViewModule('attendance'),
           showUsers: RoleAccess.canViewUsers(_currentRole),
           showSalary: RoleAccess.canViewSalaryManagement(_currentRole),
           showNotifications: RoleAccess.canViewModule('notifications'),
           onDashboard: () => _setIndex(0),
           onLeads: () => _setIndex(1),
           onFollowUps: () => _setIndex(2),
+          onEoi: () => _setIndex(12),
           onSiteVisits: () => _setIndex(3),
+          onSiteVisitDone: () => _setIndex(13),
           onRevisits: () => _setIndex(4),
           onProjects: () => _setIndex(5),
           onTeam: () => _setIndex(6),
           onReports: () => _setIndex(7),
           onSettings: () => _setIndex(8),
           onTargets: () => _setIndex(11),
+          onLeaves: () => _setIndex(14),
           onNotifications: () => Navigator.pushNamed(context, '/notifications'),
           onSalary: () => _setIndex(9),
           onMore: () {},

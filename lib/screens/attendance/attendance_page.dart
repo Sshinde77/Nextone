@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
+import 'package:nextone/routes/app_routes.dart';
 import 'package:nextone/screens/attendance/holiday_form_page.dart';
 import 'package:nextone/screens/attendance/attendance_user_history_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
@@ -317,6 +318,26 @@ class _AttendancePageState extends State<AttendancePage> {
           _RoundActionButton(
             icon: Icons.refresh_rounded,
             onTap: _loadTodayAttendance,
+          ),
+          FilledButton.icon(
+            onPressed: () =>
+                Navigator.of(context).pushNamed(AppRoutes.leaveManagement),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+            icon: const Icon(Icons.event_busy_outlined, size: 18),
+            label: const Text(
+              'Leaves',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
           ),
           if (_showExportButton)
             OutlinedButton.icon(

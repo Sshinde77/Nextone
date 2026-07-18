@@ -790,6 +790,7 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
       text: _readString(document['name'], fallback: ''),
     );
     var shouldUpdate = false;
+    if (!mounted) return;
 
     await showDialog<void>(
       context: context,
@@ -970,7 +971,7 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
 
   Widget _documentDropdownField() {
     return DropdownButtonFormField<String>(
-      value: _selectedDocumentType,
+      initialValue: _selectedDocumentType,
       decoration: const InputDecoration(
         labelText: 'Document Type',
         border: OutlineInputBorder(),

@@ -553,13 +553,13 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     setState(() {
       if (paymentProofs != null) {
         _paymentProofItems =
-            paymentProofs!.isNotEmpty || _paymentProofItems.isEmpty
+            paymentProofs.isNotEmpty || _paymentProofItems.isEmpty
                 ? paymentProofs
                 : _paymentProofItems;
       }
       if (photos != null) {
         _photoItems =
-            photos!.isNotEmpty || _photoItems.isEmpty ? photos : _photoItems;
+            photos.isNotEmpty || _photoItems.isEmpty ? photos : _photoItems;
       }
       _attachmentsError = errorMessage;
       _isLoadingAttachments = false;
