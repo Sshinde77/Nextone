@@ -4115,7 +4115,7 @@ class AuthService {
     };
   }
 
-  Future<Map<String, dynamic>> createLeadWithFollowUp({
+  Future<Map<String, dynamic>> createFollowUpWithLead({
     required String name,
     required String phone,
     String alternatePhoneNumber = '',
@@ -4166,7 +4166,7 @@ class AuthService {
     final body = jsonEncode(requestPayload);
 
     _logRequest(
-      endpoint: 'createLeadWithFollowUp',
+      endpoint: 'createFollowUpWithLead',
       method: 'POST',
       uri: uri,
       headers: headers,
@@ -4176,7 +4176,7 @@ class AuthService {
     final response = await http
         .post(uri, headers: headers, body: body)
         .timeout(_requestTimeout);
-    _logResponse('createLeadWithFollowUp', response);
+    _logResponse('createFollowUpWithLead', response);
 
     final error = _handleResponse(
       response,
@@ -4196,6 +4196,50 @@ class AuthService {
     }
 
     return requestPayload;
+  }
+
+  Future<Map<String, dynamic>> createLeadWithFollowUp({
+    required String name,
+    required String phone,
+    String alternatePhoneNumber = '',
+    required String email,
+    required String source,
+    String projectId = '',
+    String projectName = '',
+    required String assignedTo,
+    String budget = '',
+    String locationPreference = '',
+    String configuration = '',
+    String leadNotes = '',
+    String callbackTime = '',
+    String nextFollowUpTime = '',
+    required String title,
+    required String dueDate,
+    required String priority,
+    required String notes,
+    String? token,
+  }) {
+    return createFollowUpWithLead(
+      name: name,
+      phone: phone,
+      alternatePhoneNumber: alternatePhoneNumber,
+      email: email,
+      source: source,
+      projectId: projectId,
+      projectName: projectName,
+      assignedTo: assignedTo,
+      budget: budget,
+      locationPreference: locationPreference,
+      configuration: configuration,
+      leadNotes: leadNotes,
+      callbackTime: callbackTime,
+      nextFollowUpTime: nextFollowUpTime,
+      title: title,
+      dueDate: dueDate,
+      priority: priority,
+      notes: notes,
+      token: token,
+    );
   }
 
   Future<Map<String, dynamic>> editFollowUp({
@@ -5428,6 +5472,41 @@ class AuthService {
       'status': normalizedStatus,
       'note': note.trim(),
     };
+  }
+
+  Future<void> deleteClosure({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Closure id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.closuresDetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+
+    _logRequest(
+      endpoint: 'deleteClosure',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteClosure', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete closure.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
   }
 
   Future<Map<String, dynamic>> closureLeadDetail({

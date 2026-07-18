@@ -1015,6 +1015,50 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> createFollowUpWithLead({
+    required String name,
+    required String phone,
+    String alternatePhoneNumber = '',
+    required String email,
+    required String source,
+    String projectId = '',
+    String projectName = '',
+    required String assignedTo,
+    String budget = '',
+    String locationPreference = '',
+    String configuration = '',
+    String leadNotes = '',
+    String callbackTime = '',
+    String nextFollowUpTime = '',
+    required String title,
+    required String dueDate,
+    required String priority,
+    required String notes,
+    String? token,
+  }) {
+    return _authService.createFollowUpWithLead(
+      name: name,
+      phone: phone,
+      alternatePhoneNumber: alternatePhoneNumber,
+      email: email,
+      source: source,
+      projectId: projectId,
+      projectName: projectName,
+      assignedTo: assignedTo,
+      budget: budget,
+      locationPreference: locationPreference,
+      configuration: configuration,
+      leadNotes: leadNotes,
+      callbackTime: callbackTime,
+      nextFollowUpTime: nextFollowUpTime,
+      title: title,
+      dueDate: dueDate,
+      priority: priority,
+      notes: notes,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> createLeadWithFollowUp({
     required String name,
     required String phone,
@@ -1036,7 +1080,7 @@ class AuthProvider {
     required String notes,
     String? token,
   }) {
-    return _authService.createLeadWithFollowUp(
+    return createFollowUpWithLead(
       name: name,
       phone: phone,
       alternatePhoneNumber: alternatePhoneNumber,
@@ -1176,6 +1220,16 @@ class AuthProvider {
       status: status,
       page: page,
       perPage: perPage,
+    );
+  }
+
+  Future<void> deleteClosure({
+    required String id,
+    String? token,
+  }) {
+    return _authService.deleteClosure(
+      id: id,
+      token: token,
     );
   }
 

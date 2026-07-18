@@ -4654,7 +4654,8 @@ class _LeadActivityItem {
           json['event_type'],
     );
     final actorName = read(
-      json['added_by_name'] ??
+      json['performed_by'] ??
+          json['added_by_name'] ??
           json['created_by_name'] ??
           json['user_name'] ??
           actor?['full_name'] ??

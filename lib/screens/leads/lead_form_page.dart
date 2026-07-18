@@ -1069,8 +1069,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           budget: _budgetController.text.trim(),
           locationPreference: _locationPreferenceController.text.trim(),
           configuration: _configurationController.text.trim(),
-          paymentProofUrl:
-              _isEoiStatus ? _paymentProofUrlController.text.trim() : '',
+          paymentProofUrl: '',
           paymentProofAmount:
               _isEoiStatus ? _paymentProofAmountController.text.trim() : '',
           paymentProof: _isEoiStatus ? _buildPaymentProofPayload() : const [],
@@ -1125,7 +1124,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           return;
         }
 
-        final createdLead = await _authProvider.createLeadWithFollowUp(
+        final createdLead = await _authProvider.createFollowUpWithLead(
           name: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
           alternatePhoneNumber: _alternatePhoneController.text.trim(),
@@ -1169,8 +1168,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
           locationPreference: _locationPreferenceController.text.trim(),
           configuration: _configurationController.text.trim(),
           notes: _notesController.text.trim(),
-          paymentProofUrl:
-              _isEoiStatus ? _paymentProofUrlController.text.trim() : '',
+          paymentProofUrl: '',
           paymentProofAmount:
               _isEoiStatus ? _paymentProofAmountController.text.trim() : '',
           paymentProof: _isEoiStatus ? _buildPaymentProofPayload() : const [],
@@ -1604,13 +1602,6 @@ class _LeadFormPageState extends State<LeadFormPage> {
                               emptyText: 'No front page photo selected',
                               files: _selectedPhotoFiles,
                               onPick: _pickPhotoFiles,
-                            ),
-                            const SizedBox(height: 14),
-                            _buildTextField(
-                              controller: _paymentProofUrlController,
-                              label: 'Payment Proof URL',
-                              hintText:
-                                  '/uploads/payment-proofs/payment_proof_receipt_123.jpg',
                             ),
                             const SizedBox(height: 12),
                             _buildTextField(

@@ -22,6 +22,7 @@ class ClosureDataCard extends StatelessWidget {
     this.onView,
     this.onEdit,
     this.onStatus,
+    this.onDelete,
   });
 
   final String leadName;
@@ -42,6 +43,7 @@ class ClosureDataCard extends StatelessWidget {
   final VoidCallback? onView;
   final VoidCallback? onEdit;
   final VoidCallback? onStatus;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +122,12 @@ class ClosureDataCard extends StatelessWidget {
               _action(Icons.remove_red_eye_outlined, onView),
               _action(Icons.edit_outlined, onEdit),
               _action(Icons.info_outline, onStatus),
+              if (onDelete != null)
+                _action(
+                  Icons.delete_outline_rounded,
+                  onDelete,
+                  iconColor: AppColors.error,
+                ),
             ],
           ),
         ],
@@ -127,7 +135,11 @@ class ClosureDataCard extends StatelessWidget {
     );
   }
 
-  Widget _action(IconData icon, VoidCallback? onTap) {
+  Widget _action(
+    IconData icon,
+    VoidCallback? onTap, {
+    Color iconColor = AppColors.textSecondary,
+  }) {
     return Container(
       margin: const EdgeInsets.only(left: 6),
       decoration: BoxDecoration(
@@ -136,7 +148,7 @@ class ClosureDataCard extends StatelessWidget {
       ),
       child: IconButton(
         onPressed: onTap,
-        icon: Icon(icon, size: 18, color: AppColors.textSecondary),
+        icon: Icon(icon, size: 18, color: iconColor),
         constraints: const BoxConstraints.tightFor(width: 34, height: 34),
         padding: EdgeInsets.zero,
       ),

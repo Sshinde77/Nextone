@@ -191,6 +191,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
   bool get _canExportData => RoleAccess.canExportModule('closures');
   bool get _showExportButton =>
       _canExportData && RoleAccess.isAdminOrSuperAdmin(_currentRole);
+  bool get _canDeleteClosures => RoleAccess.isAdminOrSuperAdmin(_currentRole);
 
   Future<void> _loadAccess() async {
     try {
@@ -2020,7 +2021,61 @@ class _ClosuresPageState extends State<ClosuresPage> {
       onView: () => _openClosureDetail(item),
       onEdit: () => _openEditClosureDialog(item),
       onStatus: () => _openStatusUpdateDialog(item),
+      onDelete: _canDeleteClosures ? () => _deleteClosure(item) : null,
     );
+  }
+
+  Future<void> _deleteClosure(Map<String, dynamic> item) async {
+    final id = _readString(item['id'], fallback: '');
+    if (id.isEmpty) {
+      _showInfo('Unable to delete closure. Missing id.');
+      return;
+    }
+
+    final label = _readString(
+      item['lead_name'] ?? item['project_name'] ?? item['unit_number'],
+      fallback: 'this closure',
+    );
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Closure'),
+          content: Text('Delete "$label"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await _authProvider.deleteClosure(
+        id: id,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      _showInfo('Closure deleted successfully.');
+      final nextPage = _items.length == 1 && _currentPage > 1
+          ? _currentPage - 1
+          : _currentPage;
+      await _loadClosures(page: nextPage);
+    } catch (error) {
+      if (!mounted) return;
+      _showInfo(AppErrorHandler.friendlyMessage(error));
+    }
   }
 
   Future<void> _openClosureDetail(Map<String, dynamic> item) async {
