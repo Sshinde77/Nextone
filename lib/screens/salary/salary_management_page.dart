@@ -1,5 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
@@ -10,6 +12,7 @@ import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SalaryManagementPage extends StatefulWidget {
   const SalaryManagementPage({
@@ -43,11 +46,34 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   int _slipsTotalPages = 1;
   final int _slipsPerPage = 10;
   List<SalarySlip> _salarySlips = <SalarySlip>[];
+  bool _isLoadingCommissions = false;
+  String? _commissionsError;
+  int _commissionsTotal = 0;
+  List<SalaryCommission> _commissions = <SalaryCommission>[];
+  final Set<String> _commissionBusyIds = <String>{};
+  final TextEditingController _commissionEmployeeController =
+      TextEditingController();
+  String _commissionEmployeeFilter = '';
+  String _commissionStatusFilter = 'all';
+  DateTime? _commissionFromDate;
+  DateTime? _commissionToDate;
+  bool _isLoadingAdvances = false;
+  String? _advancesError;
+  int _advancesTotal = 0;
+  List<SalaryAdvance> _advances = <SalaryAdvance>[];
+  final Set<String> _advanceBusyIds = <String>{};
+  final TextEditingController _advanceEmployeeController =
+      TextEditingController();
+  String _advanceEmployeeFilter = '';
+  DateTime? _advanceFromDate;
+  DateTime? _advanceToDate;
   bool _isLoadingMySalary = false;
   String? _mySalaryError;
   MySalaryResult? _mySalaryResult;
   List<SalaryHistoryEntry> _mySalaryHistory = <SalaryHistoryEntry>[];
   List<_MySalaryIncentiveRow> _myIncentives = <_MySalaryIncentiveRow>[];
+  List<SalaryCommission> _myCommissions = <SalaryCommission>[];
+  List<SalaryAdvance> _myAdvances = <SalaryAdvance>[];
   List<_MyDailyEarningRow> _myDailyEarningRows = <_MyDailyEarningRow>[];
   int _myDailyPresentFullCount = 0;
   int _myDailyPresentHalfCount = 0;
@@ -61,6 +87,11 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   int _mySalarySelectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
   int _selectedTab = 0;
+  String _myCommissionStatusFilter = 'all';
+  DateTime? _myCommissionFromDate;
+  DateTime? _myCommissionToDate;
+  DateTime? _myAdvanceFromDate;
+  DateTime? _myAdvanceToDate;
 
   bool get _isAdminSalaryView => RoleAccess.canManageSalary(_currentRole);
 
@@ -68,6 +99,13 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   void initState() {
     super.initState();
     _loadRole();
+  }
+
+  @override
+  void dispose() {
+    _commissionEmployeeController.dispose();
+    _advanceEmployeeController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadRole() async {
@@ -82,6 +120,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       if (isAdmin) {
         await _loadEmployees(page: 1);
         await _loadSalarySlips(page: 1);
+        await _loadCommissions();
+        await _loadAdvances();
       } else {
         await _loadMySalary();
       }
@@ -155,6 +195,58 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     }
   }
 
+  Future<void> _loadCommissions() async {
+    setState(() {
+      _isLoadingCommissions = true;
+      _commissionsError = null;
+    });
+    try {
+      final result = await _authProvider.salaryCommissions(
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      final sorted = List<SalaryCommission>.from(result.items)
+        ..sort((a, b) => _commissionDateOf(b).compareTo(_commissionDateOf(a)));
+      setState(() {
+        _commissions = sorted;
+        _commissionsTotal = result.total > 0 ? result.total : sorted.length;
+        _isLoadingCommissions = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingCommissions = false;
+        _commissionsError = AppErrorHandler.friendlyMessage(error);
+      });
+    }
+  }
+
+  Future<void> _loadAdvances() async {
+    setState(() {
+      _isLoadingAdvances = true;
+      _advancesError = null;
+    });
+    try {
+      final result = await _authProvider.salaryAdvances(
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      final sorted = List<SalaryAdvance>.from(result.items)
+        ..sort((a, b) => _advanceDateOf(b).compareTo(_advanceDateOf(a)));
+      setState(() {
+        _advances = sorted;
+        _advancesTotal = result.total > 0 ? result.total : sorted.length;
+        _isLoadingAdvances = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingAdvances = false;
+        _advancesError = AppErrorHandler.friendlyMessage(error);
+      });
+    }
+  }
+
   Future<void> _loadMySalary() async {
     setState(() {
       _isLoadingMySalary = true;
@@ -176,6 +268,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
           ),
         _authProvider.mySalaryHistory(token: _authProvider.currentAuthToken),
         _authProvider.myIncentives(token: _authProvider.currentAuthToken),
+        _authProvider.myCommissions(token: _authProvider.currentAuthToken),
+        _authProvider.myAdvances(token: _authProvider.currentAuthToken),
       ]);
       final result = futures[0] as MySalaryResult;
       final history = (futures[1] as List<SalaryHistoryEntry>)
@@ -184,6 +278,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
           .map(_mapMyIncentiveRow)
           .toList()
         ..sort((a, b) => b.date.compareTo(a.date));
+      final commissions = (futures[3] as List<SalaryCommission>)
+        ..sort((a, b) => _commissionDateOf(b).compareTo(_commissionDateOf(a)));
+      final advances = (futures[4] as List<SalaryAdvance>)
+        ..sort((a, b) => _advanceDateOf(b).compareTo(_advanceDateOf(a)));
 
       final dayWise = await _buildMyDailyEarnings(result);
       if (!mounted) return;
@@ -191,6 +289,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         _mySalaryResult = result;
         _mySalaryHistory = history;
         _myIncentives = incentives;
+        _myCommissions = commissions;
+        _myAdvances = advances;
         _myDailyEarningRows = dayWise.rows;
         _myDailyPresentFullCount = dayWise.fullDays;
         _myDailyPresentHalfCount = dayWise.halfDays;
@@ -299,16 +399,31 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
               ),
             );
 
-            final generateButton = SizedBox(
+            final primaryButton = SizedBox(
               width: isNarrow ? double.infinity : null,
               child: ElevatedButton.icon(
-                onPressed: _isGeneratingAllSlips
-                    ? null
-                    : _showGenerateAllSalarySlipsDialog,
-                icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                label: _isGeneratingAllSlips
-                    ? const Text('Generating...')
-                    : const Text('Generate All Slips'),
+                onPressed: _selectedTab == 2
+                    ? _showAddCommissionDialog
+                    : _selectedTab == 3
+                        ? _showAddAdvanceDialog
+                        : (_isGeneratingAllSlips
+                            ? null
+                            : _showGenerateAllSalarySlipsDialog),
+                icon: Icon(
+                  _selectedTab == 2
+                      ? Icons.add_circle_outline
+                      : _selectedTab == 3
+                          ? Icons.add_card_outlined
+                          : Icons.receipt_long_outlined,
+                  size: 18,
+                ),
+                label: _selectedTab == 2
+                    ? const Text('Add Commission')
+                    : _selectedTab == 3
+                        ? const Text('Add Advance')
+                        : _isGeneratingAllSlips
+                            ? const Text('Generating...')
+                            : const Text('Generate All Slips'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -322,7 +437,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                 children: [
                   refreshButton,
                   const SizedBox(height: 8),
-                  generateButton,
+                  primaryButton,
                 ],
               );
             }
@@ -331,7 +446,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
               children: [
                 Expanded(child: refreshButton),
                 const SizedBox(width: 8),
-                Expanded(child: generateButton),
+                Expanded(child: primaryButton),
               ],
             );
           }
@@ -356,7 +471,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
               const SizedBox(height: 12),
               if (_selectedTab == 0)
                 _buildEmployeesSection()
-              else ...[
+              else if (_selectedTab == 1) ...[
                 _buildFilterTile(
                   DateFormat('MMMM')
                       .format(DateTime(_selectedYear, _selectedMonth)),
@@ -369,6 +484,16 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                 ),
                 const SizedBox(height: 10),
                 _buildSalarySlipsSection(),
+                const SizedBox(height: 150),
+              ] else if (_selectedTab == 2) ...[
+                _buildCommissionFilters(),
+                const SizedBox(height: 12),
+                _buildCommissionsSection(),
+                const SizedBox(height: 150),
+              ] else ...[
+                _buildAdvanceFilters(),
+                const SizedBox(height: 12),
+                _buildAdvancesSection(),
                 const SizedBox(height: 150),
               ],
             ],
@@ -416,6 +541,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     final slips = _mySalaryResult?.salarySlips ?? const <MySalarySlip>[];
     final history = _filteredMySalaryHistory();
     final incentives = _filteredMyIncentives();
+    final commissions = _filteredMyCommissions();
+    final advances = _filteredMyAdvances();
     final latestSlip = slips.isNotEmpty ? slips.first : null;
     final perDay = current?.perDaySalary ?? latestSlip?.perDaySalary ?? 0;
     final effectiveFrom = current?.effectiveFrom;
@@ -489,25 +616,36 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
           const SizedBox(height: 10),
           _mySalaryTabBar(),
           const SizedBox(height: 10),
-          _buildFilterTile(monthName, onTap: _pickMySalaryMonth),
-          const SizedBox(height: 8),
-          _buildFilterTile(_selectedYear.toString(), onTap: _pickMySalaryYear),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: _loadMySalary,
-              icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
+          if (_mySalaryTab == 3) ...[
+            _buildMyCommissionFilters(),
+            const SizedBox(height: 10),
+          ] else if (_mySalaryTab == 4) ...[
+            _buildMyAdvanceFilters(),
+            const SizedBox(height: 10),
+          ] else ...[
+            _buildFilterTile(monthName, onTap: _pickMySalaryMonth),
+            const SizedBox(height: 8),
+            _buildFilterTile(_selectedYear.toString(),
+                onTap: _pickMySalaryYear),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                onPressed: _loadMySalary,
+                icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
+              ),
             ),
-          ),
+          ],
           if (_mySalaryTab == 0)
             _mySalarySlipsList(slips)
           else if (_mySalaryTab == 1)
-            _mySalaryDayWise(slips)
-          else if (_mySalaryTab == 2)
             _mySalaryHistoryList(history)
+          else if (_mySalaryTab == 2)
+            _myIncentivesList(incentives)
+          else if (_mySalaryTab == 3)
+            _myCommissionsList(commissions)
           else
-            _myIncentivesList(incentives),
+            _myAdvancesList(advances),
         ],
       ],
     );
@@ -594,14 +732,6 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Per day: ${_formatCurrency(perDay)}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11,
-                    ),
-                  ),
-                  Text(
                     'Effective from ${_formatDate(effectiveFrom)}',
                     style: const TextStyle(
                       color: Colors.white70,
@@ -678,9 +808,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         child: Row(
           children: [
             _myTabButton('Salary Slips', 0),
-            _myTabButton('Day-wise Earnings', 1),
-            _myTabButton('Salary History', 2),
-            _myTabButton('Incentives', 3),
+            _myTabButton('Salary History', 1),
+            _myTabButton('Incentives', 2),
+            _myTabButton('Commissions', 3),
+            _myTabButton('Advances', 4),
           ],
         ),
       ),
@@ -787,6 +918,73 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       final matchesMonth = _mySalarySelectedMonth == 0 ||
           item.date.month == _mySalarySelectedMonth;
       return matchesYear && matchesMonth;
+    }).toList();
+  }
+
+  List<SalaryCommission> _filteredMyCommissions() {
+    return _myCommissions.where((item) {
+      final matchesStatus = _myCommissionStatusFilter == 'all' ||
+          (_myCommissionStatusFilter == 'paid' && item.isPaid) ||
+          (_myCommissionStatusFilter == 'unpaid' && !item.isPaid);
+      final date = _commissionDateOf(item);
+      final matchesFrom = _myCommissionFromDate == null ||
+          !date.isBefore(_myCommissionFromDate!);
+      final matchesTo =
+          _myCommissionToDate == null || !date.isAfter(_myCommissionToDate!);
+      return matchesStatus && matchesFrom && matchesTo;
+    }).toList();
+  }
+
+  List<SalaryAdvance> _filteredMyAdvances() {
+    return _myAdvances.where((item) {
+      final date = _advanceDateOf(item);
+      final matchesFrom =
+          _myAdvanceFromDate == null || !date.isBefore(_myAdvanceFromDate!);
+      final matchesTo =
+          _myAdvanceToDate == null || !date.isAfter(_myAdvanceToDate!);
+      return matchesFrom && matchesTo;
+    }).toList();
+  }
+
+  DateTime _commissionDateOf(SalaryCommission item) {
+    return item.createdAt ?? item.updatedAt ?? DateTime(1970, 1, 1);
+  }
+
+  List<SalaryCommission> _filteredCommissions() {
+    final query = _commissionEmployeeFilter.trim().toLowerCase();
+    return _commissions.where((item) {
+      final employeeName = item.employeeName.toLowerCase();
+      final matchesEmployee = query.isEmpty || employeeName.contains(query);
+      final matchesStatus = _commissionStatusFilter == 'all' ||
+          (_commissionStatusFilter == 'paid' && item.isPaid) ||
+          (_commissionStatusFilter == 'unpaid' && !item.isPaid);
+      final date = _commissionDateOf(item);
+      final matchesFrom =
+          _commissionFromDate == null || !date.isBefore(_commissionFromDate!);
+      final matchesTo =
+          _commissionToDate == null || !date.isAfter(_commissionToDate!);
+      return matchesEmployee && matchesStatus && matchesFrom && matchesTo;
+    }).toList();
+  }
+
+  DateTime _advanceDateOf(SalaryAdvance item) {
+    return item.advanceDate ??
+        item.createdAt ??
+        item.updatedAt ??
+        DateTime(1970, 1, 1);
+  }
+
+  List<SalaryAdvance> _filteredAdvances() {
+    final query = _advanceEmployeeFilter.trim().toLowerCase();
+    return _advances.where((item) {
+      final matchesEmployee =
+          query.isEmpty || item.employeeName.toLowerCase().contains(query);
+      final date = _advanceDateOf(item);
+      final matchesFrom =
+          _advanceFromDate == null || !date.isBefore(_advanceFromDate!);
+      final matchesTo =
+          _advanceToDate == null || !date.isAfter(_advanceToDate!);
+      return matchesEmployee && matchesFrom && matchesTo;
     }).toList();
   }
 
@@ -1367,6 +1565,294 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     );
   }
 
+  Widget _buildMyCommissionFilters() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'My Commissions',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _loadMySalary,
+              icon: const Icon(
+                Icons.refresh,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
+              label: const Text('Refresh'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _myCommissionStatusFilter,
+              isExpanded: true,
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('All Status')),
+                DropdownMenuItem(value: 'paid', child: Text('Paid')),
+                DropdownMenuItem(value: 'unpaid', child: Text('Unpaid')),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _myCommissionStatusFilter = value);
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildFilterTile(
+          _myCommissionFromDate == null
+              ? 'From date'
+              : _formatDate(_myCommissionFromDate),
+          onTap: _pickMyCommissionFromDate,
+        ),
+        const SizedBox(height: 8),
+        _buildFilterTile(
+          _myCommissionToDate == null
+              ? 'To date'
+              : _formatDate(_myCommissionToDate),
+          onTap: _pickMyCommissionToDate,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMyAdvanceFilters() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'My Advances',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _loadMySalary,
+              icon: const Icon(
+                Icons.refresh,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
+              label: const Text('Refresh'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _buildFilterTile(
+          _myAdvanceFromDate == null
+              ? 'From date'
+              : _formatDate(_myAdvanceFromDate),
+          onTap: _pickMyAdvanceFromDate,
+        ),
+        const SizedBox(height: 8),
+        _buildFilterTile(
+          _myAdvanceToDate == null ? 'To date' : _formatDate(_myAdvanceToDate),
+          onTap: _pickMyAdvanceToDate,
+        ),
+      ],
+    );
+  }
+
+  Widget _myCommissionsList(List<SalaryCommission> commissions) {
+    if (commissions.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Text(
+          'No commissions found.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return Column(
+      children: commissions.map((item) {
+        final amount = _formatCurrency(item.commissionAmount);
+        final percentage = item.commissionPercentage == null
+            ? '-'
+            : '${item.commissionPercentage!.toStringAsFixed(1)}%';
+        final projectName =
+            item.projectName.trim().isEmpty ? '-' : item.projectName.trim();
+        final leadName = item.leadName.trim().isEmpty
+            ? ''
+            : item.leadName.trim().toLowerCase();
+        final date = _commissionDateOf(item);
+
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      amount,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '- - $percentage',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      projectName,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (leadName.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          leadName,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _statusChip(item.isPaid ? 'Paid' : 'Unpaid', item.isPaid),
+                  const SizedBox(height: 10),
+                  Text(
+                    _formatDate(date),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _myAdvancesList(List<SalaryAdvance> advances) {
+    if (advances.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Text(
+          'No advances found.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return Column(
+      children: advances.map((item) {
+        final amount = _formatCurrency(item.amount);
+        final date = _advanceDateOf(item);
+        final proofUrl = _resolvePaymentProofUrl(item.paymentProofUrl);
+
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  amount,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _formatDate(date),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (proofUrl.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () => _showProofDialog(proofUrl),
+                      icon: const Icon(Icons.link, size: 14),
+                      label: const Text('Proof'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 0,
+                          vertical: 4,
+                        ),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        minimumSize: Size.zero,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _myDailyMobileTile(_MyDailyEarningRow row) {
     final isPositive = row.earned > 0;
     final statusText = row.statusLabel.toLowerCase();
@@ -1936,6 +2422,77 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     await _loadMySalary();
   }
 
+  Future<void> _pickMyCommissionFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _myCommissionFromDate ?? DateTime.now(),
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() {
+      _myCommissionFromDate = DateTime(picked.year, picked.month, picked.day);
+      if (_myCommissionToDate != null &&
+          _myCommissionToDate!.isBefore(_myCommissionFromDate!)) {
+        _myCommissionToDate = _myCommissionFromDate;
+      }
+    });
+  }
+
+  Future<void> _pickMyCommissionToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate:
+          _myCommissionToDate ?? _myCommissionFromDate ?? DateTime.now(),
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() {
+      _myCommissionToDate =
+          DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+      if (_myCommissionFromDate != null &&
+          _myCommissionToDate!.isBefore(_myCommissionFromDate!)) {
+        _myCommissionFromDate = DateTime(picked.year, picked.month, picked.day);
+      }
+    });
+  }
+
+  Future<void> _pickMyAdvanceFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _myAdvanceFromDate ?? DateTime.now(),
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() {
+      _myAdvanceFromDate = DateTime(picked.year, picked.month, picked.day);
+      if (_myAdvanceToDate != null &&
+          _myAdvanceToDate!.isBefore(_myAdvanceFromDate!)) {
+        _myAdvanceToDate = _myAdvanceFromDate;
+      }
+    });
+  }
+
+  Future<void> _pickMyAdvanceToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _myAdvanceToDate ?? _myAdvanceFromDate ?? DateTime.now(),
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() {
+      _myAdvanceToDate =
+          DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+      if (_myAdvanceFromDate != null &&
+          _myAdvanceToDate!.isBefore(_myAdvanceFromDate!)) {
+        _myAdvanceFromDate = DateTime(picked.year, picked.month, picked.day);
+      }
+    });
+  }
+
   Widget _buildSummaryCard(_SummaryStat stat) {
     return Container(
       padding: const EdgeInsets.all(10),
@@ -2020,6 +2577,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         children: [
           Expanded(child: _tabButton('Employees & Salaries', 0)),
           Expanded(child: _tabButton('Salary Slips', 1)),
+          Expanded(child: _tabButton('Commissions', 2)),
+          Expanded(child: _tabButton('Advances', 3)),
         ],
       ),
     );
@@ -2187,6 +2746,583 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
           onPageChanged: (page) => _loadSalarySlips(page: page),
         ),
       ],
+    );
+  }
+
+  Widget _buildCommissionFilters() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: TextField(
+            controller: _commissionEmployeeController,
+            onChanged: (value) =>
+                setState(() => _commissionEmployeeFilter = value.trim()),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              hintText: 'Filter by employee...',
+              prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _commissionStatusFilter,
+              isExpanded: true,
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('All Status')),
+                DropdownMenuItem(value: 'paid', child: Text('Paid')),
+                DropdownMenuItem(value: 'unpaid', child: Text('Unpaid')),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _commissionStatusFilter = value);
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildFilterTile(
+          _commissionFromDate == null
+              ? 'From date'
+              : _formatDate(_commissionFromDate),
+          onTap: _pickCommissionFromDate,
+        ),
+        const SizedBox(height: 10),
+        _buildFilterTile(
+          _commissionToDate == null
+              ? 'To date'
+              : _formatDate(_commissionToDate),
+          onTap: _pickCommissionToDate,
+        ),
+        if (_commissionEmployeeFilter.isNotEmpty ||
+            _commissionStatusFilter != 'all' ||
+            _commissionFromDate != null ||
+            _commissionToDate != null) ...[
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {
+                setState(() {
+                  _commissionEmployeeController.clear();
+                  _commissionEmployeeFilter = '';
+                  _commissionStatusFilter = 'all';
+                  _commissionFromDate = null;
+                  _commissionToDate = null;
+                });
+              },
+              child: const Text('Clear Filters'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCommissionsSection() {
+    if (_isLoadingCommissions) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_commissionsError != null) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _commissionsError!,
+              style: const TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _loadCommissions,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final rows = _filteredCommissions().map(_mapCommissionToRow).toList();
+    if (rows.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(
+          child: Text(
+            'No commissions found.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Showing ${rows.length} of ${_commissionsTotal > 0 ? _commissionsTotal : _commissions.length} commissions',
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...rows.map(_buildCommissionCard),
+      ],
+    );
+  }
+
+  Widget _buildAdvanceFilters() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: TextField(
+            controller: _advanceEmployeeController,
+            onChanged: (value) =>
+                setState(() => _advanceEmployeeFilter = value.trim()),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              hintText: 'Filter by employee...',
+              prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildFilterTile(
+          _advanceFromDate == null
+              ? 'From date'
+              : _formatDate(_advanceFromDate),
+          onTap: _pickAdvanceFromDate,
+        ),
+        const SizedBox(height: 10),
+        _buildFilterTile(
+          _advanceToDate == null ? 'To date' : _formatDate(_advanceToDate),
+          onTap: _pickAdvanceToDate,
+        ),
+        if (_advanceEmployeeFilter.isNotEmpty ||
+            _advanceFromDate != null ||
+            _advanceToDate != null) ...[
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {
+                setState(() {
+                  _advanceEmployeeController.clear();
+                  _advanceEmployeeFilter = '';
+                  _advanceFromDate = null;
+                  _advanceToDate = null;
+                });
+              },
+              child: const Text('Clear Filters'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAdvancesSection() {
+    if (_isLoadingAdvances) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_advancesError != null) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _advancesError!,
+              style: const TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _loadAdvances,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final rows = _filteredAdvances().map(_mapAdvanceToRow).toList();
+    if (rows.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(
+          child: Text(
+            'No advances found.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Showing ${rows.length} of ${_advancesTotal > 0 ? _advancesTotal : _advances.length} advances',
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...rows.map(_buildAdvanceCard),
+      ],
+    );
+  }
+
+  Widget _buildAdvanceCard(_AdvanceRow row) {
+    final isBusy = _advanceBusyIds.contains(row.id);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 560;
+          final details = [
+            _metaSection(
+              label: 'Date',
+              value: row.date,
+              icon: Icons.calendar_month_outlined,
+            ),
+            _metaSection(
+              label: 'Amount',
+              value: row.amount,
+              valueColor: const Color(0xFF1D4ED8),
+            ),
+            _metaSection(
+              label: 'Reference',
+              value: row.reference,
+              icon: Icons.receipt_long_outlined,
+            ),
+            _metaSection(
+              label: 'Notes',
+              value: row.notes,
+              icon: Icons.notes_outlined,
+            ),
+          ];
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFFE4EEF8),
+                    child: Text(
+                      row.initials,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          row.employee,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          row.role,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _ActionIcon(
+                    icon: Icons.delete_outline,
+                    color: const Color(0xFFDC2626),
+                    onPressed: isBusy ? null : () => _deleteAdvance(row.id),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (isCompact) ...[
+                ...details.map(
+                  (meta) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: meta,
+                  ),
+                ),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(child: details[0]),
+                    const SizedBox(width: 10),
+                    Expanded(child: details[1]),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: details[2]),
+                    const SizedBox(width: 10),
+                    Expanded(child: details[3]),
+                  ],
+                ),
+              ],
+              if (row.proofUrl.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => _showProofDialog(row.proofUrl),
+                    icon: const Icon(Icons.link, size: 14),
+                    label: const Text('View Proof'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 0,
+                        vertical: 4,
+                      ),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      minimumSize: Size.zero,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCommissionCard(_CommissionRow row) {
+    final isBusy = _commissionBusyIds.contains(row.id);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 560;
+          final amountColor =
+              row.isPaid ? const Color(0xFF16A34A) : const Color(0xFF1D4ED8);
+          final details = [
+            _metaSection(
+              label: 'Lead / Project',
+              value: row.projectLeadLabel,
+              icon: Icons.apartment_outlined,
+            ),
+            _metaSection(
+              label: 'Amount',
+              value: row.amount,
+              valueColor: amountColor,
+            ),
+            _metaSection(
+              label: 'Commission %',
+              value: row.percentage,
+              icon: Icons.percent,
+            ),
+            _metaSection(
+              label: 'Date',
+              value: row.date,
+              icon: Icons.calendar_month_outlined,
+            ),
+          ];
+
+          final actionButtons = Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _ActionIcon(
+                icon: row.isPaid
+                    ? Icons.check_circle
+                    : Icons.check_circle_outline,
+                color: row.isPaid
+                    ? const Color(0xFF16A34A)
+                    : const Color(0xFFE18300),
+                onPressed: isBusy || row.isPaid
+                    ? null
+                    : () => _markCommissionPaid(row.id),
+              ),
+              _ActionIcon(
+                icon: Icons.delete_outline,
+                color: const Color(0xFFDC2626),
+                onPressed: isBusy ? null : () => _deleteCommission(row.id),
+              ),
+            ],
+          );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFFE4EEF8),
+                    child: Text(
+                      row.initials,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          row.employee,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          row.role,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _statusChip(row.isPaid ? 'Paid' : 'Unpaid', row.isPaid),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (isCompact) ...[
+                ...details.map(
+                  (meta) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: meta,
+                  ),
+                ),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(child: details[0]),
+                    const SizedBox(width: 10),
+                    Expanded(child: details[1]),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: details[2]),
+                    const SizedBox(width: 10),
+                    Expanded(child: details[3]),
+                  ],
+                ),
+              ],
+              if (row.notes.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF7F9FC),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    row.notes,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: isBusy
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : actionButtons,
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -2695,6 +3831,159 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     await _loadSalarySlips(page: 1);
   }
 
+  Future<void> _pickCommissionFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _commissionFromDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    setState(() {
+      _commissionFromDate = DateTime(picked.year, picked.month, picked.day);
+      if (_commissionToDate != null &&
+          _commissionToDate!.isBefore(_commissionFromDate!)) {
+        _commissionToDate = _commissionFromDate;
+      }
+    });
+  }
+
+  Future<void> _pickCommissionToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _commissionToDate ?? _commissionFromDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    setState(() {
+      _commissionToDate =
+          DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+      if (_commissionFromDate != null &&
+          _commissionToDate!.isBefore(_commissionFromDate!)) {
+        _commissionFromDate = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+        );
+      }
+    });
+  }
+
+  Future<void> _pickAdvanceFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _advanceFromDate ?? DateTime.now(),
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() {
+      _advanceFromDate = DateTime(picked.year, picked.month, picked.day);
+      if (_advanceToDate != null &&
+          _advanceToDate!.isBefore(_advanceFromDate!)) {
+        _advanceToDate = _advanceFromDate;
+      }
+    });
+  }
+
+  Future<void> _pickAdvanceToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _advanceToDate ?? _advanceFromDate ?? DateTime.now(),
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() {
+      _advanceToDate =
+          DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
+      if (_advanceFromDate != null &&
+          _advanceToDate!.isBefore(_advanceFromDate!)) {
+        _advanceFromDate = DateTime(picked.year, picked.month, picked.day);
+      }
+    });
+  }
+
+  _CommissionRow _mapCommissionToRow(SalaryCommission commission) {
+    final primaryProject = commission.projectName.trim();
+    final leadName = commission.leadName.trim();
+    final projectLeadLabel = primaryProject.isNotEmpty
+        ? (leadName.isNotEmpty ? '$primaryProject\n$leadName' : primaryProject)
+        : (leadName.isNotEmpty ? leadName : '-');
+    final name = commission.employeeName.trim().isEmpty
+        ? 'Unknown'
+        : commission.employeeName.trim();
+    final initials = name
+        .split(' ')
+        .where((part) => part.trim().isNotEmpty)
+        .take(2)
+        .map((part) => part.trim()[0].toUpperCase())
+        .join();
+    return _CommissionRow(
+      id: commission.id,
+      employee: name,
+      role: _toTitleCase(commission.employeeRole),
+      initials: initials.isEmpty ? 'NA' : initials,
+      projectLeadLabel: projectLeadLabel,
+      amount: _formatCurrency(commission.commissionAmount),
+      percentage: commission.commissionPercentage == null
+          ? '-'
+          : '${commission.commissionPercentage!.toStringAsFixed(1)}%',
+      date: _formatDate(_commissionDateOf(commission)),
+      notes: commission.notes?.trim() ?? '',
+      isPaid: commission.isPaid,
+    );
+  }
+
+  _AdvanceRow _mapAdvanceToRow(SalaryAdvance advance) {
+    final name = advance.employeeName.trim().isEmpty
+        ? 'Unknown'
+        : advance.employeeName.trim();
+    final initials = name
+        .split(' ')
+        .where((part) => part.trim().isNotEmpty)
+        .take(2)
+        .map((part) => part.trim()[0].toUpperCase())
+        .join();
+    return _AdvanceRow(
+      id: advance.id,
+      employee: name,
+      role: _toTitleCase(advance.employeeRole),
+      initials: initials.isEmpty ? 'NA' : initials,
+      date: _formatDate(_advanceDateOf(advance)),
+      amount: _formatCurrency(advance.amount),
+      reference: (advance.transactionReference ?? '').trim().isEmpty
+          ? '---'
+          : advance.transactionReference!.trim(),
+      notes:
+          (advance.notes ?? '').trim().isEmpty ? '---' : advance.notes!.trim(),
+      proofUrl: (advance.paymentProofUrl ?? '').trim(),
+    );
+  }
+
+  Widget _statusChip(String label, bool isPaid) {
+    final background =
+        isPaid ? const Color(0xFFDDF6E8) : const Color(0xFFFFF1D6);
+    final textColor =
+        isPaid ? const Color(0xFF16A34A) : const Color(0xFFE18300);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: textColor,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
   _SalarySlipRow _mapSalarySlipToRow(SalarySlip slip) {
     return _SalarySlipRow(
       employee: slip.employeeName.isEmpty ? '-' : slip.employeeName,
@@ -2735,6 +4024,1285 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<void> _showAddCommissionDialog() async {
+    _SelectionOption? selectedEmployee;
+    _SelectionOption? selectedLead;
+    _SelectionOption? selectedProject;
+    final amountController = TextEditingController();
+    final percentageController = TextEditingController();
+    final notesController = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        bool isSaving = false;
+
+        Widget selectorField({
+          required String label,
+          required String placeholder,
+          required _SelectionOption? value,
+          required Future<void> Function() onTap,
+          bool requiredField = false,
+        }) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                requiredField ? '$label *' : label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              value?.title ?? placeholder,
+                              style: TextStyle(
+                                color: value == null
+                                    ? AppColors.textSecondary
+                                    : AppColors.textPrimary,
+                                fontWeight: value == null
+                                    ? FontWeight.w500
+                                    : FontWeight.w700,
+                              ),
+                            ),
+                            if (value != null && value.subtitle.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  value.subtitle,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.search, color: AppColors.textSecondary),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        Widget textField({
+          required String label,
+          required TextEditingController controller,
+          required String hint,
+          TextInputType? keyboardType,
+          int maxLines = 1,
+        }) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                keyboardType: keyboardType,
+                maxLines: maxLines,
+                decoration: InputDecoration(
+                  hintText: hint,
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppColors.primary),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> pickEmployee() async {
+              final option = await _showSearchPicker(
+                title: 'Select Employee',
+                hintText: 'Type to search employees...',
+                initialOptions: _employees
+                    .map(
+                      (employee) => _SelectionOption(
+                        id: employee.id,
+                        title: employee.fullName.isEmpty
+                            ? 'Unknown Employee'
+                            : employee.fullName,
+                        subtitle: [
+                          employee.email,
+                          _toTitleCase(employee.role),
+                        ].where((item) => item.trim().isNotEmpty).join(' - '),
+                        raw: employee.rawData,
+                      ),
+                    )
+                    .toList(),
+              );
+              if (option == null) return;
+              setModalState(() => selectedEmployee = option);
+            }
+
+            Future<void> pickLead() async {
+              final option = await _showSearchPicker(
+                title: 'Select Lead',
+                hintText: 'Type to search leads...',
+                loader: _searchLeadOptions,
+              );
+              if (option == null) return;
+              setModalState(() {
+                selectedLead = option;
+                final autoProjectId = _readStringValue(
+                  option.raw['project_id'] ??
+                      option.raw['projectId'] ??
+                      option.raw['project_uuid'],
+                );
+                final nestedProject = option.raw['project'];
+                final autoProjectName = _readStringValue(
+                  option.raw['project_name'] ??
+                      (nestedProject is Map ? nestedProject['name'] : null) ??
+                      option.raw['project'],
+                );
+                if (selectedProject == null &&
+                    (autoProjectId.isNotEmpty || autoProjectName.isNotEmpty)) {
+                  selectedProject = _SelectionOption(
+                    id: autoProjectId.isNotEmpty
+                        ? autoProjectId
+                        : autoProjectName,
+                    title: autoProjectName.isNotEmpty
+                        ? autoProjectName
+                        : 'Selected Project',
+                    subtitle: '',
+                    raw: <String, dynamic>{
+                      'id': autoProjectId,
+                      'name': autoProjectName,
+                    },
+                  );
+                }
+              });
+            }
+
+            Future<void> pickProject() async {
+              final option = await _showSearchPicker(
+                title: 'Select Project',
+                hintText: 'Type to search projects...',
+                loader: _searchProjectOptions,
+              );
+              if (option == null) return;
+              setModalState(() => selectedProject = option);
+            }
+
+            Future<void> submit() async {
+              final employeeId = selectedEmployee?.id.trim() ?? '';
+              final amount = double.tryParse(
+                  amountController.text.trim().replaceAll(',', ''));
+              final percentageText = percentageController.text.trim();
+              final percentage = percentageText.isEmpty
+                  ? null
+                  : double.tryParse(percentageText.replaceAll(',', ''));
+              if (employeeId.isEmpty) {
+                _showMessage('Employee is required.', isError: true);
+                return;
+              }
+              if (amount == null || amount <= 0) {
+                _showMessage('Enter a valid commission amount.', isError: true);
+                return;
+              }
+              setModalState(() => isSaving = true);
+              try {
+                final result = await _authProvider.salaryAddCommission(
+                  userId: employeeId,
+                  leadId: selectedLead?.id,
+                  projectId: selectedProject?.id,
+                  projectName: selectedProject?.title,
+                  commissionAmount: amount,
+                  commissionPercentage: percentage,
+                  notes: notesController.text.trim(),
+                  token: _authProvider.currentAuthToken,
+                );
+                if (!mounted) return;
+                Navigator.of(context).pop();
+                _showMessage(result.message);
+                await _loadCommissions();
+              } catch (error) {
+                if (!mounted) return;
+                setModalState(() => isSaving = false);
+                _showMessage(
+                  AppErrorHandler.friendlyMessage(error),
+                  isError: true,
+                );
+              }
+            }
+
+            return AlertDialog(
+              titlePadding: const EdgeInsets.fromLTRB(22, 18, 10, 12),
+              contentPadding: const EdgeInsets.fromLTRB(22, 0, 22, 14),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              title: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Add Commission',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed:
+                        isSaving ? null : () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 520,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      selectorField(
+                        label: 'Team',
+                        placeholder: 'Type to search employees...',
+                        value: selectedEmployee,
+                        onTap: pickEmployee,
+                        requiredField: true,
+                      ),
+                      const SizedBox(height: 14),
+                      selectorField(
+                        label: 'Lead',
+                        placeholder: 'Type to search leads (optional)...',
+                        value: selectedLead,
+                        onTap: pickLead,
+                      ),
+                      const SizedBox(height: 14),
+                      selectorField(
+                        label: 'Project',
+                        placeholder: 'Type to search projects (optional)...',
+                        value: selectedProject,
+                        onTap: pickProject,
+                      ),
+                      const SizedBox(height: 14),
+                      textField(
+                        label: 'Commission Amount (Rs.) *',
+                        controller: amountController,
+                        hint: '25000',
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      textField(
+                        label: 'Commission Percentage (optional)',
+                        controller: percentageController,
+                        hint: '2.5',
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      textField(
+                        label: 'Notes (optional)',
+                        controller: notesController,
+                        hint: 'Referral commission for closed deal',
+                        maxLines: 4,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      isSaving ? null : () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: isSaving ? null : submit,
+                  icon: isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.add_circle_outline, size: 18),
+                  label: Text(isSaving ? 'Saving...' : 'Add Commission'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showAddAdvanceDialog() async {
+    _SelectionOption? selectedEmployee;
+    DateTime selectedDate = DateTime.now();
+    final amountController = TextEditingController();
+    final referenceController = TextEditingController();
+    final notesController = TextEditingController();
+    PlatformFile? selectedProof;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        bool isSaving = false;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> pickEmployee() async {
+              final option = await _showSearchPicker(
+                title: 'Select Employee',
+                hintText: 'Type to search employees...',
+                initialOptions: _employees
+                    .map(
+                      (employee) => _SelectionOption(
+                        id: employee.id,
+                        title: employee.fullName.isEmpty
+                            ? 'Unknown Employee'
+                            : employee.fullName,
+                        subtitle: [
+                          employee.email,
+                          _toTitleCase(employee.role),
+                        ].where((item) => item.trim().isNotEmpty).join(' - '),
+                        raw: employee.rawData,
+                      ),
+                    )
+                    .toList(),
+              );
+              if (option == null) return;
+              setModalState(() => selectedEmployee = option);
+            }
+
+            Future<void> pickDate() async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: selectedDate,
+                firstDate: DateTime(2020, 1, 1),
+                lastDate: DateTime(2100, 12, 31),
+              );
+              if (picked == null) return;
+              setModalState(() => selectedDate = picked);
+            }
+
+            Future<void> pickProof() async {
+              final result = await FilePicker.platform.pickFiles(
+                allowMultiple: false,
+                withData: true,
+                type: FileType.custom,
+                allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
+              );
+              if (result == null || result.files.isEmpty) return;
+              setModalState(() => selectedProof = result.files.single);
+            }
+
+            Future<void> submit() async {
+              final employeeId = selectedEmployee?.id.trim() ?? '';
+              final amount = double.tryParse(
+                  amountController.text.trim().replaceAll(',', ''));
+              if (employeeId.isEmpty) {
+                _showMessage('Employee is required.', isError: true);
+                return;
+              }
+              if (amount == null || amount <= 0) {
+                _showMessage('Enter a valid amount.', isError: true);
+                return;
+              }
+              final proof = selectedProof;
+              final hasProofBytes =
+                  proof?.bytes != null && proof!.bytes!.isNotEmpty;
+              final hasProofPath = !kIsWeb &&
+                  proof?.path != null &&
+                  proof!.path!.trim().isNotEmpty;
+              if (proof == null || (!hasProofBytes && !hasProofPath)) {
+                _showMessage('Payment proof is required.', isError: true);
+                return;
+              }
+
+              setModalState(() => isSaving = true);
+              try {
+                final proofUrl = await _authProvider.uploadPaymentProofFile(
+                  filePath: hasProofPath ? proof.path! : '',
+                  fileBytes: hasProofBytes ? proof.bytes : null,
+                  fileName: proof.name,
+                  token: _authProvider.currentAuthToken,
+                );
+                final result = await _authProvider.salaryAddAdvance(
+                  userId: employeeId,
+                  advanceDate: DateFormat('yyyy-MM-dd').format(selectedDate),
+                  amount: amount,
+                  transactionReference: referenceController.text.trim(),
+                  paymentProofUrl: proofUrl,
+                  notes: notesController.text.trim(),
+                  token: _authProvider.currentAuthToken,
+                );
+                if (!mounted) return;
+                Navigator.of(context).pop();
+                _showMessage(result.message);
+                await _loadAdvances();
+              } catch (error) {
+                if (!mounted) return;
+                setModalState(() => isSaving = false);
+                _showMessage(
+                  AppErrorHandler.friendlyMessage(error),
+                  isError: true,
+                );
+              }
+            }
+
+            InputDecoration inputDecoration(String hint, {IconData? icon}) {
+              return InputDecoration(
+                hintText: hint,
+                prefixIcon: icon == null
+                    ? null
+                    : Icon(icon, color: AppColors.textSecondary),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.primary),
+                ),
+              );
+            }
+
+            return AlertDialog(
+              titlePadding: const EdgeInsets.fromLTRB(22, 18, 10, 12),
+              contentPadding: const EdgeInsets.fromLTRB(22, 0, 22, 14),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              title: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Add Advance',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed:
+                        isSaving ? null : () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 520,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Team *',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: pickEmployee,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  selectedEmployee?.title ??
+                                      'Type to search employees...',
+                                  style: TextStyle(
+                                    color: selectedEmployee == null
+                                        ? AppColors.textSecondary
+                                        : AppColors.textPrimary,
+                                    fontWeight: selectedEmployee == null
+                                        ? FontWeight.w500
+                                        : FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const Icon(
+                                Icons.search,
+                                color: AppColors.textSecondary,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Advance Date *',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: pickDate,
+                        borderRadius: BorderRadius.circular(14),
+                        child: IgnorePointer(
+                          child: TextField(
+                            controller: TextEditingController(
+                              text: DateFormat('dd MMM yyyy')
+                                  .format(selectedDate),
+                            ),
+                            decoration: inputDecoration(
+                              'Advance Date',
+                              icon: Icons.calendar_today_outlined,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Amount (Rs.) *',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: amountController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: inputDecoration('10000',
+                            icon: Icons.currency_rupee),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Transaction Reference (optional)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: referenceController,
+                        decoration: inputDecoration(
+                          'TXN123456789',
+                          icon: Icons.receipt_long_outlined,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Payment Proof *',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            OutlinedButton(
+                              onPressed: isSaving ? null : pickProof,
+                              child: const Text('Choose File'),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                selectedProof?.name ?? 'No file chosen',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Notes (optional)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: notesController,
+                        maxLines: 4,
+                        decoration: inputDecoration('e.g. Emergency advance'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      isSaving ? null : () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: isSaving ? null : submit,
+                  icon: isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.add_card_outlined, size: 18),
+                  label: Text(isSaving ? 'Saving...' : 'Add Advance'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteAdvance(String advanceId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Advance'),
+        content: const Text(
+          'This advance record will be removed. Do you want to continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _advanceBusyIds.add(advanceId));
+    try {
+      final message = await _authProvider.salaryDeleteAdvance(
+        advanceId: advanceId,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      _showMessage(message);
+      await _loadAdvances();
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(AppErrorHandler.friendlyMessage(error), isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _advanceBusyIds.remove(advanceId));
+      }
+    }
+  }
+
+  Future<void> _markCommissionPaid(String commissionId) async {
+    setState(() => _commissionBusyIds.add(commissionId));
+    try {
+      final result = await _authProvider.salaryMarkCommissionPaid(
+        commissionId: commissionId,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      _showMessage(result.message);
+      await _loadCommissions();
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(AppErrorHandler.friendlyMessage(error), isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _commissionBusyIds.remove(commissionId));
+      }
+    }
+  }
+
+  Future<void> _deleteCommission(String commissionId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Commission'),
+        content: const Text(
+          'This commission record will be removed. Do you want to continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _commissionBusyIds.add(commissionId));
+    try {
+      final message = await _authProvider.salaryDeleteCommission(
+        commissionId: commissionId,
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) return;
+      _showMessage(message);
+      await _loadCommissions();
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(AppErrorHandler.friendlyMessage(error), isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _commissionBusyIds.remove(commissionId));
+      }
+    }
+  }
+
+  Future<_SelectionOption?> _showSearchPicker({
+    required String title,
+    required String hintText,
+    List<_SelectionOption> initialOptions = const <_SelectionOption>[],
+    Future<List<_SelectionOption>> Function(String query)? loader,
+  }) async {
+    final queryController = TextEditingController();
+    List<_SelectionOption> visibleOptions = initialOptions;
+    bool isLoading = loader != null;
+    String? error;
+    bool hasRequested = false;
+
+    return showModalBottomSheet<_SelectionOption>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> loadOptions([String query = '']) async {
+              if (loader == null) {
+                final normalized = query.trim().toLowerCase();
+                final filtered = initialOptions.where((option) {
+                  if (normalized.isEmpty) return true;
+                  final haystack =
+                      '${option.title} ${option.subtitle}'.toLowerCase();
+                  return haystack.contains(normalized);
+                }).toList();
+                setModalState(() {
+                  visibleOptions = filtered;
+                  isLoading = false;
+                  error = null;
+                });
+                return;
+              }
+
+              setModalState(() {
+                isLoading = true;
+                error = null;
+              });
+              try {
+                final loaded = await loader(query);
+                if (!context.mounted) return;
+                setModalState(() {
+                  visibleOptions = loaded;
+                  isLoading = false;
+                });
+              } catch (e) {
+                if (!context.mounted) return;
+                setModalState(() {
+                  isLoading = false;
+                  error = AppErrorHandler.friendlyMessage(e);
+                });
+              }
+            }
+
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!hasRequested) {
+                hasRequested = true;
+                loadOptions();
+              }
+            });
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.78,
+              minChildSize: 0.45,
+              maxChildSize: 0.92,
+              builder: (context, scrollController) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        left: 18,
+                        right: 18,
+                        top: 14,
+                        bottom: MediaQuery.of(context).viewInsets.bottom + 18,
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD1D5DB),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                icon: const Icon(Icons.close),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: queryController,
+                            onChanged: loadOptions,
+                            decoration: InputDecoration(
+                              hintText: hintText,
+                              prefixIcon: const Icon(
+                                Icons.search,
+                                color: AppColors.textSecondary,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide:
+                                    const BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide:
+                                    const BorderSide(color: AppColors.border),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: isLoading
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : error != null
+                                    ? Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            error!,
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              color: AppColors.error,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          TextButton(
+                                            onPressed: () => loadOptions(
+                                              queryController.text,
+                                            ),
+                                            child: const Text('Retry'),
+                                          ),
+                                        ],
+                                      )
+                                    : visibleOptions.isEmpty
+                                        ? const Center(
+                                            child: Text(
+                                              'No results found.',
+                                              style: TextStyle(
+                                                color: AppColors.textSecondary,
+                                              ),
+                                            ),
+                                          )
+                                        : ListView.separated(
+                                            controller: scrollController,
+                                            itemCount: visibleOptions.length,
+                                            separatorBuilder: (_, __) =>
+                                                const Divider(height: 1),
+                                            itemBuilder: (context, index) {
+                                              final option =
+                                                  visibleOptions[index];
+                                              return ListTile(
+                                                contentPadding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 4,
+                                                  vertical: 2,
+                                                ),
+                                                title: Text(
+                                                  option.title,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                subtitle:
+                                                    option.subtitle.isEmpty
+                                                        ? null
+                                                        : Text(option.subtitle),
+                                                onTap: () =>
+                                                    Navigator.of(context).pop(
+                                                  option,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<List<_SelectionOption>> _searchLeadOptions(String query) async {
+    final result = await _authProvider.leads(
+      token: _authProvider.currentAuthToken,
+      search: query.trim().isEmpty ? null : query.trim(),
+      page: 1,
+      perPage: 20,
+    );
+    return result.items.map((item) {
+      final name = _readStringValue(
+        item['full_name'] ?? item['name'] ?? item['lead_name'],
+      );
+      final nestedProject = item['project'];
+      final project = _readStringValue(
+        item['project_name'] ??
+            (nestedProject is Map ? nestedProject['name'] : null) ??
+            item['project'],
+      );
+      final phone = _readStringValue(
+        item['phone_number'] ?? item['phone'] ?? item['mobile'],
+      );
+      return _SelectionOption(
+        id: _readStringValue(item['id'] ?? item['lead_id'] ?? item['leadId']),
+        title: name.isEmpty ? 'Unnamed Lead' : name,
+        subtitle: [project, phone]
+            .where((value) => value.trim().isNotEmpty)
+            .join(' - '),
+        raw: item,
+      );
+    }).toList();
+  }
+
+  Future<List<_SelectionOption>> _searchProjectOptions(String query) async {
+    final result = await _authProvider.projects(
+      token: _authProvider.currentAuthToken,
+      search: query.trim().isEmpty ? null : query.trim(),
+      page: 1,
+      perPage: 20,
+    );
+    return result.items.map((item) {
+      final name = _readStringValue(
+        item['name'] ?? item['project_name'] ?? item['title'],
+      );
+      final city = _readStringValue(item['city']);
+      final locality = _readStringValue(item['locality']);
+      return _SelectionOption(
+        id: _readStringValue(
+          item['id'] ?? item['project_id'] ?? item['projectId'] ?? item['uuid'],
+        ),
+        title: name.isEmpty ? 'Unnamed Project' : name,
+        subtitle: [city, locality]
+            .where((value) => value.trim().isNotEmpty)
+            .join(' - '),
+        raw: item,
+      );
+    }).toList();
+  }
+
+  String _resolvePaymentProofUrl(String? rawUrl) {
+    final trimmed = (rawUrl ?? '').trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('/')) {
+      return 'https://api.nextonerealty.in$trimmed';
+    }
+    return 'https://api.nextonerealty.in/$trimmed';
+  }
+
+  Future<void> _showProofDialog(String rawUrl) async {
+    final resolvedUrl = _resolvePaymentProofUrl(rawUrl);
+    if (resolvedUrl.isEmpty) {
+      _showMessage('Invalid proof URL.', isError: true);
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        final screenSize = MediaQuery.sizeOf(context);
+        final dialogWidth =
+            (screenSize.width - 32).clamp(320.0, 720.0).toDouble();
+        final dialogHeight =
+            (screenSize.height - 48).clamp(320.0, 760.0).toDouble();
+
+        return Dialog(
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          child: SizedBox(
+            width: dialogWidth,
+            height: dialogHeight,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 8, 8),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Payment Proof',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox.expand(
+                      child: InteractiveViewer(
+                        minScale: 0.8,
+                        maxScale: 4,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            resolvedUrl,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        'Preview unavailable.',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        resolvedUrl,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Close'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => _openExternalUrl(resolvedUrl),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Open Externally'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openExternalUrl(String rawUrl) async {
+    final resolvedUrl = _resolvePaymentProofUrl(rawUrl);
+    if (resolvedUrl.isEmpty) return;
+    final uri = Uri.tryParse(resolvedUrl);
+    if (uri == null) {
+      _showMessage('Invalid proof URL.', isError: true);
+      return;
+    }
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      _showMessage('Unable to open proof URL.', isError: true);
+    }
+  }
+
+  void _showMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppColors.error : AppColors.primary,
+      ),
+    );
   }
 
   Future<void> _showGenerateAllSalarySlipsDialog() async {
@@ -4239,7 +6807,7 @@ class _ActionIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: IconButton(
-        onPressed: onPressed ?? () {},
+        onPressed: onPressed,
         icon: Icon(
           icon,
           size: 17,
@@ -4319,6 +6887,70 @@ class _SalarySlipRow {
   final String deductions;
   final String finalAmount;
   final String generatedBy;
+}
+
+class _CommissionRow {
+  const _CommissionRow({
+    required this.id,
+    required this.employee,
+    required this.role,
+    required this.initials,
+    required this.projectLeadLabel,
+    required this.amount,
+    required this.percentage,
+    required this.date,
+    required this.notes,
+    required this.isPaid,
+  });
+
+  final String id;
+  final String employee;
+  final String role;
+  final String initials;
+  final String projectLeadLabel;
+  final String amount;
+  final String percentage;
+  final String date;
+  final String notes;
+  final bool isPaid;
+}
+
+class _AdvanceRow {
+  const _AdvanceRow({
+    required this.id,
+    required this.employee,
+    required this.role,
+    required this.initials,
+    required this.date,
+    required this.amount,
+    required this.reference,
+    required this.notes,
+    required this.proofUrl,
+  });
+
+  final String id;
+  final String employee;
+  final String role;
+  final String initials;
+  final String date;
+  final String amount;
+  final String reference;
+  final String notes;
+  final String proofUrl;
+}
+
+class _SelectionOption {
+  const _SelectionOption({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.raw,
+  });
+
+  final String id;
+  final String title;
+  final String subtitle;
+  final Map<String, dynamic> raw;
 }
 
 class _AttendanceRow {

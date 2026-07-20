@@ -46,6 +46,8 @@ class ApiConstants {
   static const String leadSourceConfigDetail = '/config/lead-sources/{id}';
   static const String leadStatusesConfig = '/config/lead-statuses';
   static const String leadStatusConfigDetail = '/config/lead-statuses/{id}';
+  static const String uploadPaymentProof = '/upload/payment-proof';
+  static const String leadPaymentProof = '/leads/{id}/payment-proof';
   static const String leadPaymentProofs = '/leads/{id}/payment-proofs';
   static const String leadPaymentProofDetail =
       '/leads/{id}/payment-proofs/{proofId}';
@@ -74,6 +76,12 @@ class ApiConstants {
 
   //project Endpoints
   static const String projects = '/projects';
+  static const String publicProjects = '/public/projects';
+  static const String uploadProjectPhoto = '/projects/upload-photo';
+  static const String uploadUnitPlan = '/projects/upload-unit-plan';
+  static const String uploadCreative = '/projects/upload-creative';
+  static const String uploadVideo = '/projects/upload-video';
+  static const String uploadDeveloperLogo = '/projects/upload-developer-logo';
   static const String createprojects = '/projects';
   static const String projectsdetail = '/projects/{id}';
   static const String deleteprojects = '/projects/{id}';
@@ -180,7 +188,16 @@ class ApiConstants {
   static const String salaryHistory = '/salary/history/{userId}';
   static const String salaryIncentives = '/salary/incentives';
   static const String salaryIncentiveCreate = '/salary/incentive';
+  static const String salaryCommissions = '/salary/commissions';
+  static const String salaryCommissionCreate = '/salary/commission';
+  static const String salaryCommissionPaid = '/salary/commission/{id}/paid';
+  static const String salaryCommissionDelete = '/salary/commission/{id}';
+  static const String salaryAdvances = '/salary/advances';
+  static const String salaryAdvanceCreate = '/salary/advance';
+  static const String salaryAdvanceDelete = '/salary/advance/{id}';
   static const String mySalary = '/salary/my-salary';
   static const String mySalaryHistory = '/salary/my-salary-history';
   static const String myIncentives = '/salary/my-incentives';
+  static const String myCommissions = '/salary/my-commissions';
+  static const String myAdvances = '/salary/my-advances';
 }

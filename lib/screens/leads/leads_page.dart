@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -39,18 +40,6 @@ class LeadsPage extends StatefulWidget {
 }
 
 class _LeadsPageState extends State<LeadsPage> {
-  static const List<String> _statusOptions = <String>[
-    'new',
-    'contacted',
-    'interested',
-    'follow_up',
-    'site_visit_scheduled',
-    'site_visit_done',
-    'negotiation',
-    'booked',
-    'lost',
-  ];
-
   static const List<String> _defaultSourceOptions = <String>[
     'Facebook',
     'Walk-in',
@@ -72,14 +61,27 @@ class _LeadsPageState extends State<LeadsPage> {
 
   static const int _myLeadsTabIndex = 0;
   static const int _teamLeadsTabIndex = 1;
+  static const List<String> _statusFlow = <String>[
+    'new',
+    'contacted',
+    'interested',
+    'follow_up',
+    'site_visit_scheduled',
+    'site_visit_done',
+    'negotiation',
+    'booked',
+    'lost',
+  ];
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _reassignNoteController = TextEditingController();
+  final TextEditingController _statusNoteController = TextEditingController();
   final Set<String> _selectedLeadIds = <String>{};
   final AuthProvider _authProvider = AuthProvider();
   bool _isBulkSelectionMode = false;
   bool _isExporting = false;
   bool _isSubmittingReassign = false;
+  bool _isSubmittingStatus = false;
   bool _isLoadingLeadSources = false;
   String? _visiblePhoneLeadId;
   String? _expandedQuickActionLeadId;
@@ -103,6 +105,8 @@ class _LeadsPageState extends State<LeadsPage> {
   String? _selectedStatus;
   String? _selectedSource;
   String? _selectedTeamId;
+  String? _projectSearchQuery;
+  String? _selectedNextStatus;
   List<_LeadModel> _currentPageLeads = <_LeadModel>[];
   final Map<String, _LeadPhoneAccess> _leadPhoneAccessById =
       <String, _LeadPhoneAccess>{};
@@ -200,6 +204,7 @@ class _LeadsPageState extends State<LeadsPage> {
     _searchDebounce?.cancel();
     _searchController.dispose();
     _reassignNoteController.dispose();
+    _statusNoteController.dispose();
     super.dispose();
   }
 
@@ -357,6 +362,7 @@ class _LeadsPageState extends State<LeadsPage> {
               status: _resolvedStatus,
               source: _selectedSource,
               search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+              project: _projectSearchQuery,
               page: _currentPage,
               perPage: _pageSize,
             )
@@ -366,6 +372,7 @@ class _LeadsPageState extends State<LeadsPage> {
               source: _selectedSource,
               assignedTo: _selectedTeamId,
               search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+              project: _projectSearchQuery,
               page: _currentPage,
               perPage: _pageSize,
             );
@@ -499,6 +506,8 @@ class _LeadsPageState extends State<LeadsPage> {
     String? tempStatus = _resolvedStatus;
     String? tempSource = _selectedSource;
     String? tempTeamId = _isMyLeadsTab ? null : _selectedTeamId;
+    String tempProject = _projectSearchQuery ?? '';
+    final projectController = TextEditingController(text: tempProject);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -522,12 +531,14 @@ class _LeadsPageState extends State<LeadsPage> {
                           value: null,
                           child: Text('All'),
                         ),
-                        ..._statusOptions.map(
-                          (status) => DropdownMenuItem<String?>(
-                            value: status,
-                            child: Text(_formatLeadStatusLabel(status)),
-                          ),
-                        ),
+                        ..._pipelineStatuses
+                            .where((status) => status.isActive)
+                            .map(
+                              (status) => DropdownMenuItem<String?>(
+                                value: status.key,
+                                child: Text(status.label),
+                              ),
+                            ),
                       ],
                       onChanged: (value) {
                         setSheetState(() {
@@ -560,6 +571,18 @@ class _LeadsPageState extends State<LeadsPage> {
                         tempSource =
                             value == null || value.isEmpty ? null : value;
                       });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: projectController,
+                    decoration: _sheetFieldDecoration('Search by project'),
+                    textInputAction: TextInputAction.search,
+                    onChanged: (value) {
+                      tempProject = value;
+                    },
+                    onSubmitted: (value) {
+                      tempProject = value;
                     },
                   ),
                   if (!_isMyLeadsTab) ...[
@@ -601,6 +624,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                   ? _resolvedStatus
                                   : null;
                               _selectedSource = null;
+                              _projectSearchQuery = null;
                               _selectedTeamId = null;
                               _currentPage = 1;
                               _selectedLeadIds.clear();
@@ -621,6 +645,9 @@ class _LeadsPageState extends State<LeadsPage> {
                                   ? _resolvedStatus
                                   : tempStatus;
                               _selectedSource = tempSource;
+                              _projectSearchQuery = tempProject.trim().isEmpty
+                                  ? null
+                                  : tempProject.trim();
                               _selectedTeamId =
                                   _isMyLeadsTab ? null : tempTeamId;
                               _currentPage = 1;
@@ -642,6 +669,7 @@ class _LeadsPageState extends State<LeadsPage> {
         );
       },
     );
+    projectController.dispose();
   }
 
   Future<void> _openManageLeadSourcesDialog() async {
@@ -2510,6 +2538,941 @@ class _LeadsPageState extends State<LeadsPage> {
     await _loadLeads();
   }
 
+  Future<void> _openSingleFollowUpForm(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'follow_ups',
+      action: 'create',
+      moduleLabel: 'follow-ups',
+    );
+    if (!allowed) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FollowUpFormPage(initialLeadId: lead.id),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+    await _loadLeads();
+  }
+
+  Future<void> _openSingleSiteVisitForm(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'create',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SiteVisitFormPage(initialLeadId: lead.id),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+    await _loadLeads();
+  }
+
+  Future<void> _openStatusSheet(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
+    final statusOptions = _allStatusOptions();
+    if (statusOptions.isEmpty) {
+      _showSnackBar('No statuses available.');
+      return;
+    }
+
+    final current = _normalizeStatus(lead.status);
+    _selectedNextStatus =
+        statusOptions.contains(current) ? current : statusOptions.first;
+    _statusNoteController.clear();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return _buildSheetContainer(
+              title: 'Update Status',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SearchableDropdownField<String>(
+                    label: 'Status',
+                    sheetTitle: 'Update Status',
+                    value: _selectedNextStatus,
+                    hintText: 'Select status',
+                    items: statusOptions
+                        .map(
+                          (status) => SearchableDropdownItem<String>(
+                            value: status,
+                            label: _prettyStatus(status),
+                          ),
+                        )
+                        .toList(),
+                    enabled: !_isSubmittingStatus,
+                    onChanged: (value) {
+                      setSheetState(() {
+                        _selectedNextStatus = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _statusNoteController,
+                    minLines: 2,
+                    maxLines: 3,
+                    decoration: _sheetFieldDecoration('Add note (optional)'),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _isSubmittingStatus
+                          ? null
+                          : () async {
+                              setSheetState(() {
+                                _isSubmittingStatus = true;
+                              });
+                              final updatedStatus =
+                                  await _submitStatusChange(lead);
+                              if (!mounted) {
+                                return;
+                              }
+                              setSheetState(() {
+                                _isSubmittingStatus = false;
+                              });
+                              if (updatedStatus != null) {
+                                Navigator.of(context).pop();
+                                if (_isFollowUpConversionStatus(
+                                  updatedStatus,
+                                )) {
+                                  await _openSingleFollowUpForm(lead);
+                                } else if (_isSiteVisitScheduleStatus(
+                                  updatedStatus,
+                                )) {
+                                  await _openSingleSiteVisitForm(lead);
+                                } else if (_isEoiStatus(updatedStatus) &&
+                                    !(await _leadHasEoiDocuments(lead))) {
+                                  await _openLeadEoiDocumentsModal(lead);
+                                } else if (_isEoiStatus(updatedStatus)) {
+                                  await _openLeadEoiDocumentsModal(lead);
+                                }
+                              }
+                            },
+                      child: Text(
+                        _isSubmittingStatus ? 'Updating...' : 'Update Status',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<String?> _submitStatusChange(_LeadModel lead) async {
+    if (_selectedNextStatus == null || _selectedNextStatus!.isEmpty) {
+      _showSnackBar('Please select the next status.');
+      return null;
+    }
+
+    try {
+      final updatedStatus = _selectedNextStatus!;
+      await _authProvider.updateLeadStatus(
+        id: lead.id,
+        status: updatedStatus,
+        note: _statusNoteController.text.trim(),
+        token: _authProvider.currentAuthToken,
+      );
+      await _loadLeads();
+      if (!mounted) {
+        return null;
+      }
+      _showSnackBar('Lead status updated successfully.');
+      return updatedStatus;
+    } catch (e) {
+      if (!mounted) {
+        return null;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
+      return null;
+    }
+  }
+
+  Future<bool> _leadHasEoiDocuments(_LeadModel lead) async {
+    if (_rawLeadHasEoiDocuments(lead.rawData)) {
+      return true;
+    }
+    try {
+      final proofs = await _authProvider.leadPaymentProofs(
+        id: lead.id,
+        token: _authProvider.currentAuthToken,
+      );
+      return proofs.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool _rawLeadHasEoiDocuments(Map<String, dynamic> data) {
+    final candidates = <dynamic>[
+      data['payment_proofs'],
+      data['paymentProofs'],
+      data['payment_proof'],
+      data['paymentProof'],
+      data['eoi_documents'],
+      data['eoiDocuments'],
+    ];
+    for (final candidate in candidates) {
+      if (candidate is List && candidate.isNotEmpty) {
+        return true;
+      }
+      if (candidate is Map && candidate.isNotEmpty) {
+        return true;
+      }
+      if (_readString(candidate).isNotEmpty) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _uploadLeadEoiDocument(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
+    final amountController = TextEditingController();
+    PlatformFile? selectedFile;
+    var shouldUpload = false;
+    var isUploading = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !isUploading,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (sheetContext, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          titlePadding: EdgeInsets.zero,
+          contentPadding: const EdgeInsets.fromLTRB(30, 24, 30, 24),
+          actionsPadding: const EdgeInsets.fromLTRB(30, 0, 30, 26),
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(30, 20, 22, 18),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Upload Payment Proof',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: isUploading
+                          ? null
+                          : () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: AppColors.border),
+            ],
+          ),
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    decoration: _sheetFieldDecoration('e.g. 50000').copyWith(
+                      labelText: 'Amount',
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'File *',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        OutlinedButton(
+                          onPressed: isUploading
+                              ? null
+                              : () async {
+                                  final picked =
+                                      await FilePicker.platform.pickFiles(
+                                    type: FileType.custom,
+                                    allowMultiple: false,
+                                    allowedExtensions: const <String>[
+                                      'jpg',
+                                      'jpeg',
+                                      'png',
+                                      'webp',
+                                      'pdf',
+                                    ],
+                                  );
+                                  if (picked == null ||
+                                      picked.files.isEmpty ||
+                                      !dialogContext.mounted) {
+                                    return;
+                                  }
+                                  selectedFile = picked.files.first;
+                                  setDialogState(() {});
+                                },
+                          child: const Text('Choose File'),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            selectedFile?.name ?? 'No file chosen',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: isUploading
+                        ? null
+                        : () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: isUploading
+                        ? null
+                        : () {
+                            if (!_hasSelectedUploadFile(selectedFile)) {
+                              _showSnackBar('Please choose a file.');
+                              return;
+                            }
+                            shouldUpload = true;
+                            Navigator.of(dialogContext).pop();
+                          },
+                    child: const Text('Upload'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || !shouldUpload || !_hasSelectedUploadFile(selectedFile)) {
+      amountController.dispose();
+      return;
+    }
+
+    setState(() {
+      isUploading = true;
+    });
+    try {
+      await _authProvider.uploadLeadPaymentProof(
+        id: lead.id,
+        filePath: _platformFilePath(selectedFile),
+        fileBytes: selectedFile?.bytes,
+        fileName: selectedFile?.name.trim() ?? '',
+        name: selectedFile?.name.trim() ?? '',
+        amount: amountController.text.trim(),
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('EOI document uploaded successfully.');
+      await _loadLeads();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+    } finally {
+      amountController.dispose();
+      if (mounted) {
+        setState(() {
+          isUploading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openLeadEoiDocumentsModal(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
+    var paymentProofs = <Map<String, dynamic>>[];
+    var bookingPhotos = <Map<String, dynamic>>[];
+    try {
+      paymentProofs = await _authProvider.leadPaymentProofs(
+        id: lead.id,
+        token: _authProvider.currentAuthToken,
+      );
+    } catch (_) {
+      paymentProofs = const <Map<String, dynamic>>[];
+    }
+    try {
+      bookingPhotos = await _authProvider.leadPhotos(
+        id: lead.id,
+        token: _authProvider.currentAuthToken,
+      );
+    } catch (_) {
+      bookingPhotos = const <Map<String, dynamic>>[];
+    }
+    if (!mounted) return;
+
+    var isUploadingProof = false;
+    var isUploadingPhoto = false;
+
+    Future<void> uploadPaymentProof(
+      StateSetter setDialogState,
+      BuildContext dialogContext,
+    ) async {
+      setDialogState(() => isUploadingProof = true);
+      try {
+        await _uploadLeadEoiDocument(lead);
+        paymentProofs = await _authProvider.leadPaymentProofs(
+          id: lead.id,
+          token: _authProvider.currentAuthToken,
+        );
+        if (!mounted || !dialogContext.mounted) return;
+        await _loadLeads();
+      } catch (error) {
+        if (mounted) {
+          _showSnackBar(AppErrorHandler.friendlyMessage(error));
+        }
+      } finally {
+        if (mounted && dialogContext.mounted) {
+          setDialogState(() => isUploadingProof = false);
+        }
+      }
+    }
+
+    Future<void> uploadBookingPhoto(
+      StateSetter setDialogState,
+      BuildContext dialogContext,
+    ) async {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+      if (picked == null || picked.files.isEmpty || !mounted) return;
+      final file = picked.files.first;
+      if (!_hasSelectedUploadFile(file)) {
+        _showSnackBar('Please choose a photo.');
+        return;
+      }
+
+      setDialogState(() => isUploadingPhoto = true);
+      try {
+        await _authProvider.uploadLeadPhoto(
+          id: lead.id,
+          filePath: _platformFilePath(file),
+          fileBytes: file.bytes,
+          fileName: file.name.trim(),
+          name: file.name.trim(),
+          token: _authProvider.currentAuthToken,
+        );
+        bookingPhotos = await _authProvider.leadPhotos(
+          id: lead.id,
+          token: _authProvider.currentAuthToken,
+        );
+        if (!mounted || !dialogContext.mounted) return;
+        _showSnackBar('Booking form photo uploaded successfully.');
+        await _loadLeads();
+      } catch (error) {
+        if (mounted) {
+          _showSnackBar(AppErrorHandler.friendlyMessage(error));
+        }
+      } finally {
+        if (mounted && dialogContext.mounted) {
+          setDialogState(() => isUploadingPhoto = false);
+        }
+      }
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !isUploadingProof && !isUploadingPhoto,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final proof = paymentProofs.isNotEmpty ? paymentProofs.first : null;
+            final photo = bookingPhotos.isNotEmpty ? bookingPhotos.first : null;
+            final isBusy = isUploadingProof || isUploadingPhoto;
+            return AlertDialog(
+              titlePadding: const EdgeInsets.fromLTRB(24, 20, 12, 12),
+              contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              title: Row(
+                children: [
+                  const Expanded(child: Text('EOI Documents')),
+                  IconButton(
+                    onPressed:
+                        isBusy ? null : () => Navigator.of(dialogContext).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF7DF),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.description_outlined,
+                              color: Color(0xFFF59E0B),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'EOI Documents',
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Payment proof and booking form photo for this EOI',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isNarrow = constraints.maxWidth < 560;
+                          final proofColumn = _buildEoiDocumentColumn(
+                            title: 'PAYMENT PROOF',
+                            primaryLabel: 'Document',
+                            primaryValue: _docName(proof, '--'),
+                            secondaryLabel: 'Amount',
+                            secondaryValue: _docAmount(proof),
+                            buttonLabel: isUploadingProof
+                                ? 'Uploading...'
+                                : 'Upload Payment Proof',
+                            onUpload: isBusy
+                                ? null
+                                : () => uploadPaymentProof(
+                                      setDialogState,
+                                      dialogContext,
+                                    ),
+                            onPreview: proof == null
+                                ? null
+                                : () => _openEoiDocumentPreview(proof),
+                          );
+                          final photoColumn = _buildEoiDocumentColumn(
+                            title: 'BOOKING FORM PHOTO',
+                            primaryLabel: '',
+                            primaryValue: _docName(photo, '--'),
+                            secondaryLabel: '',
+                            secondaryValue: '',
+                            buttonLabel: isUploadingPhoto
+                                ? 'Uploading...'
+                                : 'Upload Photo',
+                            onUpload: isBusy
+                                ? null
+                                : () => uploadBookingPhoto(
+                                      setDialogState,
+                                      dialogContext,
+                                    ),
+                            onPreview: photo == null
+                                ? null
+                                : () => _openEoiDocumentPreview(photo),
+                          );
+                          if (isNarrow) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                proofColumn,
+                                const SizedBox(height: 22),
+                                photoColumn,
+                              ],
+                            );
+                          }
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: proofColumn),
+                              const SizedBox(width: 36),
+                              Expanded(child: photoColumn),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildEoiDocumentColumn({
+    required String title,
+    required String primaryLabel,
+    required String primaryValue,
+    required String secondaryLabel,
+    required String secondaryValue,
+    required String buttonLabel,
+    required VoidCallback? onUpload,
+    VoidCallback? onPreview,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 14),
+        if (primaryLabel.isNotEmpty) ...[
+          Text(
+            primaryLabel,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Text(
+          primaryValue.isEmpty ? '--' : primaryValue,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        if (secondaryLabel.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          Text(
+            secondaryLabel,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            secondaryValue.isEmpty ? '--' : secondaryValue,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+        const SizedBox(height: 22),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            if (onPreview != null)
+              OutlinedButton.icon(
+                onPressed: onPreview,
+                icon: const Icon(Icons.visibility_outlined, size: 16),
+                label: const Text('Preview'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            OutlinedButton.icon(
+              onPressed: onUpload,
+              icon: const Icon(Icons.upload_outlined, size: 16),
+              label: Text(buttonLabel),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+                side: const BorderSide(color: AppColors.border),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _docName(Map<String, dynamic>? doc, String fallback) {
+    if (doc == null) return fallback;
+    final value = _readString(
+      doc['name'] ?? doc['title'] ?? doc['file_name'] ?? doc['filename'],
+    );
+    return value.isEmpty ? fallback : value;
+  }
+
+  String _docAmount(Map<String, dynamic>? doc) {
+    if (doc == null) return '--';
+    final value = _readString(doc['amount'] ?? doc['payment_proof_amount']);
+    return value.isEmpty ? '--' : value;
+  }
+
+  String _fileNameFromUrl(String url, {required String fallback}) {
+    final value = url.trim();
+    if (value.isEmpty) {
+      return fallback;
+    }
+    final uri = Uri.tryParse(value);
+    final path = uri?.path.trim().isNotEmpty == true ? uri!.path : value;
+    final fileName = path.replaceAll('\\', '/').split('/').last.trim();
+    if (fileName.isEmpty) {
+      return fallback;
+    }
+    return Uri.decodeComponent(fileName);
+  }
+
+  String _docUrl(Map<String, dynamic>? doc) {
+    if (doc == null) return '';
+    final raw = _readString(
+      doc['public_url'] ??
+          doc['url'] ??
+          doc['payment_proof_url'] ??
+          doc['file_url'] ??
+          doc['file_path'] ??
+          doc['path'],
+    );
+    if (raw.startsWith('/')) {
+      return 'https://api.nextonerealty.in$raw';
+    }
+    return raw;
+  }
+
+  bool _isPreviewImageUrl(String url) {
+    final lower = url.toLowerCase().split('?').first;
+    return lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.gif');
+  }
+
+  Future<void> _openEoiDocumentPreview(Map<String, dynamic> doc) async {
+    final url = _docUrl(doc);
+    if (url.isEmpty) {
+      _showSnackBar('File is not available.');
+      return;
+    }
+    if (_isPreviewImageUrl(url)) {
+      await showDialog<void>(
+        context: context,
+        barrierColor: Colors.black87,
+        builder: (dialogContext) => Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: const EdgeInsets.all(16),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _docName(doc, 'Document'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: InteractiveViewer(
+                    minScale: 0.8,
+                    maxScale: 4,
+                    child: Image.network(url, fit: BoxFit.contain),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      _showSnackBar('File link is not valid.');
+      return;
+    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  bool _hasSelectedUploadFile(PlatformFile? file) {
+    if (file == null) {
+      return false;
+    }
+    final bytes = file.bytes;
+    if (bytes != null && bytes.isNotEmpty) {
+      return true;
+    }
+    try {
+      final path = file.path;
+      return path != null && path.trim().isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _platformFilePath(PlatformFile? file) {
+    if (file == null) {
+      return '';
+    }
+    try {
+      return file.path?.trim() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   Future<void> _openReassignSheet(_LeadModel lead) async {
     final allowed = await PermissionGuard.allowModuleAction(
       context,
@@ -3092,6 +4055,70 @@ class _LeadsPageState extends State<LeadsPage> {
         borderSide: const BorderSide(color: AppColors.primary),
       ),
     );
+  }
+
+  String _normalizeStatus(String status) {
+    return status.trim().toLowerCase().replaceAll(RegExp(r'[\s-]+'), '_');
+  }
+
+  bool _isFollowUpConversionStatus(String status) {
+    final normalized = _normalizeStatus(status);
+    return normalized == 'follow_up' || normalized == 'followup';
+  }
+
+  bool _isSiteVisitScheduleStatus(String status) {
+    final normalized = _normalizeStatus(status);
+    return normalized == 'site_visit_scheduled' ||
+        normalized == 'site_visit_schedule' ||
+        normalized == 'schedule_visit' ||
+        normalized == 'scheduled_visit';
+  }
+
+  bool _isEoiStatus(String status) {
+    return _normalizeStatus(status) == 'eoi';
+  }
+
+  List<String> _allStatusOptions() {
+    final apiStatuses = _pipelineStatuses
+        .where((status) => status.isActive && status.key.trim().isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final apiFlow = apiStatuses
+        .map((status) => _normalizeStatus(status.key))
+        .where((status) => status.isNotEmpty)
+        .toList(growable: false);
+    return apiFlow.isNotEmpty ? apiFlow : _statusFlow;
+  }
+
+  String _prettyStatus(String status) {
+    final normalized = _normalizeStatus(status);
+    final configured = _pipelineStatuses.where((item) {
+      return _normalizeStatus(item.key) == normalized;
+    }).toList();
+    if (configured.isNotEmpty && configured.first.label.trim().isNotEmpty) {
+      return configured.first.label;
+    }
+    return normalized
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+  }
+
+  List<String> _allowedTransitions(String current) {
+    final flow = _allStatusOptions();
+
+    if (current.isEmpty || !flow.contains(current)) {
+      return flow;
+    }
+    if (current == 'booked' || current == 'lost') {
+      return const <String>[];
+    }
+    final index = flow.indexOf(current);
+    if (index < 0 || index + 1 >= flow.length) {
+      return const <String>[];
+    }
+    return flow.sublist(index + 1);
   }
 
   Color _parseHexColor(String input) {
@@ -3885,6 +4912,11 @@ class _LeadsPageState extends State<LeadsPage> {
                           icon: Icons.person_add_alt_1_outlined,
                           color: AppColors.primary,
                           onTap: () => _openReassignSheet(lead),
+                        ),
+                        DataCardAction(
+                          icon: Icons.autorenew_rounded,
+                          color: const Color(0xFF14B8A6),
+                          onTap: () => _openStatusSheet(lead),
                         ),
                         DataCardAction(
                           icon: Icons.edit_outlined,

@@ -17,6 +17,7 @@ import 'package:nextone/screens/site_visits/site_revisits_page.dart';
 import 'package:nextone/screens/team/team_page.dart';
 import 'package:nextone/screens/targets/targets_page.dart';
 import 'package:nextone/screens/users/users_page.dart';
+import 'package:nextone/screens/website_enquiries/website_enquiries_page.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/services/notification_navigation_service.dart';
 import 'package:nextone/utils/role_access.dart';
@@ -43,7 +44,7 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     final index = widget.initialIndex;
-    _currentIndex = index < 0 ? 0 : (index >= 15 ? 14 : index);
+    _currentIndex = index < 0 ? 0 : (index >= 16 ? 15 : index);
     _loadAccess();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(NotificationNavigationService.flushPendingNavigation());
@@ -159,6 +160,8 @@ class _MainScreenState extends State<MainScreen> {
         return const SiteVisitDonePage();
       case 14:
         return const LeaveManagementPage();
+      case 15:
+        return const WebsiteEnquiriesPage();
       default:
         return const HomePage(showBottomNav: false);
     }
@@ -224,6 +227,7 @@ class _MainScreenState extends State<MainScreen> {
           showAttendance: RoleAccess.canViewModule('attendance'),
           showTargets: RoleAccess.canViewModule('targets'),
           showLeaves: RoleAccess.canViewModule('attendance'),
+          showWebsiteEnquiries: RoleAccess.isAdminOrSuperAdmin(_currentRole),
           showUsers: RoleAccess.canViewUsers(_currentRole),
           showSalary: RoleAccess.canViewSalaryManagement(_currentRole),
           showNotifications: RoleAccess.canViewModule('notifications'),
@@ -240,6 +244,7 @@ class _MainScreenState extends State<MainScreen> {
           onSettings: () => _setIndex(8),
           onTargets: () => _setIndex(11),
           onLeaves: () => _setIndex(14),
+          onWebsiteEnquiries: () => _setIndex(15),
           onNotifications: () => Navigator.pushNamed(context, '/notifications'),
           onSalary: () => _setIndex(9),
           onMore: () {},

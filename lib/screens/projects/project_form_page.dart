@@ -48,8 +48,9 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
 
   static const List<_SelectOption> _statuses = <_SelectOption>[
     _SelectOption(value: 'pre_launch', label: 'Pre Launch'),
-    _SelectOption(value: 'active', label: 'Active'),
-    _SelectOption(value: 'inactive', label: 'Inactive'),
+    _SelectOption(value: 'under_construction', label: 'Under Construction'),
+    _SelectOption(value: 'nearby_possession', label: 'Nearby Possession'),
+    _SelectOption(value: 'ready_to_move', label: 'Ready To Move'),
   ];
 
   final _formKey = GlobalKey<FormState>();
@@ -71,7 +72,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   final List<_ConfigurationInput> _configurations = <_ConfigurationInput>[];
   final List<String> _amenities = <String>[];
 
-  String _status = 'active';
+  String _status = 'pre_launch';
 
   List<Map<String, dynamic>> _existingPhotoDocs =
       const <Map<String, dynamic>>[];
@@ -200,7 +201,9 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     _existingPaymentPlanDocs = _readDocumentPayloads(data, 'payment_plans');
     _existingVideoDocs = _readDocumentPayloads(data, 'videos');
 
-    final status = _readString(data['status']).toLowerCase();
+    final status = _readString(data['status'])
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\s-]+'), '_');
     if (_statuses.any((option) => option.value == status)) {
       _status = status;
     }
@@ -223,7 +226,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   }
 
   void _ensureConfigurationRow() {
-    if (_configurations.isEmpty) {
+    if (_configurations.isEmpty || _configurations.last.hasValue) {
       _configurations.add(_ConfigurationInput());
     }
   }
@@ -486,6 +489,102 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
         .toList();
   }
 
+  Map<String, dynamic> _buildUploadedDocumentPayload(
+    Map<String, dynamic> uploaded,
+    PlatformFile file,
+  ) {
+    final fileName = _readString(
+      uploaded['file_name'] ??
+          uploaded['filename'] ??
+          uploaded['original_name'] ??
+          uploaded['name'],
+    );
+    final filePathValue = _readString(
+      uploaded['file_path'] ??
+          uploaded['filePath'] ??
+          uploaded['path'] ??
+          uploaded['url'] ??
+          uploaded['file_url'] ??
+          uploaded['fileUrl'],
+    );
+    final mimeType = _readString(
+      uploaded['mime_type'] ?? uploaded['mimeType'],
+    );
+    final fileSize = uploaded['file_size'] ?? uploaded['fileSize'] ?? file.size;
+
+    return <String, dynamic>{
+      ...uploaded,
+      'file_name': fileName.isNotEmpty ? fileName : file.name.trim(),
+      'file_path': filePathValue,
+      'file_size': fileSize,
+      'mime_type': mimeType.isNotEmpty ? mimeType : _mimeTypeForFile(file),
+    };
+  }
+
+  Future<List<Map<String, dynamic>>> _buildUploadedImagePayloads(
+    List<PlatformFile> files,
+  ) async {
+    final payloads = <Map<String, dynamic>>[];
+
+    for (final file in files) {
+      final filePath = file.path?.trim() ?? '';
+      if (filePath.isEmpty) {
+        continue;
+      }
+
+      final uploaded = await _authProvider.uploadProjectPhoto(
+        filePath: filePath,
+        fileName: file.name.trim(),
+        token: _authProvider.currentAuthToken,
+      );
+
+      payloads.add(_buildUploadedDocumentPayload(uploaded, file));
+    }
+
+    return payloads;
+  }
+
+  Future<List<Map<String, dynamic>>> _buildUploadedDocumentPayloads({
+    required List<PlatformFile> files,
+    required Future<Map<String, dynamic>> Function(PlatformFile file) uploader,
+  }) async {
+    final payloads = <Map<String, dynamic>>[];
+
+    for (final file in files) {
+      final filePath = file.path?.trim() ?? '';
+      if (filePath.isEmpty) {
+        continue;
+      }
+
+      final uploaded = await uploader(file);
+      payloads.add(_buildUploadedDocumentPayload(uploaded, file));
+    }
+
+    return payloads;
+  }
+
+  Future<Map<String, dynamic>?> _buildUploadedDeveloperLogoPayload() async {
+    if (_developerLogoFiles.isEmpty) {
+      return _existingDeveloperLogoDocs.isNotEmpty
+          ? _existingDeveloperLogoDocs.first
+          : null;
+    }
+
+    final file = _developerLogoFiles.first;
+    final filePath = file.path?.trim() ?? '';
+    if (filePath.isEmpty) {
+      return null;
+    }
+
+    final uploaded = await _authProvider.uploadDeveloperLogo(
+      filePath: filePath,
+      fileName: file.name.trim(),
+      token: _authProvider.currentAuthToken,
+    );
+
+    return _buildUploadedDocumentPayload(uploaded, file);
+  }
+
   String _mimeTypeForFile(PlatformFile file) {
     final extension = (file.extension ?? '').toLowerCase();
     switch (extension) {
@@ -680,8 +779,32 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   }
 
   void _addConfigurationRow() {
+    if (_configurations.isEmpty) {
+      setState(() {
+        _configurations.add(_ConfigurationInput());
+      });
+      return;
+    }
+
+    final draft = _configurations.last;
+    if (!draft.hasValue) {
+      return;
+    }
+
     setState(() {
-      _configurations.add(_ConfigurationInput());
+      _ensureConfigurationRow();
+    });
+  }
+
+  void _removeConfigurationAt(int index) {
+    if (index < 0 || index >= _configurations.length) {
+      return;
+    }
+
+    setState(() {
+      final item = _configurations.removeAt(index);
+      item.dispose();
+      _ensureConfigurationRow();
     });
   }
 
@@ -737,6 +860,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
     }
 
     _addAmenity();
+    _addConfigurationRow();
 
     final form = _formKey.currentState;
     if (form == null || !form.validate()) {
@@ -752,15 +876,12 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           .map((row) => row.toPayload())
           .where((item) => item.isNotEmpty)
           .toList();
+      final uploadedPhotos = await _buildUploadedImagePayloads(_photoFiles);
+      final developerLogoPayload = await _buildUploadedDeveloperLogoPayload();
       final photos = <Map<String, dynamic>>[
         ..._existingPhotoDocs,
-        ..._buildDocumentPayloads(_photoFiles),
+        ...uploadedPhotos,
       ];
-      final developerLogoPayload = _developerLogoFiles.isNotEmpty
-          ? _buildDocumentPayloads(_developerLogoFiles).first
-          : (_existingDeveloperLogoDocs.isNotEmpty
-              ? _existingDeveloperLogoDocs.first
-              : null);
       final unitPlans = <Map<String, dynamic>>[
         ..._existingUnitPlanDocs,
         ..._buildDocumentPayloads(_unitPlanFiles),
@@ -1091,7 +1212,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
                               const SizedBox(height: 14),
                               _buildConfigurationSection(isNarrow),
                               const SizedBox(height: 14),
-                              _buildAmenitiesSection(isNarrow),
+                              _buildAmenitiesSection(),
                               const SizedBox(height: 14),
                               _buildUploadField(
                                 label: 'Project Photos',
@@ -1260,39 +1381,35 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
   }
 
   Widget _buildConfigurationSection(bool isNarrow) {
+    final draft = _configurations.last;
+    final savedConfigurations = _configurations.take(_configurations.length - 1);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _FieldLabel('Configurations'),
         const SizedBox(height: 8),
-        Column(
+        _buildResponsiveRow(
+          isNarrow: isNarrow,
           children: [
-            for (var i = 0; i < _configurations.length; i++) ...[
-              _buildResponsiveRow(
-                isNarrow: isNarrow,
-                children: [
-                  _buildTextField(
-                    controller: _configurations[i].configurationController,
-                    label: i == 0 ? '' : '',
-                    hintText: '1BHK',
-                    showLabel: false,
-                  ),
-                  _buildTextField(
-                    controller: _configurations[i].carpetAreaController,
-                    label: '',
-                    hintText: '450 sqft',
-                    showLabel: false,
-                  ),
-                  _buildTextField(
-                    controller: _configurations[i].priceController,
-                    label: '',
-                    hintText: '65L',
-                    showLabel: false,
-                  ),
-                ],
-              ),
-              if (i != _configurations.length - 1) const SizedBox(height: 10),
-            ],
+            _buildTextField(
+              controller: draft.configurationController,
+              label: '',
+              hintText: '1BHK',
+              showLabel: false,
+            ),
+            _buildTextField(
+              controller: draft.carpetAreaController,
+              label: '',
+              hintText: '450 sqft',
+              showLabel: false,
+            ),
+            _buildTextField(
+              controller: draft.priceController,
+              label: '',
+              hintText: '65L',
+              showLabel: false,
+            ),
           ],
         ),
         const SizedBox(height: 10),
@@ -1312,11 +1429,26 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
+        if (savedConfigurations.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (var i = 0; i < _configurations.length - 1; i++)
+                _ConfigurationChip(
+                  configuration: _configurations[i],
+                  onRemove:
+                      _isSubmitting ? null : () => _removeConfigurationAt(i),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildAmenitiesSection(bool isNarrow) {
+  Widget _buildAmenitiesSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1342,22 +1474,19 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
             ),
             const SizedBox(width: 10),
             SizedBox(
-              width: isNarrow ? 84 : 86,
-              child: OutlinedButton.icon(
+              width: 52,
+              child: OutlinedButton(
                 onPressed: _isSubmitting ? null : _addAmenity,
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(0, 46),
+                  padding: EdgeInsets.zero,
                   foregroundColor: const Color(0xFF84BEFF),
                   side: const BorderSide(color: Color(0xFFD9E7FB)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text(
-                  'Add',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
+                child: const Icon(Icons.add, size: 20),
               ),
             ),
           ],
@@ -1713,6 +1842,11 @@ class _ConfigurationInput {
   final TextEditingController carpetAreaController;
   final TextEditingController priceController;
 
+  bool get hasValue =>
+      configurationController.text.trim().isNotEmpty ||
+      carpetAreaController.text.trim().isNotEmpty ||
+      priceController.text.trim().isNotEmpty;
+
   Map<String, dynamic> toPayload() {
     final configuration = configurationController.text.trim();
     final carpetArea = carpetAreaController.text.trim();
@@ -1731,6 +1865,78 @@ class _ConfigurationInput {
     configurationController.dispose();
     carpetAreaController.dispose();
     priceController.dispose();
+  }
+}
+
+class _ConfigurationChip extends StatelessWidget {
+  const _ConfigurationChip({
+    required this.configuration,
+    required this.onRemove,
+  });
+
+  final _ConfigurationInput configuration;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = configuration.configurationController.text.trim();
+    final carpetArea = configuration.carpetAreaController.text.trim();
+    final price = configuration.priceController.text.trim();
+
+    return Container(
+      constraints: const BoxConstraints(minWidth: 180, maxWidth: 260),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE3EAF3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title.isEmpty ? 'Configuration' : title,
+                  style: const TextStyle(
+                    color: Color(0xFF1F2937),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (carpetArea.isNotEmpty || price.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    [
+                      if (carpetArea.isNotEmpty) carpetArea,
+                      if (price.isNotEmpty) price,
+                    ].join(' • '),
+                    style: const TextStyle(
+                      color: Color(0xFF667085),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: onRemove,
+            child: const Icon(
+              Icons.close,
+              size: 14,
+              color: Color(0xFF667085),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

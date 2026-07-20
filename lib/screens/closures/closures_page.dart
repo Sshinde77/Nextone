@@ -1981,9 +1981,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
       ),
       items: const [
         DropdownMenuItem(value: 'all', child: Text('All')),
-        DropdownMenuItem(value: 'confirmed', child: Text('confirmed')),
-        DropdownMenuItem(value: 'cancelled', child: Text('cancelled')),
-        DropdownMenuItem(value: 'on_hold', child: Text('on_hold')),
+        DropdownMenuItem(value: 'confirmed', child: Text('Confirmed')),
+        DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+        DropdownMenuItem(value: 'on_hold', child: Text('On Hold')),
       ],
       onChanged: (value) {
         if (value == null) return;
@@ -2016,7 +2016,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
       commissionLabel: _rupee(_toDouble(item['commission_amount'])),
       commissionPaidLabel: item['commission_paid'] == true ? 'Yes' : 'No',
       closedByName: _readString(item['closed_by_name'], fallback: '-'),
-      statusLabel: status,
+      statusLabel: _statusToUi(status),
       statusColor: _statusColor(status),
       onView: () => _openClosureDetail(item),
       onEdit: () => _openEditClosureDialog(item),

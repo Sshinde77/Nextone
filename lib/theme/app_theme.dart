@@ -114,6 +114,23 @@ abstract final class AppTheme {
           ),
         ),
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF12345B),
+        contentTextStyle: TextStyle(
+          fontFamily: appFontFamily,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        insetPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        elevation: 10,
+        actionTextColor: Colors.white,
+        closeIconColor: Colors.white,
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: const Color(0xFFF3F4F6),

@@ -188,6 +188,9 @@ class RoleAccess {
   }
 
   static bool canAccessMainTab(String role, int index) {
+    if (index == 15) {
+      return isAdminOrSuperAdmin(role);
+    }
     final _ = role;
     final module = mainTabModule(index);
     if (module == null) {
@@ -233,6 +236,8 @@ class RoleAccess {
         return 'leads';
       case 14:
         return 'attendance';
+      case 15:
+        return null;
       default:
         return null;
     }
@@ -270,6 +275,8 @@ class RoleAccess {
         return 'Site Visit Done';
       case 14:
         return 'Leaves';
+      case 15:
+        return 'Website Inquiries';
       default:
         return 'Module';
     }

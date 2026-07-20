@@ -4,6 +4,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
 
@@ -563,12 +564,14 @@ class _LeaveManagementPageState extends State<LeaveManagementPage> {
   Widget build(BuildContext context) {
     if (_isLoadingScreen) {
       return const Scaffold(
+        appBar: CrmAppBar(title: 'Leave Management'),
         backgroundColor: Color(0xFFF4F6FA),
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
+      appBar: const CrmAppBar(title: 'Leave Management'),
       backgroundColor: const Color(0xFFF4F6FA),
       body: SafeArea(
         child: RefreshIndicator(

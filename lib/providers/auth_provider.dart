@@ -238,6 +238,14 @@ class AuthProvider {
     return _authService.myIncentives(token: token);
   }
 
+  Future<List<SalaryCommission>> myCommissions({String? token}) {
+    return _authService.myCommissions(token: token);
+  }
+
+  Future<List<SalaryAdvance>> myAdvances({String? token}) {
+    return _authService.myAdvances(token: token);
+  }
+
   Future<SalaryIncentiveCreateResult> salaryAddIncentive({
     required String userId,
     required int month,
@@ -252,6 +260,170 @@ class AuthProvider {
       year: year,
       amount: amount,
       reason: reason,
+      token: token,
+    );
+  }
+
+  Future<SalaryCommissionsResult> salaryCommissions({String? token}) {
+    return _authService.salaryCommissions(token: token);
+  }
+
+  Future<SalaryCommissionMutationResult> salaryAddCommission({
+    required String userId,
+    String? leadId,
+    String? projectId,
+    String? projectName,
+    required double commissionAmount,
+    double? commissionPercentage,
+    String? notes,
+    String? token,
+  }) {
+    return _authService.salaryAddCommission(
+      userId: userId,
+      leadId: leadId,
+      projectId: projectId,
+      projectName: projectName,
+      commissionAmount: commissionAmount,
+      commissionPercentage: commissionPercentage,
+      notes: notes,
+      token: token,
+    );
+  }
+
+  Future<SalaryCommissionMutationResult> salaryMarkCommissionPaid({
+    required String commissionId,
+    String? token,
+  }) {
+    return _authService.salaryMarkCommissionPaid(
+      commissionId: commissionId,
+      token: token,
+    );
+  }
+
+  Future<SalaryAdvancesResult> salaryAdvances({String? token}) {
+    return _authService.salaryAdvances(token: token);
+  }
+
+  Future<SalaryAdvanceMutationResult> salaryAddAdvance({
+    required String userId,
+    required String advanceDate,
+    required double amount,
+    String? transactionReference,
+    String? paymentProofUrl,
+    String? notes,
+    String? token,
+  }) {
+    return _authService.salaryAddAdvance(
+      userId: userId,
+      advanceDate: advanceDate,
+      amount: amount,
+      transactionReference: transactionReference,
+      paymentProofUrl: paymentProofUrl,
+      notes: notes,
+      token: token,
+    );
+  }
+
+  Future<String> salaryDeleteAdvance({
+    required String advanceId,
+    String? token,
+  }) {
+    return _authService.salaryDeleteAdvance(
+      advanceId: advanceId,
+      token: token,
+    );
+  }
+
+  Future<String> uploadPaymentProofFile({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) {
+    return _authService.uploadPaymentProofFile(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadProjectPhoto({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) {
+    return _authService.uploadProjectPhoto(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadUnitPlan({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) {
+    return _authService.uploadUnitPlan(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadCreative({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) {
+    return _authService.uploadCreative(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadProjectVideo({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) {
+    return _authService.uploadProjectVideo(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadDeveloperLogo({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) {
+    return _authService.uploadDeveloperLogo(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+    );
+  }
+
+  Future<String> salaryDeleteCommission({
+    required String commissionId,
+    String? token,
+  }) {
+    return _authService.salaryDeleteCommission(
+      commissionId: commissionId,
       token: token,
     );
   }
@@ -391,6 +563,7 @@ class AuthProvider {
     String? from,
     String? to,
     String? search,
+    String? project,
     int page = 1,
     int perPage = 20,
   }) {
@@ -402,6 +575,7 @@ class AuthProvider {
       from: from,
       to: to,
       search: search,
+      project: project,
       page: page,
       perPage: perPage,
     );
@@ -414,6 +588,7 @@ class AuthProvider {
     String? from,
     String? to,
     String? search,
+    String? project,
     int page = 1,
     int perPage = 20,
   }) {
@@ -424,6 +599,7 @@ class AuthProvider {
       from: from,
       to: to,
       search: search,
+      project: project,
       page: page,
       perPage: perPage,
     );
@@ -1659,6 +1835,7 @@ class AuthProvider {
     String fileName = '',
     String name = '',
     String amount = '',
+    String paymentProofUrl = '',
     String? token,
   }) {
     return _authService.uploadLeadPaymentProof(
@@ -1668,6 +1845,7 @@ class AuthProvider {
       fileName: fileName,
       name: name,
       amount: amount,
+      paymentProofUrl: paymentProofUrl,
       token: token,
     );
   }
@@ -1893,6 +2071,18 @@ class AuthProvider {
       token: token,
       city: city,
       status: status,
+      search: search,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
+  Future<LeadsListResult> publicProjects({
+    String? search,
+    int page = 1,
+    int perPage = 100,
+  }) {
+    return _authService.publicProjects(
       search: search,
       page: page,
       perPage: perPage,

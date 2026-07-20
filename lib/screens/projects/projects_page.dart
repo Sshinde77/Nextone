@@ -202,6 +202,69 @@ class _ProjectsPageState extends State<ProjectsPage> {
       return const <String>[];
     }
 
+    String readDocumentPublicUrl(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        return readString(
+          value['public_url'] ?? value['url'] ?? value['file_path'],
+        );
+      }
+      if (value is Map) {
+        return readDocumentPublicUrl(Map<String, dynamic>.from(value));
+      }
+      return '';
+    }
+
+    List<String> readPhotoUrls(dynamic value) {
+      if (value is! List) {
+        return const <String>[];
+      }
+      return value
+          .map((item) {
+            if (item is Map<String, dynamic>) {
+              return readDocumentPublicUrl(item);
+            }
+            if (item is Map) {
+              return readDocumentPublicUrl(Map<String, dynamic>.from(item));
+            }
+            return '';
+          })
+          .where((url) => url.isNotEmpty)
+          .toList(growable: false);
+    }
+
+    List<_ProjectConfiguration> readConfigurations(dynamic value) {
+      if (value is List) {
+        return value
+            .map((item) {
+              if (item is Map<String, dynamic>) {
+                return _ProjectConfiguration.fromMap(item);
+              }
+              if (item is Map) {
+                return _ProjectConfiguration.fromMap(
+                    Map<String, dynamic>.from(item));
+              }
+              return _ProjectConfiguration(
+                configuration: readString(item),
+                carpetArea: '',
+                price: '',
+              );
+            })
+            .where((item) => item.hasContent)
+            .toList(growable: false);
+      }
+
+      final flat = readList(value);
+      return flat
+          .map(
+            (item) => _ProjectConfiguration(
+              configuration: item,
+              carpetArea: '',
+              price: '',
+            ),
+          )
+          .toList(growable: false);
+    }
+
     return _Project(
       id: readString(payload['id']),
       name: readString(payload['name']),
@@ -209,7 +272,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       city: readString(payload['city']),
       locality: readString(payload['locality']),
       address: readString(payload['address']),
-      configurations: readList(payload['configurations']),
+      configurations: readConfigurations(payload['configurations']),
       priceRange: readString(payload['price_range']),
       totalUnits: readInt(payload['total_units']),
       possessionDate: readString(payload['possession_date']),
@@ -232,6 +295,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
       createdBy: readString(payload['created_by']),
       totalLeads: readString(payload['total_leads']),
       mappedLeads: readInt(payload['total_leads']),
+      developerLogoUrl: readDocumentPublicUrl(payload['developer_logo']),
+      photoUrls: readPhotoUrls(payload['photos']),
     );
   }
 
@@ -450,55 +515,389 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   Widget _buildProjectCard(_Project project) {
     final normalizedStatus = project.status.toLowerCase();
-    final priorityColor =
-        normalizedStatus == 'active' ? AppColors.success : AppColors.warning;
+    final statusColor = normalizedStatus == 'active'
+        ? AppColors.success
+        : normalizedStatus == 'completed'
+            ? AppColors.primary
+            : AppColors.warning;
+    final coverPhotoUrl =
+        project.photoUrls.isNotEmpty ? project.photoUrls.first : '';
+    final location = [
+      if (project.city.trim().isNotEmpty) project.city.trim(),
+      if (project.locality.trim().isNotEmpty) project.locality.trim(),
+    ].join(' • ');
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: DataCard(
-        name: project.name,
-        leadId: project.location,
-        status:
-            normalizedStatus.isEmpty ? 'N/A' : normalizedStatus.toUpperCase(),
-        priority: project.developer.isEmpty ? 'N/A' : project.developer,
-        priorityColor: priorityColor,
-        nextFollowUpDate:
-            project.reraNumber.isEmpty ? 'N/A' : project.reraNumber,
-        budget: project.priceRange.isEmpty ? 'N/A' : project.priceRange,
-        phone: project.totalLeads.isEmpty ? '0' : project.totalLeads,
-        profileImageUrl: '',
-        leftMetaLabel: 'Developer',
-        rightMetaLabel: 'RERA Number',
-        bottomRightLabel: 'Total Leads',
-        assigneeName:
-            project.developer.isEmpty ? 'Unknown Developer' : project.developer,
-        assigneeImageUrl: '',
-        actions: [
-          DataCardAction(
-            icon: Icons.visibility_outlined,
-            onTap: () => _openProjectDetails(project),
-          ),
-          DataCardAction(
-            icon: Icons.share_outlined,
-            onTap: () => _shareProject(project),
-          ),
-          DataCardAction(
-            icon: Icons.download_outlined,
-            onTap: () => _openDownloadTypeSheet(project),
-          ),
-          if (_canEditProjects)
-            DataCardAction(
-              icon: Icons.edit_outlined,
-              onTap: () => _openEditProject(project),
+      child: DataCardShell(
+        padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (coverPhotoUrl.isNotEmpty)
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(18)),
+                child: SizedBox(
+                  height: 168,
+                  width: double.infinity,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _ProjectPhotoCarousel(photoUrls: project.photoUrls),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Color(0x08000000),
+                              Color(0xAA102033),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: _buildProjectStatusChip(
+                          normalizedStatus,
+                          statusColor,
+                        ),
+                      ),
+                      if (project.photoUrls.length > 1)
+                        Positioned(
+                          left: 12,
+                          bottom: 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.48),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              '${project.photoUrls.length} Photos',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildProjectLogo(project),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              project.name.isEmpty
+                                  ? 'Unnamed Project'
+                                  : project.name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              project.developer.isEmpty
+                                  ? 'Developer not added'
+                                  : project.developer,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            if (location.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_outlined,
+                                    size: 15,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      location,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (coverPhotoUrl.isEmpty)
+                        _buildProjectStatusChip(normalizedStatus, statusColor),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildProjectMetricRow(
+                        left: _buildProjectMetricText(
+                          icon: Icons.sell_outlined,
+                          label: 'Price Range',
+                          value: project.priceRange.isEmpty
+                              ? 'N/A'
+                              : project.priceRange,
+                        ),
+                        right: _buildProjectMetricText(
+                          icon: Icons.people_alt_outlined,
+                          label: 'Total Leads',
+                          value: project.totalLeads.isEmpty
+                              ? '0'
+                              : project.totalLeads,
+                        ),
+                      ),
+                      _buildProjectMetricRow(
+                        left: _buildProjectMetricText(
+                          icon: Icons.verified_outlined,
+                          label: 'RERA',
+                          value: project.reraNumber.isEmpty
+                              ? 'N/A'
+                              : project.reraNumber,
+                        ),
+                        right: _buildProjectMetricText(
+                          icon: Icons.apartment_outlined,
+                          label: 'Configuration',
+                          value: project.configurationText.isEmpty
+                              ? 'N/A'
+                              : project.configurationText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Total Units: ${project.totalUnits > 0 ? project.totalUnits : '-'}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      _buildProjectActions([
+                        DataCardAction(
+                          icon: Icons.visibility_outlined,
+                          onTap: () => _openProjectDetails(project),
+                        ),
+                        DataCardAction(
+                          icon: Icons.share_outlined,
+                          onTap: () => _shareProject(project),
+                        ),
+                        DataCardAction(
+                          icon: Icons.download_outlined,
+                          onTap: () => _openDownloadTypeSheet(project),
+                        ),
+                        if (_canEditProjects)
+                          DataCardAction(
+                            icon: Icons.edit_outlined,
+                            onTap: () => _openEditProject(project),
+                          ),
+                        if (_canDeleteProjects)
+                          DataCardAction(
+                            icon: Icons.delete_outline,
+                            color: AppColors.error,
+                            onTap: _isDeleting
+                                ? () {}
+                                : () => _deleteProject(project),
+                          ),
+                      ]),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          if (_canDeleteProjects)
-            DataCardAction(
-              icon: Icons.delete_outline,
-              color: AppColors.error,
-              onTap: _isDeleting ? () {} : () => _deleteProject(project),
-            ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildProjectLogo(_Project project) {
+    final logoUrl = project.developerLogoUrl?.trim() ?? '';
+    if (logoUrl.isNotEmpty) {
+      return Container(
+        width: 58,
+        height: 58,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Image.network(
+          logoUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildProjectFallbackLogo(project),
+        ),
+      );
+    }
+    return _buildProjectFallbackLogo(project);
+  }
+
+  Widget _buildProjectFallbackLogo(_Project project) {
+    final seed =
+        project.developer.isNotEmpty ? project.developer : project.name;
+    final initial = seed.trim().isEmpty ? 'P' : seed.trim()[0].toUpperCase();
+    return Container(
+      width: 58,
+      height: 58,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F1FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD5E4FF)),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: const TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+          color: AppColors.primary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProjectStatusChip(String normalizedStatus, Color statusColor) {
+    final label = normalizedStatus.isEmpty
+        ? 'N/A'
+        : normalizedStatus.replaceAll('_', ' ').toUpperCase();
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 132),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: statusColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProjectMetricRow({
+    required Widget left,
+    required Widget right,
+  }) {
+    return Row(
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 16),
+        Expanded(child: right),
+      ],
+    );
+  }
+
+  Widget _buildProjectMetricText({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: AppColors.textSecondary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProjectActions(List<DataCardAction> actions) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.end,
+      children: actions
+          .map(
+            (action) => Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF6F8FC),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: IconButton(
+                onPressed: action.onTap,
+                icon: Icon(
+                  action.icon,
+                  size: 18,
+                  color: action.color ?? AppColors.textSecondary,
+                ),
+                constraints:
+                    const BoxConstraints.tightFor(width: 38, height: 38),
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          )
+          .toList(growable: false),
     );
   }
 
@@ -1755,7 +2154,7 @@ class _Project {
   final String city;
   final String locality;
   final String address;
-  final List<String> configurations;
+  final List<_ProjectConfiguration> configurations;
   final String priceRange;
   final int totalUnits;
   final String possessionDate;
@@ -1770,6 +2169,8 @@ class _Project {
   final String createdBy;
   final String totalLeads;
   final int mappedLeads;
+  final String? developerLogoUrl;
+  final List<String> photoUrls;
 
   const _Project({
     required this.id,
@@ -1793,10 +2194,15 @@ class _Project {
     required this.createdBy,
     required this.totalLeads,
     required this.mappedLeads,
+    required this.developerLogoUrl,
+    required this.photoUrls,
   });
 
   String get location => '$locality, $city';
-  String get configurationText => configurations.join(', ');
+  String get configurationText => configurations
+      .map((item) => item.configuration.trim())
+      .where((item) => item.isNotEmpty)
+      .join(', ');
 
   Map<String, dynamic> toPayload() {
     return <String, dynamic>{
@@ -1806,7 +2212,8 @@ class _Project {
       'city': city,
       'locality': locality,
       'address': address,
-      'configurations': configurations,
+      'configurations':
+          configurations.map((item) => item.toMap()).toList(growable: false),
       'price_range': priceRange,
       'total_units': totalUnits,
       'possession_date': possessionDate,
@@ -1820,7 +2227,203 @@ class _Project {
       'description': description,
       'created_by': createdBy,
       'total_leads': totalLeads,
+      'developer_logo': developerLogoUrl == null
+          ? null
+          : <String, dynamic>{'public_url': developerLogoUrl},
+      'photos': photoUrls
+          .map((url) => <String, dynamic>{'public_url': url})
+          .toList(growable: false),
     };
+  }
+}
+
+class _ProjectConfiguration {
+  const _ProjectConfiguration({
+    required this.configuration,
+    required this.carpetArea,
+    required this.price,
+  });
+
+  final String configuration;
+  final String carpetArea;
+  final String price;
+
+  bool get hasContent =>
+      configuration.trim().isNotEmpty ||
+      carpetArea.trim().isNotEmpty ||
+      price.trim().isNotEmpty;
+
+  String get summaryLabel {
+    final parts = <String>[
+      if (configuration.trim().isNotEmpty) configuration.trim(),
+      if (carpetArea.trim().isNotEmpty) carpetArea.trim(),
+      if (price.trim().isNotEmpty) price.trim(),
+    ];
+    return parts.join(' • ');
+  }
+
+  factory _ProjectConfiguration.fromMap(Map<String, dynamic> json) {
+    String read(dynamic value) {
+      if (value is String) return value.trim();
+      if (value is num || value is bool) return value.toString().trim();
+      return '';
+    }
+
+    return _ProjectConfiguration(
+      configuration: read(json['configuration'] ?? json['name']),
+      carpetArea: read(json['carpet_area'] ?? json['carpetArea']),
+      price: read(json['price']),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return <String, dynamic>{
+      'configuration': configuration,
+      'carpet_area': carpetArea,
+      'price': price,
+    };
+  }
+}
+
+class _ProjectPhotoCarousel extends StatefulWidget {
+  const _ProjectPhotoCarousel({
+    required this.photoUrls,
+  });
+
+  final List<String> photoUrls;
+
+  @override
+  State<_ProjectPhotoCarousel> createState() => _ProjectPhotoCarouselState();
+}
+
+class _ProjectPhotoCarouselState extends State<_ProjectPhotoCarousel> {
+  late final PageController _pageController;
+  Timer? _timer;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _startAutoSlide();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProjectPhotoCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.photoUrls.length != widget.photoUrls.length) {
+      _currentIndex = 0;
+      _timer?.cancel();
+      _startAutoSlide();
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(0);
+      }
+    }
+  }
+
+  void _startAutoSlide() {
+    if (widget.photoUrls.length <= 1) {
+      return;
+    }
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || !_pageController.hasClients) {
+        return;
+      }
+      final nextIndex = (_currentIndex + 1) % widget.photoUrls.length;
+      _pageController.animateToPage(
+        nextIndex,
+        duration: const Duration(milliseconds: 550),
+        curve: Curves.easeInOut,
+      );
+      _currentIndex = nextIndex;
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.photoUrls.isEmpty) {
+      return Container(
+        color: const Color(0xFFF3F6FB),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.image_not_supported_outlined,
+          color: AppColors.textSecondary,
+          size: 34,
+        ),
+      );
+    }
+
+    if (widget.photoUrls.length == 1) {
+      return Image.network(
+        widget.photoUrls.first,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          color: const Color(0xFFF3F6FB),
+          alignment: Alignment.center,
+          child: const Icon(
+            Icons.image_not_supported_outlined,
+            color: AppColors.textSecondary,
+            size: 34,
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PageView.builder(
+          controller: _pageController,
+          itemCount: widget.photoUrls.length,
+          onPageChanged: (index) {
+            _currentIndex = index;
+          },
+          itemBuilder: (context, index) {
+            return Image.network(
+              widget.photoUrls[index],
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: const Color(0xFFF3F6FB),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.image_not_supported_outlined,
+                  color: AppColors.textSecondary,
+                  size: 34,
+                ),
+              ),
+            );
+          },
+        ),
+        Positioned(
+          right: 12,
+          bottom: 12,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List<Widget>.generate(
+              widget.photoUrls.length,
+              (index) => Container(
+                width: 7,
+                height: 7,
+                margin: const EdgeInsets.only(left: 4),
+                decoration: BoxDecoration(
+                  color: index == _currentIndex
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.45),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

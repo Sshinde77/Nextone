@@ -19,6 +19,7 @@ class CRMAppBottomNav extends StatefulWidget {
   final VoidCallback? onSalary;
   final VoidCallback? onClosures;
   final VoidCallback? onLeaves;
+  final VoidCallback? onWebsiteEnquiries;
   final VoidCallback onMore;
   final VoidCallback onLess;
   final int? leadsBadgeCount;
@@ -38,6 +39,7 @@ class CRMAppBottomNav extends StatefulWidget {
   final bool showAttendance;
   final bool showTargets;
   final bool showLeaves;
+  final bool showWebsiteEnquiries;
 
   const CRMAppBottomNav({
     super.key,
@@ -58,6 +60,7 @@ class CRMAppBottomNav extends StatefulWidget {
     this.onSalary,
     this.onClosures,
     this.onLeaves,
+    this.onWebsiteEnquiries,
     required this.onMore,
     required this.onLess,
     this.leadsBadgeCount,
@@ -77,6 +80,7 @@ class CRMAppBottomNav extends StatefulWidget {
     this.showAttendance = true,
     this.showTargets = false,
     this.showLeaves = true,
+    this.showWebsiteEnquiries = false,
   });
 
   @override
@@ -114,13 +118,12 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           onTap: widget.onLeads,
           badgeCount: widget.leadsBadgeCount,
         ),
-      if (widget.showFollowUps)
+      if (widget.showSiteVisitDone && widget.onSiteVisitDone != null)
         _NavEntry(
-          index: 2,
-          label: 'Follow-Ups',
-          icon: Icons.check_circle_outline,
-          onTap: widget.onFollowUps,
-          badgeCount: widget.followUpsBadgeCount,
+          index: 13,
+          label: 'Site Visit Done',
+          icon: Icons.how_to_reg_outlined,
+          onTap: widget.onSiteVisitDone!,
         ),
       if (widget.showEoi)
         _NavEntry(
@@ -129,19 +132,20 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           icon: Icons.inventory_2_outlined,
           onTap: widget.onEoi,
         ),
+      if (widget.showFollowUps)
+        _NavEntry(
+          index: 2,
+          label: 'Follow-Ups',
+          icon: Icons.check_circle_outline,
+          onTap: widget.onFollowUps,
+          badgeCount: widget.followUpsBadgeCount,
+        ),
       if (widget.showSiteVisits)
         _NavEntry(
           index: 3,
           label: 'Site Visits',
           icon: Icons.location_on_outlined,
           onTap: widget.onSiteVisits,
-        ),
-      if (widget.showSiteVisitDone && widget.onSiteVisitDone != null)
-        _NavEntry(
-          index: 13,
-          label: 'Site Visit Done',
-          icon: Icons.how_to_reg_outlined,
-          onTap: widget.onSiteVisitDone!,
         ),
       if (widget.showRevisits)
         _NavEntry(
@@ -157,6 +161,13 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           icon: Icons.verified_outlined,
           onTap: widget.onClosures!,
         ),
+      if (widget.showTargets && widget.onTargets != null)
+        _NavEntry(
+          index: 11,
+          label: 'Targets',
+          icon: Icons.track_changes_outlined,
+          onTap: widget.onTargets!,
+        ),
       if (widget.showAttendance)
         _NavEntry(
           index: 7,
@@ -170,13 +181,6 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           label: 'Leaves',
           icon: Icons.event_busy_outlined,
           onTap: widget.onLeaves!,
-        ),
-      if (widget.showTargets && widget.onTargets != null)
-        _NavEntry(
-          index: 11,
-          label: 'Targets',
-          icon: Icons.track_changes_outlined,
-          onTap: widget.onTargets!,
         ),
       if (widget.showSalary && widget.onSalary != null)
         _NavEntry(
@@ -192,19 +196,26 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
           icon: Icons.groups_outlined,
           onTap: widget.onTeam,
         ),
-      if (widget.showUsers)
-        _NavEntry(
-          index: 8,
-          label: 'Users',
-          icon: Icons.manage_accounts_outlined,
-          onTap: widget.onSettings,
-        ),
       if (widget.showNotifications && widget.onNotifications != null)
         _NavEntry(
           index: -1,
           label: 'Notifications',
           icon: Icons.notifications_outlined,
           onTap: widget.onNotifications!,
+        ),
+      if (widget.showWebsiteEnquiries && widget.onWebsiteEnquiries != null)
+        _NavEntry(
+          index: 15,
+          label: 'Website Inquiries',
+          icon: Icons.language_rounded,
+          onTap: widget.onWebsiteEnquiries!,
+        ),
+      if (widget.showUsers)
+        _NavEntry(
+          index: 8,
+          label: 'Access Control',
+          icon: Icons.manage_accounts_outlined,
+          onTap: widget.onSettings,
         ),
     ];
   }

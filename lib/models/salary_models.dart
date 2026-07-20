@@ -300,6 +300,266 @@ class SalaryIncentiveCreateResult {
   final Map<String, dynamic> incentive;
 }
 
+class SalaryCommission {
+  const SalaryCommission({
+    required this.id,
+    required this.userId,
+    this.leadId,
+    this.projectId,
+    required this.projectName,
+    required this.commissionAmount,
+    this.commissionPercentage,
+    this.notes,
+    required this.isPaid,
+    required this.employeeName,
+    required this.employeeRole,
+    required this.leadName,
+    this.createdAt,
+    this.updatedAt,
+    required this.rawData,
+  });
+
+  final String id;
+  final String userId;
+  final String? leadId;
+  final String? projectId;
+  final String projectName;
+  final double commissionAmount;
+  final double? commissionPercentage;
+  final String? notes;
+  final bool isPaid;
+  final String employeeName;
+  final String employeeRole;
+  final String leadName;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final Map<String, dynamic> rawData;
+
+  factory SalaryCommission.fromMap(Map<String, dynamic> json) {
+    String readString(dynamic value) => value?.toString().trim() ?? '';
+
+    double? readDouble(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString().trim());
+    }
+
+    DateTime? readDate(dynamic value) {
+      final raw = readString(value);
+      if (raw.isEmpty) return null;
+      return DateTime.tryParse(raw);
+    }
+
+    final userMap = json['user'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['user'] as Map<String, dynamic>)
+        : <String, dynamic>{};
+    final leadMap = json['lead'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['lead'] as Map<String, dynamic>)
+        : <String, dynamic>{};
+    final projectMap = json['project'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['project'] as Map<String, dynamic>)
+        : <String, dynamic>{};
+
+    final amount = readDouble(
+          json['commission_amount'] ??
+              json['amount'] ??
+              json['commission'] ??
+              json['value'],
+        ) ??
+        0;
+    final percentage = readDouble(
+      json['commission_percentage'] ?? json['percentage'] ?? json['percent'],
+    );
+    final notesRaw = readString(
+      json['notes'] ?? json['note'] ?? json['description'],
+    );
+    final employeeName = readString(
+      json['employee_name'] ??
+          json['user_name'] ??
+          json['full_name'] ??
+          userMap['full_name'] ??
+          userMap['name'],
+    );
+    final employeeRole = readString(
+      json['employee_role'] ?? json['role'] ?? userMap['role'],
+    );
+    final leadName = readString(
+      json['lead_name'] ??
+          json['lead_title'] ??
+          leadMap['full_name'] ??
+          leadMap['name'],
+    );
+    final projectName = readString(
+      json['project_name'] ?? projectMap['name'] ?? projectMap['project_name'],
+    );
+    final paidValue = json['is_paid'] ?? json['paid'] ?? json['status'];
+    final isPaid = paidValue == true ||
+        readString(paidValue).toLowerCase() == 'paid' ||
+        readString(paidValue).toLowerCase() == 'true';
+
+    return SalaryCommission(
+      id: readString(json['id']),
+      userId: readString(json['user_id'] ?? userMap['id']),
+      leadId: readString(json['lead_id'] ?? leadMap['id']).isEmpty
+          ? null
+          : readString(json['lead_id'] ?? leadMap['id']),
+      projectId: readString(
+        json['project_id'] ??
+            projectMap['id'] ??
+            projectMap['project_id'] ??
+            projectMap['uuid'],
+      ).isEmpty
+          ? null
+          : readString(
+              json['project_id'] ??
+                  projectMap['id'] ??
+                  projectMap['project_id'] ??
+                  projectMap['uuid'],
+            ),
+      projectName: projectName,
+      commissionAmount: amount,
+      commissionPercentage: percentage,
+      notes: notesRaw.isEmpty ? null : notesRaw,
+      isPaid: isPaid,
+      employeeName: employeeName,
+      employeeRole: employeeRole,
+      leadName: leadName,
+      createdAt: readDate(json['created_at'] ?? json['date']),
+      updatedAt: readDate(json['updated_at'] ?? json['paid_at']),
+      rawData: Map<String, dynamic>.from(json),
+    );
+  }
+}
+
+class SalaryCommissionsResult {
+  const SalaryCommissionsResult({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.perPage,
+    required this.totalPages,
+  });
+
+  final List<SalaryCommission> items;
+  final int total;
+  final int page;
+  final int perPage;
+  final int totalPages;
+}
+
+class SalaryCommissionMutationResult {
+  const SalaryCommissionMutationResult({
+    required this.message,
+    required this.commission,
+  });
+
+  final String message;
+  final Map<String, dynamic> commission;
+}
+
+class SalaryAdvance {
+  const SalaryAdvance({
+    required this.id,
+    required this.userId,
+    required this.advanceDate,
+    required this.amount,
+    this.transactionReference,
+    this.paymentProofUrl,
+    this.notes,
+    required this.employeeName,
+    required this.employeeRole,
+    this.createdAt,
+    this.updatedAt,
+    required this.rawData,
+  });
+
+  final String id;
+  final String userId;
+  final DateTime? advanceDate;
+  final double amount;
+  final String? transactionReference;
+  final String? paymentProofUrl;
+  final String? notes;
+  final String employeeName;
+  final String employeeRole;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final Map<String, dynamic> rawData;
+
+  factory SalaryAdvance.fromMap(Map<String, dynamic> json) {
+    String readString(dynamic value) => value?.toString().trim() ?? '';
+
+    double readDouble(dynamic value) {
+      if (value is num) return value.toDouble();
+      return double.tryParse(value?.toString().trim() ?? '') ?? 0;
+    }
+
+    DateTime? readDate(dynamic value) {
+      final raw = readString(value);
+      if (raw.isEmpty) return null;
+      return DateTime.tryParse(raw);
+    }
+
+    final userMap = json['user'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['user'] as Map<String, dynamic>)
+        : <String, dynamic>{};
+    final reference = readString(
+      json['transaction_reference'] ?? json['reference'] ?? json['txn_ref'],
+    );
+    final proof = readString(
+      json['payment_proof_url'] ?? json['proof_url'] ?? json['receipt_url'],
+    );
+    final notesRaw = readString(
+      json['notes'] ?? json['note'] ?? json['description'],
+    );
+
+    return SalaryAdvance(
+      id: readString(json['id']),
+      userId: readString(json['user_id'] ?? userMap['id']),
+      advanceDate: readDate(
+        json['advance_date'] ?? json['date'] ?? json['created_at'],
+      ),
+      amount: readDouble(json['amount'] ?? json['advance_amount']),
+      transactionReference: reference.isEmpty ? null : reference,
+      paymentProofUrl: proof.isEmpty ? null : proof,
+      notes: notesRaw.isEmpty ? null : notesRaw,
+      employeeName: readString(
+        json['employee_name'] ??
+            json['user_name'] ??
+            json['full_name'] ??
+            userMap['full_name'] ??
+            userMap['name'],
+      ),
+      employeeRole: readString(
+        json['employee_role'] ?? json['role'] ?? userMap['role'],
+      ),
+      createdAt: readDate(json['created_at']),
+      updatedAt: readDate(json['updated_at']),
+      rawData: Map<String, dynamic>.from(json),
+    );
+  }
+}
+
+class SalaryAdvancesResult {
+  const SalaryAdvancesResult({
+    required this.items,
+    required this.total,
+  });
+
+  final List<SalaryAdvance> items;
+  final int total;
+}
+
+class SalaryAdvanceMutationResult {
+  const SalaryAdvanceMutationResult({
+    required this.message,
+    required this.advance,
+  });
+
+  final String message;
+  final Map<String, dynamic> advance;
+}
+
 class SalaryHistoryEntry {
   const SalaryHistoryEntry({
     required this.id,

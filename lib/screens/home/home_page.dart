@@ -606,18 +606,32 @@ class _HomePageState extends State<HomePage> {
                     onLeadsTap: () => _openMainTab(1),
                     onSiteVisitsTap: () => _openMainTab(3),
                     onFollowUpsTap: () => _openMainTab(2),
+                    onEoiTap: () => _openMainTab(12),
+                    onSiteVisitDoneTap: () => _openMainTab(13),
+                    onRevisitsTap: () => _openMainTab(4),
                     onProjectsTap: () => _openMainTab(5),
                     onTeamTap: () => _openMainTab(6),
                     onAttendanceTap: () => _openMainTab(7),
-                    onNotificationsTap: () {
-                      Navigator.pushNamed(context, AppRoutes.notifications);
-                    },
-                    onReportsTap: () => _openMainTab(8),
+                    onUsersTap: () => _openMainTab(8),
+                    onSalaryTap: () => _openMainTab(9),
+                    onClosuresTap: () => _openMainTab(10),
+                    onTargetsTap: () => _openMainTab(11),
+                    onLeavesTap: () => _openMainTab(14),
                     showLeads: canShowLeads,
                     showSiteVisits: canShowSiteVisits,
                     showFollowUps: canShowFollowUps,
+                    showEoi: RoleAccess.canViewModule('leads'),
+                    showSiteVisitDone: RoleAccess.canViewModule('leads'),
+                    showRevisits: RoleAccess.canViewModule('revisits'),
                     showProjects: canShowProjects,
                     showTeam: RoleAccess.canViewTeam(_currentRole),
+                    showAttendance: RoleAccess.canViewModule('attendance'),
+                    showUsers: RoleAccess.canViewUsers(_currentRole),
+                    showSalary:
+                        RoleAccess.canViewSalaryManagement(_currentRole),
+                    showClosures: RoleAccess.canViewModule('closures'),
+                    showTargets: RoleAccess.canViewModule('targets'),
+                    showLeaves: RoleAccess.canViewModule('attendance'),
                   ),
                   rightChild: canShowSiteVisits
                       ? _UpcomingVisitsCard(
@@ -1755,31 +1769,61 @@ class _QuickAccessCard extends StatelessWidget {
     required this.onLeadsTap,
     required this.onSiteVisitsTap,
     required this.onFollowUpsTap,
+    required this.onEoiTap,
+    required this.onSiteVisitDoneTap,
+    required this.onRevisitsTap,
     required this.onProjectsTap,
     required this.onTeamTap,
     required this.onAttendanceTap,
-    required this.onNotificationsTap,
-    required this.onReportsTap,
+    required this.onUsersTap,
+    required this.onSalaryTap,
+    required this.onClosuresTap,
+    required this.onTargetsTap,
+    required this.onLeavesTap,
     required this.showLeads,
     required this.showSiteVisits,
     required this.showFollowUps,
+    required this.showEoi,
+    required this.showSiteVisitDone,
+    required this.showRevisits,
     required this.showProjects,
     required this.showTeam,
+    required this.showAttendance,
+    required this.showUsers,
+    required this.showSalary,
+    required this.showClosures,
+    required this.showTargets,
+    required this.showLeaves,
   });
 
   final VoidCallback onLeadsTap;
   final VoidCallback onSiteVisitsTap;
   final VoidCallback onFollowUpsTap;
+  final VoidCallback onEoiTap;
+  final VoidCallback onSiteVisitDoneTap;
+  final VoidCallback onRevisitsTap;
   final VoidCallback onProjectsTap;
   final VoidCallback onTeamTap;
   final VoidCallback onAttendanceTap;
-  final VoidCallback onNotificationsTap;
-  final VoidCallback onReportsTap;
+  final VoidCallback onUsersTap;
+  final VoidCallback onSalaryTap;
+  final VoidCallback onClosuresTap;
+  final VoidCallback onTargetsTap;
+  final VoidCallback onLeavesTap;
   final bool showLeads;
   final bool showSiteVisits;
   final bool showFollowUps;
+  final bool showEoi;
+  final bool showSiteVisitDone;
+  final bool showRevisits;
   final bool showProjects;
   final bool showTeam;
+  final bool showAttendance;
+  final bool showUsers;
+  final bool showSalary;
+  final bool showClosures;
+  final bool showTargets;
+  final bool showLeaves;
 
   @override
   Widget build(BuildContext context) {
@@ -1805,12 +1849,33 @@ class _QuickAccessCard extends StatelessWidget {
           color: const Color(0xFF10B981),
           onTap: onFollowUpsTap,
         ),
+      if (showEoi)
+        _QuickAccessItem(
+          title: 'EOI',
+          icon: Icons.receipt_long_outlined,
+          color: const Color(0xFF14B8A6),
+          onTap: onEoiTap,
+        ),
       if (showProjects)
         _QuickAccessItem(
           title: 'Projects',
           icon: Icons.apartment_outlined,
           color: const Color(0xFFF59E0B),
           onTap: onProjectsTap,
+        ),
+      if (showSiteVisitDone)
+        _QuickAccessItem(
+          title: 'Site Visit Done',
+          icon: Icons.check_circle_outline,
+          color: const Color(0xFF059669),
+          onTap: onSiteVisitDoneTap,
+        ),
+      if (showRevisits)
+        _QuickAccessItem(
+          title: 'Re-visits',
+          icon: Icons.replay_outlined,
+          color: const Color(0xFF7C3AED),
+          onTap: onRevisitsTap,
         ),
       if (showTeam)
         _QuickAccessItem(
@@ -1819,24 +1884,48 @@ class _QuickAccessCard extends StatelessWidget {
           color: const Color(0xFFEC4899),
           onTap: onTeamTap,
         ),
-      _QuickAccessItem(
-        title: 'Attendance',
-        icon: Icons.badge_outlined,
-        color: const Color(0xFFEF4444),
-        onTap: onAttendanceTap,
-      ),
-      // _QuickAccessItem(
-      //   title: 'Notifications',
-      //   icon: Icons.notifications_none_rounded,
-      //   color: const Color(0xFF06B6D4),
-      //   onTap: onNotificationsTap,
-      // ),
-      // _QuickAccessItem(
-      //   title: 'Reports',
-      //   icon: Icons.bar_chart_rounded,
-      //   color: const Color(0xFF2563EB),
-      //   onTap: onReportsTap,
-      // ),
+      if (showAttendance)
+        _QuickAccessItem(
+          title: 'Attendance',
+          icon: Icons.badge_outlined,
+          color: const Color(0xFFEF4444),
+          onTap: onAttendanceTap,
+        ),
+      if (showUsers)
+        _QuickAccessItem(
+          title: 'Users',
+          icon: Icons.people_alt_outlined,
+          color: const Color(0xFF2563EB),
+          onTap: onUsersTap,
+        ),
+      if (showSalary)
+        _QuickAccessItem(
+          title: 'Salary',
+          icon: Icons.account_balance_wallet_outlined,
+          color: const Color(0xFF0EA5E9),
+          onTap: onSalaryTap,
+        ),
+      if (showClosures)
+        _QuickAccessItem(
+          title: 'Closures',
+          icon: Icons.task_alt_outlined,
+          color: const Color(0xFFF97316),
+          onTap: onClosuresTap,
+        ),
+      if (showTargets)
+        _QuickAccessItem(
+          title: 'Targets',
+          icon: Icons.flag_outlined,
+          color: const Color(0xFFDC2626),
+          onTap: onTargetsTap,
+        ),
+      if (showLeaves)
+        _QuickAccessItem(
+          title: 'Leaves',
+          icon: Icons.event_busy_outlined,
+          color: const Color(0xFF6366F1),
+          onTap: onLeavesTap,
+        ),
     ];
 
     return _DashCard(

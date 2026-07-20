@@ -248,6 +248,9 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
   }
 
   String _resolveAssignedToForSubmit() {
+    if (!widget.isEditMode && !_canKeepCurrentAssignedUser) {
+      return _selectedLeadAssignedUserId();
+    }
     if (_canKeepCurrentAssignedUser && _keepCurrentAssignedUser) {
       return _selectedLeadAssignedUserId();
     }
@@ -704,8 +707,82 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        if (!widget.isEditMode &&
-                            _canKeepCurrentAssignedUser) ...[
+                        if (_canKeepCurrentAssignedUser) ...[
+                          if (!widget.isEditMode) ...[
+                            Container(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: AppColors.border),
+                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.white,
+                              ),
+                              child: CheckboxListTile(
+                                contentPadding:
+                                    const EdgeInsets.symmetric(horizontal: 12),
+                                title: const Text(
+                                  'Keep currently assigned user',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  _keepCurrentAssignedUser
+                                      ? 'Site visit will stay with ${_selectedLeadAssignedUserLabel()}'
+                                      : 'Select a different team member below',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                value: _keepCurrentAssignedUser,
+                                onChanged: _isSubmitting
+                                    ? null
+                                    : (value) => setState(
+                                          () => _keepCurrentAssignedUser =
+                                              value ?? false,
+                                        ),
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                dense: true,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          _buildLabel('ASSIGN TO'),
+                          const SizedBox(height: 8),
+                          if (_keepCurrentAssignedUser && !widget.isEditMode)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFD),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Text(
+                                _selectedLeadAssignedUserLabel(),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            )
+                          else
+                            _buildDropdown(
+                              sheetTitle: 'Assign To',
+                              value: _selectedAssigneeId,
+                              hint: 'Select team member...',
+                              items: _buildAssigneeOptions(),
+                              onChanged: (val) =>
+                                  setState(() => _selectedAssigneeId = val),
+                            ),
+                          const SizedBox(height: 16),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             decoration: BoxDecoration(
@@ -717,92 +794,22 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                               contentPadding:
                                   const EdgeInsets.symmetric(horizontal: 12),
                               title: const Text(
-                                'Keep currently assigned user',
+                                'Transport arranged for client',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: AppColors.textPrimary,
                                 ),
                               ),
-                              subtitle: Text(
-                                _keepCurrentAssignedUser
-                                    ? 'Site visit will stay with ${_selectedLeadAssignedUserLabel()}'
-                                    : 'Select a different team member below',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                ),
+                              value: _transportArranged,
+                              onChanged: (val) => setState(
+                                () => _transportArranged = val ?? false,
                               ),
-                              value: _keepCurrentAssignedUser,
-                              onChanged: _isSubmitting
-                                  ? null
-                                  : (value) => setState(
-                                        () => _keepCurrentAssignedUser =
-                                            value ?? false,
-                                      ),
                               controlAffinity: ListTileControlAffinity.leading,
                               dense: true,
                             ),
                           ),
                           const SizedBox(height: 16),
                         ],
-                        _buildLabel('ASSIGN TO'),
-                        const SizedBox(height: 8),
-                        if (_canKeepCurrentAssignedUser &&
-                            _keepCurrentAssignedUser &&
-                            !widget.isEditMode)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 14,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFD),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: Text(
-                              _selectedLeadAssignedUserLabel(),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          )
-                        else
-                          _buildDropdown(
-                            sheetTitle: 'Assign To',
-                            value: _selectedAssigneeId,
-                            hint: 'Select team member...',
-                            items: _buildAssigneeOptions(),
-                            onChanged: (val) =>
-                                setState(() => _selectedAssigneeId = val),
-                          ),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(12),
-                            color: Colors.white,
-                          ),
-                          child: CheckboxListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 12),
-                            title: const Text(
-                              'Transport arranged for client',
-                              style: TextStyle(
-                                  fontSize: 14, color: AppColors.textPrimary),
-                            ),
-                            value: _transportArranged,
-                            onChanged: (val) => setState(
-                                () => _transportArranged = val ?? false),
-                            controlAffinity: ListTileControlAffinity.leading,
-                            dense: true,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
                         _buildLabel('NOTES'),
                         const SizedBox(height: 8),
                         TextFormField(

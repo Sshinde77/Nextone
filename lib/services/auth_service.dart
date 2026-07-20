@@ -1417,6 +1417,114 @@ class AuthService {
     throw Exception('My incentives response format is not valid.');
   }
 
+  Future<List<SalaryCommission>> myCommissions({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.myCommissions}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'myCommissions',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('myCommissions', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch your commissions.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      dynamic source;
+      if (decoded is List) {
+        source = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is List) {
+          source = data;
+        } else if (data is Map) {
+          source = data['commissions'] ??
+              data['items'] ??
+              data['rows'] ??
+              data['data'];
+        } else {
+          source =
+              decoded['commissions'] ?? decoded['items'] ?? decoded['rows'];
+        }
+      }
+
+      if (source is List) {
+        return source
+            .whereType<Map>()
+            .map(_stringDynamicMap)
+            .map(SalaryCommission.fromMap)
+            .toList();
+      }
+    } catch (_) {}
+
+    throw Exception('My commissions response format is not valid.');
+  }
+
+  Future<List<SalaryAdvance>> myAdvances({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.myAdvances}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'myAdvances',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('myAdvances', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch your advances.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      dynamic source;
+      if (decoded is List) {
+        source = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is List) {
+          source = data;
+        } else if (data is Map) {
+          source =
+              data['advances'] ?? data['items'] ?? data['rows'] ?? data['data'];
+        } else {
+          source = decoded['advances'] ?? decoded['items'] ?? decoded['rows'];
+        }
+      }
+
+      if (source is List) {
+        return source
+            .whereType<Map>()
+            .map(_stringDynamicMap)
+            .map(SalaryAdvance.fromMap)
+            .toList();
+      }
+    } catch (_) {}
+
+    throw Exception('My advances response format is not valid.');
+  }
+
   Future<SalaryIncentiveCreateResult> salaryAddIncentive({
     required String userId,
     required int month,
@@ -1500,6 +1608,683 @@ class AuthService {
     }
   }
 
+  Future<SalaryCommissionsResult> salaryCommissions({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryCommissions}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'salaryCommissions',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('salaryCommissions', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch salary commissions.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      dynamic source;
+      Map<String, dynamic> pagination = _extractPaginationMap(decoded);
+
+      if (decoded is List) {
+        source = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is List) {
+          source = data;
+        } else if (data is Map<String, dynamic>) {
+          source = data['commissions'] ??
+              data['items'] ??
+              data['rows'] ??
+              data['data'] ??
+              data['list'];
+          if (pagination.isEmpty) {
+            pagination = _extractPaginationMap(data);
+          }
+        } else {
+          source =
+              decoded['commissions'] ?? decoded['items'] ?? decoded['rows'];
+        }
+      }
+
+      if (source is! List) {
+        throw Exception('Salary commissions response format is not valid.');
+      }
+
+      final items = source
+          .whereType<Map>()
+          .map(_stringDynamicMap)
+          .map(SalaryCommission.fromMap)
+          .toList();
+      final total = _readIntFromMap(
+            pagination,
+            ['total', 'total_items', 'totalItems', 'count'],
+          ) ??
+          items.length;
+      final page = _readIntFromMap(
+            pagination,
+            ['page', 'current_page', 'currentPage'],
+          ) ??
+          1;
+      final perPage = _readIntFromMap(
+            pagination,
+            ['per_page', 'perPage', 'page_size', 'limit'],
+          ) ??
+          items.length;
+      final totalPages = _readIntFromMap(
+            pagination,
+            ['total_pages', 'totalPages', 'last_page', 'lastPage'],
+          ) ??
+          _deriveTotalPages(
+              total: total, perPage: perPage <= 0 ? items.length : perPage);
+
+      return SalaryCommissionsResult(
+        items: items,
+        total: total,
+        page: page,
+        perPage: perPage <= 0 ? items.length : perPage,
+        totalPages: totalPages <= 0 ? 1 : totalPages,
+      );
+    } catch (_) {
+      throw Exception('Salary commissions response format is not valid.');
+    }
+  }
+
+  Future<SalaryCommissionMutationResult> salaryAddCommission({
+    required String userId,
+    String? leadId,
+    String? projectId,
+    String? projectName,
+    required double commissionAmount,
+    double? commissionPercentage,
+    String? notes,
+    String? token,
+  }) async {
+    final normalizedUserId = userId.trim();
+    final normalizedLeadId = leadId?.trim() ?? '';
+    final normalizedProjectId = projectId?.trim() ?? '';
+    final normalizedProjectName = projectName?.trim() ?? '';
+    final normalizedNotes = notes?.trim() ?? '';
+    if (normalizedUserId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+    if (commissionAmount <= 0) {
+      throw Exception('Valid commission amount is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.salaryCommissionCreate}',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final bodyMap = <String, dynamic>{
+      'user_id': normalizedUserId,
+      'commission_amount': commissionAmount,
+    };
+    if (normalizedLeadId.isNotEmpty) {
+      bodyMap['lead_id'] = normalizedLeadId;
+    }
+    if (normalizedProjectId.isNotEmpty) {
+      bodyMap['project_id'] = normalizedProjectId;
+    }
+    if (normalizedProjectName.isNotEmpty) {
+      bodyMap['project_name'] = normalizedProjectName;
+    }
+    if (commissionPercentage != null && commissionPercentage > 0) {
+      bodyMap['commission_percentage'] = commissionPercentage;
+    }
+    if (normalizedNotes.isNotEmpty) {
+      bodyMap['notes'] = normalizedNotes;
+    }
+
+    final body = jsonEncode(bodyMap);
+    _logRequest(
+      endpoint: 'salaryAddCommission',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('salaryAddCommission', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to add commission.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Add commission response format is not valid.');
+      }
+      final data = decoded['data'];
+      Map<String, dynamic> commission = const {};
+      if (data is Map<String, dynamic>) {
+        final commissionRaw =
+            data['commission'] ?? data['item'] ?? data['row'] ?? data;
+        if (commissionRaw is Map) {
+          commission = _stringDynamicMap(commissionRaw);
+        }
+      }
+      return SalaryCommissionMutationResult(
+        message: decoded['message']?.toString().trim().isNotEmpty == true
+            ? decoded['message'].toString().trim()
+            : 'Commission added successfully',
+        commission: commission,
+      );
+    } catch (_) {
+      throw Exception('Add commission response format is not valid.');
+    }
+  }
+
+  Future<SalaryCommissionMutationResult> salaryMarkCommissionPaid({
+    required String commissionId,
+    String? token,
+  }) async {
+    final normalizedCommissionId = commissionId.trim();
+    if (normalizedCommissionId.isEmpty) {
+      throw Exception('Commission id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.salaryCommissionPaid.replaceFirst(
+      '{id}',
+      normalizedCommissionId,
+    );
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'salaryMarkCommissionPaid',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.patch(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('salaryMarkCommissionPaid', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update commission status.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Commission status response format is not valid.');
+      }
+      final data = decoded['data'];
+      Map<String, dynamic> commission = const {};
+      if (data is Map<String, dynamic>) {
+        final commissionRaw =
+            data['commission'] ?? data['item'] ?? data['row'] ?? data;
+        if (commissionRaw is Map) {
+          commission = _stringDynamicMap(commissionRaw);
+        }
+      }
+      return SalaryCommissionMutationResult(
+        message: decoded['message']?.toString().trim().isNotEmpty == true
+            ? decoded['message'].toString().trim()
+            : 'Commission marked as paid',
+        commission: commission,
+      );
+    } catch (_) {
+      throw Exception('Commission status response format is not valid.');
+    }
+  }
+
+  Future<String> salaryDeleteCommission({
+    required String commissionId,
+    String? token,
+  }) async {
+    final normalizedCommissionId = commissionId.trim();
+    if (normalizedCommissionId.isEmpty) {
+      throw Exception('Commission id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.salaryCommissionDelete.replaceFirst(
+      '{id}',
+      normalizedCommissionId,
+    );
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'salaryDeleteCommission',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('salaryDeleteCommission', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete commission.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final message = decoded['message']?.toString().trim() ?? '';
+        if (message.isNotEmpty) {
+          return message;
+        }
+      }
+    } catch (_) {}
+
+    return 'Commission deleted successfully';
+  }
+
+  Future<SalaryAdvancesResult> salaryAdvances({String? token}) async {
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryAdvances}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'salaryAdvances',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('salaryAdvances', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch salary advances.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      dynamic source;
+      if (decoded is List) {
+        source = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is List) {
+          source = data;
+        } else if (data is Map) {
+          source =
+              data['advances'] ?? data['items'] ?? data['rows'] ?? data['data'];
+        } else {
+          source = decoded['advances'] ?? decoded['items'] ?? decoded['rows'];
+        }
+      }
+
+      if (source is! List) {
+        throw Exception('Salary advances response format is not valid.');
+      }
+
+      final items = source
+          .whereType<Map>()
+          .map(_stringDynamicMap)
+          .map(SalaryAdvance.fromMap)
+          .toList();
+      return SalaryAdvancesResult(items: items, total: items.length);
+    } catch (_) {
+      throw Exception('Salary advances response format is not valid.');
+    }
+  }
+
+  Future<SalaryAdvanceMutationResult> salaryAddAdvance({
+    required String userId,
+    required String advanceDate,
+    required double amount,
+    String? transactionReference,
+    String? paymentProofUrl,
+    String? notes,
+    String? token,
+  }) async {
+    final normalizedUserId = userId.trim();
+    final normalizedDate = advanceDate.trim();
+    final normalizedReference = transactionReference?.trim() ?? '';
+    final normalizedProof = paymentProofUrl?.trim() ?? '';
+    final normalizedNotes = notes?.trim() ?? '';
+    if (normalizedUserId.isEmpty) {
+      throw Exception('User id is required.');
+    }
+    if (normalizedDate.isEmpty) {
+      throw Exception('Advance date is required.');
+    }
+    if (amount <= 0) {
+      throw Exception('Valid amount is required.');
+    }
+    if (normalizedProof.isEmpty) {
+      throw Exception('Payment proof is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.salaryAdvanceCreate}');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode(<String, dynamic>{
+      'user_id': normalizedUserId,
+      'advance_date': normalizedDate,
+      'amount': amount,
+      'transaction_reference':
+          normalizedReference.isEmpty ? null : normalizedReference,
+      'payment_proof_url': normalizedProof,
+      'notes': normalizedNotes.isEmpty ? null : normalizedNotes,
+    });
+    _logRequest(
+      endpoint: 'salaryAddAdvance',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('salaryAddAdvance', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to add advance.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Add advance response format is not valid.');
+      }
+      final data = decoded['data'];
+      Map<String, dynamic> advance = const {};
+      if (data is Map<String, dynamic>) {
+        final advanceRaw =
+            data['advance'] ?? data['item'] ?? data['row'] ?? data;
+        if (advanceRaw is Map) {
+          advance = _stringDynamicMap(advanceRaw);
+        }
+      }
+      return SalaryAdvanceMutationResult(
+        message: decoded['message']?.toString().trim().isNotEmpty == true
+            ? decoded['message'].toString().trim()
+            : 'Advance added successfully',
+        advance: advance,
+      );
+    } catch (_) {
+      throw Exception('Add advance response format is not valid.');
+    }
+  }
+
+  Future<String> salaryDeleteAdvance({
+    required String advanceId,
+    String? token,
+  }) async {
+    final normalizedAdvanceId = advanceId.trim();
+    if (normalizedAdvanceId.isEmpty) {
+      throw Exception('Advance id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.salaryAdvanceDelete
+        .replaceFirst('{id}', normalizedAdvanceId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'salaryDeleteAdvance',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('salaryDeleteAdvance', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete advance.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final message = decoded['message']?.toString().trim() ?? '';
+        if (message.isNotEmpty) {
+          return message;
+        }
+      }
+    } catch (_) {}
+
+    return 'Advance deleted successfully';
+  }
+
+  Future<String> uploadPaymentProofFile({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) {
+    return _uploadPaymentProofFile(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadProjectPhoto({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) {
+    return _uploadProjectDocument(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+      endpointPath: ApiConstants.uploadProjectPhoto,
+      endpointName: 'uploadProjectPhoto',
+      fieldName: 'photo',
+      emptyFileMessage: 'Select a project photo to upload.',
+      fallbackMessage: 'Unable to upload project photo.',
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadUnitPlan({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) {
+    return _uploadProjectDocument(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+      endpointPath: ApiConstants.uploadUnitPlan,
+      endpointName: 'uploadUnitPlan',
+      fieldName: 'unit_plan',
+      emptyFileMessage: 'Select a unit plan to upload.',
+      fallbackMessage: 'Unable to upload unit plan.',
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadCreative({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) {
+    return _uploadProjectDocument(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+      endpointPath: ApiConstants.uploadCreative,
+      endpointName: 'uploadCreative',
+      fieldName: 'creative',
+      emptyFileMessage: 'Select a creative to upload.',
+      fallbackMessage: 'Unable to upload creative.',
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadProjectVideo({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) {
+    return _uploadProjectDocument(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+      endpointPath: ApiConstants.uploadVideo,
+      endpointName: 'uploadProjectVideo',
+      fieldName: 'video',
+      emptyFileMessage: 'Select a video to upload.',
+      fallbackMessage: 'Unable to upload video.',
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadDeveloperLogo({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) async {
+    return _uploadProjectDocument(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+      token: token,
+      endpointPath: ApiConstants.uploadDeveloperLogo,
+      endpointName: 'uploadDeveloperLogo',
+      fieldName: 'developer_logo',
+      emptyFileMessage: 'Select a developer logo to upload.',
+      fallbackMessage: 'Unable to upload developer logo.',
+    );
+  }
+
+  Future<Map<String, dynamic>> _uploadProjectDocument({
+    required String endpointPath,
+    required String endpointName,
+    required String fieldName,
+    required String emptyFileMessage,
+    required String fallbackMessage,
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) async {
+    final normalizedPath = filePath.trim();
+    final normalizedFileName = fileName.trim();
+    final hasBytes = fileBytes != null && fileBytes.isNotEmpty;
+    if (normalizedPath.isEmpty && !hasBytes) {
+      throw Exception(emptyFileMessage);
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpointPath');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['accept'] = 'application/json';
+    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    request.files.add(
+      hasBytes
+          ? http.MultipartFile.fromBytes(
+              fieldName,
+              fileBytes,
+              filename:
+                  normalizedFileName.isEmpty ? fieldName : normalizedFileName,
+              contentType: _documentMediaType(
+                normalizedFileName.isEmpty
+                    ? normalizedPath
+                    : normalizedFileName,
+              ),
+            )
+          : await http.MultipartFile.fromPath(
+              fieldName,
+              normalizedPath,
+              contentType: _documentMediaType(normalizedPath),
+            ),
+    );
+
+    _logRequest(
+      endpoint: endpointName,
+      method: 'POST',
+      uri: uri,
+      headers: request.headers,
+      body: 'multipart/form-data',
+    );
+
+    final streamedResponse = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    _logResponse(endpointName, response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: fallbackMessage,
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final logoMap = _extractLeadMap(decoded);
+      if (logoMap != null && logoMap.isNotEmpty) {
+        return logoMap;
+      }
+      if (decoded is Map<String, dynamic>) {
+        final data = decoded['data'];
+        if (data is Map<String, dynamic> && data.isNotEmpty) {
+          return data;
+        }
+        return decoded;
+      }
+    } catch (_) {
+      // Fall through to parsing error below.
+    }
+
+    throw Exception('Developer logo upload response is not valid.');
+  }
+
   Future<MySalaryResult> mySalary({
     int? month,
     required int year,
@@ -1573,6 +2358,7 @@ class AuthService {
     String? from,
     String? to,
     String? search,
+    String? project,
     int page = 1,
     int perPage = 20,
   }) async {
@@ -1599,6 +2385,9 @@ class AuthService {
     }
     if (search != null && search.trim().isNotEmpty) {
       query['search'] = search.trim();
+    }
+    if (project != null && project.trim().isNotEmpty) {
+      query['project'] = project.trim();
     }
 
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.leads}')
@@ -1661,6 +2450,7 @@ class AuthService {
     String? from,
     String? to,
     String? search,
+    String? project,
     int page = 1,
     int perPage = 20,
   }) async {
@@ -1684,6 +2474,9 @@ class AuthService {
     }
     if (search != null && search.trim().isNotEmpty) {
       query['search'] = search.trim();
+    }
+    if (project != null && project.trim().isNotEmpty) {
+      query['project'] = project.trim();
     }
 
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.myLeads}')
@@ -6409,6 +7202,7 @@ class AuthService {
     String fileName = '',
     String name = '',
     String amount = '',
+    String paymentProofUrl = '',
     String? token,
   }) async {
     final normalizedId = id.trim();
@@ -6418,57 +7212,41 @@ class AuthService {
 
     final normalizedPath = filePath.trim();
     final normalizedFileName = fileName.trim();
-    final hasBytes = fileBytes != null && fileBytes.isNotEmpty;
-    if (normalizedPath.isEmpty && !hasBytes) {
-      throw Exception('Select a payment proof to upload.');
+    final normalizedUrl = paymentProofUrl.trim().isNotEmpty
+        ? paymentProofUrl.trim()
+        : await _uploadPaymentProofFile(
+            filePath: normalizedPath,
+            fileBytes: fileBytes,
+            fileName: normalizedFileName,
+            token: token,
+          );
+    if (normalizedUrl.isEmpty) {
+      throw Exception('Payment proof URL is required.');
     }
 
     final resolvedToken = token ?? _authToken;
     final endpoint =
-        ApiConstants.leadPaymentProofs.replaceFirst('{id}', normalizedId);
+        ApiConstants.leadPaymentProof.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
-    final request = http.MultipartRequest('POST', uri);
-    request.headers['accept'] = 'application/json';
-    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
-      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
-    }
-    if (name.trim().isNotEmpty) {
-      request.fields['name'] = name.trim();
-    }
-    if (amount.trim().isNotEmpty) {
-      request.fields['amount'] = amount.trim();
-    }
-    request.files.add(
-      hasBytes
-          ? http.MultipartFile.fromBytes(
-              'payment_proof',
-              fileBytes,
-              filename: normalizedFileName.isEmpty
-                  ? 'payment_proof'
-                  : normalizedFileName,
-              contentType: _documentMediaType(
-                normalizedFileName.isEmpty
-                    ? normalizedPath
-                    : normalizedFileName,
-              ),
-            )
-          : await http.MultipartFile.fromPath(
-              'payment_proof',
-              normalizedPath,
-              contentType: _documentMediaType(normalizedPath),
-            ),
-    );
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    final normalizedAmount = amount.trim();
+    final body = jsonEncode({
+      'payment_proof_url': normalizedUrl,
+      'payment_proof_amount':
+          normalizedAmount.isEmpty ? null : normalizedAmount,
+    });
 
     _logRequest(
       endpoint: 'uploadLeadPaymentProof',
-      method: 'POST',
+      method: 'PATCH',
       uri: uri,
-      headers: request.headers,
-      body: 'multipart/form-data',
+      headers: headers,
+      body: body,
     );
 
-    final streamedResponse = await request.send().timeout(_requestTimeout);
-    final response = await http.Response.fromStream(streamedResponse);
+    final response = await _sendWithRetry(
+      () => http.patch(uri, headers: headers, body: body),
+    );
     _logResponse('uploadLeadPaymentProof', response);
 
     final error = _handleResponse(
@@ -6492,10 +7270,132 @@ class AuthService {
 
     return <String, dynamic>{
       'id': normalizedId,
-      'url': normalizedPath,
-      'name': name.trim(),
+      'url': normalizedUrl,
+      'payment_proof_url': normalizedUrl,
+      'name': name.trim().isEmpty ? normalizedFileName : name.trim(),
       'amount': amount.trim(),
+      'payment_proof_amount': amount.trim(),
     };
+  }
+
+  Future<String> _uploadPaymentProofFile({
+    String filePath = '',
+    List<int>? fileBytes,
+    String fileName = '',
+    String? token,
+  }) async {
+    final normalizedPath = filePath.trim();
+    final normalizedFileName = fileName.trim();
+    final hasBytes = fileBytes != null && fileBytes.isNotEmpty;
+    if (normalizedPath.isEmpty && !hasBytes) {
+      throw Exception('Select a payment proof to upload.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.uploadPaymentProof}');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['accept'] = 'application/json';
+    if (resolvedToken != null && resolvedToken.trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${resolvedToken.trim()}';
+    }
+    request.files.add(
+      hasBytes
+          ? http.MultipartFile.fromBytes(
+              'payment_proof',
+              fileBytes,
+              filename: normalizedFileName.isEmpty
+                  ? 'payment_proof'
+                  : normalizedFileName,
+              contentType: _documentMediaType(
+                normalizedFileName.isEmpty
+                    ? normalizedPath
+                    : normalizedFileName,
+              ),
+            )
+          : await http.MultipartFile.fromPath(
+              'payment_proof',
+              normalizedPath,
+              contentType: _documentMediaType(normalizedPath),
+            ),
+    );
+
+    _logRequest(
+      endpoint: 'uploadPaymentProofFile',
+      method: 'POST',
+      uri: uri,
+      headers: request.headers,
+      body: 'multipart/form-data',
+    );
+
+    final streamedResponse = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    _logResponse('uploadPaymentProofFile', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to upload payment proof file.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final decoded = jsonDecode(response.body);
+      final uploadedUrl = _extractPaymentProofUploadUrl(decoded);
+      if (uploadedUrl.isNotEmpty) {
+        return uploadedUrl;
+      }
+    } catch (_) {}
+
+    throw Exception('Payment proof upload did not return a file URL.');
+  }
+
+  String _extractPaymentProofUploadUrl(dynamic source) {
+    String normalize(String value) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return '';
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        return trimmed;
+      }
+      if (trimmed.startsWith('/')) {
+        final apiRoot = ApiConstants.baseUrl.split('/api/').first;
+        return '$apiRoot$trimmed';
+      }
+      if (trimmed.startsWith('uploads/')) {
+        final apiRoot = ApiConstants.baseUrl.split('/api/').first;
+        return '$apiRoot/$trimmed';
+      }
+      return '';
+    }
+
+    if (source is Map) {
+      for (final key in const <String>[
+        'payment_proof_url',
+        'public_url',
+        'file_url',
+        'url',
+        'file_path',
+        'path',
+      ]) {
+        final value = source[key];
+        if (value is String && value.trim().isNotEmpty) {
+          return normalize(value);
+        }
+      }
+      for (final value in source.values) {
+        if (value is Map || value is List) {
+          final nested = _extractPaymentProofUploadUrl(value);
+          if (nested.isNotEmpty) return nested;
+        }
+      }
+    } else if (source is List) {
+      for (final value in source) {
+        final nested = _extractPaymentProofUploadUrl(value);
+        if (nested.isNotEmpty) return nested;
+      }
+    }
+    return '';
   }
 
   Future<void> deleteLeadPaymentProof({
@@ -7781,6 +8681,73 @@ class AuthService {
       );
     } catch (_) {
       throw Exception('Projects response format is not valid.');
+    }
+  }
+
+  Future<LeadsListResult> publicProjects({
+    String? search,
+    int page = 1,
+    int perPage = 100,
+  }) async {
+    final query = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
+
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.publicProjects}')
+            .replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json');
+    _logRequest(
+      endpoint: 'publicProjects',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('publicProjects', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch public projects.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+
+      final resolvedCurrentPage = _readIntFromMap(
+              pagination, ['page', 'current_page', 'currentPage']) ??
+          page;
+      final resolvedPerPage = _readIntFromMap(
+              pagination, ['per_page', 'perPage', 'page_size', 'limit']) ??
+          perPage;
+      final resolvedTotalItems = _readIntFromMap(
+              pagination, ['total', 'total_items', 'totalItems', 'count']) ??
+          items.length;
+      final resolvedTotalPages = _readIntFromMap(pagination,
+              ['total_pages', 'totalPages', 'last_page', 'lastPage']) ??
+          _deriveTotalPages(
+              total: resolvedTotalItems, perPage: resolvedPerPage);
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Public projects response format is not valid.');
     }
   }
 

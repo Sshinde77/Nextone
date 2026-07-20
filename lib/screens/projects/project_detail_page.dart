@@ -1353,6 +1353,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                     children: [
                       _buildHeroCard(data, status, statusColor),
+                      if (_readPhotoUrls(data).isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        _buildPhotosSection(data),
+                      ],
                       const SizedBox(height: 14),
                       _buildSectionCard(
                         title: 'Overview',
@@ -1376,6 +1380,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                               icon: Icons.verified_user_outlined),
                         ],
                       ),
+                      if (_readAmenities(data).isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        _buildAmenitiesSection(data),
+                      ],
                       const SizedBox(height: 14),
                       _buildSectionCard(
                         title: 'Description',
@@ -2009,57 +2017,98 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   Widget _buildHeroCard(
       Map<String, dynamic> data, String status, Color statusColor) {
+    final developerLogoUrl = _readDeveloperLogoUrl(data);
+    final developerName = _readString(data['developer']);
+    final locality = _readString(data['locality']);
+    final city = _readString(data['city']);
+    final location =
+        [locality, city].where((value) => value.isNotEmpty).join(', ');
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [AppColors.primaryLight, AppColors.primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildDeveloperLogoBadge(
+                developerLogoUrl: developerLogoUrl,
+                projectName: _readString(data['name']),
+                developerName: developerName,
+              ),
+              const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  _readString(data['name']).isEmpty
-                      ? 'Project'
-                      : _readString(data['name']),
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _readString(data['name']).isEmpty
+                          ? 'Project'
+                          : _readString(data['name']),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (developerName.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        developerName,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.22),
+                  color: statusColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: statusColor.withValues(alpha: 0.28),
+                  ),
                 ),
                 child: Text(
                   status.isEmpty ? 'N/A' : status.toUpperCase(),
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 11),
+                  style: TextStyle(
+                    color: statusColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            '${_readString(data['locality'])}, ${_readString(data['city'])}',
-            style: const TextStyle(
-                color: Colors.white70,
+          if (location.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              location,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
                 fontSize: 14,
-                fontWeight: FontWeight.w600),
-          ),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Row(
             children: [
@@ -2073,28 +2122,164 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
+  Widget _buildDeveloperLogoBadge({
+    required String developerLogoUrl,
+    required String projectName,
+    required String developerName,
+  }) {
+    final seed = developerName.isNotEmpty ? developerName : projectName;
+    final initial = seed.trim().isEmpty ? 'P' : seed.trim()[0].toUpperCase();
+    return Container(
+      width: 58,
+      height: 58,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: developerLogoUrl.isEmpty
+          ? Center(
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: AppColors.primaryDark,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            )
+          : Image.network(
+              developerLogoUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Center(
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    color: AppColors.primaryDark,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildPhotosSection(Map<String, dynamic> data) {
+    final photoUrls = _readPhotoUrls(data);
+    return _buildSectionCard(
+      title: 'Project Photos',
+      children: [
+        _ProjectPhotoGallery(
+          photoUrls: photoUrls,
+          onPreviewRequested: (index) => _openPhotoPreview(photoUrls, index),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openPhotoPreview(
+      List<String> photoUrls, int initialIndex) async {
+    if (photoUrls.isEmpty ||
+        initialIndex < 0 ||
+        initialIndex >= photoUrls.length) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (dialogContext) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            return Dialog(
+              backgroundColor: Colors.black,
+              insetPadding: const EdgeInsets.all(10),
+              child: SizedBox(
+                width: constraints.maxWidth * 0.96,
+                height: constraints.maxHeight * 0.9,
+                child: _ProjectPhotoPreviewGallery(
+                  photoUrls: photoUrls,
+                  initialIndex: initialIndex,
+                  onClose: () => Navigator.of(dialogContext).pop(),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAmenitiesSection(Map<String, dynamic> data) {
+    final amenities = _readAmenities(data);
+    return _buildSectionCard(
+      title: 'Amenities',
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: amenities
+              .map(
+                (amenity) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F8FF),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFD9E7FF)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        size: 15,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        amenity,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
   Widget _heroStat(String label, String value) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.14),
+          color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white24),
+          border: Border.all(color: AppColors.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label,
                 style: const TextStyle(
-                    color: Colors.white70,
+                    color: AppColors.textSecondary,
                     fontSize: 11,
                     fontWeight: FontWeight.w700)),
             const SizedBox(height: 3),
             Text(
               value.isEmpty ? '-' : value,
               style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   fontSize: 20,
                   fontWeight: FontWeight.w800),
             ),
@@ -2223,6 +2408,54 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     return '';
   }
 
+  String _readDeveloperLogoUrl(Map<String, dynamic> data) {
+    final raw = data['developer_logo'] ?? data['developerLogo'];
+    if (raw is Map<String, dynamic>) {
+      return _readString(raw['public_url'] ?? raw['url'] ?? raw['file_path']);
+    }
+    if (raw is Map) {
+      return _readDeveloperLogoUrl(
+        <String, dynamic>{'developer_logo': Map<String, dynamic>.from(raw)},
+      );
+    }
+    return '';
+  }
+
+  List<String> _readPhotoUrls(Map<String, dynamic> data) {
+    final raw = data['photos'];
+    if (raw is! List) {
+      return const <String>[];
+    }
+    return raw
+        .map((item) {
+          if (item is Map<String, dynamic>) {
+            return _readString(
+              item['public_url'] ?? item['url'] ?? item['file_path'],
+            );
+          }
+          if (item is Map) {
+            final map = Map<String, dynamic>.from(item);
+            return _readString(
+              map['public_url'] ?? map['url'] ?? map['file_path'],
+            );
+          }
+          return '';
+        })
+        .where((url) => url.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  List<String> _readAmenities(Map<String, dynamic> data) {
+    final raw = data['amenities'];
+    if (raw is! List) {
+      return const <String>[];
+    }
+    return raw
+        .map(_readString)
+        .where((amenity) => amenity.isNotEmpty)
+        .toList(growable: false);
+  }
+
   String _formatDate(String raw) {
     if (raw.isEmpty) return '';
     final parsed = DateTime.tryParse(raw);
@@ -2332,6 +2565,327 @@ class _ProjectDocument {
     final parsed = DateTime.tryParse(raw);
     if (parsed == null) return raw;
     return DateFormat('dd MMM yyyy').format(parsed.toLocal());
+  }
+}
+
+class _ProjectPhotoGallery extends StatefulWidget {
+  const _ProjectPhotoGallery({
+    required this.photoUrls,
+    required this.onPreviewRequested,
+  });
+
+  final List<String> photoUrls;
+  final ValueChanged<int> onPreviewRequested;
+
+  @override
+  State<_ProjectPhotoGallery> createState() => _ProjectPhotoGalleryState();
+}
+
+class _ProjectPhotoGalleryState extends State<_ProjectPhotoGallery> {
+  late final PageController _pageController;
+  Timer? _timer;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _startAutoSlide();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProjectPhotoGallery oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.photoUrls.length != widget.photoUrls.length) {
+      _currentIndex = 0;
+      _timer?.cancel();
+      _startAutoSlide();
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(0);
+      }
+    }
+  }
+
+  void _startAutoSlide() {
+    if (widget.photoUrls.length <= 1) {
+      return;
+    }
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || !_pageController.hasClients) {
+        return;
+      }
+      final nextIndex = (_currentIndex + 1) % widget.photoUrls.length;
+      _pageController.animateToPage(
+        nextIndex,
+        duration: const Duration(milliseconds: 550),
+        curve: Curves.easeInOut,
+      );
+      _currentIndex = nextIndex;
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            height: 220,
+            width: double.infinity,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                PageView.builder(
+                  controller: _pageController,
+                  itemCount: widget.photoUrls.length,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    return GestureDetector(
+                      onTap: () => widget.onPreviewRequested(index),
+                      child: Image.network(
+                        widget.photoUrls[index],
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFFF3F6FB),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.image_not_supported_outlined,
+                            color: AppColors.textSecondary,
+                            size: 36,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                if (widget.photoUrls.length > 1)
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${_currentIndex + 1}/${widget.photoUrls.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 62,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: widget.photoUrls.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final isActive = index == _currentIndex;
+              return GestureDetector(
+                onTap: () {
+                  _pageController.animateToPage(
+                    index,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                  );
+                },
+                child: Container(
+                  width: 82,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isActive ? AppColors.primary : AppColors.border,
+                      width: isActive ? 2 : 1,
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.network(
+                    widget.photoUrls[index],
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFFF3F6FB),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image_outlined,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProjectPhotoPreviewGallery extends StatefulWidget {
+  const _ProjectPhotoPreviewGallery({
+    required this.photoUrls,
+    required this.initialIndex,
+    required this.onClose,
+  });
+
+  final List<String> photoUrls;
+  final int initialIndex;
+  final VoidCallback onClose;
+
+  @override
+  State<_ProjectPhotoPreviewGallery> createState() =>
+      _ProjectPhotoPreviewGalleryState();
+}
+
+class _ProjectPhotoPreviewGalleryState
+    extends State<_ProjectPhotoPreviewGallery> {
+  late final PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+            child: Row(
+              children: [
+                Text(
+                  'Photo ${_currentIndex + 1} of ${widget.photoUrls.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: widget.onClose,
+                  icon: const Icon(Icons.close, color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: widget.photoUrls.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 4,
+                  child: Center(
+                    child: Image.network(
+                      widget.photoUrls[index],
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) {
+                        return const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'Unable to preview this image.',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (widget.photoUrls.length > 1)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: SizedBox(
+                height: 56,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: widget.photoUrls.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final isActive = index == _currentIndex;
+                    return GestureDetector(
+                      onTap: () {
+                        _pageController.animateToPage(
+                          index,
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOut,
+                        );
+                      },
+                      child: Container(
+                        width: 72,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isActive ? Colors.white : Colors.white24,
+                            width: isActive ? 2 : 1,
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.network(
+                          widget.photoUrls[index],
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: const Color(0xFF1F2937),
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.broken_image_outlined,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 
