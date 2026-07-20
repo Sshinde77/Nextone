@@ -8912,6 +8912,7 @@ class AuthService {
 
     final normalizedProjectName = projectName.trim();
     if (normalizedProjectName.isNotEmpty) {
+      payload['project_id'] = normalizedProjectName;
       payload['project_name'] = normalizedProjectName;
     }
   }

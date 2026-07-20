@@ -9,6 +9,7 @@ import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/searchable_dropdown_field.dart';
 import 'package:nextone/widgets/site_revisit_data_card.dart';
@@ -185,7 +186,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.only(top: 30),
-                child: Center(child: CircularProgressIndicator()),
+                child: AppPreloader.compact(message: 'Loading revisits...'),
               )
             else if (_error != null)
               _buildError()

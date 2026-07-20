@@ -6,6 +6,7 @@ import 'package:nextone/models/auth_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/services/notification_navigation_service.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -283,7 +284,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         showNotificationIcon: false,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppPreloader.screen(message: 'Loading notifications...')
           : RefreshIndicator(
               onRefresh: () =>
                   _refreshData(showLoader: false, page: _currentPage),

@@ -21,6 +21,7 @@ import 'package:nextone/screens/website_enquiries/website_enquiries_page.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/services/notification_navigation_service.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_bottom_nav.dart';
 
 class MainScreen extends StatefulWidget {
@@ -201,7 +202,7 @@ class _MainScreenState extends State<MainScreen> {
       },
       child: Scaffold(
         body: _isLoadingAccess
-            ? const Center(child: CircularProgressIndicator())
+            ? const AppPreloader.screen(message: 'Loading access...')
             : Stack(
                 children: [
                   _buildCurrentScreen(),
@@ -209,7 +210,9 @@ class _MainScreenState extends State<MainScreen> {
                     const Positioned.fill(
                       child: ColoredBox(
                         color: Color(0x66000000),
-                        child: Center(child: CircularProgressIndicator()),
+                        child: AppPreloader.compact(
+                          message: 'Refreshing access...',
+                        ),
                       ),
                     ),
                 ],

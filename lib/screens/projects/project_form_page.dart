@@ -878,17 +878,41 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
           .toList();
       final uploadedPhotos = await _buildUploadedImagePayloads(_photoFiles);
       final developerLogoPayload = await _buildUploadedDeveloperLogoPayload();
+      final uploadedUnitPlans = await _buildUploadedDocumentPayloads(
+        files: _unitPlanFiles,
+        uploader: (file) => _authProvider.uploadUnitPlan(
+          filePath: file.path?.trim() ?? '',
+          fileName: file.name.trim(),
+          token: _authProvider.currentAuthToken,
+        ),
+      );
+      final uploadedCreatives = await _buildUploadedDocumentPayloads(
+        files: _creativeFiles,
+        uploader: (file) => _authProvider.uploadCreative(
+          filePath: file.path?.trim() ?? '',
+          fileName: file.name.trim(),
+          token: _authProvider.currentAuthToken,
+        ),
+      );
+      final uploadedVideos = await _buildUploadedDocumentPayloads(
+        files: _videoFiles,
+        uploader: (file) => _authProvider.uploadProjectVideo(
+          filePath: file.path?.trim() ?? '',
+          fileName: file.name.trim(),
+          token: _authProvider.currentAuthToken,
+        ),
+      );
       final photos = <Map<String, dynamic>>[
         ..._existingPhotoDocs,
         ...uploadedPhotos,
       ];
       final unitPlans = <Map<String, dynamic>>[
         ..._existingUnitPlanDocs,
-        ..._buildDocumentPayloads(_unitPlanFiles),
+        ...uploadedUnitPlans,
       ];
       final creatives = <Map<String, dynamic>>[
         ..._existingCreativeDocs,
-        ..._buildDocumentPayloads(_creativeFiles),
+        ...uploadedCreatives,
       ];
       final paymentPlans = <Map<String, dynamic>>[
         ..._existingPaymentPlanDocs,
@@ -896,7 +920,7 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
       ];
       final videos = <Map<String, dynamic>>[
         ..._existingVideoDocs,
-        ..._buildDocumentPayloads(_videoFiles),
+        ...uploadedVideos,
       ];
 
       final name = _nameController.text.trim();
@@ -1382,7 +1406,8 @@ class _ProjectFormPageState extends State<ProjectFormPage> {
 
   Widget _buildConfigurationSection(bool isNarrow) {
     final draft = _configurations.last;
-    final savedConfigurations = _configurations.take(_configurations.length - 1);
+    final savedConfigurations =
+        _configurations.take(_configurations.length - 1);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

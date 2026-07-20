@@ -4,6 +4,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
@@ -566,7 +567,7 @@ class _LeaveManagementPageState extends State<LeaveManagementPage> {
       return const Scaffold(
         appBar: CrmAppBar(title: 'Leave Management'),
         backgroundColor: Color(0xFFF4F6FA),
-        body: Center(child: CircularProgressIndicator()),
+        body: AppPreloader.screen(message: 'Loading leaves...'),
       );
     }
 
@@ -951,7 +952,7 @@ class _LeaveManagementPageState extends State<LeaveManagementPage> {
           if (isLoading)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 48),
-              child: Center(child: CircularProgressIndicator()),
+              child: AppPreloader.compact(message: 'Loading data...'),
             )
           else if (error != null)
             Padding(

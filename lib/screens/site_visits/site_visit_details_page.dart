@@ -6,6 +6,7 @@ import 'package:nextone/screens/site_visits/feedback_form_dialog.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -133,7 +134,7 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
         showBackButton: true,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppPreloader.screen(message: 'Loading site visit...')
           : _error != null
               ? Center(
                   child: Padding(

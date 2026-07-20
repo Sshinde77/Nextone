@@ -7,6 +7,7 @@ import 'package:nextone/screens/team/team_member_details_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/assign_manager_dialog.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
@@ -616,7 +617,7 @@ class _UsersPageState extends State<UsersPage> {
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 40),
-                child: Center(child: CircularProgressIndicator()),
+                child: AppPreloader.compact(message: 'Loading users...'),
               )
             else if (_error != null)
               Container(

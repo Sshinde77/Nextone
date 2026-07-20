@@ -10,6 +10,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/salary/salary_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -369,7 +370,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         showBackButton: widget.showBackButton,
       ),
       body: _isLoadingAccess
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppPreloader.screen(message: 'Loading salary access...')
           : _isAdminSalaryView
               ? _buildAdminBody()
               : _buildOtherRoleBody(),
@@ -579,7 +580,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         if (_isLoadingMySalary)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
-            child: Center(child: CircularProgressIndicator()),
+            child: AppPreloader.compact(message: 'Loading salary data...'),
           )
         else if (_mySalaryError != null)
           Container(
@@ -2611,7 +2612,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     if (_isLoadingEmployees) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(child: CircularProgressIndicator()),
+        child: AppPreloader.compact(message: 'Loading team...'),
       );
     }
 
@@ -2676,7 +2677,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     if (_isLoadingSlips) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(child: CircularProgressIndicator()),
+        child: AppPreloader.compact(message: 'Loading salary slips...'),
       );
     }
 

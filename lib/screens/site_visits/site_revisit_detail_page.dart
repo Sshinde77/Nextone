@@ -6,6 +6,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/site_visits/feedback_form_dialog.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class SiteRevisitDetailPage extends StatefulWidget {
@@ -72,7 +73,9 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.only(top: 40),
-                child: Center(child: CircularProgressIndicator()),
+                child: AppPreloader.compact(
+                  message: 'Loading revisit details...',
+                ),
               )
             else if (_error != null)
               _errorCard()

@@ -13,6 +13,7 @@ import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/permission_guard.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class ProjectDetailPage extends StatefulWidget {
@@ -1330,7 +1331,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         label: const Text('Share Project'),
       ),
       body: _isLoading && _data == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppPreloader.screen(message: 'Loading project details...')
           : _error != null && _data == null
               ? Center(
                   child: Padding(
@@ -1531,7 +1532,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           ),
           if (_isLoadingDocuments) ...[
             const SizedBox(height: 16),
-            const Center(child: CircularProgressIndicator()),
+            const AppPreloader.compact(message: 'Loading documents...'),
           ] else if (_documentsError != null) ...[
             const SizedBox(height: 16),
             Text(
@@ -1681,7 +1682,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           if (_isLoadingLeads)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
-              child: Center(child: CircularProgressIndicator()),
+              child: AppPreloader.compact(message: 'Loading leads...'),
             )
           else if (_leadsError != null)
             Column(

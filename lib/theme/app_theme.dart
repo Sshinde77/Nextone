@@ -131,6 +131,10 @@ abstract final class AppTheme {
         actionTextColor: Colors.white,
         closeIconColor: Colors.white,
       ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: AppColors.primary,
+        circularTrackColor: AppColors.secondary,
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: const Color(0xFFF3F4F6),

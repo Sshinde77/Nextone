@@ -5,6 +5,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class FollowUpDetailPage extends StatefulWidget {
@@ -159,7 +160,7 @@ class _FollowUpDetailPageState extends State<FollowUpDetailPage> {
         showBackButton: true,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppPreloader.screen(message: 'Loading follow-up...')
           : _errorMessage != null
               ? _buildError()
               : RefreshIndicator(

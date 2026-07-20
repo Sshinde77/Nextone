@@ -8,6 +8,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/access_denied_view.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
 
@@ -463,7 +464,7 @@ class _TargetsPageState extends State<TargetsPage> {
     if (_isLoadingAccess) {
       return const Scaffold(
         appBar: CrmAppBar(title: 'Targets'),
-        body: Center(child: CircularProgressIndicator()),
+        body: AppPreloader.screen(message: 'Loading access...'),
       );
     }
 
@@ -595,7 +596,7 @@ class _TargetsPageState extends State<TargetsPage> {
             if (_isLoadingTargets)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 40),
-                child: Center(child: CircularProgressIndicator()),
+                child: AppPreloader.compact(message: 'Loading targets...'),
               )
             else if (_targetsError != null)
               _TargetsInfoCard(

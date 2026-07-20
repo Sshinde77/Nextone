@@ -6,6 +6,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -92,7 +93,9 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.only(top: 40),
-                child: Center(child: CircularProgressIndicator()),
+                child: AppPreloader.compact(
+                  message: 'Loading closure details...',
+                ),
               )
             else if (_error != null)
               _errorCard()

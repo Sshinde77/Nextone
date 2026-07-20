@@ -10,6 +10,7 @@ import 'package:nextone/screens/projects/project_form_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
@@ -329,7 +330,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.only(top: 18),
-                child: Center(child: CircularProgressIndicator()),
+                child: AppPreloader.compact(message: 'Loading projects...'),
               )
             else if (_loadError != null)
               _buildErrorState()

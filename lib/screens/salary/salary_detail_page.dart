@@ -6,6 +6,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/models/salary_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 
 class SalaryDetailPage extends StatefulWidget {
   const SalaryDetailPage({
@@ -988,7 +989,7 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
+              child: AppPreloader.compact(message: 'Loading salary detail...'),
             )
           else if (_error != null)
             Padding(
@@ -1141,7 +1142,7 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
           if (_isLoadingSalaryInfo)
             const Padding(
               padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
+              child: AppPreloader.compact(message: 'Loading salary history...'),
             )
           else if (_salaryInfoError != null)
             Padding(

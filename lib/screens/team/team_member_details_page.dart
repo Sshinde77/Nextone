@@ -4,6 +4,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 enum _HistoryTab { leads, followUps, siteVisits }
@@ -283,7 +284,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
         onBackTap: () => Navigator.pop(context),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppPreloader.screen(message: 'Loading member details...')
           : RefreshIndicator(
               onRefresh: _fetchMemberDetails,
               child: SingleChildScrollView(
@@ -592,7 +593,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
           if (_isPerformanceLoading)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
-              child: Center(child: CircularProgressIndicator()),
+              child: AppPreloader.compact(message: 'Loading performance...'),
             )
           else if (_performanceError != null)
             _buildPerformanceError(_performanceError!)
@@ -1203,7 +1204,7 @@ class _TeamMemberDetailsPageState extends State<TeamMemberDetailsPage> {
           if (_isHistoryLoading)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
+              child: AppPreloader.compact(message: 'Loading history...'),
             )
           else if (_historyError != null)
             _buildHistoryError(_historyError!)

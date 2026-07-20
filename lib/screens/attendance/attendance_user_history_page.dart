@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
 
 class AttendanceUserHistoryPage extends StatefulWidget {
@@ -673,7 +674,9 @@ class _AttendanceUserHistoryPageState extends State<AttendanceUserHistoryPage> {
                     _buildHeader(),
                     Expanded(
                       child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
+                          ? const AppPreloader.screen(
+                              message: 'Loading attendance history...',
+                            )
                           : _error != null
                               ? _buildErrorState()
                               : RefreshIndicator(

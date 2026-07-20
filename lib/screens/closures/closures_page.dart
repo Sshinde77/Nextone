@@ -9,6 +9,7 @@ import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/closure_data_card.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
@@ -260,7 +261,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.only(top: 30),
-                child: Center(child: CircularProgressIndicator()),
+                child: AppPreloader.compact(message: 'Loading closures...'),
               )
             else if (_error != null)
               _buildError()

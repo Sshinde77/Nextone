@@ -4,6 +4,7 @@ import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/searchable_dropdown_field.dart';
 
@@ -467,7 +468,8 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
     );
     if (!allowed) return;
 
-    if (!_formKey.currentState!.validate()) return;
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) return;
 
     setState(() => _isSubmitting = true);
 
@@ -537,7 +539,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       backgroundColor: AppColors.background,
       appBar: CrmAppBar(title: title, showBackButton: true),
       body: _isLoadingDropdowns
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppPreloader.screen(message: 'Loading site visit form...')
           : SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),

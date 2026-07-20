@@ -8,6 +8,7 @@ import 'package:nextone/screens/leads/lead_form_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/access_denied_view.dart';
+import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
 class WebsiteEnquiriesPage extends StatefulWidget {
@@ -412,7 +413,9 @@ class _WebsiteEnquiriesPageState extends State<WebsiteEnquiriesPage> {
                     const Positioned.fill(
                       child: ColoredBox(
                         color: Color(0x66FFFFFF),
-                        child: Center(child: CircularProgressIndicator()),
+                        child: AppPreloader.compact(
+                          message: 'Loading website inquiries...',
+                        ),
                       ),
                     ),
                 ],
