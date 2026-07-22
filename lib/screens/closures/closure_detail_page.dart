@@ -5,6 +5,7 @@ import 'package:nextone/constants/api_constants.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/app_feedback.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -952,9 +953,7 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
     final uri = Uri.tryParse(url);
     if (uri == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to preview this document.')),
-      );
+      _showSnackBar('Unable to preview this document.');
       return;
     }
     final launched = await launchUrl(
@@ -962,9 +961,7 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
       mode: LaunchMode.externalApplication,
     );
     if (!launched && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to preview this document.')),
-      );
+      _showSnackBar('Unable to preview this document.');
     }
   }
 
@@ -1030,9 +1027,7 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    AppFeedback.showMessage(message, isError: true);
   }
 
   double _toDouble(dynamic value) {

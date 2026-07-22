@@ -8,11 +8,13 @@ import 'package:nextone/screens/site_visits/lead_site_visit_form_page.dart';
 import 'package:nextone/screens/site_visits/site_revisits_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_details_page.dart';
 import 'package:nextone/screens/site_visits/site_visit_form_page.dart';
+import 'package:nextone/utils/app_feedback.dart';
 import 'package:nextone/utils/export_file_helper.dart';
-import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/utils/permission_guard.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
+import 'package:nextone/widgets/searchable_dropdown_field.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../utils/app_error_handler.dart';
@@ -73,6 +75,24 @@ class _SiteVisit {
   String projectId;
   String assigneeId;
   Map<String, dynamic> rawData;
+}
+
+class _TeamMemberOption {
+  const _TeamMemberOption({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
+}
+
+class _ScheduleRevisitResult {
+  const _ScheduleRevisitResult({
+    required this.statusUpdated,
+  });
+
+  final bool statusUpdated;
 }
 
 class _SiteVisitsPageState extends State<SiteVisitsPage> {
@@ -1613,11 +1633,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     }
     await _loadSiteVisits(page: _currentPage);
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Site visit scheduled successfully.')),
-      );
+    _showSnackBar('Site visit scheduled successfully.');
   }
 
   Future<void> _openScheduleWithLeadForm() async {
@@ -1645,11 +1661,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     }
     await _loadSiteVisits(page: _currentPage);
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Site visit scheduled successfully.')),
-      );
+    _showSnackBar('Site visit scheduled successfully.');
   }
 
   Future<void> _openRevisitsPage() async {
@@ -1711,11 +1723,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     }
     await _loadSiteVisits(page: _currentPage);
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Site visit updated successfully.')),
-      );
+    _showSnackBar('Site visit updated successfully.');
   }
 
   void _openVisitDetails(_SiteVisit visit) {
@@ -1735,7 +1743,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       return;
     }
     if (action == 'reschedule') {
-      await _openEditVisitForm(visit);
+      await _openScheduleRevisitDialog(visit);
       return;
     }
     if (action == 'assign') {
@@ -1819,6 +1827,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     final closingPersonController = TextEditingController();
     bool isSubmitting = false;
     _VisitStatus selectedStatus = visit.status;
+    bool shouldOpenRevisitDialog = false;
 
     final updated = await showDialog<bool>(
       context: context,
@@ -1826,6 +1835,11 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         return StatefulBuilder(
           builder: (context, setLocalState) {
             Future<void> submit() async {
+              if (selectedStatus == _VisitStatus.rescheduled) {
+                shouldOpenRevisitDialog = true;
+                Navigator.of(context).pop(false);
+                return;
+              }
               setLocalState(() => isSubmitting = true);
               try {
                 await _authProvider.updateSiteVisitStatus(
@@ -1840,9 +1854,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
               } catch (e) {
                 if (!context.mounted) return;
                 setLocalState(() => isSubmitting = false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
-                );
+                _showSnackBar(AppErrorHandler.friendlyMessage(e));
               }
             }
 
@@ -1965,11 +1977,355 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
     noteController.dispose();
     closingPersonController.dispose();
+    if (shouldOpenRevisitDialog && mounted) {
+      await _openScheduleRevisitDialog(visit);
+      return;
+    }
     if (updated == true && mounted) {
       setState(() {
         visit.status = selectedStatus;
       });
       _showSnackBar('Site visit status updated.');
+    }
+  }
+
+  Future<void> _openScheduleRevisitDialog(_SiteVisit visit) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'revisits',
+      action: 'create',
+      moduleLabel: 're-visits',
+    );
+    if (!allowed || !mounted) return;
+
+    final reasonController = TextEditingController();
+    final notesController = TextEditingController();
+    final members = await _loadActiveTeamMembers();
+    if (!mounted) return;
+
+    final now = DateTime.now();
+    final firstAllowedDate = DateTime(now.year, now.month, now.day);
+    final defaultDate = visit.dateTime.isAfter(firstAllowedDate)
+        ? DateTime(visit.dateTime.year, visit.dateTime.month, visit.dateTime.day)
+        : firstAllowedDate.add(const Duration(days: 1));
+    DateTime? selectedDate = defaultDate;
+    TimeOfDay? selectedTime = TimeOfDay.fromDateTime(visit.dateTime);
+    bool transportArranged = visit.rawData['transport_arranged'] == true;
+    bool isSubmitting = false;
+
+    _TeamMemberOption? selectedMember;
+    final currentAssigneeId = visit.assigneeId.trim();
+    if (currentAssigneeId.isNotEmpty) {
+      for (final member in members) {
+        if (member.id == currentAssigneeId) {
+          selectedMember = member;
+          break;
+        }
+      }
+    }
+
+    final result = await showDialog<_ScheduleRevisitResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            final dateLabel =
+                selectedDate == null ? 'Select date' : _toYmd(selectedDate!);
+            final timeLabel = selectedTime == null
+                ? '--:--'
+                : _formatTimeOfDay(selectedTime!);
+
+            Future<void> pickDate() async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: selectedDate ?? defaultDate,
+                firstDate: firstAllowedDate,
+                lastDate: DateTime(now.year + 5),
+              );
+              if (picked == null) return;
+              setLocalState(() => selectedDate = picked);
+            }
+
+            Future<void> pickTime() async {
+              final picked = await showTimePicker(
+                context: context,
+                initialTime:
+                    selectedTime ?? const TimeOfDay(hour: 10, minute: 0),
+              );
+              if (picked == null) return;
+              setLocalState(() => selectedTime = picked);
+            }
+
+            Future<void> submit() async {
+              final assignedToId =
+                  (selectedMember?.id ?? visit.assigneeId).trim();
+              if (selectedDate == null || selectedTime == null) {
+                _showSnackBar('Visit date and time are required.');
+                return;
+              }
+              if (assignedToId.isEmpty) {
+                _showSnackBar('Assign To is required.');
+                return;
+              }
+              if (reasonController.text.trim().isEmpty) {
+                _showSnackBar('Reason for re-visit is required.');
+                return;
+              }
+
+              setLocalState(() => isSubmitting = true);
+              try {
+                await _authProvider.createSiteRevisit(
+                  originalVisitId: visit.id,
+                  visitDate: _toYmd(selectedDate!),
+                  visitTime: _formatTimeOfDay(selectedTime!),
+                  assignedTo: assignedToId,
+                  reason: reasonController.text.trim(),
+                  notes: notesController.text.trim(),
+                  transportArranged: transportArranged,
+                  token: _authProvider.currentAuthToken,
+                );
+
+                var statusUpdated = false;
+                try {
+                  await _authProvider.updateSiteVisitStatus(
+                    id: visit.id,
+                    status: _apiStatus(_VisitStatus.rescheduled),
+                    note: notesController.text.trim(),
+                    token: _authProvider.currentAuthToken,
+                  );
+                  statusUpdated = true;
+                } catch (_) {
+                  statusUpdated = false;
+                }
+
+                if (!context.mounted) return;
+                Navigator.of(context).pop(
+                  _ScheduleRevisitResult(statusUpdated: statusUpdated),
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                setLocalState(() => isSubmitting = false);
+                _showSnackBar(AppErrorHandler.friendlyMessage(e));
+              }
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: SizedBox(
+                width: 560,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Schedule Re-visit',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundColor: AppColors.tertiary,
+                                child: Text(
+                                  _visitInitials(visit),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      visit.lead,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${visit.property} - Original Visit: ${_toYmd(visit.dateTime)}',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _pickerField(
+                                label: 'Visit Date *',
+                                value: dateLabel,
+                                icon: Icons.calendar_today_outlined,
+                                onTap: isSubmitting ? null : pickDate,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _pickerField(
+                                label: 'Visit Time *',
+                                value: timeLabel,
+                                icon: Icons.access_time_outlined,
+                                onTap: isSubmitting ? null : pickTime,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Assign To'),
+                        const SizedBox(height: 6),
+                        SearchableDropdownField<_TeamMemberOption>(
+                          label: 'Assign To',
+                          sheetTitle: 'Assign To',
+                          showFieldLabel: false,
+                          value: selectedMember,
+                          hintText: 'Select team member',
+                          items: members
+                              .map(
+                                (member) =>
+                                    SearchableDropdownItem<_TeamMemberOption>(
+                                  value: member,
+                                  label: member.name,
+                                ),
+                              )
+                              .toList(),
+                          enabled: !isSubmitting,
+                          onChanged: (value) =>
+                              setLocalState(() => selectedMember = value),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Reason for Re-visit *'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: reasonController,
+                          enabled: !isSubmitting,
+                          decoration: _fieldDecoration(
+                            hint: 'Client wanted to see units again...',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Notes'),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: notesController,
+                          enabled: !isSubmitting,
+                          maxLines: 3,
+                          decoration: _fieldDecoration(
+                            hint: 'Bring updated price list...',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        CheckboxListTile(
+                          value: transportArranged,
+                          onChanged: isSubmitting
+                              ? null
+                              : (value) => setLocalState(
+                                    () => transportArranged = value ?? false,
+                                  ),
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('Transport arranged for client'),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () => Navigator.of(context).pop(),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: isSubmitting ? null : submit,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                ),
+                                child: isSubmitting
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text('Schedule Re-visit'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    reasonController.dispose();
+    notesController.dispose();
+
+    if (result == null || !mounted) return;
+
+    await _loadSiteVisits(page: _currentPage);
+    if (!mounted) return;
+
+    if (result.statusUpdated) {
+      _showSnackBar('Re-visit scheduled successfully.');
+    } else {
+      _showSnackBar(
+        'Re-visit scheduled, but the original visit status was not updated.',
+      );
     }
   }
 
@@ -2176,6 +2532,123 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         borderSide: const BorderSide(color: AppColors.border),
       ),
     );
+  }
+
+  Widget _pickerField({
+    required String label,
+    required String value,
+    required IconData icon,
+    required VoidCallback? onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: _fieldDecoration(),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    value,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                  ),
+                ),
+                Icon(icon, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<List<_TeamMemberOption>> _loadActiveTeamMembers() async {
+    final usersRaw = await _authProvider.assignmentUsers(
+      token: _authProvider.currentAuthToken,
+    );
+    final membersById = <String, _TeamMemberOption>{};
+
+    for (final raw in usersRaw) {
+      if (!_isActiveUser(raw)) continue;
+      final id = _readString(
+        raw['id'] ?? raw['user_id'] ?? raw['userId'] ?? raw['uuid'],
+      );
+      if (id.isEmpty) continue;
+
+      final baseName = _readString(
+        raw['full_name'] ??
+            raw['name'] ??
+            '${raw['first_name'] ?? ''} ${raw['last_name'] ?? ''}',
+      );
+      final readableRole = _roleLabel(raw);
+      membersById[id] = _TeamMemberOption(
+        id: id,
+        name: readableRole.isEmpty ? baseName : '$baseName ($readableRole)',
+      );
+    }
+
+    final members = membersById.values.toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return members;
+  }
+
+  bool _isActiveUser(Map<String, dynamic> user) {
+    final value =
+        user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'];
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final normalized = _readString(value).toLowerCase();
+    return normalized == 'true' ||
+        normalized == '1' ||
+        normalized == 'yes' ||
+        normalized == 'active';
+  }
+
+  String _roleLabel(Map<String, dynamic> user) {
+    final rawRole = _readString(
+      user['role'] ??
+          user['user_role'] ??
+          user['userRole'] ??
+          user['designation'],
+    );
+    if (rawRole.isEmpty) return '';
+    return rawRole
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .map(
+          (part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+        )
+        .join(' ');
+  }
+
+  String _toYmd(DateTime value) {
+    return '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+  }
+
+  String _formatTimeOfDay(TimeOfDay value) {
+    return '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _visitInitials(_SiteVisit visit) {
+    final source = visit.lead.trim().isNotEmpty ? visit.lead.trim() : visit.property;
+    final parts = source
+        .split(' ')
+        .where((part) => part.trim().isNotEmpty)
+        .map((part) => part.trim())
+        .toList();
+    if (parts.isEmpty) return 'SV';
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    final first = parts[0].isEmpty ? '' : parts[0][0];
+    final second = parts[1].isEmpty ? '' : parts[1][0];
+    final initials = '$first$second'.trim().toUpperCase();
+    return initials.isEmpty ? 'SV' : initials;
   }
 
   Future<void> _loadSiteVisits({int? page}) async {
@@ -2413,9 +2886,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    AppFeedback.showMessage(message, isError: true);
   }
 
   Future<void> _exportSiteVisits() async {

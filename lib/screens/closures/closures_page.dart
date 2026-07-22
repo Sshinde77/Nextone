@@ -6,6 +6,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/closures/closure_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/app_feedback.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
@@ -566,10 +567,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
     final leads = leadResult.items;
     final projects = projectResult.items;
     if (leads.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('No leads available for closure booking.')),
-      );
+      _showSnackBar('No leads available for closure booking.');
       return;
     }
 
@@ -722,12 +720,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                   _documentTypeValue(selectedDocumentType ?? '');
               final documentName = documentNameController.text.trim();
               if (documentType.isEmpty || documentName.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text('Select document type and enter document name.'),
-                  ),
-                );
+                _showSnackBar('Select document type and enter document name.');
                 return;
               }
 
@@ -740,9 +733,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
               final file = picked.files.first;
               final safeFileName = file.name.trim();
               if (safeFileName.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Selected file is not valid.')),
-                );
+                _showSnackBar('Selected file is not valid.');
                 return;
               }
 
@@ -779,11 +770,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
               final documentPayloads = _buildClosureDocumentPayloads(documents);
               if (selectedDocumentType != null ||
                   documentNameController.text.trim().isNotEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Upload the document before submitting.'),
-                  ),
-                );
+                _showSnackBar('Upload the document before submitting.');
                 return;
               }
               if ((selectedLeadId ?? '').isEmpty ||
@@ -791,9 +778,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                   unitNumberController.text.trim().isEmpty ||
                   floorController.text.trim().isEmpty ||
                   unitTypeController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Fill all required fields.')),
-                );
+                _showSnackBar('Fill all required fields.');
                 return;
               }
               setLocalState(() => isSubmitting = true);
@@ -834,9 +819,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
               } catch (e) {
                 setLocalState(() => isSubmitting = false);
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
-                );
+                _showSnackBar(AppErrorHandler.friendlyMessage(e));
               }
             }
 
@@ -1372,9 +1355,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
     if (created == true && mounted) {
       await _loadClosures();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Closure created successfully.')),
-      );
+      _showSnackBar('Closure created successfully.');
     }
   }
 
@@ -2095,9 +2076,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
   }
 
   void _showInfo(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    AppFeedback.showMessage(message);
   }
 
   Future<void> _openEditClosureDialog(Map<String, dynamic> item) async {
@@ -2169,12 +2148,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
                   _documentTypeValue(selectedDocumentType ?? '');
               final documentName = documentNameController.text.trim();
               if (documentType.isEmpty || documentName.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text('Select document type and enter document name.'),
-                  ),
-                );
+                _showSnackBar('Select document type and enter document name.');
                 return;
               }
 
@@ -2187,9 +2161,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
               final file = picked.files.first;
               final safeFileName = file.name.trim();
               if (safeFileName.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Selected file is not valid.')),
-                );
+                _showSnackBar('Selected file is not valid.');
                 return;
               }
 
@@ -2226,19 +2198,13 @@ class _ClosuresPageState extends State<ClosuresPage> {
               final documentPayloads = _buildClosureDocumentPayloads(documents);
               if (selectedDocumentType != null ||
                   documentNameController.text.trim().isNotEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Upload the document before submitting.'),
-                  ),
-                );
+                _showSnackBar('Upload the document before submitting.');
                 return;
               }
               if (unitNumberController.text.trim().isEmpty ||
                   floorController.text.trim().isEmpty ||
                   unitTypeController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Fill all required fields.')),
-                );
+                _showSnackBar('Fill all required fields.');
                 return;
               }
               setLocalState(() => isSubmitting = true);
@@ -2279,9 +2245,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
               } catch (e) {
                 setLocalState(() => isSubmitting = false);
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
-                );
+                _showSnackBar(AppErrorHandler.friendlyMessage(e));
               }
             }
 
@@ -2790,10 +2754,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
     if (updated == true && mounted) {
       await _loadClosures();
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-            const SnackBar(content: Text('Closure updated successfully.')));
+      _showSnackBar('Closure updated successfully.');
     }
   }
 
@@ -2841,9 +2802,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
               } catch (e) {
                 if (!context.mounted) return;
                 setLocalState(() => isSubmitting = false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
-                );
+                _showSnackBar(AppErrorHandler.friendlyMessage(e));
               }
             }
 
@@ -3000,9 +2959,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
     if (updated == true && mounted) {
       await _loadClosures();
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Closure status updated')));
+      _showSnackBar('Closure status updated');
     }
   }
 
@@ -3101,9 +3058,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    AppFeedback.showMessage(message, isError: true);
   }
 
   String _readString(dynamic value, {required String fallback}) {

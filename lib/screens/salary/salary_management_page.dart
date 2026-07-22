@@ -9,6 +9,7 @@ import 'package:nextone/models/salary_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/salary/salary_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/app_feedback.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -3205,9 +3206,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                 icon: row.isPaid
                     ? Icons.check_circle
                     : Icons.check_circle_outline,
-                color: row.isPaid
-                    ? const Color(0xFF16A34A)
-                    : const Color(0xFFE18300),
+                color: const Color(0xFF16A34A),
                 onPressed: isBusy || row.isPaid
                     ? null
                     : () => _markCommissionPaid(row.id),
@@ -3965,22 +3964,33 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
 
   Widget _statusChip(String label, bool isPaid) {
     final background =
-        isPaid ? const Color(0xFFDDF6E8) : const Color(0xFFFFF1D6);
+        isPaid ? const Color(0xFFDDF6E8) : const Color(0xFFF1F5F9);
     final textColor =
-        isPaid ? const Color(0xFF16A34A) : const Color(0xFFE18300);
+        isPaid ? const Color(0xFF16A34A) : const Color(0xFF475569);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: textColor,
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isPaid ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 14,
+            color: isPaid ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -4164,8 +4174,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
           builder: (context, setModalState) {
             Future<void> pickEmployee() async {
               final option = await _showSearchPicker(
-                title: 'Select Employee',
-                hintText: 'Type to search employees...',
+                title: 'Select Team Member',
+                hintText: 'Type to search team members...',
                 initialOptions: _employees
                     .map(
                       (employee) => _SelectionOption(
@@ -4244,7 +4254,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                   ? null
                   : double.tryParse(percentageText.replaceAll(',', ''));
               if (employeeId.isEmpty) {
-                _showMessage('Employee is required.', isError: true);
+                _showMessage('Team member is required.', isError: true);
                 return;
               }
               if (amount == null || amount <= 0) {
@@ -4305,8 +4315,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       selectorField(
-                        label: 'Team',
-                        placeholder: 'Type to search employees...',
+                        label: 'Team Member',
+                        placeholder: 'Type to search team members...',
                         value: selectedEmployee,
                         onTap: pickEmployee,
                         requiredField: true,
@@ -4408,8 +4418,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
           builder: (context, setModalState) {
             Future<void> pickEmployee() async {
               final option = await _showSearchPicker(
-                title: 'Select Employee',
-                hintText: 'Type to search employees...',
+                title: 'Select Team Member',
+                hintText: 'Type to search team members...',
                 initialOptions: _employees
                     .map(
                       (employee) => _SelectionOption(
@@ -4457,7 +4467,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
               final amount = double.tryParse(
                   amountController.text.trim().replaceAll(',', ''));
               if (employeeId.isEmpty) {
-                _showMessage('Employee is required.', isError: true);
+                _showMessage('Team member is required.', isError: true);
                 return;
               }
               if (amount == null || amount <= 0) {
@@ -4558,7 +4568,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Team *',
+                        'Team Member *',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -4585,7 +4595,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                               Expanded(
                                 child: Text(
                                   selectedEmployee?.title ??
-                                      'Type to search employees...',
+                                      'Type to search team members...',
                                   style: TextStyle(
                                     color: selectedEmployee == null
                                         ? AppColors.textSecondary
@@ -5296,14 +5306,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
 
   void _showMessage(String message, {bool isError = false}) {
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? AppColors.error : AppColors.primary,
-      ),
-    );
+    AppFeedback.showMessage(message, isError: isError);
   }
 
   Future<void> _showGenerateAllSalarySlipsDialog() async {
@@ -5447,24 +5450,15 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       await _loadSalarySlips(page: 1);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              '${result.message} (Processed: ${result.totalProcessed}, Failed: ${result.totalFailed})',
-            ),
-          ),
-        );
+      _showMessage(
+        '${result.message} (Processed: ${result.totalProcessed}, Failed: ${result.totalFailed})',
+      );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(AppErrorHandler.friendlyMessage(error)),
-          ),
-        );
+      _showMessage(
+        AppErrorHandler.friendlyMessage(error),
+        isError: true,
+      );
     } finally {
       if (mounted) {
         setState(() => _isGeneratingAllSlips = false);
@@ -5816,12 +5810,9 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                               int.tryParse(workingDaysController.text.trim()) ??
                                   0;
                           if (monthly <= 0 || perDay <= 0 || days <= 0) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Enter valid working days, monthly salary, and per day salary.',
-                                ),
-                              ),
+                            _showMessage(
+                              'Enter valid working days, monthly salary, and per day salary.',
+                              isError: true,
                             );
                             return;
                           }
@@ -5840,23 +5831,14 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                             if (!mounted) return;
                             Navigator.of(context).pop();
                             await _loadEmployees(page: _employeesCurrentPage);
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                SnackBar(content: Text(result.message)),
-                              );
+                            _showMessage(result.message);
                           } catch (error) {
                             if (!mounted) return;
                             setModalState(() => isSaving = false);
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    AppErrorHandler.friendlyMessage(error),
-                                  ),
-                                ),
-                              );
+                            _showMessage(
+                              AppErrorHandler.friendlyMessage(error),
+                              isError: true,
+                            );
                           }
                         },
                   icon: const Icon(Icons.check_circle_outline, size: 16),
@@ -6161,15 +6143,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                                         ) ??
                                         0;
                                     if (monthly <= 0) {
-                                      ScaffoldMessenger.of(context)
-                                        ..hideCurrentSnackBar()
-                                        ..showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Enter a valid monthly salary.',
-                                            ),
-                                          ),
-                                        );
+                                      _showMessage(
+                                        'Enter a valid monthly salary.',
+                                        isError: true,
+                                      );
                                       return;
                                     }
                                     setModalState(() => isSaving = true);
@@ -6189,27 +6166,14 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                                       Navigator.of(dialogContext).pop();
                                       await _loadEmployees(
                                           page: _employeesCurrentPage);
-                                      ScaffoldMessenger.of(context)
-                                        ..hideCurrentSnackBar()
-                                        ..showSnackBar(
-                                          SnackBar(
-                                            content: Text(result.message),
-                                          ),
-                                        );
+                                      _showMessage(result.message);
                                     } catch (error) {
                                       if (!mounted) return;
                                       setModalState(() => isSaving = false);
-                                      ScaffoldMessenger.of(context)
-                                        ..hideCurrentSnackBar()
-                                        ..showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              AppErrorHandler.friendlyMessage(
-                                                error,
-                                              ),
-                                            ),
-                                          ),
-                                        );
+                                      _showMessage(
+                                        AppErrorHandler.friendlyMessage(error),
+                                        isError: true,
+                                      );
                                     }
                                   },
                             icon: isSaving
@@ -6459,23 +6423,14 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                               _selectedYear = selectedYear;
                             });
                             await _loadSalarySlips(page: 1);
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                SnackBar(content: Text(result.message)),
-                              );
+                            _showMessage(result.message);
                           } catch (error) {
                             if (!mounted) return;
                             setModalState(() => isGenerating = false);
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    AppErrorHandler.friendlyMessage(error),
-                                  ),
-                                ),
-                              );
+                            _showMessage(
+                              AppErrorHandler.friendlyMessage(error),
+                              isError: true,
+                            );
                           }
                         },
                   icon: const Icon(Icons.description_outlined, size: 16),

@@ -5921,6 +5921,7 @@ class AuthService {
     required String originalVisitId,
     required String visitDate,
     required String visitTime,
+    String? assignedTo,
     required String reason,
     required String notes,
     required bool transportArranged,
@@ -5934,6 +5935,8 @@ class AuthService {
       'original_visit_id': originalVisitId.trim(),
       'visit_date': visitDate.trim(),
       'visit_time': visitTime.trim(),
+      if (assignedTo != null && assignedTo.trim().isNotEmpty)
+        'assigned_to': assignedTo.trim(),
       'reason': reason.trim(),
       'notes': notes.trim(),
       'transport_arranged': transportArranged,

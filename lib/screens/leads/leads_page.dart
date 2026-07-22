@@ -3,6 +3,7 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -2216,7 +2217,7 @@ class _LeadsPageState extends State<LeadsPage> {
         children: [
           _buildQuickActionIcon(
             tooltip: 'WhatsApp',
-            icon: Icons.chat_outlined,
+            icon: FontAwesomeIcons.whatsapp,
             color: const Color(0xFF25D366),
             onTap: () => _sendLeadDetailsViaWhatsApp(lead),
           ),

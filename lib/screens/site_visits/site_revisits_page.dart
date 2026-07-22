@@ -6,6 +6,7 @@ import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/site_visits/site_revisit_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/app_feedback.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
@@ -757,9 +758,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    AppFeedback.showMessage(message, isError: true);
   }
 
   int _countByStatus(String status) {
@@ -788,11 +787,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     if (created != true || !mounted) return;
     await _loadRevisits();
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Re-visit scheduled successfully')),
-      );
+    _showSnackBar('Re-visit scheduled successfully');
   }
 
   Future<bool?> _showScheduleRevisitDialog() async {
@@ -800,11 +795,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     if (!mounted) return false;
 
     if (visits.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('No original site visits available')),
-        );
+      _showSnackBar('No original site visits available');
       return false;
     }
 
@@ -855,15 +846,9 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                   selectedDate == null ||
                   selectedTime == null ||
                   reasonController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Original visit, date, time and reason are required.',
-                      ),
-                    ),
-                  );
+                _showSnackBar(
+                  'Original visit, date, time and reason are required.',
+                );
                 return;
               }
 
@@ -883,11 +868,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
               } catch (e) {
                 if (!context.mounted) return;
                 setLocalState(() => isSubmitting = false);
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
-                  );
+                _showSnackBar(AppErrorHandler.friendlyMessage(e));
               }
             }
 
@@ -1269,10 +1250,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
 
             Future<void> submit() async {
               if (selectedDate == null || selectedTime == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Visit date and time are required.')),
-                );
+                _showSnackBar('Visit date and time are required.');
                 return;
               }
               setLocalState(() => isSubmitting = true);
@@ -1293,9 +1271,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
               } catch (e) {
                 if (!context.mounted) return;
                 setLocalState(() => isSubmitting = false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
-                );
+                _showSnackBar(AppErrorHandler.friendlyMessage(e));
               }
             }
 
@@ -1463,9 +1439,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     if (updated == true && mounted) {
       await _loadRevisits();
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Re-visit updated')));
+      _showSnackBar('Re-visit updated');
     }
   }
 
@@ -1511,9 +1485,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
               } catch (e) {
                 if (!context.mounted) return;
                 setLocalState(() => isSubmitting = false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AppErrorHandler.friendlyMessage(e))),
-                );
+                _showSnackBar(AppErrorHandler.friendlyMessage(e));
               }
             }
 
@@ -1686,10 +1658,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     if (updated == true && mounted) {
       await _loadRevisits();
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-            const SnackBar(content: Text('Re-visit status updated')));
+      _showSnackBar('Re-visit status updated');
     }
   }
 

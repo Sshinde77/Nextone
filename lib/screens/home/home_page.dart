@@ -226,6 +226,7 @@ class _HomePageState extends State<HomePage> {
 
     final leads = asMap(summary['leads']);
     final siteVisits = asMap(summary['site_visits']);
+    final revisits = asMap(summary['revisits']);
     final tasks = asMap(summary['tasks']);
     final projects = asMap(summary['projects']);
 
@@ -282,6 +283,23 @@ class _HomePageState extends State<HomePage> {
       'done_site_visits',
       'doneSiteVisits',
     ]);
+    final totalRevisits = (() {
+      final nested = readNested(revisits, const <String>[
+        'total',
+        'total_revisits',
+        'totalRevisits',
+        'revisits',
+        'revisit_count',
+        'revisitCount',
+      ]);
+      if (nested != 0) return nested;
+      return readValue(const <String>[
+        'total_revisits',
+        'totalRevisits',
+        'revisit_count',
+        'revisitCount',
+      ]);
+    })();
     final totalFollowUps = readNested(tasks, const <String>[
       'total',
       'total_follow_ups',
@@ -335,6 +353,9 @@ class _HomePageState extends State<HomePage> {
         'value': totalSiteVisits,
         'upcoming': upcomingSiteVisits,
         'done': doneSiteVisits,
+      },
+      'total_revisits': <String, dynamic>{
+        'value': totalRevisits,
       },
       'total_follow_ups': <String, dynamic>{
         'value': totalFollowUps,
@@ -1250,6 +1271,17 @@ class _StatsGrid extends StatelessWidget {
               value: '$totalSiteVisits',
               subtitle: '$upcomingSiteVisits upcoming',
               tag: '$doneSiteVisits done',
+              compact: compact,
+              onTap: onSiteVisitsTap,
+            ),
+          if (showSiteVisits)
+            _StatCard(
+              icon: Icons.check_circle_outline_rounded,
+              iconBg: const Color(0xFF22C55E),
+              bubbleColor: const Color(0xFFDCFCE7),
+              title: 'Site Visits Done',
+              value: '$doneSiteVisits',
+              subtitle: 'of $totalSiteVisits total',
               compact: compact,
               onTap: onSiteVisitsTap,
             ),
