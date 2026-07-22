@@ -849,28 +849,52 @@ class AuthService {
         throw Exception('Salary slips response format is not valid.');
       }
 
-      final data = body['data'];
-      if (data is! List) {
+      final dataRoot = body['data'];
+      List<dynamic>? data;
+      Map<String, dynamic> paginationMap = <String, dynamic>{};
+
+      if (dataRoot is List) {
+        data = dataRoot;
+      } else if (dataRoot is Map<String, dynamic>) {
+        final nestedList = dataRoot['items'] ??
+            dataRoot['slips'] ??
+            dataRoot['salary_slips'] ??
+            dataRoot['rows'] ??
+            dataRoot['data'];
+        if (nestedList is List) {
+          data = nestedList;
+        }
+        final nestedPagination = dataRoot['pagination'] ?? dataRoot['meta'];
+        if (nestedPagination is Map<String, dynamic>) {
+          paginationMap = nestedPagination;
+        }
+      }
+
+      if (data == null) {
         throw Exception('Salary slips data list is missing.');
       }
 
-      final pagination = body['pagination'];
-      final paginationMap =
-          pagination is Map<String, dynamic> ? pagination : <String, dynamic>{};
+      final pagination = body['pagination'] ?? body['meta'];
+      if (pagination is Map<String, dynamic> && paginationMap.isEmpty) {
+        paginationMap = pagination;
+      }
 
-      final totalRaw = paginationMap['total'];
+      final totalRaw = paginationMap['total'] ??
+          paginationMap['total_items'] ??
+          paginationMap['count'];
       final resolvedTotal = totalRaw is num
           ? totalRaw.toInt()
           : int.tryParse(totalRaw?.toString() ?? '') ?? data.length;
-      final pageRaw = paginationMap['page'];
+      final pageRaw = paginationMap['page'] ?? paginationMap['current_page'];
       final resolvedPage = pageRaw is num
           ? pageRaw.toInt()
           : int.tryParse(pageRaw?.toString() ?? '') ?? page;
-      final perPageRaw = paginationMap['per_page'];
+      final perPageRaw = paginationMap['per_page'] ?? paginationMap['limit'];
       final resolvedPerPage = perPageRaw is num
           ? perPageRaw.toInt()
           : int.tryParse(perPageRaw?.toString() ?? '') ?? perPage;
-      final totalPagesRaw = paginationMap['total_pages'];
+      final totalPagesRaw =
+          paginationMap['total_pages'] ?? paginationMap['last_page'];
       final resolvedTotalPages = totalPagesRaw is num
           ? totalPagesRaw.toInt()
           : int.tryParse(totalPagesRaw?.toString() ?? '') ?? 1;
@@ -896,8 +920,7 @@ class AuthService {
   Future<SalaryGenerateAllResult> salaryGenerateAll({
     required int month,
     required int year,
-    int? workingDaysOverride,
-    Map<String, num>? deductionsMap,
+    String? payDate,
     String? notes,
     String? token,
   }) async {
@@ -909,11 +932,8 @@ class AuthService {
       'month': month,
       'year': year,
     };
-    if (workingDaysOverride != null) {
-      bodyMap['working_days_override'] = workingDaysOverride;
-    }
-    if (deductionsMap != null && deductionsMap.isNotEmpty) {
-      bodyMap['deductions_map'] = deductionsMap;
+    if (payDate != null && payDate.trim().isNotEmpty) {
+      bodyMap['pay_date'] = payDate.trim();
     }
     if (notes != null && notes.trim().isNotEmpty) {
       bodyMap['notes'] = notes.trim();
@@ -1116,8 +1136,8 @@ class AuthService {
     required String userId,
     required int month,
     required int year,
-    required double deductions,
-    int? workingDaysOverride,
+    required double basicSalary,
+    String? payDate,
     String? notes,
     String? token,
   }) async {
@@ -1129,10 +1149,10 @@ class AuthService {
       'user_id': userId,
       'month': month,
       'year': year,
-      'deductions': deductions,
+      'basic_salary': basicSalary,
     };
-    if (workingDaysOverride != null) {
-      bodyMap['working_days_override'] = workingDaysOverride;
+    if (payDate != null && payDate.trim().isNotEmpty) {
+      bodyMap['pay_date'] = payDate.trim();
     }
     if (notes != null && notes.trim().isNotEmpty) {
       bodyMap['notes'] = notes.trim();
@@ -1186,6 +1206,67 @@ class AuthService {
       );
     } catch (_) {
       throw Exception('Generate salary slip response format is not valid.');
+    }
+  }
+
+  Future<SalarySlipUpdateResult> salaryUpdateSlip({
+    required String slipId,
+    required double basicSalary,
+    String? notes,
+    String? token,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.salarySlipDetail.replaceFirst(
+      '{id}',
+      slipId.trim(),
+    );
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final bodyMap = <String, dynamic>{
+      'basic_salary': basicSalary,
+    };
+    if (notes != null && notes.trim().isNotEmpty) {
+      bodyMap['notes'] = notes.trim();
+    }
+    final body = jsonEncode(bodyMap);
+    _logRequest(
+      endpoint: 'salaryUpdateSlip',
+      method: 'PUT',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .put(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('salaryUpdateSlip', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update salary slip.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Update salary slip response format is not valid.');
+      }
+      final data = decoded['data'];
+      final slipRaw = data is Map<String, dynamic>
+          ? (data['slip'] is Map ? _stringDynamicMap(data['slip']) : data)
+          : <String, dynamic>{};
+      return SalarySlipUpdateResult(
+        message: decoded['message']?.toString().trim().isNotEmpty == true
+            ? decoded['message'].toString().trim()
+            : 'Salary slip updated successfully',
+        slip: slipRaw,
+      );
+    } catch (_) {
+      throw Exception('Update salary slip response format is not valid.');
     }
   }
 

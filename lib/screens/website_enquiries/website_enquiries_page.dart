@@ -1743,7 +1743,7 @@ class _EditWebsiteEnquiryDialogState extends State<_EditWebsiteEnquiryDialog> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _status,
+                    initialValue: _status,
                     decoration: inputDecoration.copyWith(labelText: 'Status'),
                     items: const [
                       DropdownMenuItem(value: 'new', child: Text('New')),

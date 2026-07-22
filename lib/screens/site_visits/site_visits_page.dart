@@ -2007,7 +2007,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     final now = DateTime.now();
     final firstAllowedDate = DateTime(now.year, now.month, now.day);
     final defaultDate = visit.dateTime.isAfter(firstAllowedDate)
-        ? DateTime(visit.dateTime.year, visit.dateTime.month, visit.dateTime.day)
+        ? DateTime(
+            visit.dateTime.year, visit.dateTime.month, visit.dateTime.day)
         : firstAllowedDate.add(const Duration(days: 1));
     DateTime? selectedDate = defaultDate;
     TimeOfDay? selectedTime = TimeOfDay.fromDateTime(visit.dateTime);
@@ -2598,8 +2599,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   bool _isActiveUser(Map<String, dynamic> user) {
-    final value =
-        user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'];
+    final value = user['is_active'] ??
+        user['isActive'] ??
+        user['active'] ??
+        user['status'];
     if (value is bool) return value;
     if (value is num) return value != 0;
     final normalized = _readString(value).toLowerCase();
@@ -2621,7 +2624,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         .split('_')
         .where((part) => part.trim().isNotEmpty)
         .map(
-          (part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+          (part) =>
+              '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
         )
         .join(' ');
   }
@@ -2635,7 +2639,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   }
 
   String _visitInitials(_SiteVisit visit) {
-    final source = visit.lead.trim().isNotEmpty ? visit.lead.trim() : visit.property;
+    final source =
+        visit.lead.trim().isNotEmpty ? visit.lead.trim() : visit.property;
     final parts = source
         .split(' ')
         .where((part) => part.trim().isNotEmpty)

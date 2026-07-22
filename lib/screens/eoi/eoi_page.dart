@@ -46,7 +46,6 @@ class _EoiPageState extends State<EoiPage> {
   int _totalPages = 1;
   int _totalItems = 0;
   String _searchQuery = '';
-  String _projectQuery = '';
   String? _selectedSource;
   String? _selectedTeamId;
   List<_LeadModel> _currentPageLeads = <_LeadModel>[];
@@ -82,7 +81,7 @@ class _EoiPageState extends State<EoiPage> {
   }
 
   List<_LeadModel> get _visibleLeads {
-    final query = _projectQuery.trim().toLowerCase();
+    final query = _projectController.text.trim().toLowerCase();
     if (query.isEmpty) {
       return _currentPageLeads;
     }

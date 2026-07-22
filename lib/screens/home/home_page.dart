@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/models/auth_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/routes/app_routes.dart';
 import 'package:nextone/screens/attendance/attendance_page.dart';
@@ -386,10 +387,30 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      final summary = await _authProvider.mySummary();
+      final now = DateTime.now();
+      final from = '${now.year}-${_twoDigits(now.month)}-01';
+      final lastDayOfMonth = DateTime(now.year, now.month + 1, 0).day;
+      final to =
+          '${now.year}-${_twoDigits(now.month)}-${_twoDigits(lastDayOfMonth)}';
+
+      final results = await Future.wait<dynamic>([
+        _authProvider.mySummary(),
+        _authProvider.myRevisits(
+          from: from,
+          to: to,
+          page: 1,
+          perPage: 1,
+        ),
+      ]);
+      final summary = results[0] as Map<String, dynamic>;
+      final revisits = results[1] as LeadsListResult;
+      final normalizedSummary = _normalizePersonalSummary(summary);
+      normalizedSummary['total_revisits'] = <String, dynamic>{
+        'value': revisits.totalItems,
+      };
       if (!mounted) return;
       setState(() {
-        _dashboardStats = _normalizePersonalSummary(summary);
+        _dashboardStats = normalizedSummary;
         _statsLoading = false;
       });
     } catch (error) {

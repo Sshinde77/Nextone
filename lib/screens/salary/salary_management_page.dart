@@ -1158,6 +1158,17 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                           ),
                         ),
                       ],
+                      if ((s.pdfUrl ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _openExternalUrl(s.pdfUrl!),
+                            icon: const Icon(Icons.download_outlined, size: 16),
+                            label: const Text('Download PDF'),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1200,201 +1211,6 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
               subtitle!,
               style: const TextStyle(color: AppColors.textSecondary),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _mySalaryDayWise(List<MySalarySlip> slips) {
-    final isMobile = MediaQuery.of(context).size.width < 700;
-    if (_myDailyEarningRows.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 20),
-        child: Text(
-          'No day-wise earnings for selected month/year.',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-      );
-    }
-
-    final title = _mySalarySelectedMonth == 0
-        ? '$_selectedYear SALARY SUMMARY'
-        : '${DateFormat('MMM').format(DateTime(_selectedYear, _mySalarySelectedMonth)).toUpperCase()} $_selectedYear SALARY SUMMARY';
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              gradient: LinearGradient(
-                  colors: [Color(0xFF0A7CFF), Color(0xFF2F5FE3)]),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _formatCurrency(_myDailyEarnedTotal),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  'Earned so far - ${_formatPresentDays(_myDailyPresentDays)} days present',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _miniInfo(
-                      'Monthly Base', _formatCurrency(_myDailyMonthlySalary)),
-                ),
-                Expanded(
-                    child: _miniInfo(
-                        'Per Day', _formatCurrency(_myDailyPerDaySalary))),
-                Expanded(
-                  child: _miniInfo(
-                    'Days Present',
-                    _formatPresentDays(_myDailyPresentDays),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (!isMobile) ...[
-            const Divider(height: 1, color: AppColors.border),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: const [
-                  Expanded(
-                    flex: 4,
-                    child: Text(
-                      'DATE',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      'STATUS',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      'HOURS',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      'EARNED',
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: AppColors.border),
-            ..._myDailyEarningRows.map((row) => _myDailyRowTile(row)),
-          ] else ...[
-            const Divider(height: 1, color: AppColors.border),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: _myDailyEarningRows
-                    .map(
-                      (row) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _myDailyMobileTile(row),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ),
-          ],
-          const Divider(height: 1, color: AppColors.border),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '$_myDailyPresentFullCount full + $_myDailyPresentHalfCount half days',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text(
-                      'Total Earned This Period',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      _formatCurrency(_myDailyEarnedTotal),
-                      style: const TextStyle(
-                        color: Color(0xFF0A7CFF),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 22,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -3508,6 +3324,18 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isCompact = constraints.maxWidth < 560;
+          final hasPdf = row.pdfUrl.trim().isNotEmpty;
+          final actionButtons = Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _ActionIcon(
+                icon: Icons.edit_outlined,
+                color: const Color(0xFF2563EB),
+                onPressed: () => _showEditSalarySlipDialog(row),
+              ),
+            ],
+          );
           final infoBlocks = [
             _metaSection(label: 'Monthly Salary', value: row.monthlySalary),
             _metaSection(label: 'Days', value: row.days),
@@ -3558,9 +3386,12 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
                     _roleChip(row.month),
                   ],
                 ),
+                const SizedBox(height: 10),
+                Align(alignment: Alignment.centerRight, child: actionButtons),
                 const SizedBox(height: 10),
                 ...infoBlocks.map(
                   (block) => Padding(
@@ -3568,6 +3399,15 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     child: block,
                   ),
                 ),
+                if (hasPdf)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openExternalUrl(row.pdfUrl),
+                      icon: const Icon(Icons.download_outlined, size: 16),
+                      label: const Text('Download PDF'),
+                    ),
+                  ),
               ],
             );
           }
@@ -3600,7 +3440,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
                   _roleChip(row.month),
+                  const SizedBox(width: 8),
+                  actionButtons,
                 ],
               ),
               const SizedBox(height: 10),
@@ -3627,6 +3470,17 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                   Expanded(child: infoBlocks[5]),
                 ],
               ),
+              if (hasPdf) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openExternalUrl(row.pdfUrl),
+                    icon: const Icon(Icons.download_outlined, size: 16),
+                    label: const Text('Download PDF'),
+                  ),
+                ),
+              ],
             ],
           );
         },
@@ -3997,16 +3851,20 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
 
   _SalarySlipRow _mapSalarySlipToRow(SalarySlip slip) {
     return _SalarySlipRow(
+      id: slip.id,
       employee: slip.employeeName.isEmpty ? '-' : slip.employeeName,
       role: _toTitleCase(slip.employeeRole),
       month:
           '${DateFormat('MMM').format(DateTime(slip.year, slip.month))} ${slip.year}',
       monthlySalary: _formatCurrency(slip.monthlySalary),
+      monthlySalaryAmount: slip.monthlySalary,
       days: '${slip.presentDays}/${slip.workingDays}',
       earned: _formatCurrency(slip.earnedSalary),
       deductions: _formatCurrency(slip.deductions),
       finalAmount: _formatCurrency(slip.finalSalary),
       generatedBy: slip.generatedByName.isEmpty ? '-' : slip.generatedByName,
+      pdfUrl: slip.pdfUrl ?? '',
+      notes: slip.notes ?? '',
     );
   }
 
@@ -5295,12 +5153,12 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     if (resolvedUrl.isEmpty) return;
     final uri = Uri.tryParse(resolvedUrl);
     if (uri == null) {
-      _showMessage('Invalid proof URL.', isError: true);
+      _showMessage('Invalid file URL.', isError: true);
       return;
     }
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened && mounted) {
-      _showMessage('Unable to open proof URL.', isError: true);
+      _showMessage('Unable to open file URL.', isError: true);
     }
   }
 
@@ -5312,8 +5170,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   Future<void> _showGenerateAllSalarySlipsDialog() async {
     int selectedMonth = _selectedMonth;
     int selectedYear = _selectedYear;
-    int? workingDaysOverride;
-    final overrideController = TextEditingController();
+    DateTime? selectedPayDate;
+    final notesController = TextEditingController();
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -5386,7 +5244,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'Working Days Override (optional)',
+                      'Pay Date',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -5395,17 +5253,47 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     ),
                     const SizedBox(height: 6),
                     TextField(
-                      controller: overrideController,
-                      keyboardType: TextInputType.number,
+                      readOnly: true,
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedPayDate ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked == null) return;
+                        setModalState(() => selectedPayDate = picked);
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Select date',
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                        prefixIcon: const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 18,
+                        ),
+                        suffixText: selectedPayDate == null
+                            ? null
+                            : DateFormat('dd-MM-yyyy').format(selectedPayDate!),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Notes',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: notesController,
                       decoration: const InputDecoration(
-                        hintText: 'Auto',
+                        hintText: 'Optional',
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
-                      onChanged: (value) {
-                        final parsed = int.tryParse(value.trim());
-                        workingDaysOverride = parsed;
-                      },
                     ),
                   ],
                 ),
@@ -5429,8 +5317,8 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       },
     );
 
-    overrideController.dispose();
-
+    final notes = notesController.text.trim();
+    notesController.dispose();
     if (confirmed != true || !mounted) return;
 
     setState(() => _isGeneratingAllSlips = true);
@@ -5438,7 +5326,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       final result = await _authProvider.salaryGenerateAll(
         month: selectedMonth,
         year: selectedYear,
-        workingDaysOverride: workingDaysOverride,
+        payDate: selectedPayDate == null
+            ? null
+            : DateFormat('yyyy-MM-dd').format(selectedPayDate!),
+        notes: notes,
         token: _authProvider.currentAuthToken,
       );
       if (!mounted) return;
@@ -5652,7 +5543,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                         setModalState(recalcPerDay);
                       },
                       decoration: const InputDecoration(
-                        prefixText: 'â‚¹  ',
+                        prefixText: 'Rs.  ',
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
@@ -5674,7 +5565,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                       ),
                       onChanged: (_) => perDayEdited = true,
                       decoration: const InputDecoration(
-                        prefixText: 'â‚¹  ',
+                        prefixText: 'Rs.  ',
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
@@ -6212,8 +6103,15 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     int selectedYear = _selectedYear;
     bool isGenerating = false;
 
-    final deductionsController = TextEditingController(text: '0');
-    final workingDaysController = TextEditingController();
+    DateTime? selectedPayDate;
+    final basicSalaryValue = row.monthlySalaryAmount ?? 0;
+    final basicSalaryController = TextEditingController(
+      text: basicSalaryValue > 0
+          ? basicSalaryValue.toStringAsFixed(
+              basicSalaryValue.truncateToDouble() == basicSalaryValue ? 0 : 2,
+            )
+          : '',
+    );
     final notesController = TextEditingController();
 
     await showDialog<void>(
@@ -6331,7 +6229,7 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'Deductions (â‚¹)',
+                      'Basic Salary (Rs.)',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -6340,19 +6238,19 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     ),
                     const SizedBox(height: 6),
                     TextField(
-                      controller: deductionsController,
+                      controller: basicSalaryController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
                       decoration: const InputDecoration(
-                        prefixText: 'â‚¹  ',
+                        prefixText: 'Rs.  ',
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'Working Days Override (leave blank for auto)',
+                      'Pay Date',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -6361,12 +6259,30 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                     ),
                     const SizedBox(height: 6),
                     TextField(
-                      controller: workingDaysController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        hintText: 'Auto (Mon-Fri count)',
-                        border: OutlineInputBorder(),
+                      readOnly: true,
+                      onTap: isGenerating
+                          ? null
+                          : () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: selectedPayDate ?? DateTime.now(),
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2100),
+                              );
+                              if (picked == null) return;
+                              setModalState(() => selectedPayDate = picked);
+                            },
+                      decoration: InputDecoration(
+                        hintText: 'Select date',
+                        border: const OutlineInputBorder(),
                         isDense: true,
+                        prefixIcon: const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 18,
+                        ),
+                        suffixText: selectedPayDate == null
+                            ? null
+                            : DateFormat('dd-MM-yyyy').format(selectedPayDate!),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -6400,19 +6316,27 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                   onPressed: isGenerating
                       ? null
                       : () async {
-                          final deductions = double.tryParse(
-                                  deductionsController.text.trim()) ??
-                              0;
-                          final workingOverride =
-                              int.tryParse(workingDaysController.text.trim());
+                          final basicSalary = double.tryParse(
+                            basicSalaryController.text.trim(),
+                          );
+                          if (basicSalary == null || basicSalary <= 0) {
+                            _showMessage(
+                              'Enter a valid basic salary.',
+                              isError: true,
+                            );
+                            return;
+                          }
                           setModalState(() => isGenerating = true);
                           try {
                             final result = await _authProvider.salaryGenerate(
                               userId: row.userId,
                               month: selectedMonth,
                               year: selectedYear,
-                              deductions: deductions,
-                              workingDaysOverride: workingOverride,
+                              basicSalary: basicSalary,
+                              payDate: selectedPayDate == null
+                                  ? null
+                                  : DateFormat('yyyy-MM-dd')
+                                      .format(selectedPayDate!),
                               notes: notesController.text.trim(),
                               token: _authProvider.currentAuthToken,
                             );
@@ -6447,8 +6371,265 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       },
     );
 
-    deductionsController.dispose();
-    workingDaysController.dispose();
+    basicSalaryController.dispose();
+    notesController.dispose();
+  }
+
+  Future<void> _showEditSalarySlipDialog(_SalarySlipRow row) async {
+    final basicSalaryController = TextEditingController(
+      text: row.monthlySalaryAmount.toStringAsFixed(
+        row.monthlySalaryAmount.truncateToDouble() == row.monthlySalaryAmount
+            ? 0
+            : 2,
+      ),
+    );
+    final notesController = TextEditingController(text: row.notes);
+    bool isSaving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final initials = row.employee
+                .split(RegExp(r'\s+'))
+                .where((part) => part.isNotEmpty)
+                .take(2)
+                .map((part) => part[0].toUpperCase())
+                .join();
+
+            InputDecoration fieldDecoration({
+              String? hintText,
+              String? prefixText,
+            }) {
+              return InputDecoration(
+                hintText: hintText,
+                prefixText: prefixText,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.primary),
+                ),
+                isDense: true,
+              );
+            }
+
+            Widget fieldLabel(String text) {
+              return Text(
+                text,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              );
+            }
+
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(30, 20, 24, 18),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Edit Slip - ${row.employee}',
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: isSaving
+                                ? null
+                                : () => Navigator.of(dialogContext).pop(),
+                            icon: const Icon(Icons.close),
+                            color: AppColors.textSecondary,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(30, 24, 30, 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF7F9FC),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 21,
+                                    backgroundColor: const Color(0xFF6AA3FF),
+                                    child: Text(
+                                      initials.isEmpty ? 'U' : initials,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          row.employee,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          row.month,
+                                          style: const TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            fieldLabel('Basic Salary (Rs.)'),
+                            const SizedBox(height: 7),
+                            TextField(
+                              controller: basicSalaryController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              decoration: fieldDecoration(prefixText: 'Rs.  '),
+                            ),
+                            const SizedBox(height: 16),
+                            fieldLabel('Notes'),
+                            const SizedBox(height: 7),
+                            TextField(
+                              controller: notesController,
+                              decoration: fieldDecoration(
+                                hintText: 'e.g. Corrected after payroll review',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: isSaving
+                                ? null
+                                : () => Navigator.of(dialogContext).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    final basicSalary = double.tryParse(
+                                      basicSalaryController.text.trim(),
+                                    );
+                                    if (basicSalary == null ||
+                                        basicSalary <= 0) {
+                                      _showMessage(
+                                        'Enter a valid basic salary.',
+                                        isError: true,
+                                      );
+                                      return;
+                                    }
+                                    setModalState(() => isSaving = true);
+                                    try {
+                                      final result =
+                                          await _authProvider.salaryUpdateSlip(
+                                        slipId: row.id,
+                                        basicSalary: basicSalary,
+                                        notes: notesController.text.trim(),
+                                        token: _authProvider.currentAuthToken,
+                                      );
+                                      if (!mounted) return;
+                                      Navigator.of(dialogContext).pop();
+                                      await _loadSalarySlips(
+                                        page: _slipsCurrentPage,
+                                      );
+                                      _showMessage(result.message);
+                                    } catch (error) {
+                                      if (!mounted) return;
+                                      setModalState(() => isSaving = false);
+                                      _showMessage(
+                                        AppErrorHandler.friendlyMessage(error),
+                                        isError: true,
+                                      );
+                                    }
+                                  },
+                            icon: const Icon(Icons.edit_outlined, size: 16),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0A7CFF),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            label:
+                                Text(isSaving ? 'Saving...' : 'Save Changes'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    basicSalaryController.dispose();
     notesController.dispose();
   }
 
@@ -6823,26 +7004,34 @@ class _EmployeeSalaryRow {
 
 class _SalarySlipRow {
   const _SalarySlipRow({
+    required this.id,
     required this.employee,
     required this.role,
     required this.month,
     required this.monthlySalary,
+    required this.monthlySalaryAmount,
     required this.days,
     required this.earned,
     required this.deductions,
     required this.finalAmount,
     required this.generatedBy,
+    required this.pdfUrl,
+    required this.notes,
   });
 
+  final String id;
   final String employee;
   final String role;
   final String month;
   final String monthlySalary;
+  final double monthlySalaryAmount;
   final String days;
   final String earned;
   final String deductions;
   final String finalAmount;
   final String generatedBy;
+  final String pdfUrl;
+  final String notes;
 }
 
 class _CommissionRow {

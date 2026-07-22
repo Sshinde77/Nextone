@@ -181,6 +181,7 @@ class ApiConstants {
   // Salary Endpoints
   static const String salaryEmployees = '/salary/employees';
   static const String salarySlips = '/salary/slips';
+  static const String salarySlipDetail = '/salary/slips/{id}';
   static const String salaryGenerateAll = '/salary/generate-all';
   static const String salarySet = '/salary/set';
   static const String salaryAppraisal = '/salary/appraisal';

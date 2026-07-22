@@ -782,6 +782,9 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
     if (!allowed) {
       return;
     }
+    if (!mounted) {
+      return;
+    }
 
     final closureId = _closureId;
     final documentId = _readString(document['id'], fallback: '');

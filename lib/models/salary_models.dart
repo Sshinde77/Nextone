@@ -104,6 +104,7 @@ class SalarySlip {
     required this.employeeRole,
     required this.employeeEmail,
     required this.generatedByName,
+    this.pdfUrl,
     this.notes,
     this.createdAt,
     this.updatedAt,
@@ -131,6 +132,7 @@ class SalarySlip {
   final String employeeRole;
   final String employeeEmail;
   final String generatedByName;
+  final String? pdfUrl;
   final Map<String, dynamic> rawData;
 
   factory SalarySlip.fromMap(Map<String, dynamic> json) {
@@ -154,30 +156,69 @@ class SalarySlip {
       return DateTime.tryParse(raw);
     }
 
-    final notesValue = readString(json['notes']);
+    final employeeRaw = json['employee'];
+    final employee =
+        employeeRaw is Map ? Map<String, dynamic>.from(employeeRaw) : null;
+    final generatedByRaw =
+        json['generated_by_user'] ?? json['generated_by_data'];
+    final generatedByUser = generatedByRaw is Map
+        ? Map<String, dynamic>.from(generatedByRaw)
+        : null;
+    final notesValue = readString(json['notes'] ?? json['note']);
 
     return SalarySlip(
-      id: readString(json['id']),
-      userId: readString(json['user_id']),
-      month: readInt(json['month']),
-      year: readInt(json['year']),
-      monthlySalary: readDouble(json['monthly_salary']),
-      workingDays: readInt(json['working_days']),
-      presentDays: readInt(json['present_days']),
+      id: readString(json['id'] ?? json['_id'] ?? json['salary_slip_id']),
+      userId: readString(
+        json['user_id'] ??
+            json['employee_id'] ??
+            employee?['id'] ??
+            employee?['user_id'],
+      ),
+      month: readInt(json['month'] ?? json['salary_month']),
+      year: readInt(json['year'] ?? json['salary_year']),
+      monthlySalary: readDouble(json['monthly_salary'] ?? json['basic_salary']),
+      workingDays: readInt(
+        json['working_days'] ?? json['total_working_days'] ?? json['days'],
+      ),
+      presentDays: readInt(json['present_days'] ?? json['attendance_days']),
       absentDays: readInt(json['absent_days']),
       leaveDays: readInt(json['leave_days']),
       perDaySalary: readDouble(json['per_day_salary']),
       earnedSalary: readDouble(json['earned_salary']),
-      deductions: readDouble(json['deductions']),
-      finalSalary: readDouble(json['final_salary']),
-      generatedBy: readString(json['generated_by']),
+      deductions: readDouble(
+        json['deductions'] ?? json['total_deductions'] ?? json['deduction'],
+      ),
+      finalSalary: readDouble(
+        json['final_salary'] ?? json['net_salary'] ?? json['payable_salary'],
+      ),
+      generatedBy: readString(
+        json['generated_by'] ??
+            generatedByUser?['id'] ??
+            generatedByUser?['user_id'],
+      ),
       notes: notesValue.isEmpty ? null : notesValue,
-      createdAt: readDate(json['created_at']),
+      createdAt: readDate(json['created_at'] ?? json['generated_at']),
       updatedAt: readDate(json['updated_at']),
-      employeeName: readString(json['employee_name']),
-      employeeRole: readString(json['employee_role']),
-      employeeEmail: readString(json['employee_email']),
-      generatedByName: readString(json['generated_by_name']),
+      employeeName: readString(
+        json['employee_name'] ??
+            json['full_name'] ??
+            employee?['full_name'] ??
+            employee?['name'],
+      ),
+      employeeRole: readString(
+        json['employee_role'] ?? employee?['role'] ?? employee?['designation'],
+      ),
+      employeeEmail: readString(
+        json['employee_email'] ?? employee?['email'] ?? employee?['work_email'],
+      ),
+      generatedByName: readString(
+        json['generated_by_name'] ??
+            generatedByUser?['full_name'] ??
+            generatedByUser?['name'],
+      ),
+      pdfUrl: readString(json['pdf_url']).isEmpty
+          ? null
+          : readString(json['pdf_url']),
       rawData: Map<String, dynamic>.from(json),
     );
   }
@@ -288,6 +329,16 @@ class SalaryGenerateResult {
   final Map<String, dynamic> slip;
   final Map<String, dynamic> employee;
   final Map<String, dynamic> breakdown;
+}
+
+class SalarySlipUpdateResult {
+  const SalarySlipUpdateResult({
+    required this.message,
+    required this.slip,
+  });
+
+  final String message;
+  final Map<String, dynamic> slip;
 }
 
 class SalaryIncentiveCreateResult {
@@ -676,6 +727,7 @@ class MySalarySlip {
     required this.earnedSalary,
     required this.deductions,
     required this.finalSalary,
+    this.pdfUrl,
     this.notes,
     this.generatedAt,
   });
@@ -686,13 +738,14 @@ class MySalarySlip {
   final String monthLabel;
   final double monthlySalary;
   final int workingDays;
-  final int presentDays;
+  final double presentDays;
   final int absentDays;
   final int leaveDays;
   final double perDaySalary;
   final double earnedSalary;
   final double deductions;
   final double finalSalary;
+  final String? pdfUrl;
   final String? notes;
   final DateTime? generatedAt;
 
@@ -723,13 +776,16 @@ class MySalarySlip {
       monthLabel: json['month_label']?.toString().trim() ?? '',
       monthlySalary: readDouble(json['monthly_salary']),
       workingDays: readInt(json['working_days']),
-      presentDays: readInt(json['present_days']),
+      presentDays: readDouble(json['present_days']),
       absentDays: readInt(json['absent_days']),
       leaveDays: readInt(json['leave_days']),
       perDaySalary: readDouble(json['per_day_salary']),
       earnedSalary: readDouble(json['earned_salary']),
       deductions: readDouble(json['deductions']),
       finalSalary: readDouble(json['final_salary']),
+      pdfUrl: (json['pdf_url']?.toString().trim().isEmpty ?? true)
+          ? null
+          : json['pdf_url']!.toString().trim(),
       notes: notesRaw.isEmpty ? null : notesRaw,
       generatedAt: readDate(json['generated_at']),
     );

@@ -137,16 +137,14 @@ class AuthProvider {
   Future<SalaryGenerateAllResult> salaryGenerateAll({
     required int month,
     required int year,
-    int? workingDaysOverride,
-    Map<String, num>? deductionsMap,
+    String? payDate,
     String? notes,
     String? token,
   }) {
     return _authService.salaryGenerateAll(
       month: month,
       year: year,
-      workingDaysOverride: workingDaysOverride,
-      deductionsMap: deductionsMap,
+      payDate: payDate,
       notes: notes,
       token: token,
     );
@@ -194,8 +192,8 @@ class AuthProvider {
     required String userId,
     required int month,
     required int year,
-    required double deductions,
-    int? workingDaysOverride,
+    required double basicSalary,
+    String? payDate,
     String? notes,
     String? token,
   }) {
@@ -203,8 +201,22 @@ class AuthProvider {
       userId: userId,
       month: month,
       year: year,
-      deductions: deductions,
-      workingDaysOverride: workingDaysOverride,
+      basicSalary: basicSalary,
+      payDate: payDate,
+      notes: notes,
+      token: token,
+    );
+  }
+
+  Future<SalarySlipUpdateResult> salaryUpdateSlip({
+    required String slipId,
+    required double basicSalary,
+    String? notes,
+    String? token,
+  }) {
+    return _authService.salaryUpdateSlip(
+      slipId: slipId,
+      basicSalary: basicSalary,
       notes: notes,
       token: token,
     );
