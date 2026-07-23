@@ -581,6 +581,17 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    int readQuickAccessCount(String statKey) {
+      final stats = _dashboardStats?[statKey];
+      if (stats is Map) {
+        final dynamic value = stats['value'];
+        if (value is int) return value;
+        if (value is num) return value.toInt();
+        if (value is String) return int.tryParse(value) ?? 0;
+      }
+      return 0;
+    }
+
     final screenWidth = MediaQuery.of(context).size.width;
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final navReservedHeight = 76.0 + 12.0;
@@ -674,6 +685,7 @@ class _HomePageState extends State<HomePage> {
                     showClosures: RoleAccess.canViewModule('closures'),
                     showTargets: RoleAccess.canViewModule('targets'),
                     showLeaves: RoleAccess.canViewModule('attendance'),
+                    revisitCount: readQuickAccessCount('total_revisits'),
                   ),
                   rightChild: canShowSiteVisits
                       ? _UpcomingVisitsCard(
@@ -1261,6 +1273,7 @@ class _StatsGrid extends StatelessWidget {
     final totalSiteVisits = readInt(siteVisits, 'value');
     final upcomingSiteVisits = readInt(siteVisits, 'upcoming');
     final doneSiteVisits = readInt(siteVisits, 'done');
+    final revisits = readInt(siteVisits, 'rescheduled');
     final totalFollowUps = readInt(followUps, 'value');
     final pendingFollowUps = readInt(followUps, 'pending');
     final totalProjects = readInt(projects, 'value');
@@ -1303,6 +1316,17 @@ class _StatsGrid extends StatelessWidget {
               title: 'Site Visits Done',
               value: '$doneSiteVisits',
               subtitle: 'of $totalSiteVisits total',
+              compact: compact,
+              onTap: onSiteVisitsTap,
+            ),
+          if (showSiteVisits)
+            _StatCard(
+              icon: Icons.refresh_rounded,
+              iconBg: const Color(0xFFF97316),
+              bubbleColor: const Color(0xFFFFEDD5),
+              title: 'Revisits',
+              value: '$revisits',
+              subtitle: 'rescheduled visits',
               compact: compact,
               onTap: onSiteVisitsTap,
             ),
@@ -1847,6 +1871,7 @@ class _QuickAccessCard extends StatelessWidget {
     required this.showClosures,
     required this.showTargets,
     required this.showLeaves,
+    this.revisitCount = 0,
   });
 
   final VoidCallback onLeadsTap;
@@ -1877,6 +1902,7 @@ class _QuickAccessCard extends StatelessWidget {
   final bool showClosures;
   final bool showTargets;
   final bool showLeaves;
+  final int revisitCount;
 
   @override
   Widget build(BuildContext context) {
@@ -1929,6 +1955,7 @@ class _QuickAccessCard extends StatelessWidget {
           icon: Icons.replay_outlined,
           color: const Color(0xFF7C3AED),
           onTap: onRevisitsTap,
+          count: revisitCount,
         ),
       if (showTeam)
         _QuickAccessItem(
@@ -2010,7 +2037,7 @@ class _QuickAccessCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
-                    children: [
+                    children: <Widget>[
                       Container(
                         width: 40,
                         height: 40,
@@ -2018,18 +2045,38 @@ class _QuickAccessCard extends StatelessWidget {
                           color: item.color,
                           borderRadius: BorderRadius.circular(13),
                         ),
-                        child: Icon(item.icon, color: Colors.white, size: 20),
+                        child: Icon(
+                          item.icon,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF13233E),
-                          ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF13233E),
+                              ),
+                            ),
+                            if (item.count != null) const SizedBox(height: 2),
+                            if (item.count != null)
+                              Text(
+                                '${item.count}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF5B6B84),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ],
@@ -2050,12 +2097,14 @@ class _QuickAccessItem {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.count,
   });
 
   final String title;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final int? count;
 }
 
 class _UpcomingVisitsCard extends StatelessWidget {

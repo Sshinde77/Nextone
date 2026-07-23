@@ -5,11 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nextone/constants/app_colors.dart';
+import 'package:nextone/models/auth_models.dart';
 import 'package:nextone/models/salary_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/salary/salary_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/app_feedback.dart';
+import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
@@ -1163,7 +1165,11 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                         Align(
                           alignment: Alignment.centerLeft,
                           child: OutlinedButton.icon(
-                            onPressed: () => _openExternalUrl(s.pdfUrl!),
+                            onPressed: () => _downloadSalarySlipPdf(
+                              slipId: s.id,
+                              fallbackFileName:
+                                  _buildSalarySlipFileNameFromMySlip(s),
+                            ),
                             icon: const Icon(Icons.download_outlined, size: 16),
                             label: const Text('Download PDF'),
                           ),
@@ -3403,7 +3409,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: OutlinedButton.icon(
-                      onPressed: () => _openExternalUrl(row.pdfUrl),
+                      onPressed: () => _downloadSalarySlipPdf(
+                        slipId: row.id,
+                        fallbackFileName: _buildSalarySlipFileNameFromRow(row),
+                      ),
                       icon: const Icon(Icons.download_outlined, size: 16),
                       label: const Text('Download PDF'),
                     ),
@@ -3475,7 +3484,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: OutlinedButton.icon(
-                    onPressed: () => _openExternalUrl(row.pdfUrl),
+                    onPressed: () => _downloadSalarySlipPdf(
+                      slipId: row.id,
+                      fallbackFileName: _buildSalarySlipFileNameFromRow(row),
+                    ),
                     icon: const Icon(Icons.download_outlined, size: 16),
                     label: const Text('Download PDF'),
                   ),
@@ -3866,6 +3878,37 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       pdfUrl: slip.pdfUrl ?? '',
       notes: slip.notes ?? '',
     );
+  }
+
+  String _buildSalarySlipFileNameFromRow(_SalarySlipRow row) {
+    final employee = row.employee
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+    final month = row.month
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+    final namePart = employee.isEmpty ? 'employee' : employee;
+    final monthPart = month.isEmpty ? 'salary_slip' : month;
+    return 'salary_slip_${namePart}_$monthPart.pdf';
+  }
+
+  String _buildSalarySlipFileNameFromMySlip(MySalarySlip slip) {
+    final monthLabel = slip.monthLabel.trim().isNotEmpty
+        ? slip.monthLabel.trim()
+        : '${DateFormat('MMM').format(DateTime(slip.year, slip.month))}_${slip.year}';
+    final month = monthLabel
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+    final monthPart = month.isEmpty ? 'salary_slip' : month;
+    return 'salary_slip_$monthPart.pdf';
   }
 
   Future<void> _openSalaryDetail(_EmployeeSalaryRow row) async {
@@ -5162,9 +5205,58 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     }
   }
 
+  Future<void> _downloadSalarySlipPdf({
+    required String slipId,
+    String? fallbackFileName,
+  }) async {
+    final normalizedSlipId = slipId.trim();
+    if (normalizedSlipId.isEmpty) {
+      _showMessage('Salary slip id is missing.', isError: true);
+      return;
+    }
+
+    try {
+      final ExportFileResult exported =
+          await _authProvider.downloadSalarySlipPdf(
+        slipId: normalizedSlipId,
+        token: _authProvider.currentAuthToken,
+      );
+      final fileName = exported.fileName.trim().isNotEmpty
+          ? exported.fileName.trim()
+          : (fallbackFileName?.trim().isNotEmpty ?? false)
+              ? fallbackFileName!.trim()
+              : 'salary_slip_$normalizedSlipId.pdf';
+
+      if (kIsWeb) {
+        _showMessage(
+          'PDF generated ($fileName), but direct file save is not supported on Web in this build.',
+        );
+        return;
+      }
+
+      final file = await ExportFileHelper.saveToDownloadNextone(
+        fileName: fileName,
+        bytes: exported.bytes,
+      );
+      _showBottomSnackBar('Salary slip downloaded: ${file.path}');
+    } catch (error) {
+      _showMessage(
+        AppErrorHandler.friendlyMessage(error),
+        isError: true,
+      );
+    }
+  }
+
   void _showMessage(String message, {bool isError = false}) {
     if (!mounted) return;
     AppFeedback.showMessage(message, isError: isError);
+  }
+
+  void _showBottomSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _showGenerateAllSalarySlipsDialog() async {

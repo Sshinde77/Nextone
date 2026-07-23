@@ -1270,6 +1270,53 @@ class AuthService {
     }
   }
 
+  Future<ExportFileResult> downloadSalarySlipPdf({
+    required String slipId,
+    String? token,
+  }) async {
+    final normalizedSlipId = slipId.trim();
+    if (normalizedSlipId.isEmpty) {
+      throw Exception('Salary slip id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.salarySlipPdf.replaceFirst('{id}', normalizedSlipId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers =
+        _headers(accept: 'application/pdf,*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'downloadSalarySlipPdf',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('downloadSalarySlipPdf', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to download salary slip PDF.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    final disposition = response.headers['content-disposition'] ?? '';
+    final fileName = _readFileNameFromDisposition(disposition) ??
+        'salary_slip_$normalizedSlipId.pdf';
+    final contentTypeHeader = response.headers['content-type'] ?? '';
+    return ExportFileResult(
+      fileName: fileName,
+      bytes: response.bodyBytes,
+      contentType: contentTypeHeader.trim().isEmpty
+          ? 'application/pdf'
+          : contentTypeHeader,
+    );
+  }
+
   Future<SalaryHistoryResult> salaryHistory({
     required String userId,
     String? token,

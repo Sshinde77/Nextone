@@ -222,6 +222,16 @@ class AuthProvider {
     );
   }
 
+  Future<ExportFileResult> downloadSalarySlipPdf({
+    required String slipId,
+    String? token,
+  }) {
+    return _authService.downloadSalarySlipPdf(
+      slipId: slipId,
+      token: token,
+    );
+  }
+
   Future<SalaryHistoryResult> salaryHistory({
     required String userId,
     String? token,
