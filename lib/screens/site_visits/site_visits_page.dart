@@ -1,5 +1,7 @@
 // ignore_for_file: use_build_context_synchronously, unused_element
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
@@ -98,6 +100,7 @@ class _ScheduleRevisitResult {
 
 class _SiteVisitsPageState extends State<SiteVisitsPage> {
   final AuthProvider _authProvider = AuthProvider();
+  final TextEditingController _searchController = TextEditingController();
   static const List<String> _teamMembers = <String>[
     'Aarav Patel',
     'Priya Sharma',
@@ -118,8 +121,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   bool _isLoadingVisits = false;
   String? _loadError;
   String _currentRole = '';
+  Timer? _searchDebounce;
   _VisitScope _selectedScope = _VisitScope.team;
   String _selectedStatus = '';
+  String _searchQuery = '';
   int _currentPage = 1;
   final int _perPage = 10;
   int _totalPages = 1;
@@ -137,6 +142,13 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     _visits = <_SiteVisit>[];
     _loadAccess();
     _loadSiteVisits();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   bool get _canExportData => RoleAccess.canExportModule('site_visits');
@@ -173,13 +185,13 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     final list = _statusFilteredVisits
         .where((visit) => _isSameDate(visit.dateTime, _selectedDate))
         .toList()
-      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
     return list;
   }
 
   List<_SiteVisit> get _allVisitsSorted {
     final list = List<_SiteVisit>.from(_statusFilteredVisits)
-      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
     return list;
   }
 
@@ -280,6 +292,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
               _buildQuickActions(),
               SizedBox(height: _s(12)),
               _buildStatusAndRevisitsRow(),
+              SizedBox(height: _s(12)),
+              _buildSearchBar(),
               SizedBox(height: _s(14)),
               if (_isCalendarView) ...[
                 AnimatedSwitcher(
@@ -562,6 +576,61 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildSearchBar() {
+    return TextField(
+      controller: _searchController,
+      onChanged: _onSearchChanged,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: 'Search lead, project...',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: _searchQuery.trim().isNotEmpty
+            ? IconButton(
+                onPressed: _clearSearch,
+                icon: const Icon(Icons.close),
+              )
+            : null,
+        filled: true,
+        fillColor: Colors.white,
+        isDense: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(_s(12)),
+          borderSide: BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(_s(12)),
+          borderSide: BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(_s(12)),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+        ),
+      ),
+    );
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      setState(() {
+        _searchQuery = value;
+        _currentPage = 1;
+      });
+      _loadSiteVisits(page: 1);
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+      _currentPage = 1;
+    });
+    _loadSiteVisits(page: 1);
   }
 
   Widget _buildPaginationControls() {
@@ -2735,6 +2804,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       final result = _isMyScope
           ? await _authProvider.mySiteVisits(
               token: _authProvider.currentAuthToken,
+              search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
               page: targetPage,
               perPage: _perPage,
             )
@@ -2743,6 +2813,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
               status: _selectedStatus.trim().isEmpty
                   ? null
                   : _selectedStatus.trim(),
+              search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
               page: targetPage,
               perPage: _perPage,
             );
@@ -2750,7 +2821,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           .map(_visitFromApi)
           .whereType<_SiteVisit>()
           .toList()
-        ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+        ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
       if (!mounted) {
         return;
       }

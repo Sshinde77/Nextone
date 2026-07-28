@@ -1,5 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
@@ -35,6 +37,7 @@ enum _RevisitScope { myItems, team }
 class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   final AuthProvider _authProvider = AuthProvider();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   bool _isExporting = false;
   bool _isLoading = false;
   String? _error;
@@ -42,6 +45,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   String _currentRole = '';
   _RevisitScope _selectedScope = _RevisitScope.team;
   String _statusFilter = 'all';
+  String _searchQuery = '';
   int _currentPage = 1;
   int _totalPages = 1;
   int _totalItems = 0;
@@ -56,6 +60,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -85,6 +90,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     final nextPage = page ?? _currentPage;
     final apiStatus =
         _statusFilter == 'all' ? null : _statusFilter.trim().toLowerCase();
+    final apiSearch = _searchQuery.trim().isEmpty ? null : _searchQuery.trim();
 
     setState(() {
       _isLoading = true;
@@ -97,12 +103,15 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
               token: _authProvider.currentAuthToken,
               from: _monthStart,
               to: _monthEnd,
+              status: apiStatus,
+              search: apiSearch,
               page: nextPage,
               perPage: _perPage,
             )
           : await _authProvider.siteRevisits(
               token: _authProvider.currentAuthToken,
               status: apiStatus,
+              search: apiSearch,
               page: nextPage,
               perPage: _perPage,
             );
@@ -125,7 +134,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleItems = _items.where(_matchesFilter).toList();
+    final visibleItems = _items;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: CrmAppBar(
@@ -354,11 +363,18 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
         Expanded(
           child: TextField(
             controller: _searchController,
-            onChanged: (_) => setState(() {}),
+            onChanged: _onSearchChanged,
+            textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               isDense: true,
               hintText: 'Search lead, project...',
               prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.trim().isNotEmpty
+                  ? IconButton(
+                      onPressed: _clearSearch,
+                      icon: const Icon(Icons.close),
+                    )
+                  : null,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -411,6 +427,28 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       itemLabel: 'records',
       onPageChanged: (page) => _loadRevisits(page: page),
     );
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      setState(() {
+        _searchQuery = value;
+        _currentPage = 1;
+      });
+      _loadRevisits(page: 1);
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+      _currentPage = 1;
+    });
+    _loadRevisits(page: 1);
   }
 
   Future<DateTimeRange?> _showExportDateRangeDialog() async {
@@ -746,19 +784,6 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       default:
         return AppColors.primary;
     }
-  }
-
-  bool _matchesFilter(Map<String, dynamic> item) {
-    final status =
-        _readString(item['status'], fallback: 'scheduled').toLowerCase().trim();
-    final query = _searchController.text.trim().toLowerCase();
-    final lead = _readString(item['lead_name'], fallback: '').toLowerCase();
-    final project =
-        _readString(item['project_name'], fallback: '').toLowerCase();
-    final textMatch =
-        query.isEmpty || lead.contains(query) || project.contains(query);
-    final statusMatch = _statusFilter == 'all' || status == _statusFilter;
-    return textMatch && statusMatch;
   }
 
   void _showSnackBar(String message) {

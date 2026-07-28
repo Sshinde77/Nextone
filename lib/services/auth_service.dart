@@ -5355,6 +5355,7 @@ class AuthService {
   Future<LeadsListResult> siteVisits({
     String? token,
     String? status,
+    String? search,
     int page = 1,
     int perPage = 20,
   }) async {
@@ -5366,6 +5367,9 @@ class AuthService {
     final normalizedStatus = status?.trim() ?? '';
     if (normalizedStatus.isNotEmpty) {
       queryParams['status'] = normalizedStatus;
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      queryParams['search'] = search.trim();
     }
 
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.sitevisits}')
@@ -5423,6 +5427,7 @@ class AuthService {
 
   Future<LeadsListResult> mySiteVisits({
     String? token,
+    String? search,
     int page = 1,
     int perPage = 20,
   }) async {
@@ -5431,6 +5436,9 @@ class AuthService {
       'page': page.toString(),
       'per_page': perPage.toString(),
     };
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
 
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.mySiteVisits}')
         .replace(queryParameters: query);
@@ -5598,6 +5606,7 @@ class AuthService {
   Future<LeadsListResult> siteRevisits({
     String? token,
     String? status,
+    String? search,
     int page = 1,
     int perPage = 20,
   }) async {
@@ -5608,6 +5617,9 @@ class AuthService {
     };
     if (status != null && status.trim().isNotEmpty) {
       query['status'] = status.trim();
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
     }
 
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}')
@@ -5675,6 +5687,8 @@ class AuthService {
     required String from,
     required String to,
     String? token,
+    String? status,
+    String? search,
     int page = 1,
     int perPage = 20,
   }) async {
@@ -5685,6 +5699,12 @@ class AuthService {
       'page': page.toString(),
       'per_page': perPage.toString(),
     };
+    if (status != null && status.trim().isNotEmpty) {
+      query['status'] = status.trim();
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
 
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.myRevisits}')
         .replace(queryParameters: query);

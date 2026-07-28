@@ -1343,12 +1343,14 @@ class AuthProvider {
   Future<LeadsListResult> siteVisits({
     String? token,
     String? status,
+    String? search,
     int page = 1,
     int perPage = 20,
   }) {
     return _authService.siteVisits(
       token: token,
       status: status,
+      search: search,
       page: page,
       perPage: perPage,
     );
@@ -1356,11 +1358,13 @@ class AuthProvider {
 
   Future<LeadsListResult> mySiteVisits({
     String? token,
+    String? search,
     int page = 1,
     int perPage = 20,
   }) {
     return _authService.mySiteVisits(
       token: token,
+      search: search,
       page: page,
       perPage: perPage,
     );
@@ -1380,12 +1384,14 @@ class AuthProvider {
   Future<LeadsListResult> siteRevisits({
     String? token,
     String? status,
+    String? search,
     int page = 1,
     int perPage = 20,
   }) {
     return _authService.siteRevisits(
       token: token,
       status: status,
+      search: search,
       page: page,
       perPage: perPage,
     );
@@ -1395,6 +1401,8 @@ class AuthProvider {
     required String from,
     required String to,
     String? token,
+    String? status,
+    String? search,
     int page = 1,
     int perPage = 20,
   }) {
@@ -1402,6 +1410,8 @@ class AuthProvider {
       from: from,
       to: to,
       token: token,
+      status: status,
+      search: search,
       page: page,
       perPage: perPage,
     );
