@@ -12,6 +12,7 @@ class LeadDetailModel {
   final String callbackTime;
   final String nextFollowupTime;
   final String projectName;
+  final String closingPerson;
   final AssignedTo? assignedTo;
   final List<Map<String, dynamic>> paymentProofs;
   final List<Map<String, dynamic>> photos;
@@ -30,6 +31,7 @@ class LeadDetailModel {
     required this.callbackTime,
     required this.nextFollowupTime,
     required this.projectName,
+    required this.closingPerson,
     this.assignedTo,
     this.paymentProofs = const <Map<String, dynamic>>[],
     this.photos = const <Map<String, dynamic>>[],
@@ -91,6 +93,8 @@ class LeadDetailModel {
                       : null))
               ?.toString() ??
           '',
+      closingPerson:
+          (json['closing_person'] ?? json['closingPerson'])?.toString() ?? '',
       assignedTo: json['assigned_to'] != null
           ? AssignedTo.fromJson(json['assigned_to'])
           : null,

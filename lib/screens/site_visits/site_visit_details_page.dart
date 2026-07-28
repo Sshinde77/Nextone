@@ -73,7 +73,10 @@ class _SiteVisitDetailsPageState extends State<SiteVisitDetailsPage> {
     final visitTime = data['visit_time']?.toString() ?? 'N/A';
     final transportArranged = data['transport_arranged'] == true;
     final notes = data['notes']?.toString() ?? 'No notes provided.';
-    final closingPerson = _readString(data['closing_person'], fallback: '');
+    final closingPerson = _readString(
+      data['closing_person'] ?? data['closingPerson'],
+      fallback: '',
+    );
     final completionNote = _readString(data['note'], fallback: '');
     final leadName = _readField(
       data,

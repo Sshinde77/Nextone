@@ -2906,6 +2906,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       _LeadInfoItem('Alternate Phone', _lead!.alternatePhoneNumber),
       _LeadInfoItem('Email', _lead!.email),
       _LeadInfoItem('Project', _lead!.projectName),
+      _LeadInfoItem('Closing Person', _lead!.closingPerson),
       _LeadInfoItem('Source', _lead!.source),
       _LeadInfoItem('Callback', _formatDateTimeValue(_lead!.callbackTime)),
       _LeadInfoItem(

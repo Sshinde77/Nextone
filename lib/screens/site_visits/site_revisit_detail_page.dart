@@ -59,6 +59,12 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final closingPerson = _readString(
+      _data?['closing_person'] ?? _data?['closingPerson'],
+      fallback: '',
+    );
+    final completionNote = _readString(_data?['note'], fallback: '');
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8FC),
       appBar: const CrmAppBar(
@@ -93,24 +99,16 @@ class _SiteRevisitDetailPageState extends State<SiteRevisitDetailPage> {
                 'Notes',
                 _readString(_data!['notes'], fallback: '-'),
               ),
-              if (_readString(_data!['closing_person'], fallback: '')
-                      .trim()
-                      .isNotEmpty ||
-                  _readString(_data!['note'], fallback: '')
-                      .trim()
-                      .isNotEmpty) ...[
+              if (closingPerson.trim().isNotEmpty ||
+                  completionNote.trim().isNotEmpty) ...[
                 const SizedBox(height: 10),
                 _infoSection(
                   'Completion Details',
                   [
-                    if (_readString(_data!['closing_person'], fallback: '')
-                        .trim()
-                        .isNotEmpty)
-                      'Closing Person: ${_readString(_data!['closing_person'], fallback: '')}',
-                    if (_readString(_data!['note'], fallback: '')
-                        .trim()
-                        .isNotEmpty)
-                      'Note: ${_readString(_data!['note'], fallback: '')}',
+                    if (closingPerson.trim().isNotEmpty)
+                      'Closing Person: $closingPerson',
+                    if (completionNote.trim().isNotEmpty)
+                      'Note: $completionNote',
                   ].join('\n'),
                 ),
               ],
