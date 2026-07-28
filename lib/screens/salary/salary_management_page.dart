@@ -78,13 +78,6 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
   List<_MySalaryIncentiveRow> _myIncentives = <_MySalaryIncentiveRow>[];
   List<SalaryCommission> _myCommissions = <SalaryCommission>[];
   List<SalaryAdvance> _myAdvances = <SalaryAdvance>[];
-  List<_MyDailyEarningRow> _myDailyEarningRows = <_MyDailyEarningRow>[];
-  int _myDailyPresentFullCount = 0;
-  int _myDailyPresentHalfCount = 0;
-  double _myDailyPresentDays = 0;
-  double _myDailyPerDaySalary = 0;
-  double _myDailyMonthlySalary = 0;
-  double _myDailyEarnedTotal = 0;
   int _mySalaryTab = 0;
   String? _expandedMySalarySlipId;
   int _selectedMonth = DateTime.now().month;
@@ -287,7 +280,6 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
       final advances = (futures[4] as List<SalaryAdvance>)
         ..sort((a, b) => _advanceDateOf(b).compareTo(_advanceDateOf(a)));
 
-      final dayWise = await _buildMyDailyEarnings(result);
       if (!mounted) return;
       setState(() {
         _mySalaryResult = result;
@@ -295,13 +287,6 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
         _myIncentives = incentives;
         _myCommissions = commissions;
         _myAdvances = advances;
-        _myDailyEarningRows = dayWise.rows;
-        _myDailyPresentFullCount = dayWise.fullDays;
-        _myDailyPresentHalfCount = dayWise.halfDays;
-        _myDailyPresentDays = dayWise.presentDays;
-        _myDailyPerDaySalary = dayWise.perDaySalary;
-        _myDailyMonthlySalary = dayWise.monthlySalary;
-        _myDailyEarnedTotal = dayWise.earnedTotal;
         _isLoadingMySalary = false;
       });
     } catch (error) {
@@ -1677,513 +1662,10 @@ class _SalaryManagementPageState extends State<SalaryManagementPage> {
     );
   }
 
-  Widget _myDailyMobileTile(_MyDailyEarningRow row) {
-    final isPositive = row.earned > 0;
-    final statusText = row.statusLabel.toLowerCase();
-    final isHalfDay = statusText.contains('half');
-    final statusBg = isHalfDay
-        ? const Color(0xFFFBEAF4)
-        : (isPositive ? const Color(0xFFDDF6E8) : const Color(0xFFF1F5F9));
-    final statusFg = isHalfDay
-        ? const Color(0xFFC2185B)
-        : (isPositive ? const Color(0xFF14864A) : AppColors.textSecondary);
-    final earnedFg =
-        isPositive ? const Color(0xFF16A34A) : AppColors.textSecondary;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFBFDFF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE3E9F2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  DateFormat('dd MMM yyyy').format(row.date),
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 17,
-                  ),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  row.statusLabel,
-                  style: TextStyle(
-                    color: statusFg,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (row.timeLabel.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              row.timeLabel,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: _myDailyMeta('Hours', row.hoursLabel)),
-              Expanded(
-                child: _myDailyMeta(
-                  'Earned',
-                  isPositive
-                      ? '+${_formatCurrency(row.earned)}'
-                      : _formatCurrency(0),
-                  alignRight: true,
-                  valueColor: earnedFg,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _myDailyMeta(
-    String label,
-    String value, {
-    bool alignRight = false,
-    Color? valueColor,
-  }) {
-    return Column(
-      crossAxisAlignment:
-          alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          textAlign: alignRight ? TextAlign.right : TextAlign.left,
-          style: TextStyle(
-            color: valueColor ?? AppColors.textPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _myDailyRowTile(_MyDailyEarningRow row) {
-    final isPositive = row.earned > 0;
-    final statusBg =
-        isPositive ? const Color(0xFFDDF6E8) : const Color(0xFFF1F5F9);
-    final statusFg =
-        isPositive ? const Color(0xFF14864A) : AppColors.textSecondary;
-    final earnedFg =
-        isPositive ? const Color(0xFF16A34A) : AppColors.textSecondary;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  DateFormat('dd MMM yyyy').format(row.date),
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 17,
-                  ),
-                ),
-                if (row.timeLabel.isNotEmpty)
-                  Text(
-                    row.timeLabel,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Center(
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  row.statusLabel,
-                  style: TextStyle(
-                    color: statusFg,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              row.hoursLabel,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              isPositive
-                  ? '+${_formatCurrency(row.earned)}'
-                  : _formatCurrency(0),
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                color: earnedFg,
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<_MyDailyEarningSummary> _buildMyDailyEarnings(
-      MySalaryResult salaryResult) async {
-    final payload = await _fetchAttendancePayload();
-    final allRows = payload.rows;
-    final salarySummary = payload.salarySummary;
-    final double perDaySalary = (salarySummary?.perDaySalary ?? 0) > 0
-        ? salarySummary!.perDaySalary
-        : _resolvePerDaySalary(salaryResult);
-    final double monthlySalary = (salarySummary?.monthlySalary ?? 0) > 0
-        ? salarySummary!.monthlySalary
-        : _resolveMonthlySalary(salaryResult);
-
-    final filtered = allRows
-        .where((row) => row.date.year == _selectedYear)
-        .where((row) =>
-            _mySalarySelectedMonth == 0 ||
-            row.date.month == _mySalarySelectedMonth)
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
-
-    int fullDays = 0;
-    int halfDays = 0;
-    double presentDays = 0;
-    double earnedTotal = 0;
-    final List<_MyDailyEarningRow> rows = <_MyDailyEarningRow>[];
-
-    for (final row in filtered) {
-      final status = row.status.toLowerCase();
-      final isHalf = status.contains('half');
-      final isPresent =
-          status.contains('present') || status.contains('approved') || isHalf;
-      final double earned =
-          isPresent ? (isHalf ? perDaySalary / 2 : perDaySalary) : 0.0;
-
-      if (isPresent && !isHalf) fullDays += 1;
-      if (isHalf) halfDays += 1;
-      if (isPresent) presentDays += isHalf ? 0.5 : 1;
-      earnedTotal += earned;
-
-      rows.add(
-        _MyDailyEarningRow(
-          date: row.date,
-          statusLabel: _toTitleCase(row.status),
-          timeLabel: row.timeLabel,
-          hoursLabel: row.hoursLabel,
-          earned: earned,
-        ),
-      );
-    }
-
-    if ((salarySummary?.presentDays ?? 0) > 0) {
-      presentDays = salarySummary!.presentDays;
-    }
-    if ((salarySummary?.earnedSalary ?? 0) > 0) {
-      earnedTotal = salarySummary!.earnedSalary;
-    }
-
-    return _MyDailyEarningSummary(
-      rows: rows,
-      fullDays: fullDays,
-      halfDays: halfDays,
-      presentDays: presentDays,
-      perDaySalary: perDaySalary,
-      monthlySalary: monthlySalary,
-      earnedTotal: earnedTotal,
-    );
-  }
-
-  double _resolvePerDaySalary(MySalaryResult result) {
-    final selected = _mySalarySelectedMonth == 0
-        ? null
-        : result.salarySlips
-            .where((s) => s.month == _mySalarySelectedMonth)
-            .toList();
-    if (selected != null && selected.isNotEmpty) {
-      return selected.first.perDaySalary;
-    }
-    if (result.currentMonthlySalary?.perDaySalary != null) {
-      return result.currentMonthlySalary!.perDaySalary!;
-    }
-    if (result.salarySlips.isNotEmpty) {
-      return result.salarySlips.first.perDaySalary;
-    }
-    return 0;
-  }
-
-  double _resolveMonthlySalary(MySalaryResult result) {
-    final selected = _mySalarySelectedMonth == 0
-        ? null
-        : result.salarySlips
-            .where((s) => s.month == _mySalarySelectedMonth)
-            .toList();
-    if (selected != null && selected.isNotEmpty) {
-      return selected.first.monthlySalary;
-    }
-    if (result.currentMonthlySalary != null) {
-      return result.currentMonthlySalary!.amount;
-    }
-    if (result.salarySlips.isNotEmpty) {
-      return result.salarySlips.first.monthlySalary;
-    }
-    return 0;
-  }
-
-  Future<_AttendanceMePayload> _fetchAttendancePayload() async {
-    final List<_AttendanceRow> rows = <_AttendanceRow>[];
-    _AttendanceSalarySummary? salarySummary;
-    int page = 1;
-    const int perPage = 30;
-
-    while (page <= 12) {
-      final data = await _authProvider.attendanceMe(
-        page: page,
-        perPage: perPage,
-        token: _authProvider.currentAuthToken,
-      );
-      salarySummary ??= _extractAttendanceSalary(data);
-      final pageRows = _extractAttendanceRows(data);
-      if (pageRows.isEmpty) break;
-      rows.addAll(pageRows);
-      if (pageRows.length < perPage) break;
-      page += 1;
-    }
-
-    final Map<String, _AttendanceRow> unique = <String, _AttendanceRow>{};
-    for (final row in rows) {
-      final key =
-          '${row.date.toIso8601String()}-${row.status}-${row.timeLabel}';
-      unique[key] = row;
-    }
-    return _AttendanceMePayload(
-      rows: unique.values.toList(),
-      salarySummary: salarySummary,
-    );
-  }
-
-  List<_AttendanceRow> _extractAttendanceRows(Map<String, dynamic> raw) {
-    final directList = raw['data'];
-    final root = _pickFirstMap(raw, const ['data']) ?? raw;
-    final list = directList is List
-        ? directList
-        : _pickFirstList(root, const [
-            'data',
-            'attendance',
-            'attendances',
-            'items',
-            'rows',
-            'results',
-            'history',
-          ]);
-    if (list == null) return const <_AttendanceRow>[];
-
-    final List<_AttendanceRow> parsed = <_AttendanceRow>[];
-    for (final item in list) {
-      if (item is! Map) continue;
-      final map = Map<String, dynamic>.from(item);
-      final date = _readFirstDate(map, const [
-        'attendance_date',
-        'attendanceDate',
-        'date',
-        'created_at',
-      ]);
-      if (date == null) continue;
-
-      final status = _readFirstString(map, const [
-        'status',
-        'attendance_status',
-        'attendanceStatus',
-      ]);
-      final timeLabel = _readFirstTimeLabel(map);
-      final hoursLabel = _readWorkingHoursLabel(map);
-      parsed.add(
-        _AttendanceRow(
-          date: date.toLocal(),
-          status: status.isEmpty ? 'absent' : status,
-          timeLabel: timeLabel,
-          hoursLabel: hoursLabel,
-        ),
-      );
-    }
-    return parsed;
-  }
-
-  _AttendanceSalarySummary? _extractAttendanceSalary(Map<String, dynamic> raw) {
-    final salaryRaw = raw['salary'];
-    if (salaryRaw is! Map) return null;
-    final salary = Map<String, dynamic>.from(salaryRaw);
-    return _AttendanceSalarySummary(
-      monthlySalary: _readAsDouble(salary['monthly_salary']),
-      presentDays: _readAsDouble(salary['present_days']),
-      perDaySalary: _readAsDouble(salary['per_day_salary']),
-      earnedSalary: _readAsDouble(salary['earned_salary']),
-    );
-  }
-
-  Map<String, dynamic>? _pickFirstMap(
-    Map<String, dynamic> source,
-    List<String> keys,
-  ) {
-    for (final key in keys) {
-      final value = source[key];
-      if (value is Map) return Map<String, dynamic>.from(value);
-    }
-    return null;
-  }
-
-  List<dynamic>? _pickFirstList(
-      Map<String, dynamic> source, List<String> keys) {
-    for (final key in keys) {
-      final value = source[key];
-      if (value is List) return value;
-    }
-    return null;
-  }
-
-  String _readFirstString(Map<String, dynamic> source, List<String> keys) {
-    for (final key in keys) {
-      final value = source[key];
-      if (value == null) continue;
-      final text = value.toString().trim();
-      if (text.isNotEmpty) return text;
-    }
-    return '';
-  }
-
-  DateTime? _readFirstDate(Map<String, dynamic> source, List<String> keys) {
-    final raw = _readFirstString(source, keys);
-    if (raw.isEmpty) return null;
-    return DateTime.tryParse(raw);
-  }
-
+  // ignore: unused_element
   String _readFirstTimeLabel(Map<String, dynamic> source) {
-    final checkInRaw = _readFirstString(source, const [
-      'check_in_time',
-      'checkInTime',
-      'check_in',
-      'checkIn',
-      'in_time',
-    ]);
-    final checkOutRaw = _readFirstString(source, const [
-      'check_out_time',
-      'checkOutTime',
-      'check_out',
-      'checkOut',
-      'out_time',
-    ]);
-    String formatOne(String raw) {
-      if (raw.isEmpty) return '';
-      final dt = DateTime.tryParse(raw);
-      return dt == null
-          ? raw
-          : DateFormat('hh:mm a').format(dt.toLocal()).toLowerCase();
-    }
-
-    final checkIn = formatOne(checkInRaw);
-    final checkOut = formatOne(checkOutRaw);
-    if (checkIn.isNotEmpty && checkOut.isNotEmpty) {
-      return '→$checkIn   ←$checkOut';
-    }
-    if (checkIn.isNotEmpty) return '→$checkIn';
-    if (checkOut.isNotEmpty) return '←$checkOut';
+    final _ = source;
     return '';
-  }
-
-  String _readWorkingHoursLabel(Map<String, dynamic> source) {
-    final raw = _readFirstString(
-        source, const ['working_hours', 'workingHours', 'hours']);
-    if (raw.isEmpty) return '--';
-    final value = double.tryParse(raw);
-    if (value == null) return raw;
-    return '${value.toStringAsFixed(2)}h';
-  }
-
-  double _readAsDouble(dynamic value) {
-    if (value == null) return 0;
-    if (value is num) return value.toDouble();
-    return double.tryParse(value.toString()) ?? 0;
-  }
-
-  String _formatPresentDays(double value) {
-    if (value == value.roundToDouble()) return value.toInt().toString();
-    return value.toStringAsFixed(1);
-  }
-
-  Widget _miniInfo(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-        ),
-      ],
-    );
   }
 
   Future<void> _pickMySalaryMonth() async {
@@ -7190,6 +6672,7 @@ class _SelectionOption {
   final Map<String, dynamic> raw;
 }
 
+// ignore: unused_element
 class _AttendanceRow {
   const _AttendanceRow({
     required this.date,
@@ -7204,6 +6687,7 @@ class _AttendanceRow {
   final String hoursLabel;
 }
 
+// ignore: unused_element
 class _MyDailyEarningRow {
   const _MyDailyEarningRow({
     required this.date,
@@ -7234,6 +6718,7 @@ class _MySalaryIncentiveRow {
   final DateTime date;
 }
 
+// ignore: unused_element
 class _MyDailyEarningSummary {
   const _MyDailyEarningSummary({
     required this.rows,
@@ -7254,6 +6739,7 @@ class _MyDailyEarningSummary {
   final double earnedTotal;
 }
 
+// ignore: unused_element
 class _AttendanceSalarySummary {
   const _AttendanceSalarySummary({
     required this.monthlySalary,
@@ -7268,6 +6754,7 @@ class _AttendanceSalarySummary {
   final double earnedSalary;
 }
 
+// ignore: unused_element
 class _AttendanceMePayload {
   const _AttendanceMePayload({
     required this.rows,

@@ -11,6 +11,7 @@ import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/app_preloader.dart';
+import 'package:nextone/widgets/closing_manager_dialog.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/searchable_dropdown_field.dart';
 import 'package:nextone/widgets/site_revisit_data_card.dart';
@@ -625,6 +626,9 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       onEdit: () => _openEditRevisit(item),
       onStatus: () => _openStatusUpdateDialog(item),
       onCall: () => _launchCaller(leadPhone),
+      onClosingManager: _isDoneStatus(statusRaw)
+          ? () => _openClosingManagerDialogForRevisit(item)
+          : null,
     );
   }
 
@@ -1662,6 +1666,61 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     }
   }
 
+  Future<void> _openClosingManagerDialogForRevisit(
+    Map<String, dynamic> item,
+  ) async {
+    final leadId = _readString(item['lead_id'], fallback: '');
+    if (leadId.isEmpty) {
+      _showSnackBar('Lead information is missing for this re-visit.');
+      return;
+    }
+
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'revisits',
+      action: 'edit',
+      moduleLabel: 're-visits',
+    );
+    if (!allowed || !mounted) {
+      return;
+    }
+
+    final leadName = _readString(item['lead_name'], fallback: 'N/A');
+    final initialValue = _readString(
+      item['closing_person'] ?? item['closingPerson'],
+      fallback: '',
+    );
+
+    try {
+      final updated = await showClosingManagerDialog(
+        context: context,
+        leadName: leadName,
+        initialValue: initialValue,
+        onSubmit: (closingManager) async {
+          await _authProvider.updateLeadClosingManager(
+            id: leadId,
+            closingPerson: closingManager,
+            token: _authProvider.currentAuthToken,
+          );
+        },
+      );
+      if (updated != true || !mounted) {
+        return;
+      }
+      await _loadRevisits(page: _currentPage);
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Closing manager updated successfully.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
+    }
+  }
+
   String _uiToApiStatus(String value) {
     switch (value.trim().toLowerCase()) {
       case 'done':
@@ -1694,6 +1753,11 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       default:
         return 'Scheduled';
     }
+  }
+
+  bool _isDoneStatus(String status) {
+    final normalized = status.trim().toLowerCase();
+    return normalized == 'done' || normalized == 'completed';
   }
 
   String _initials(String name) {

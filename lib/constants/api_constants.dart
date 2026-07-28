@@ -37,6 +37,7 @@ class ApiConstants {
   static const String leadsdetail = '/leads/{id}';
   static const String deleteleads = '/leads/{id}';
   static const String editleads = '/leads/{id}';
+  static const String leadClosingManager = '/leads/{id}/closing-manager';
   static const String updatestatusleads = '/leads/{id}/status';
   static const String reassignmemberleads = '/leads/{id}/assign';
   static const String leadsBulkTemplate = '/leads/bulk/template';

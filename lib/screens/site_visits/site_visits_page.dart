@@ -13,6 +13,7 @@ import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/closing_manager_dialog.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
 import 'package:nextone/widgets/searchable_dropdown_field.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1343,6 +1344,14 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                   icon: Icons.check_circle_outline,
                   onTap: () => _handleVisitAction('status', visit),
                 ),
+                if (visit.status == _VisitStatus.completed) ...[
+                  SizedBox(width: _s(6)),
+                  _cardActionButton(
+                    icon: Icons.manage_accounts_outlined,
+                    iconColor: AppColors.primary,
+                    onTap: () => _openClosingManagerDialogForVisit(visit),
+                  ),
+                ],
                 SizedBox(width: _s(6)),
                 _cardActionButton(
                   icon: Icons.edit_outlined,
@@ -2328,6 +2337,65 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         'Re-visit scheduled, but the original visit status was not updated.',
       );
     }
+  }
+
+  Future<void> _openClosingManagerDialogForVisit(_SiteVisit visit) async {
+    if (visit.leadId.trim().isEmpty) {
+      _showSnackBar('Lead information is missing for this site visit.');
+      return;
+    }
+
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'edit',
+      moduleLabel: 'site visits',
+    );
+    if (!allowed || !mounted) {
+      return;
+    }
+
+    String? updatedClosingManager;
+
+    try {
+      final updated = await showClosingManagerDialog(
+        context: context,
+        leadName: visit.lead,
+        initialValue: visit.closingPerson,
+        onSubmit: (closingManager) async {
+          await _authProvider.updateLeadClosingManager(
+            id: visit.leadId,
+            closingPerson: closingManager,
+            token: _authProvider.currentAuthToken,
+          );
+          updatedClosingManager = closingManager;
+        },
+      );
+      if (updated != true || !mounted) {
+        return;
+      }
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+    await _loadSiteVisits(page: _currentPage);
+    if (!mounted) {
+      return;
+    }
+    if (updatedClosingManager != null && updatedClosingManager!.isNotEmpty) {
+      setState(() {
+        visit.closingPerson = updatedClosingManager!;
+      });
+    }
+    _showSnackBar('Closing manager updated successfully.');
   }
 
   Future<void> _captureFeedback(_SiteVisit visit) async {

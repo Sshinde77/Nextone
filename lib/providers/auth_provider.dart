@@ -2069,6 +2069,18 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> updateLeadClosingManager({
+    required String id,
+    required String closingPerson,
+    String? token,
+  }) {
+    return _authService.updateLeadClosingManager(
+      id: id,
+      closingPerson: closingPerson,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> reassignLead({
     required String id,
     required String assignedTo,

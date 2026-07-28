@@ -94,11 +94,16 @@ class AuthService {
 
     _logResponse('login', response);
 
-    if (response.statusCode == 401) {
+    if (response.statusCode == 401 || response.statusCode == 403) {
       final loginErrorBody = _decodeJsonMap(response.body);
       final message =
           loginErrorBody != null ? _readMessage(loginErrorBody) : null;
-      return message ?? 'Invalid credentials';
+      if (message != null && message.trim().isNotEmpty) {
+        return message.trim();
+      }
+      return response.statusCode == 401
+          ? 'Invalid credentials'
+          : 'Login failed.';
     }
 
     final error = _handleResponse(response, fallbackMessage: 'Login failed.');
@@ -10154,6 +10159,68 @@ class AuthService {
     }
 
     return <String, dynamic>{'id': id, 'is_read': true};
+  }
+
+  Future<Map<String, dynamic>> updateLeadClosingManager({
+    required String id,
+    required String closingPerson,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+
+    final normalizedClosingPerson = closingPerson.trim();
+    if (normalizedClosingPerson.isEmpty) {
+      throw Exception('Closing manager is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.leadClosingManager.replaceFirst(
+      '{id}',
+      normalizedId,
+    );
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode({
+      'closing_person': normalizedClosingPerson,
+    });
+
+    _logRequest(
+      endpoint: 'updateLeadClosingManager',
+      method: 'PATCH',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .patch(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('updateLeadClosingManager', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update closing manager.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Closing manager response format is not valid.');
+      }
+      final data = decoded['data'];
+      if (data is! Map) {
+        return const <String, dynamic>{};
+      }
+      return _stringDynamicMap(data);
+    } catch (_) {
+      throw Exception('Closing manager response format is not valid.');
+    }
   }
 
   Future<void> deleteSingleNotification({

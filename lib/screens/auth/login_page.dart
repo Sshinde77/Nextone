@@ -33,6 +33,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePhonePassword = true;
   bool _isSubmitting = false;
   int _activeLoginTab = 0; // 0 for Email, 1 for Phone
+  String? _loginErrorText;
 
   @override
   void initState() {
@@ -65,6 +66,7 @@ class _LoginPageState extends State<LoginPage> {
     FocusScope.of(context).unfocus();
     setState(() {
       _isSubmitting = true;
+      _loginErrorText = null;
     });
 
     try {
@@ -81,7 +83,9 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (errorMessage != null) {
-        _showSnackBar(errorMessage);
+        setState(() {
+          _loginErrorText = errorMessage;
+        });
         return;
       }
       unawaited(PushNotificationService.syncTokenWithBackend());
@@ -94,10 +98,14 @@ class _LoginPageState extends State<LoginPage> {
       );
     } on TimeoutException {
       if (!mounted) return;
-      _showSnackBar(AppErrorHandler.timeoutMessage);
+      setState(() {
+        _loginErrorText = AppErrorHandler.timeoutMessage;
+      });
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar(AppErrorHandler.friendlyMessage(error));
+      setState(() {
+        _loginErrorText = AppErrorHandler.friendlyMessage(error);
+      });
     } finally {
       if (mounted) {
         setState(() {
@@ -253,6 +261,20 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 ),
                         ),
+                        if (_loginErrorText != null &&
+                            _loginErrorText!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            _loginErrorText!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.error,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

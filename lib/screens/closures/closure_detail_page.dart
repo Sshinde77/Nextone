@@ -875,7 +875,7 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
       action: 'edit',
       moduleLabel: 'closures',
     );
-    if (!allowed) {
+    if (!mounted || !allowed) {
       return;
     }
 

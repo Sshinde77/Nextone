@@ -19,6 +19,7 @@ import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/permission_guard.dart';
 import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
+import 'package:nextone/widgets/closing_manager_dialog.dart';
 import 'package:nextone/widgets/data_card.dart';
 import 'package:nextone/widgets/searchable_dropdown_field.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
@@ -2723,6 +2724,50 @@ class _LeadsPageState extends State<LeadsPage> {
     }
   }
 
+  Future<void> _openClosingManagerDialogForLead(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed || !mounted) {
+      return;
+    }
+
+    final initialValue = _readString(
+      lead.rawData['closing_person'] ?? lead.rawData['closingPerson'],
+    );
+
+    try {
+      final updated = await showClosingManagerDialog(
+        context: context,
+        leadName: lead.name,
+        initialValue: initialValue,
+        onSubmit: (closingManager) async {
+          await _authProvider.updateLeadClosingManager(
+            id: lead.id,
+            closingPerson: closingManager,
+            token: _authProvider.currentAuthToken,
+          );
+        },
+      );
+      if (updated == true && mounted) {
+        await _loadLeads();
+        if (!mounted) {
+          return;
+        }
+        _showSnackBar('Closing manager updated successfully.');
+      }
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
+    }
+  }
+
   Future<bool> _leadHasEoiDocuments(_LeadModel lead) async {
     if (_rawLeadHasEoiDocuments(lead.rawData)) {
       return true;
@@ -4919,6 +4964,13 @@ class _LeadsPageState extends State<LeadsPage> {
                           color: const Color(0xFF14B8A6),
                           onTap: () => _openStatusSheet(lead),
                         ),
+                        if (lead.status.trim().toLowerCase() ==
+                            'site_visit_done')
+                          DataCardAction(
+                            icon: Icons.manage_accounts_outlined,
+                            color: AppColors.primary,
+                            onTap: () => _openClosingManagerDialogForLead(lead),
+                          ),
                         DataCardAction(
                           icon: Icons.edit_outlined,
                           onTap: () => _openEditLead(lead),

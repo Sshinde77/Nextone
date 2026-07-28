@@ -23,6 +23,7 @@ class SiteRevisitDataCard extends StatelessWidget {
     this.onEdit,
     this.onStatus,
     this.onCall,
+    this.onClosingManager,
     this.onDelete,
   });
 
@@ -45,6 +46,7 @@ class SiteRevisitDataCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onStatus;
   final VoidCallback? onCall;
+  final VoidCallback? onClosingManager;
   final VoidCallback? onDelete;
 
   @override
@@ -124,6 +126,12 @@ class SiteRevisitDataCard extends StatelessWidget {
               _action(Icons.remove_red_eye_outlined, onView),
               _action(Icons.edit_outlined, onEdit),
               if (!_isDoneStatus) _action(Icons.check_circle_outline, onStatus),
+              if (_isDoneStatus)
+                _action(
+                  Icons.manage_accounts_outlined,
+                  onClosingManager,
+                  color: AppColors.primary,
+                ),
               if (onDelete != null) _action(Icons.delete_outline, onDelete),
             ],
           ),
