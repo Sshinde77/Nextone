@@ -10,6 +10,7 @@ class SiteRevisitDataCard extends StatelessWidget {
     required this.projectCity,
     required this.visitDateLabel,
     required this.visitTimeLabel,
+    required this.createdAt,
     required this.assignedToName,
     required this.closingPersonName,
     required this.transportLabel,
@@ -33,6 +34,7 @@ class SiteRevisitDataCard extends StatelessWidget {
   final String projectCity;
   final String visitDateLabel;
   final String visitTimeLabel;
+  final String createdAt;
   final String assignedToName;
   final String closingPersonName;
   final String transportLabel;
@@ -114,6 +116,7 @@ class SiteRevisitDataCard extends StatelessWidget {
           _infoRow('Project', '$projectName, $projectCity'),
           _infoRow('Date', visitDateLabel),
           _infoRow('Time', visitTimeLabel),
+          _infoRow('Created At', createdAt),
           _infoRow('Assigned To', assignedToName),
           _infoRow('Closing Person', closingPersonName),
           _infoRow('Transport', transportLabel),

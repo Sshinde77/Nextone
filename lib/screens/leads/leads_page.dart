@@ -4937,6 +4937,7 @@ class _LeadsPageState extends State<LeadsPage> {
                       budget: lead.budget,
                       phone: _displayPhoneForLead(lead),
                       phoneAction: _phoneRevealAction(lead),
+                      createdAt: lead.createdAt,
                       profileImageUrl: lead.profileImageUrl,
                       assigneeName: lead.assignee.name,
                       assigneeImageUrl: lead.assignee.imageUrl,
@@ -5350,6 +5351,7 @@ class _LeadModel {
     required this.assignedToId,
     required this.locationPreference,
     required this.notes,
+    required this.createdAt,
     required this.rawData,
   });
 
@@ -5368,6 +5370,7 @@ class _LeadModel {
   final String assignedToId;
   final String locationPreference;
   final String notes;
+  final String createdAt;
   final Map<String, dynamic> rawData;
 
   factory _LeadModel.fromApi(Map<String, dynamic> json) {
@@ -5462,6 +5465,9 @@ class _LeadModel {
       json['location_preference'] ?? json['locationPreference'],
     );
     final notes = _readString(json['notes']);
+    final createdAt = _readDateTime(
+      json['created_at'] ?? json['createdAt'] ?? json['timestamp'],
+    );
 
     return _LeadModel(
       id: id,
@@ -5481,6 +5487,7 @@ class _LeadModel {
       assignedToId: assignedToId,
       locationPreference: locationPreference,
       notes: notes,
+      createdAt: createdAt,
       rawData: Map<String, dynamic>.from(json),
     );
   }

@@ -1994,6 +1994,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
       towerBlock: _readString(item['tower_block'], fallback: '-').toUpperCase(),
       floorNumber: item['floor_number']?.toString() ?? '-',
       bookingDate: _formatDate(_readString(item['booking_date'], fallback: '')),
+      createdAt: _formatDate(_readString(item['created_at'], fallback: '')),
       dealValueLabel: _rupee(_toDouble(item['agreed_price'])),
       commissionLabel: _rupee(_toDouble(item['commission_amount'])),
       commissionPaidLabel: item['commission_paid'] == true ? 'Yes' : 'No',

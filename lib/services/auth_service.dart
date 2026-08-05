@@ -528,13 +528,18 @@ class AuthService {
     String? token,
     int page = 1,
     int perPage = 10,
+    String? search,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.users}')
-        .replace(queryParameters: <String, String>{
+    final queryParameters = <String, String>{
       'page': page.toString(),
       'per_page': perPage.toString(),
-    });
+    };
+    if (search != null && search.trim().isNotEmpty) {
+      queryParameters['search'] = search.trim();
+    }
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.users}')
+        .replace(queryParameters: queryParameters);
     final headers = _headers(accept: 'application/json', token: resolvedToken);
     _logRequest(
       endpoint: 'usersPaged',

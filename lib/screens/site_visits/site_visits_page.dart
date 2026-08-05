@@ -51,6 +51,7 @@ class _SiteVisit {
     required this.dateTime,
     required this.imageUrl,
     required this.assignee,
+    required this.createdAt,
     this.closingPerson = '',
     this.status = _VisitStatus.scheduled,
     this.feedback = '',
@@ -70,6 +71,7 @@ class _SiteVisit {
   DateTime dateTime;
   String imageUrl;
   String assignee;
+  String createdAt;
   String closingPerson;
   _VisitStatus status;
   String feedback;
@@ -1351,7 +1353,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                 ),
               ],
             ),
-            SizedBox(height: _s(8)),
+               SizedBox(height: _s(10)),
             Row(
               children: [
                 Expanded(
@@ -1375,6 +1377,21 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
               ],
             ),
             SizedBox(height: _s(10)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _visitInfoBlock(
+                    label: 'Created At',
+                    icon: Icons.event_note_outlined,
+                    value: visit.createdAt,
+                  ),
+                ),
+                SizedBox(width: _s(14)),
+                const Expanded(child: SizedBox.shrink()),
+              ],
+            ),
+            SizedBox(height: _s(8)),
             Row(
               children: [
                 CircleAvatar(
@@ -2896,6 +2913,35 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           json['remarks'] ??
           json['feedback'],
     );
+    String formatCreatedAt(dynamic value) {
+      final raw = _readString(value);
+      if (raw.isEmpty) {
+        return '-';
+      }
+      final parsed = DateTime.tryParse(raw);
+      if (parsed == null) {
+        return raw;
+      }
+      final local = parsed.toLocal();
+      const months = <String>[
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      final day = local.day.toString().padLeft(2, '0');
+      final hour = local.hour.toString().padLeft(2, '0');
+      final minute = local.minute.toString().padLeft(2, '0');
+      return '$day ${months[local.month - 1]} ${local.year}, $hour:$minute';
+    }
 
     return _SiteVisit(
       id: id,
@@ -2924,6 +2970,9 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       leadId: _readString(json['lead_id'] ?? leadMap['id']),
       projectId: _readString(json['project_id'] ?? projectMap['id']),
       assigneeId: _readString(json['assigned_to'] ?? assignedToMap['id']),
+      createdAt: formatCreatedAt(
+        json['created_at'] ?? json['createdAt'] ?? json['timestamp'],
+      ),
       rawData: json,
     );
   }

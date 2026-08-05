@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nextone/constants/app_colors.dart';
@@ -21,6 +23,7 @@ class UsersPage extends StatefulWidget {
 }
 
 class _UsersPageState extends State<UsersPage> {
+  final TextEditingController _searchController = TextEditingController();
   final AuthProvider _authProvider = AuthProvider();
   String _selectedRole = 'All Roles';
   String _selectedStatus = 'All Status';
@@ -30,10 +33,12 @@ class _UsersPageState extends State<UsersPage> {
   int _totalItems = 0;
   final int _pageSize = 10;
   final Set<String> _assigningManagerUserIds = <String>{};
+  Timer? _searchDebounce;
   String? _error;
   List<_UserItem> _users = <_UserItem>[];
   String _currentRole = '';
   bool _isExporting = false;
+  String _searchQuery = '';
 
   static const List<String> _fallbackRoleFilters = <String>[
     'All Roles',
@@ -57,6 +62,13 @@ class _UsersPageState extends State<UsersPage> {
     _loadAccess();
     _loadRoles();
     _loadUsers(page: 1);
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   bool get _canCreateUsers => RoleAccess.canCreateUsers(_currentRole);
@@ -87,7 +99,7 @@ class _UsersPageState extends State<UsersPage> {
     }).toList();
   }
 
-  Future<void> _loadUsers({int page = 1}) async {
+  Future<void> _loadUsers({int page = 1, String? search}) async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -97,6 +109,7 @@ class _UsersPageState extends State<UsersPage> {
         token: _authProvider.currentAuthToken,
         page: page,
         perPage: _pageSize,
+        search: search ?? _searchQuery,
       );
       if (!mounted) return;
       setState(() {
@@ -113,6 +126,19 @@ class _UsersPageState extends State<UsersPage> {
         _error = AppErrorHandler.friendlyMessage(error);
       });
     }
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      final query = value.trim();
+      setState(() {
+        _searchQuery = query;
+        _currentPage = 1;
+      });
+      _loadUsers(page: 1, search: query);
+    });
   }
 
   Future<void> _loadRoles() async {
@@ -549,6 +575,27 @@ class _UsersPageState extends State<UsersPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 120),
           children: [
+            Container(
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: TextField(
+                controller: _searchController,
+                onChanged: _onSearchChanged,
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  hintText: 'Search users',
+                  hintStyle: TextStyle(color: AppColors.textSecondary),
+                  prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(

@@ -533,6 +533,9 @@ class _FollowUpPageState extends State<FollowUpPage> {
     final leadPhone = _readString(
       payload['lead_phone'] ?? payload['leadPhone'] ?? payload['phone'],
     );
+    final createdAt = _formatCreatedAt(
+      payload['created_at'] ?? payload['createdAt'] ?? payload['timestamp'],
+    );
 
     return _FollowUpModel(
       id: id,
@@ -550,6 +553,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
       channel: 'Call',
       notes: _readString(payload['notes']),
       assignee: assignee,
+      createdAt: createdAt,
     );
   }
 
@@ -1022,6 +1026,9 @@ class _FollowUpPageState extends State<FollowUpPage> {
     String assigneeImage = '';
     String assigneePhone =
         _readString(json['assigned_phone'] ?? json['assignedPhone']);
+    final createdAt = _formatCreatedAt(
+      json['created_at'] ?? json['createdAt'] ?? json['timestamp'],
+    );
     if (assigned is Map<String, dynamic>) {
       assigneeName = _readString(
         assigned['name'] ??
@@ -1064,7 +1071,20 @@ class _FollowUpPageState extends State<FollowUpPage> {
         imageUrl: assigneeImage,
         phone: assigneePhone,
       ),
+      createdAt: createdAt,
     );
+  }
+
+  String _formatCreatedAt(dynamic value) {
+    final raw = _readString(value);
+    if (raw.isEmpty) {
+      return '-';
+    }
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) {
+      return raw;
+    }
+    return DateFormat('dd MMM yyyy, hh:mm a').format(parsed.toLocal());
   }
 
   String _labelStatus(String value) {
@@ -1529,6 +1549,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
                   budget: followUp.channel,
                   phone:
                       followUp.leadPhone.isEmpty ? 'N/A' : followUp.leadPhone,
+                  createdAt: followUp.createdAt,
                   profileImageUrl: followUp.assignee.imageUrl,
                   assigneeName: followUp.assignee.name,
                   assigneeImageUrl: followUp.assignee.imageUrl,
@@ -1708,6 +1729,7 @@ class _FollowUpModel {
     required this.channel,
     required this.notes,
     required this.assignee,
+    required this.createdAt,
   });
 
   final String id;
@@ -1724,6 +1746,7 @@ class _FollowUpModel {
   final String channel;
   final String notes;
   final _PersonModel assignee;
+  final String createdAt;
 
   _FollowUpModel copyWith({
     String? id,
@@ -1740,6 +1763,7 @@ class _FollowUpModel {
     String? channel,
     String? notes,
     _PersonModel? assignee,
+    String? createdAt,
   }) {
     return _FollowUpModel(
       id: id ?? this.id,
@@ -1756,6 +1780,7 @@ class _FollowUpModel {
       channel: channel ?? this.channel,
       notes: notes ?? this.notes,
       assignee: assignee ?? this.assignee,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

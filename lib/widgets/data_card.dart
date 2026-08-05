@@ -67,6 +67,7 @@ class DataCard extends StatelessWidget {
     required this.assigneeName,
     required this.assigneeImageUrl,
     required this.actions,
+    this.createdAt = '',
     this.bulkSelectionMode = false,
     this.isSelected = false,
     this.phoneAction,
@@ -90,6 +91,7 @@ class DataCard extends StatelessWidget {
   final String assigneeName;
   final String assigneeImageUrl;
   final List<DataCardAction> actions;
+  final String createdAt;
   final Widget? phoneAction;
 
   final bool bulkSelectionMode;
@@ -210,6 +212,14 @@ class DataCard extends StatelessWidget {
                       trailing: phoneAction,
                     ),
                   ),
+                  if (createdAt.trim().isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _metaItem(
+                      'Created At',
+                      createdAt,
+                      icon: Icons.event_note_outlined,
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   Row(
                     children: [

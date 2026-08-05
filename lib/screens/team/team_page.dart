@@ -31,6 +31,7 @@ class _TeamPageState extends State<TeamPage> {
   final Set<String> _deletingMemberIds = <String>{};
   final Set<String> _changingRoleMemberIds = <String>{};
   final Set<String> _assigningManagerMemberIds = <String>{};
+  String _currentUserId = '';
   String _currentRole = '';
   final List<_RoleOption> _roleOptions = const [
     _RoleOption(label: 'Admin', value: 'admin'),
@@ -40,6 +41,7 @@ class _TeamPageState extends State<TeamPage> {
   ];
 
   final List<_TeamMember> _members = [];
+  final List<_TeamMember> _allMembers = [];
   List<_TeamMember> _assignmentMembers = [];
 
   bool get _canCreateUsers => RoleAccess.canCreateUsers(_currentRole);
@@ -54,23 +56,49 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   List<_TeamMember> get _filteredMembers {
-    final query = _searchController.text.toLowerCase();
+    final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) {
-      return _members;
+      return _allMembers;
     }
 
-    return _members.where((m) {
+    return _allMembers.where((m) {
       return m.name.toLowerCase().contains(query) ||
           m.role.toLowerCase().contains(query);
     }).toList();
   }
 
+  int get _visibleTotalItems => _filteredMembers.length;
+
+  int get _visibleTotalPages {
+    final totalItems = _visibleTotalItems;
+    if (totalItems <= 0) {
+      return 1;
+    }
+    return ((totalItems + _pageSize - 1) ~/ _pageSize);
+  }
+
+  List<_TeamMember> get _visibleMembers {
+    final members = _filteredMembers;
+    final safePage = _currentPage.clamp(1, _visibleTotalPages).toInt();
+    final startIndex = (safePage - 1) * _pageSize;
+    if (startIndex >= members.length) {
+      return const <_TeamMember>[];
+    }
+    return members.skip(startIndex).take(_pageSize).toList();
+  }
+
+  void _syncVisibleMembers() {
+    _members
+      ..clear()
+      ..addAll(_visibleMembers);
+  }
+
   _TeamMember? get _bestPerformer {
-    if (_members.isEmpty) {
+    if (_allMembers.isEmpty) {
       return null;
     }
 
-    return _members.reduce(
+    return _allMembers.reduce(
       (a, b) => a.conversionRate >= b.conversionRate ? a : b,
     );
   }
@@ -80,7 +108,6 @@ class _TeamPageState extends State<TeamPage> {
     super.initState();
     _loadAccess();
     _loadMembers(page: 1);
-    _loadAssignmentMembers();
   }
 
   @override
@@ -101,9 +128,26 @@ class _TeamPageState extends State<TeamPage> {
     }
   }
 
+  Future<void> _loadCurrentUserId() async {
+    try {
+      final profile = await _authProvider.profile(
+        token: _authProvider.currentAuthToken,
+      );
+      final currentUserId = _TeamMember._toCleanString(profile.data['id']);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _currentUserId = currentUserId;
+      });
+    } catch (_) {
+      // Fall back to showing the tree as returned if profile lookup fails.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final members = _filteredMembers;
+    final members = _members;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -132,7 +176,7 @@ class _TeamPageState extends State<TeamPage> {
             _buildSearchAndCreateRow(),
             const SizedBox(height: 16),
             Text(
-              'Team Members (${_totalItems > 0 ? _totalItems : members.length})',
+              'Team Members ($_totalItems)',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -150,14 +194,19 @@ class _TeamPageState extends State<TeamPage> {
               )
             else
               ...members.map(_buildMemberCard),
-            if (_totalPages > 1) ...[
+            if (_visibleTotalPages > 1) ...[
               const SizedBox(height: 14),
               PaginationWidget(
-                currentPage: _currentPage,
-                totalPages: _totalPages,
-                totalItems: _totalItems,
+                currentPage: _currentPage.clamp(1, _visibleTotalPages).toInt(),
+                totalPages: _visibleTotalPages,
+                totalItems: _visibleTotalItems,
                 itemLabel: 'members',
-                onPageChanged: (page) => _loadMembers(page: page),
+                onPageChanged: (page) {
+                  setState(() {
+                    _currentPage = page;
+                    _syncVisibleMembers();
+                  });
+                },
               ),
             ],
           ],
@@ -173,36 +222,44 @@ class _TeamPageState extends State<TeamPage> {
     });
 
     try {
-      final result = await _authProvider.usersPaged(
+      if (_currentUserId.isEmpty) {
+        await _loadCurrentUserId();
+      }
+
+      final users = await _authProvider.assignmentUsers(
         token: _authProvider.currentAuthToken,
-        page: page,
-        perPage: _pageSize,
       );
-      final members = result.items
+      final members = users
           .where(_TeamMember.isActiveUser)
+          .where((member) => _currentUserId.isEmpty || member['id'] != _currentUserId)
           .map(_TeamMember.fromApi)
           .toList();
       if (!mounted) {
         return;
       }
       setState(() {
-        _members
+        _allMembers
           ..clear()
           ..addAll(members);
-        _currentPage = result.currentPage <= 0 ? page : result.currentPage;
-        _totalPages = result.totalPages <= 0 ? 1 : result.totalPages;
-        _totalItems = result.totalItems < 0 ? 0 : result.totalItems;
+        _assignmentMembers = List<_TeamMember>.from(members);
+        _totalItems = _allMembers.length;
+        _totalPages = _visibleTotalPages;
+        _currentPage = page.clamp(1, _totalPages).toInt();
+        _syncVisibleMembers();
         _isLoadingMembers = false;
       });
-      _loadAssignmentMembers();
     } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
+        _allMembers.clear();
         _members.clear();
         _isLoadingMembers = false;
         _membersLoadError = AppErrorHandler.friendlyMessage(error);
+        _totalItems = 0;
+        _totalPages = 1;
+        _currentPage = 1;
       });
     }
   }
@@ -218,6 +275,7 @@ class _TeamPageState extends State<TeamPage> {
       setState(() {
         _assignmentMembers = users
             .where(_TeamMember.isActiveUser)
+            .where((member) => _currentUserId.isEmpty || member['id'] != _currentUserId)
             .map(_TeamMember.fromApi)
             .toList();
       });
@@ -335,9 +393,7 @@ class _TeamPageState extends State<TeamPage> {
       if (!mounted) {
         return;
       }
-      setState(() {
-        _members.removeWhere((m) => m.id == member.id);
-      });
+      await _loadMembers(page: _currentPage);
       _showSnackBar('Member deleted successfully.');
     } catch (error) {
       if (!mounted) {
@@ -427,11 +483,6 @@ class _TeamPageState extends State<TeamPage> {
       return;
     }
 
-    final index = _members.indexWhere((m) => m.id == member.id);
-    if (index < 0) {
-      return;
-    }
-
     setState(() {
       _changingRoleMemberIds.add(member.id);
     });
@@ -447,17 +498,7 @@ class _TeamPageState extends State<TeamPage> {
         return;
       }
 
-      setState(() {
-        final updatedData = Map<String, dynamic>.from(
-          _members[index].originalData,
-        )..['role'] = selectedRole;
-        _members[index] = _members[index].copyWith(
-          role: _TeamMember.readableRole(selectedRole),
-          rawRole: selectedRole,
-          originalData: updatedData,
-        );
-      });
-
+      await _loadMembers(page: _currentPage);
       _showSnackBar(
           'Role changed to ${_TeamMember.readableRole(selectedRole)}.');
     } catch (error) {
@@ -476,7 +517,7 @@ class _TeamPageState extends State<TeamPage> {
 
   List<_TeamMember> get _managerOptions {
     final source =
-        _assignmentMembers.isNotEmpty ? _assignmentMembers : _members;
+        _assignmentMembers.isNotEmpty ? _assignmentMembers : _allMembers;
     return source.where((member) {
       return member.rawRole == RoleAccess.salesManager;
     }).toList();
@@ -589,16 +630,7 @@ class _TeamPageState extends State<TeamPage> {
         token: _authProvider.currentAuthToken,
       );
       if (!mounted) return;
-      final index = _members.indexWhere((m) => m.id == member.id);
-      if (index >= 0) {
-        final updatedData =
-            Map<String, dynamic>.from(_members[index].originalData)
-              ..['manager_id'] = manager.id
-              ..['manager_name'] = manager.name;
-        setState(() {
-          _members[index] = _members[index].copyWith(originalData: updatedData);
-        });
-      }
+      await _loadMembers(page: _currentPage);
       _showSnackBar('Manager assigned to ${member.name}.');
     } catch (error) {
       if (!mounted) return;
@@ -755,7 +787,12 @@ class _TeamPageState extends State<TeamPage> {
             ),
             child: TextField(
               controller: _searchController,
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) {
+                setState(() {
+                  _currentPage = 1;
+                  _syncVisibleMembers();
+                });
+              },
               decoration: const InputDecoration(
                 hintText: 'Search member',
                 hintStyle: TextStyle(color: AppColors.textSecondary),

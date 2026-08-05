@@ -83,8 +83,14 @@ class AuthProvider {
     String? token,
     int page = 1,
     int perPage = 10,
+    String? search,
   }) {
-    return _authService.usersPaged(token: token, page: page, perPage: perPage);
+    return _authService.usersPaged(
+      token: token,
+      page: page,
+      perPage: perPage,
+      search: search,
+    );
   }
 
   Future<List<Map<String, dynamic>>> assignmentUsers({String? token}) {

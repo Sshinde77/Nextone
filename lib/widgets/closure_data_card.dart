@@ -13,6 +13,7 @@ class ClosureDataCard extends StatelessWidget {
     required this.towerBlock,
     required this.floorNumber,
     required this.bookingDate,
+    required this.createdAt,
     required this.dealValueLabel,
     required this.commissionLabel,
     required this.commissionPaidLabel,
@@ -34,6 +35,7 @@ class ClosureDataCard extends StatelessWidget {
   final String towerBlock;
   final String floorNumber;
   final String bookingDate;
+  final String createdAt;
   final String dealValueLabel;
   final String commissionLabel;
   final String commissionPaidLabel;
@@ -111,6 +113,7 @@ class ClosureDataCard extends StatelessWidget {
           _infoRow(
               'Unit', '$unitNumber • $unitType • $towerBlock • $floorNumber'),
           _infoRow('Booking Date', bookingDate),
+          _infoRow('Created At', createdAt),
           _infoRow('Deal Value', dealValueLabel),
           _infoRow('Commission', commissionLabel),
           _infoRow('Commission Paid', commissionPaidLabel),

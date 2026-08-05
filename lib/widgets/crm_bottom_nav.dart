@@ -213,7 +213,7 @@ class _CRMAppBottomNavState extends State<CRMAppBottomNav> {
       if (widget.showUsers)
         _NavEntry(
           index: 8,
-          label: 'Access Control',
+          label: 'Users',
           icon: Icons.manage_accounts_outlined,
           onTap: widget.onSettings,
         ),

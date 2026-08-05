@@ -651,6 +651,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
       projectCity: projectCity,
       visitDateLabel: visitDate,
       visitTimeLabel: visitTime,
+      createdAt: _formatDate(_readString(item['created_at'], fallback: '')),
       assignedToName: assignedTo,
       closingPersonName: closingPerson,
       transportLabel: transport,
