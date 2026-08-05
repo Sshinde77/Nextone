@@ -42,7 +42,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
     _ShareFieldOption(key: 'description', label: 'Description'),
   ];
 
-  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _nameSearchController =
+      TextEditingController();
+  final TextEditingController _citySearchController = TextEditingController();
   final AuthProvider _authProvider = AuthProvider();
   final RegExp _emailPattern =
       RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
@@ -54,6 +56,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
   String? _loadError;
   String _currentRole = '';
   String? _selectedStatus;
+  String _nameSearchQuery = '';
+  String _citySearchQuery = '';
   int _currentPage = 1;
   int _totalPages = 1;
   int _perPage = 10;
@@ -85,7 +89,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
-    _searchController.dispose();
+    _nameSearchController.dispose();
+    _citySearchController.dispose();
     super.dispose();
   }
 
@@ -97,12 +102,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
     });
 
     try {
-      final filters = _parseSearchFilters(_searchController.text);
       final result = await _authProvider.projects(
         token: _authProvider.currentAuthToken,
-        city: filters.city,
+        city: _citySearchQuery.trim().isEmpty ? null : _citySearchQuery.trim(),
         status: _selectedStatus,
-        search: filters.search,
+        search: _nameSearchQuery.trim().isEmpty ? null : _nameSearchQuery.trim(),
         page: requestedPage,
         perPage: _perPage,
       );
@@ -130,40 +134,22 @@ class _ProjectsPageState extends State<ProjectsPage> {
     }
   }
 
-  _ProjectSearchFilters _parseSearchFilters(String rawInput) {
-    final input = rawInput.trim();
-    if (input.isEmpty) {
-      return const _ProjectSearchFilters();
-    }
-
-    String? city;
-    String remaining = input;
-
-    final cityTagMatch =
-        RegExp(r'city\s*:\s*([^\s,]+)', caseSensitive: false).firstMatch(input);
-    if (cityTagMatch != null) {
-      city = cityTagMatch.group(1)?.trim();
-      remaining = input.replaceFirst(cityTagMatch.group(0) ?? '', '').trim();
-    } else {
-      final csvParts = input.split(RegExp(r'\s*,\s*'));
-      if (csvParts.length >= 2) {
-        city = csvParts.first.trim();
-        remaining = csvParts.skip(1).join(' ').trim();
-      }
-    }
-
-    return _ProjectSearchFilters(
-      city: (city == null || city.isEmpty) ? null : city,
-      search: remaining.isEmpty ? null : remaining,
-    );
-  }
-
-  void _onSearchChanged(String _) {
+  void _scheduleProjectSearch() {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 450), () {
       if (!mounted) return;
       _loadProjects(page: 1);
     });
+  }
+
+  void _onNameSearchChanged(String value) {
+    _nameSearchQuery = value;
+    _scheduleProjectSearch();
+  }
+
+  void _onCitySearchChanged(String value) {
+    _citySearchQuery = value;
+    _scheduleProjectSearch();
   }
 
   void _onStatusChanged(String? value) {
@@ -406,106 +392,121 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Widget _buildSearchAndCreateRow() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          flex: 2,
-          child: Container(
-            height: 50,
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              decoration: const InputDecoration(
-                hintText: 'Search (city:Mumbai Skyline) or (Mumbai, Skyline)',
-                hintStyle: TextStyle(color: AppColors.textSecondary),
-                prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 14),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSearchInput(
+                controller: _nameSearchController,
+                hintText: 'Search project name',
+                onChanged: _onNameSearchChanged,
               ),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Container(
-            height: 50,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildSearchInput(
+                controller: _citySearchController,
+                hintText: 'Search city',
+                onChanged: _onCitySearchChanged,
+              ),
             ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String?>(
-                value: _selectedStatus,
-                isExpanded: true,
-                icon: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: AppColors.textSecondary,
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 50,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
                 ),
-                hint: const Text(
-                  'Status',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                items: <DropdownMenuItem<String?>>[
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('All'),
-                  ),
-                  ..._statusOptions.map(
-                    (status) => DropdownMenuItem<String?>(
-                      value: status,
-                      child: Text(_formatStatusLabel(status)),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: _selectedStatus,
+                    isExpanded: true,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textSecondary,
                     ),
+                    hint: const Text(
+                      'Status',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    items: <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All'),
+                      ),
+                      ..._statusOptions.map(
+                        (status) => DropdownMenuItem<String?>(
+                          value: status,
+                          child: Text(_formatStatusLabel(status)),
+                        ),
+                      ),
+                    ],
+                    onChanged: _onStatusChanged,
                   ),
-                ],
-                onChanged: _onStatusChanged,
+                ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        // if (_canExportData) ...[
-        //   OutlinedButton.icon(
-        //     onPressed: _isExporting ? null : _exportProjects,
-        //     icon: _isExporting
-        //         ? const SizedBox(
-        //             width: 16,
-        //             height: 16,
-        //             child: CircularProgressIndicator(strokeWidth: 2),
-        //           )
-        //         : const Icon(Icons.download_rounded, size: 18),
-        //     label: Text(_isExporting ? 'Exporting...' : 'Export'),
-        //     style: OutlinedButton.styleFrom(
-        //       minimumSize: const Size(110, 50),
-        //       shape: RoundedRectangleBorder(
-        //         borderRadius: BorderRadius.circular(999),
-        //       ),
-        //     ),
-        //   ),
-        //   const SizedBox(width: 8),
-        // ],
-        if (_canCreateProjects)
-          FilledButton(
-            onPressed: _openCreateProject,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(120, 50),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999)),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () => _loadProjects(page: _currentPage),
+              icon: const Icon(Icons.refresh_rounded),
             ),
-            child: const Text('Add Project'),
-          ),
+            if (_canCreateProjects) ...[
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _openCreateProject,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(120, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                child: const Text('Add Project'),
+              ),
+            ],
+          ],
+        ),
       ],
+    );
+  }
+
+  Widget _buildSearchInput({
+    required TextEditingController controller,
+    required String hintText,
+    required ValueChanged<String> onChanged,
+  }) {
+    return Container(
+      height: 50,
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(color: AppColors.textSecondary),
+          prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+      ),
     );
   }
 
@@ -2136,16 +2137,6 @@ class _ProjectsPageState extends State<ProjectsPage> {
     emailController.dispose();
     messageController.dispose();
   }
-}
-
-class _ProjectSearchFilters {
-  const _ProjectSearchFilters({
-    this.city,
-    this.search,
-  });
-
-  final String? city;
-  final String? search;
 }
 
 class _Project {
