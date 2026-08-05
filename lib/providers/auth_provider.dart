@@ -1551,6 +1551,28 @@ class AuthProvider {
     );
   }
 
+  Future<Map<String, dynamic>> createSiteRevisitFromLead({
+    required String leadId,
+    required String projectId,
+    required String visitDate,
+    required String visitTime,
+    required String assignedTo,
+    required String reason,
+    required bool transportArranged,
+    String? token,
+  }) {
+    return _authService.createSiteRevisitFromLead(
+      leadId: leadId,
+      projectId: projectId,
+      visitDate: visitDate,
+      visitTime: visitTime,
+      assignedTo: assignedTo,
+      reason: reason,
+      transportArranged: transportArranged,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> createClosure({
     required String leadId,
     required String projectId,

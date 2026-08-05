@@ -111,6 +111,7 @@ class ApiConstants {
   static const String submitfeedbacksitevisits = '/site-visits/{id}/feedback';
   static const String mySiteVisits = '/me/site-visits';
   static const String siteRevisits = '/site-revisits';
+  static const String createSiteRevisitFromLead = '/site-revisits/from-lead';
   static const String myRevisits = '/me/revisits';
   static const String submitfeedbacksiteRevisits =
       '/site-revisits/{id}/feedback';

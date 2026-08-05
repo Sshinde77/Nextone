@@ -6139,6 +6139,95 @@ class AuthService {
     };
   }
 
+  Future<Map<String, dynamic>> createSiteRevisitFromLead({
+    required String leadId,
+    required String projectId,
+    required String visitDate,
+    required String visitTime,
+    required String assignedTo,
+    required String reason,
+    required bool transportArranged,
+    String? token,
+  }) async {
+    final normalizedLeadId = leadId.trim();
+    final normalizedProjectId = projectId.trim();
+    final normalizedVisitDate = visitDate.trim();
+    final normalizedVisitTime = visitTime.trim();
+    final normalizedAssignedTo = assignedTo.trim();
+    final normalizedReason = reason.trim();
+    if (normalizedLeadId.isEmpty) {
+      throw Exception('Lead id is required.');
+    }
+    if (normalizedProjectId.isEmpty) {
+      throw Exception('Project id is required.');
+    }
+    if (normalizedVisitDate.isEmpty) {
+      throw Exception('Visit date is required.');
+    }
+    if (normalizedVisitTime.isEmpty) {
+      throw Exception('Visit time is required.');
+    }
+    if (normalizedAssignedTo.isEmpty) {
+      throw Exception('Assigned user is required.');
+    }
+    if (normalizedReason.isEmpty) {
+      throw Exception('Reason is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.createSiteRevisitFromLead}',
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    final body = jsonEncode(<String, dynamic>{
+      'lead_id': normalizedLeadId,
+      'project_id': normalizedProjectId,
+      'visit_date': normalizedVisitDate,
+      'visit_time': normalizedVisitTime,
+      'assigned_to': normalizedAssignedTo,
+      'reason': normalizedReason,
+      'transport_arranged': transportArranged,
+    });
+
+    _logRequest(
+      endpoint: 'createSiteRevisitFromLead',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: body,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(_requestTimeout);
+    _logResponse('createSiteRevisitFromLead', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create re-visit from lead.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+
+    return <String, dynamic>{
+      'lead_id': normalizedLeadId,
+      'project_id': normalizedProjectId,
+      'visit_date': normalizedVisitDate,
+      'visit_time': normalizedVisitTime,
+      'assigned_to': normalizedAssignedTo,
+      'reason': normalizedReason,
+      'transport_arranged': transportArranged,
+    };
+  }
+
   List<Map<String, dynamic>>? _sanitizeClosureDocuments(
     List<Map<String, dynamic>>? documents,
   ) {

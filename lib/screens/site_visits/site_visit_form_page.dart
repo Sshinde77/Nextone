@@ -38,6 +38,8 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
   bool _useManualProjectInput = false;
   bool _keepCurrentAssignedUser = false;
   String _currentRole = '';
+  String? _currentUserId;
+  String _currentUserName = '';
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
@@ -69,16 +71,21 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
     try {
       final token = _authProvider.currentAuthToken;
       final currentRole = await RoleAccess.currentRole(_authProvider);
+      final profile = await _authProvider.profile(token: token);
       final leadsResult = await _authProvider.leads(token: token, perPage: 100);
       final projectsResult =
           await _authProvider.projects(token: token, perPage: 100);
       final usersList = await _authProvider.assignmentUsers(token: token);
+      final currentUserId = _extractUserId(profile.data);
+      final currentUserName = _extractUserName(profile.data);
 
       setState(() {
         _leads = leadsResult.items;
         _projects = projectsResult.items;
         _teamMembers = usersList;
         _currentRole = currentRole;
+        _currentUserId = currentUserId;
+        _currentUserName = currentUserName;
         _keepCurrentAssignedUser = _canKeepCurrentAssignedUser;
         _isLoadingDropdowns = false;
       });
@@ -95,6 +102,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
             });
           }
         }
+        _syncAssigneeSelectionForRole();
       }
     } catch (e) {
       if (mounted) {
@@ -154,6 +162,8 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
         );
       }
     }
+
+    _syncAssigneeSelectionForRole();
   }
 
   String _resolveProjectIdForSubmit() {
@@ -249,13 +259,95 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
   }
 
   String _resolveAssignedToForSubmit() {
-    if (!widget.isEditMode && !_canKeepCurrentAssignedUser) {
-      return _selectedLeadAssignedUserId();
-    }
     if (_canKeepCurrentAssignedUser && _keepCurrentAssignedUser) {
       return _selectedLeadAssignedUserId();
     }
-    return (_selectedAssigneeId ?? '').trim();
+    final selectedAssigneeId = (_selectedAssigneeId ?? '').trim();
+    if (selectedAssigneeId.isNotEmpty) {
+      return selectedAssigneeId;
+    }
+    final employeeAssigneeId = _resolveEmployeeAssigneeId();
+    if (employeeAssigneeId.isNotEmpty) {
+      return employeeAssigneeId;
+    }
+    return _selectedLeadAssignedUserId();
+  }
+
+  bool get _isEmployeeRole => !_canKeepCurrentAssignedUser;
+
+  void _syncAssigneeSelectionForRole() {
+    if (!_isEmployeeRole) {
+      return;
+    }
+    if ((_selectedAssigneeId ?? '').trim().isNotEmpty) {
+      return;
+    }
+    final resolvedAssigneeId = _resolveEmployeeAssigneeId();
+    if (resolvedAssigneeId.isEmpty) {
+      return;
+    }
+    if (!mounted) {
+      _selectedAssigneeId = resolvedAssigneeId;
+      return;
+    }
+    setState(() {
+      _selectedAssigneeId = resolvedAssigneeId;
+    });
+  }
+
+  String _resolveEmployeeAssigneeId() {
+    final leadAssigneeId = _selectedLeadAssignedUserId();
+    final availableOptions = _buildAssigneeOptions();
+    final currentUserId = (_currentUserId ?? '').trim();
+    final otherOptions = availableOptions
+        .where((item) => item.value.trim() != currentUserId)
+        .toList();
+
+    if (leadAssigneeId.isNotEmpty &&
+        availableOptions.any((item) => item.value == leadAssigneeId) &&
+        leadAssigneeId != currentUserId) {
+      return leadAssigneeId;
+    }
+
+    if (otherOptions.isNotEmpty) {
+      final firstOption = otherOptions.first;
+      if (firstOption.value.isNotEmpty) {
+        return firstOption.value;
+      }
+    }
+
+    if (leadAssigneeId.isNotEmpty &&
+        availableOptions.any((item) => item.value == leadAssigneeId)) {
+      return leadAssigneeId;
+    }
+
+    if (currentUserId.isNotEmpty) {
+      return currentUserId;
+    }
+
+    return leadAssigneeId;
+  }
+
+  String _resolveEmployeeAssigneeLabel() {
+    final assigneeId = (_selectedAssigneeId ?? '').trim();
+    if (assigneeId.isNotEmpty) {
+      final label = _assigneeLabelForId(assigneeId);
+      if (label.isNotEmpty) {
+        return label;
+      }
+    }
+
+    final leadAssigneeLabel = _selectedLeadAssignedUserLabel();
+    if (leadAssigneeLabel.trim().isNotEmpty &&
+        leadAssigneeLabel != 'Current lead assignee') {
+      return leadAssigneeLabel;
+    }
+
+    if (_currentUserName.trim().isNotEmpty) {
+      return _currentUserName.trim();
+    }
+
+    return 'You';
   }
 
   void _setManualProjectMode(bool enabled) {
@@ -367,6 +459,46 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
     final options = unique.values.toList()
       ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
     return options;
+  }
+
+  String _assigneeLabelForId(String id) {
+    for (final item in _buildAssigneeOptions()) {
+      if (item.value == id) {
+        return item.label;
+      }
+    }
+    return '';
+  }
+
+  String? _extractUserId(Map<String, dynamic> user) {
+    for (final key in const ['id', 'user_id', 'userId', 'uuid']) {
+      final value = user[key];
+      if (value != null && value.toString().trim().isNotEmpty) {
+        return value.toString().trim();
+      }
+    }
+    return null;
+  }
+
+  String _extractUserName(Map<String, dynamic> user) {
+    final first =
+        (user['first_name'] ?? user['firstName'] ?? '').toString().trim();
+    final last =
+        (user['last_name'] ?? user['lastName'] ?? '').toString().trim();
+    final combined = [if (first.isNotEmpty) first, if (last.isNotEmpty) last]
+        .join(' ')
+        .trim();
+    if (combined.isNotEmpty) {
+      return combined;
+    }
+
+    return (user['name'] ??
+            user['full_name'] ??
+            user['fullName'] ??
+            user['email'] ??
+            '')
+        .toString()
+        .trim();
   }
 
   String _readUserId(Map<String, dynamic> user) {
@@ -568,11 +700,11 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                         const SizedBox(height: 20),
                         _buildLabel('LEAD *'),
                         const SizedBox(height: 8),
-                        _buildDropdown(
-                          sheetTitle: 'Lead',
-                          value: _selectedLeadId,
-                          hint: 'Select lead...',
-                          items: _leads
+                          _buildDropdown(
+                            sheetTitle: 'Lead',
+                            value: _selectedLeadId,
+                            hint: 'Select lead...',
+                            items: _leads
                               .map(
                                 (e) => SearchableDropdownItem<String>(
                                   value: e['id'].toString(),
@@ -580,12 +712,19 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                                 ),
                               )
                               .toList(),
-                          onChanged: (val) => setState(() {
-                            _selectedLeadId = val;
-                            if (_canKeepCurrentAssignedUser) {
-                              _keepCurrentAssignedUser = true;
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedLeadId = val;
+                              if (_canKeepCurrentAssignedUser) {
+                                _keepCurrentAssignedUser = true;
+                              } else {
+                                _selectedAssigneeId = null;
+                              }
+                            });
+                            if (!_canKeepCurrentAssignedUser) {
+                              _syncAssigneeSelectionForRole();
                             }
-                          }),
+                          },
                           validator: (val) =>
                               val == null ? 'Lead is required' : null,
                         ),
@@ -781,6 +920,11 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                               value: _selectedAssigneeId,
                               hint: 'Select team member...',
                               items: _buildAssigneeOptions(),
+                              enabled: !_isSubmitting &&
+                                  !_isLoadingDropdowns &&
+                                  _buildAssigneeOptions().isNotEmpty,
+                              selectedLabel: _resolveEmployeeAssigneeLabel(),
+                              helperText: 'Select a different team member below',
                               onChanged: (val) =>
                                   setState(() => _selectedAssigneeId = val),
                             ),
@@ -809,6 +953,21 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                               controlAffinity: ListTileControlAffinity.leading,
                               dense: true,
                             ),
+                          ),
+                          const SizedBox(height: 16),
+                        ] else ...[
+                          _buildLabel('ASSIGN TO'),
+                          const SizedBox(height: 8),
+                          _buildDropdown(
+                            sheetTitle: 'Assign To',
+                            value: _selectedAssigneeId,
+                            hint: 'Assignment is fixed for your role',
+                            items: _buildAssigneeOptions(),
+                            enabled: false,
+                            selectedLabel: _resolveEmployeeAssigneeLabel(),
+                            helperText:
+                                'Assignment is fixed for your role and cannot be changed.',
+                            onChanged: (_) {},
                           ),
                           const SizedBox(height: 16),
                         ],
@@ -887,6 +1046,9 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
     required List<SearchableDropdownItem<String>> items,
     required void Function(String?) onChanged,
     String? Function(String?)? validator,
+    bool enabled = true,
+    String? selectedLabel,
+    String? helperText,
   }) {
     return SearchableDropdownField<String>(
       label: sheetTitle,
@@ -895,9 +1057,11 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       value: value,
       hintText: hint,
       items: items,
-      enabled: !_isSubmitting && !_isLoadingDropdowns && items.isNotEmpty,
+      enabled: enabled && !_isSubmitting && !_isLoadingDropdowns && items.isNotEmpty,
       isLoading: _isLoadingDropdowns,
       fieldValidator: validator,
+      selectedLabel: selectedLabel,
+      helperText: helperText,
       onChanged: onChanged,
     );
   }

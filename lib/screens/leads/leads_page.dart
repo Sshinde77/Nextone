@@ -2584,6 +2584,143 @@ class _LeadsPageState extends State<LeadsPage> {
     await _loadLeads();
   }
 
+  Future<List<_ProjectOption>> _loadRevisitProjectOptions() async {
+    try {
+      final result = await _authProvider.projects(
+        token: _authProvider.currentAuthToken,
+        page: 1,
+        perPage: 200,
+      );
+      final options = result.items
+          .map(_ProjectOption.tryFromApi)
+          .whereType<_ProjectOption>()
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      return options;
+    } catch (_) {
+      return const <_ProjectOption>[];
+    }
+  }
+
+  String? _resolveRevisitProjectSelection(
+    _LeadModel lead,
+    List<_ProjectOption> projectOptions,
+  ) {
+    final raw = lead.rawData;
+    final candidates = <String>[
+      _readString(raw['project_id'] ?? raw['projectId']),
+      _readString(raw['project_name'] ?? raw['projectName']),
+      _readString(raw['project'] is Map<String, dynamic>
+          ? (raw['project'] as Map<String, dynamic>)['id']
+          : raw['project']),
+      _readString(raw['project'] is Map<String, dynamic>
+          ? (raw['project'] as Map<String, dynamic>)['name']
+          : ''),
+    ].where((value) => value.isNotEmpty).toList(growable: false);
+
+    for (final candidate in candidates) {
+      for (final option in projectOptions) {
+        if (option.id == candidate || option.name.toLowerCase() == candidate.toLowerCase()) {
+          return option.id;
+        }
+      }
+    }
+    return null;
+  }
+
+  String? _resolveRevisitAssigneeSelection(
+    _LeadModel lead,
+    List<_AssigneeOption> assigneeOptions,
+  ) {
+    final assignedToId = lead.assignedToId.trim();
+    if (assignedToId.isNotEmpty &&
+        assigneeOptions.any((option) => option.id == assignedToId)) {
+      return assignedToId;
+    }
+
+    final assignedName = lead.assignee.name.trim().toLowerCase();
+    if (assignedName.isNotEmpty) {
+      for (final option in assigneeOptions) {
+        if (option.name.toLowerCase() == assignedName) {
+          return option.id;
+        }
+      }
+    }
+
+    return assigneeOptions.isNotEmpty ? assigneeOptions.first.id : null;
+  }
+
+  String _avatarInitials(String text) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      return '?';
+    }
+    final parts = normalized.split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    final initials = parts.take(2).map((part) => part[0]).join();
+    return initials.isEmpty ? normalized[0].toUpperCase() : initials.toUpperCase();
+  }
+
+  Future<void> _openLeadRevisitDialog(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'site_visits',
+      action: 'create',
+      moduleLabel: 'site revisits',
+    );
+    if (!allowed) return;
+
+    if (_assigneeOptions.isEmpty) {
+      await _loadAssigneeOptions();
+    }
+
+    final assigneeOptions = List<_AssigneeOption>.from(_assigneeOptions);
+    if (assigneeOptions.isEmpty) {
+      _showSnackBar('No active assignee available.');
+      return;
+    }
+
+    final projectOptions = await _loadRevisitProjectOptions();
+    if (!mounted) {
+      return;
+    }
+    if (projectOptions.isEmpty) {
+      _showSnackBar('No projects available.');
+      return;
+    }
+
+    final initialProjectId =
+        _resolveRevisitProjectSelection(lead, projectOptions) ??
+            projectOptions.first.id;
+    final initialAssigneeId =
+        _resolveRevisitAssigneeSelection(lead, assigneeOptions) ??
+            assigneeOptions.first.id;
+    final created = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return _LeadRevisitDialog(
+          lead: lead,
+          projectOptions: projectOptions,
+          assigneeOptions: assigneeOptions,
+          initialProjectId: initialProjectId,
+          initialAssigneeId: initialAssigneeId,
+          authProvider: _authProvider,
+        );
+      },
+    );
+
+    if (created == true) {
+      if (!mounted) {
+        return;
+      }
+      await _loadLeads();
+      if (mounted) {
+        _showSnackBar('Re-visit created successfully.');
+      }
+    }
+  }
+
   Future<void> _openStatusSheet(_LeadModel lead) async {
     final allowed = await PermissionGuard.allowModuleAction(
       context,
@@ -2665,10 +2802,10 @@ class _LeadsPageState extends State<LeadsPage> {
                               });
                               if (updatedStatus != null) {
                                 Navigator.of(context).pop();
-                                if (_isFollowUpConversionStatus(
-                                  updatedStatus,
-                                )) {
+                                if (_isFollowUpConversionStatus(updatedStatus)) {
                                   await _openSingleFollowUpForm(lead);
+                                } else if (_isRevisitStatus(updatedStatus)) {
+                                  await _openLeadRevisitDialog(lead);
                                 } else if (_isSiteVisitScheduleStatus(
                                   updatedStatus,
                                 )) {
@@ -4112,6 +4249,13 @@ class _LeadsPageState extends State<LeadsPage> {
     return normalized == 'follow_up' || normalized == 'followup';
   }
 
+  bool _isRevisitStatus(String status) {
+    final normalized = _normalizeStatus(status);
+    return normalized == 'revisit' ||
+        normalized == 're_visit' ||
+        normalized == 'site_revisit';
+  }
+
   bool _isSiteVisitScheduleStatus(String status) {
     final normalized = _normalizeStatus(status);
     return normalized == 'site_visit_scheduled' ||
@@ -5286,6 +5430,42 @@ class _LeadSourceOption {
   }
 }
 
+class _ProjectOption {
+  const _ProjectOption({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
+
+  static _ProjectOption? tryFromApi(Map<String, dynamic> json) {
+    String readString(dynamic value) {
+      if (value is String) {
+        return value.trim();
+      }
+      if (value is num || value is bool) {
+        return value.toString().trim();
+      }
+      return '';
+    }
+
+    final id = readString(
+      json['id'] ?? json['project_id'] ?? json['projectId'] ?? json['uuid'],
+    );
+    final name = readString(
+      json['name'] ??
+          json['project_name'] ??
+          json['projectName'] ??
+          json['title'],
+    );
+    if (id.isEmpty || name.isEmpty) {
+      return null;
+    }
+    return _ProjectOption(id: id, name: name);
+  }
+}
+
 class _PipelineStatusOption {
   const _PipelineStatusOption({
     required this.id,
@@ -5542,4 +5722,492 @@ class _LeadPhoneAccess {
   final bool hasAccess;
   final String phone;
   final bool hasPendingRequest;
+}
+
+class _LeadRevisitDialog extends StatefulWidget {
+  const _LeadRevisitDialog({
+    required this.lead,
+    required this.projectOptions,
+    required this.assigneeOptions,
+    required this.initialProjectId,
+    required this.initialAssigneeId,
+    required this.authProvider,
+  });
+
+  final _LeadModel lead;
+  final List<_ProjectOption> projectOptions;
+  final List<_AssigneeOption> assigneeOptions;
+  final String initialProjectId;
+  final String initialAssigneeId;
+  final AuthProvider authProvider;
+
+  @override
+  State<_LeadRevisitDialog> createState() => _LeadRevisitDialogState();
+}
+
+class _LeadRevisitDialogState extends State<_LeadRevisitDialog> {
+  late final TextEditingController _reasonController;
+  DateTime? _selectedDate;
+  TimeOfDay _selectedTime = const TimeOfDay(hour: 10, minute: 0);
+  late String _selectedProjectId;
+  late String _selectedAssigneeId;
+  bool _transportArranged = false;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _reasonController = TextEditingController(
+      text: 'Client wants to revisit before finalizing',
+    );
+    _selectedProjectId = widget.initialProjectId;
+    _selectedAssigneeId = widget.initialAssigneeId;
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  String _avatarInitials(String text) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      return '?';
+    }
+    final parts = normalized.split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    final initials = parts.take(2).map((part) => part[0]).join();
+    return initials.isEmpty ? normalized[0].toUpperCase() : initials.toUpperCase();
+  }
+
+  String _projectLabel(String id) {
+    for (final option in widget.projectOptions) {
+      if (option.id == id) {
+        return option.name;
+      }
+    }
+    return 'Select project';
+  }
+
+  String _assigneeLabel(String id) {
+    for (final option in widget.assigneeOptions) {
+      if (option.id == id) {
+        return option.name;
+      }
+    }
+    return widget.lead.assignee.name.trim().isNotEmpty
+        ? widget.lead.assignee.name.trim()
+        : 'Default: lead\'s current assignee';
+  }
+
+  String _formatVisitTime(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _showSnackBar(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) {
+      return;
+    }
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (!mounted || picked == null) {
+      return;
+    }
+    setState(() {
+      _selectedDate = picked;
+    });
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime,
+    );
+    if (!mounted || picked == null) {
+      return;
+    }
+    setState(() {
+      _selectedTime = picked;
+    });
+  }
+
+  Future<void> _submit() async {
+    if (_selectedDate == null) {
+      _showSnackBar('Please select visit date.');
+      return;
+    }
+    final reason = _reasonController.text.trim();
+    if (reason.isEmpty) {
+      _showSnackBar('Please enter reason for re-visit.');
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await widget.authProvider.createSiteRevisitFromLead(
+        leadId: widget.lead.id,
+        projectId: _selectedProjectId,
+        visitDate: _formatDateForApi(_selectedDate!),
+        visitTime: _formatVisitTime(_selectedTime),
+        assignedTo: _selectedAssigneeId,
+        reason: reason,
+        transportArranged: _transportArranged,
+        token: widget.authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) {
+        _showSnackBar(AppErrorHandler.friendlyMessage(error));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  String _formatDateForApi(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  InputDecoration _fieldDecoration(String hintText) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(color: Color(0xFF98A2B3)),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFD8E0EA)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFD8E0EA)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.4),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedProjectLabel = _projectLabel(_selectedProjectId);
+    final selectedAssigneeLabel = _assigneeLabel(_selectedAssigneeId);
+    final visitDateText = _selectedDate == null
+        ? 'Select date'
+        : _formatDateForApi(_selectedDate!);
+    final visitTimeText = _formatVisitTime(_selectedTime);
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Convert to Re-visit',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => Navigator.of(context).pop(false),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: AppColors.primary,
+                      child: Text(
+                        _avatarInitials(widget.lead.name),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.lead.name,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.lead.phone,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              SearchableDropdownField<String>(
+                label: 'Project',
+                sheetTitle: 'Select Project',
+                value: _selectedProjectId,
+                hintText: 'Type to search projects...',
+                selectedLabel: selectedProjectLabel,
+                items: widget.projectOptions
+                    .map(
+                      (project) => SearchableDropdownItem<String>(
+                        value: project.id,
+                        label: project.name,
+                      ),
+                    )
+                    .toList(),
+                enabled: !_isSubmitting,
+                onChanged: (value) {
+                  setState(() {
+                    if (value != null && value.isNotEmpty) {
+                      _selectedProjectId = value;
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: _isSubmitting ? null : _pickDate,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.border),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today_outlined,
+                                size: 18, color: AppColors.textSecondary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                visitDateText,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: _selectedDate == null
+                                      ? AppColors.textSecondary
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InkWell(
+                      onTap: _isSubmitting ? null : _pickTime,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.border),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.access_time_rounded,
+                                size: 18, color: AppColors.textSecondary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                visitTimeText,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SearchableDropdownField<String>(
+                label: 'Assign To',
+                sheetTitle: 'Assign To',
+                value: _selectedAssigneeId,
+                hintText: 'Default: lead\'s current assignee',
+                selectedLabel: selectedAssigneeLabel,
+                items: widget.assigneeOptions
+                    .map(
+                      (user) => SearchableDropdownItem<String>(
+                        value: user.id,
+                        label: user.name,
+                      ),
+                    )
+                    .toList(),
+                enabled: !_isSubmitting,
+                onChanged: (value) {
+                  setState(() {
+                    if (value != null && value.isNotEmpty) {
+                      _selectedAssigneeId = value;
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _reasonController,
+                minLines: 2,
+                maxLines: 3,
+                decoration: _fieldDecoration('Reason for Re-visit'),
+                enabled: !_isSubmitting,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                ),
+                child: CheckboxListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  title: const Text(
+                    'Transport arranged for client',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  value: _transportArranged,
+                  onChanged: _isSubmitting
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _transportArranged = value ?? false;
+                          });
+                        },
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _isSubmitting ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Schedule Re-visit'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -62,6 +62,7 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
   String? _selectedProjectId;
   String _currentUserRole = '';
   String? _currentUserId;
+  String _currentUserName = '';
   DateTime? _selectedCallbackTime;
   DateTime? _selectedNextFollowUpTime;
   DateTime? _selectedVisitDate;
@@ -112,6 +113,7 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
       final profile =
           await _authProvider.profile(token: _authProvider.currentAuthToken);
       final currentUserId = _extractUserId(profile.data);
+      final currentUserName = _extractUserName(profile.data);
 
       if (!mounted) {
         return;
@@ -120,6 +122,7 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
       setState(() {
         _currentUserRole = permissions.role;
         _currentUserId = currentUserId;
+        _currentUserName = currentUserName;
         _isLoadingUserContext = false;
         _selectedAssigneeId = _resolveAssigneeSelection(_assigneeOptions);
       });
@@ -160,7 +163,7 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
       }
       setState(() {
         _assigneeOptions = uniqueOptions;
-        _selectedAssigneeId ??= _resolveAssigneeSelection(uniqueOptions);
+        _selectedAssigneeId = _resolveAssigneeSelection(uniqueOptions);
         _isLoadingAssignees = false;
       });
     } catch (error) {
@@ -556,21 +559,42 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
   }
 
   String? _resolveAssigneeSelection(List<_AssigneeOption> options) {
+    final isEmployeeRole = !RoleAccess.isSuperAdmin(_currentUserRole) &&
+        !RoleAccess.isAdmin(_currentUserRole);
+    if (!isEmployeeRole) {
+      final currentSelection = _selectedAssigneeId;
+      if (currentSelection != null &&
+          options.any((option) => option.id == currentSelection)) {
+        return currentSelection;
+      }
+      return null;
+    }
+
+    final currentUserId = _currentUserId?.trim() ?? '';
+    final otherOptions =
+        options.where((option) => option.id.trim() != currentUserId).toList();
+
     final currentSelection = _selectedAssigneeId;
     if (currentSelection != null &&
         options.any((option) => option.id == currentSelection)) {
-      return currentSelection;
+      if (currentSelection.trim() == currentUserId && otherOptions.isNotEmpty) {
+        // Keep searching so the dropdown shows an assignable team member
+        // when one exists.
+      } else {
+        return currentSelection;
+      }
     }
 
-    final shouldAssignToSelf = !RoleAccess.isSuperAdmin(_currentUserRole) &&
-        !RoleAccess.isAdmin(_currentUserRole) &&
-        (_currentUserId?.isNotEmpty ?? false);
-    if (shouldAssignToSelf) {
-      for (final option in options) {
-        if (option.id == _currentUserId) {
-          return option.id;
-        }
-      }
+    if (otherOptions.isNotEmpty) {
+      return otherOptions.first.id;
+    }
+
+    if (currentUserId.isNotEmpty) {
+      return currentUserId;
+    }
+
+    if (options.isNotEmpty) {
+      return options.first.id;
     }
 
     return null;
@@ -582,7 +606,44 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
         return option.name;
       }
     }
+    if (_currentUserId != null &&
+        assigneeId.trim() == _currentUserId!.trim() &&
+        _currentUserName.trim().isNotEmpty) {
+      return _currentUserName.trim();
+    }
     return 'You';
+  }
+
+  String _displayAssigneeLabel() {
+    final selectedAssigneeId = _selectedAssigneeId?.trim() ?? '';
+    if (selectedAssigneeId.isNotEmpty) {
+      final label = _selectedAssigneeLabel(selectedAssigneeId);
+      if (label.isNotEmpty) {
+        return label;
+      }
+    }
+
+    if (_currentUserName.trim().isNotEmpty) {
+      return _currentUserName.trim();
+    }
+
+    return 'You';
+  }
+
+  String _extractUserName(Map<String, dynamic> source) {
+    final first = _readString(source['first_name'] ?? source['firstName']);
+    final last = _readString(source['last_name'] ?? source['lastName']);
+    final combined = [if (first.isNotEmpty) first, if (last.isNotEmpty) last]
+        .join(' ')
+        .trim();
+    if (combined.isNotEmpty) {
+      return combined;
+    }
+
+    return _readString(source['name'] ??
+        source['full_name'] ??
+        source['fullName'] ??
+        source['email']);
   }
 
   String _readString(dynamic value) {
@@ -1263,6 +1324,8 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
   }
 
   Widget _buildAssigneeDropdown() {
+    final isEmployeeRole =
+        !RoleAccess.isSuperAdmin(_currentUserRole) && !RoleAccess.isAdmin(_currentUserRole);
     return SearchableDropdownField<String>(
       label: 'Assign To',
       value: _selectedAssigneeId,
@@ -1279,9 +1342,13 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
             ),
           )
           .toList(),
+      enabled: !isEmployeeRole && !_isLoadingAssignees,
       isLoading: _isLoadingAssignees,
       errorText: _assigneeLoadError,
-      helperText: _isLoadingUserContext ? 'Loading team members...' : null,
+      selectedLabel: _displayAssigneeLabel(),
+      helperText: isEmployeeRole
+          ? 'Assignment is fixed for your role and cannot be changed.'
+          : (_isLoadingUserContext ? 'Loading team members...' : null),
       onRetry: _loadAssigneeOptions,
       onChanged: (value) {
         setState(() {
