@@ -20,17 +20,6 @@ class LeadFollowUpFormPage extends StatefulWidget {
 enum _LeadFollowUpSection { leadDetails, followUpTask }
 
 class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
-  static const List<String> _configurationOptions = <String>[
-    '1RK',
-    '1BHK',
-    '2BHK',
-    '3BHK',
-    '4BHK',
-    'Penta House / Duplex',
-    'Commercial shop',
-    'Office space',
-  ];
-
   final _authProvider = AuthProvider();
   final _leadFormKey = GlobalKey<FormState>();
   final _taskFormKey = GlobalKey<FormState>();
@@ -75,6 +64,7 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_LeadSourceOption> _leadSourceOptions = const <_LeadSourceOption>[];
   List<_ProjectOption> _projectOptions = const <_ProjectOption>[];
+  List<String> _configurationOptions = <String>[];
 
   @override
   void initState() {
@@ -83,6 +73,7 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
     _loadCurrentUserContext();
     _loadAssigneeOptions();
     _loadLeadSourceOptions();
+    _loadConfigurationOptions();
     _loadProjectOptions();
   }
 
@@ -217,6 +208,25 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
         _leadSourceOptions = const <_LeadSourceOption>[];
         _leadSourceLoadError = AppErrorHandler.friendlyMessage(error);
       });
+    }
+  }
+
+  Future<void> _loadConfigurationOptions() async {
+    try {
+      final options = await _authProvider.leadConfigurationsConfig(
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _configurationOptions = options
+            .where((option) => option.isActive)
+            .map((option) => option.name)
+            .toList(growable: false);
+      });
+    } catch (_) {
+      // Keep the form usable if the configuration API is unavailable.
     }
   }
 
@@ -599,6 +609,24 @@ class _LeadFollowUpFormPageState extends State<LeadFollowUpFormPage> {
   }
 
   Future<void> _openConfigurationSheet() async {
+    try {
+      final options = await _authProvider.leadConfigurationsConfig(
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      final activeOptions = options
+          .where((option) => option.isActive)
+          .map((option) => option.name)
+          .toList(growable: false);
+      setState(() {
+        _configurationOptions = activeOptions;
+      });
+    } catch (_) {
+      // Keep the picker usable if the configuration API is unavailable.
+    }
+
     final result = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,

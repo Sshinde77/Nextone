@@ -1353,7 +1353,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                 ),
               ],
             ),
-               SizedBox(height: _s(10)),
+            SizedBox(height: _s(10)),
             Row(
               children: [
                 Expanded(

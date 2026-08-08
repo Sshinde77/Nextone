@@ -27,17 +27,6 @@ class LeadFormPage extends StatefulWidget {
 }
 
 class _LeadFormPageState extends State<LeadFormPage> {
-  static const List<String> _configurationOptions = <String>[
-    '1RK',
-    '1BHK',
-    '2BHK',
-    '3BHK',
-    '4BHK',
-    'Penta House / Duplex',
-    'Commercial shop',
-    'Office space',
-  ];
-
   final _authProvider = AuthProvider();
 
   final _nameController = TextEditingController();
@@ -76,7 +65,9 @@ class _LeadFormPageState extends State<LeadFormPage> {
   List<_LeadSourceOption> _leadSourceOptions = const <_LeadSourceOption>[];
   List<_LeadStatusOption> _leadStatusOptions = const <_LeadStatusOption>[];
   List<_ProjectOption> _projectOptions = const <_ProjectOption>[];
+  List<String> _configurationOptions = <String>[];
   List<String> _selectedConfigurations = <String>[];
+  dynamic _configurationRawValue;
   PlatformFile? _selectedCallRecordingFile;
   List<PlatformFile> _selectedPaymentProofFiles = const <PlatformFile>[];
   List<PlatformFile> _selectedPhotoFiles = const <PlatformFile>[];
@@ -97,6 +88,7 @@ class _LeadFormPageState extends State<LeadFormPage> {
     _loadLeadSourceOptions();
     _loadLeadStatusOptions();
     _loadProjectOptions();
+    _loadConfigurationOptions();
   }
 
   @override
@@ -183,8 +175,10 @@ class _LeadFormPageState extends State<LeadFormPage> {
     _locationPreferenceController.text = _readString(
       data['location_preference'] ?? data['locationPreference'],
     );
+    _configurationRawValue = data['configuration'] ?? data['configurations'];
     _selectedConfigurations = _normalizeConfigurationValues(
-      data['configuration'] ?? data['configurations'],
+      _configurationRawValue,
+      options: _configurationOptions,
     );
     _configurationController.text = _selectedConfigurations.join(', ');
     _paymentProofUrlController.text = _readString(
@@ -443,6 +437,32 @@ class _LeadFormPageState extends State<LeadFormPage> {
     }
   }
 
+  Future<void> _loadConfigurationOptions() async {
+    try {
+      final options = await _authProvider.leadConfigurationsConfig(
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _configurationOptions = options
+            .where((option) => option.isActive)
+            .map((option) => option.name)
+            .toList(growable: false);
+        if (_configurationRawValue != null) {
+          _selectedConfigurations = _normalizeConfigurationValues(
+            _configurationRawValue,
+            options: _configurationOptions,
+          );
+          _configurationController.text = _selectedConfigurations.join(', ');
+        }
+      });
+    } catch (_) {
+      // Keep the form usable with the default in-memory configuration list.
+    }
+  }
+
   Future<void> _loadProjectOptions() async {
     setState(() {
       _isLoadingProjects = true;
@@ -663,10 +683,15 @@ class _LeadFormPageState extends State<LeadFormPage> {
     return '';
   }
 
-  List<String> _normalizeConfigurationValues(dynamic value) {
+  List<String> _normalizeConfigurationValues(
+    dynamic value, {
+    List<String>? options,
+  }) {
+    final availableOptions = options ?? _configurationOptions;
+
     String? matchOption(String candidate) {
       final normalizedCandidate = candidate.trim().toLowerCase();
-      for (final option in _configurationOptions) {
+      for (final option in availableOptions) {
         if (option.toLowerCase() == normalizedCandidate) {
           return option;
         }
@@ -702,6 +727,32 @@ class _LeadFormPageState extends State<LeadFormPage> {
   }
 
   Future<void> _openConfigurationSheet() async {
+    var sheetConfigurationOptions = List<String>.from(_configurationOptions);
+    try {
+      final latestOptions = await _authProvider.leadConfigurationsConfig(
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      sheetConfigurationOptions = latestOptions
+          .where((option) => option.isActive)
+          .map((option) => option.name)
+          .toList(growable: false);
+      setState(() {
+        _configurationOptions = sheetConfigurationOptions;
+        if (_configurationRawValue != null) {
+          _selectedConfigurations = _normalizeConfigurationValues(
+            _configurationRawValue,
+            options: _configurationOptions,
+          );
+          _configurationController.text = _selectedConfigurations.join(', ');
+        }
+      });
+    } catch (_) {
+      // Keep the picker usable with the last known configuration list.
+    }
+
     final result = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
@@ -757,9 +808,9 @@ class _LeadFormPageState extends State<LeadFormPage> {
                       const SizedBox(height: 12),
                       Expanded(
                         child: ListView.builder(
-                          itemCount: _configurationOptions.length,
+                          itemCount: sheetConfigurationOptions.length,
                           itemBuilder: (context, index) {
-                            final option = _configurationOptions[index];
+                            final option = sheetConfigurationOptions[index];
                             final isSelected = selected.contains(option);
                             return CheckboxListTile(
                               value: isSelected,

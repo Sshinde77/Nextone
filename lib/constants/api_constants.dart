@@ -47,6 +47,9 @@ class ApiConstants {
   static const String leadSourceConfigDetail = '/config/lead-sources/{id}';
   static const String leadStatusesConfig = '/config/lead-statuses';
   static const String leadStatusConfigDetail = '/config/lead-statuses/{id}';
+  static const String leadConfigurationsConfig = '/config/lead-configurations';
+  static const String leadConfigurationConfigDetail =
+      '/config/lead-configurations/{id}';
   static const String uploadPaymentProof = '/upload/payment-proof';
   static const String leadPaymentProof = '/leads/{id}/payment-proof';
   static const String leadPaymentProofs = '/leads/{id}/payment-proofs';

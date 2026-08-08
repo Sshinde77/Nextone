@@ -1,4 +1,5 @@
 import 'package:nextone/models/auth_models.dart';
+import 'package:nextone/models/lead_configuration_model.dart';
 import 'package:nextone/models/salary_models.dart';
 import 'package:nextone/services/auth_service.dart';
 
@@ -2576,6 +2577,84 @@ class AuthProvider {
 
   Future<List<Map<String, dynamic>>> leadStatusesConfig({String? token}) {
     return _authService.leadStatusesConfig(token: token);
+  }
+
+  Future<List<LeadConfigurationModel>> leadConfigurationsConfig({
+    String? token,
+    bool includeInactive = false,
+  }) {
+    return _authService.leadConfigurationsConfig(
+      token: token,
+      includeInactive: includeInactive,
+    );
+  }
+
+  Future<List<LeadConfigurationModel>> leadConfigurations({
+    String? token,
+    bool includeInactive = false,
+  }) {
+    return _authService.leadConfigurations(
+      token: token,
+      includeInactive: includeInactive,
+    );
+  }
+
+  Future<LeadConfigurationModel> createLeadConfiguration({
+    required String name,
+    String? token,
+  }) {
+    return _authService.createLeadConfiguration(
+      name: name,
+      token: token,
+    );
+  }
+
+  Future<LeadConfigurationModel> updateLeadConfigurationConfig({
+    required String id,
+    required String name,
+    required bool isActive,
+    String? token,
+  }) {
+    return _authService.updateLeadConfigurationConfig(
+      id: id,
+      name: name,
+      isActive: isActive,
+      token: token,
+    );
+  }
+
+  Future<LeadConfigurationModel> updateLeadConfiguration({
+    required String id,
+    required String name,
+    required bool isActive,
+    String? token,
+  }) {
+    return _authService.updateLeadConfiguration(
+      id: id,
+      name: name,
+      isActive: isActive,
+      token: token,
+    );
+  }
+
+  Future<void> deleteLeadConfigurationConfig({
+    required String id,
+    String? token,
+  }) {
+    return _authService.deleteLeadConfigurationConfig(
+      id: id,
+      token: token,
+    );
+  }
+
+  Future<void> deleteLeadConfiguration({
+    required String id,
+    String? token,
+  }) {
+    return _authService.deleteLeadConfiguration(
+      id: id,
+      token: token,
+    );
   }
 
   Future<Map<String, dynamic>> createLeadStatus({

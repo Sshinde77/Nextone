@@ -2,12 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:nextone/constants/api_constants.dart';
 import 'package:nextone/models/auth_models.dart';
+import 'package:nextone/models/lead_configuration_model.dart';
 import 'package:nextone/models/salary_models.dart';
 import 'package:nextone/utils/app_error_handler.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
@@ -17,6 +20,9 @@ class AuthService {
       const EffectivePermissionsResult.empty();
   static const String _authTokenStorageKey = 'auth_token';
   static const String _refreshTokenStorageKey = 'refresh_token';
+  static const String _userRoleStorageKey = 'user_role';
+  static const MethodChannel _screenSecurityChannel =
+      MethodChannel('nextone/screen_security');
   static const Duration _requestTimeout = Duration(seconds: 45);
   static const int _maxRequestAttempts = 3;
   static const Duration _retryDelay = Duration(seconds: 2);
@@ -389,6 +395,8 @@ class AuthService {
       final result = _effectivePermissionsResultFromBody(body);
       if (resolvedToken == _authToken) {
         _currentPermissions = result;
+        await _persistUserRole(result.role);
+        await _syncScreenSecurityForRole(result.role);
       }
       return result;
     } catch (_) {
@@ -10464,6 +10472,8 @@ class AuthService {
       _refreshToken = result.refreshToken ?? _refreshToken;
       _currentPermissions = const EffectivePermissionsResult.empty();
       await _persistTokens();
+      await _persistUserRole('');
+      await _syncScreenSecurityForRole('');
     } catch (_) {
       return;
     }
@@ -11093,6 +11103,43 @@ class AuthService {
     return const <Map<String, dynamic>>[];
   }
 
+  List<Map<String, dynamic>> _extractLeadConfigurationItems(dynamic source) {
+    List<Map<String, dynamic>> readList(dynamic value) {
+      if (value is List) {
+        return value.whereType<Map>().map(_stringDynamicMap).toList();
+      }
+      return const <Map<String, dynamic>>[];
+    }
+
+    final fromRootList = readList(source);
+    if (fromRootList.isNotEmpty) {
+      return fromRootList;
+    }
+
+    if (source is! Map<String, dynamic>) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    for (final key in ['data', 'configurations', 'items', 'results']) {
+      final fromKey = readList(source[key]);
+      if (fromKey.isNotEmpty) {
+        return fromKey;
+      }
+    }
+
+    final data = source['data'];
+    if (data is Map<String, dynamic>) {
+      for (final key in ['configurations', 'items', 'results']) {
+        final fromNested = readList(data[key]);
+        if (fromNested.isNotEmpty) {
+          return fromNested;
+        }
+      }
+    }
+
+    return const <Map<String, dynamic>>[];
+  }
+
   Map<String, dynamic>? _extractLeadSourceMap(dynamic source) {
     if (source is Map<String, dynamic>) {
       final data = source['data'];
@@ -11101,6 +11148,24 @@ class AuthService {
       }
 
       for (final key in ['source', 'item', 'result']) {
+        final value = source[key];
+        if (value is Map<String, dynamic>) {
+          return _stringDynamicMap(value);
+        }
+      }
+      return _stringDynamicMap(source);
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _extractLeadConfigurationMap(dynamic source) {
+    if (source is Map<String, dynamic>) {
+      final data = source['data'];
+      if (data is Map<String, dynamic>) {
+        return _stringDynamicMap(data);
+      }
+
+      for (final key in ['configuration', 'item', 'result']) {
         final value = source[key];
         if (value is Map<String, dynamic>) {
           return _stringDynamicMap(value);
@@ -11811,6 +11876,230 @@ class AuthService {
     }
   }
 
+  Future<List<LeadConfigurationModel>> leadConfigurationsConfig({
+    String? token,
+    bool includeInactive = false,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.leadConfigurationsConfig}',
+    ).replace(
+      queryParameters: <String, String>{
+        'include_inactive': includeInactive ? 'true' : 'false',
+      },
+    );
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'leadConfigurationsConfig',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('leadConfigurationsConfig', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch lead configurations.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final items = _extractLeadConfigurationItems(decoded);
+      return items.map(LeadConfigurationModel.fromApi).toList(growable: false);
+    } catch (_) {
+      throw Exception('Lead configurations response format is not valid.');
+    }
+  }
+
+  Future<List<LeadConfigurationModel>> leadConfigurations({
+    String? token,
+    bool includeInactive = false,
+  }) {
+    return leadConfigurationsConfig(
+      token: token,
+      includeInactive: includeInactive,
+    );
+  }
+
+  Future<LeadConfigurationModel> createLeadConfiguration({
+    required String name,
+    String? token,
+  }) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) {
+      throw Exception('Configuration name is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}${ApiConstants.leadConfigurationsConfig}',
+    );
+    final headers = _headers(
+      accept: 'application/json',
+      token: resolvedToken,
+    );
+    final payload = jsonEncode(<String, dynamic>{'name': normalizedName});
+    _logRequest(
+      endpoint: 'createLeadConfiguration',
+      method: 'POST',
+      uri: uri,
+      headers: headers,
+      body: payload,
+    );
+
+    final response = await http
+        .post(uri, headers: headers, body: payload)
+        .timeout(_requestTimeout);
+    _logResponse('createLeadConfiguration', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to create lead configuration.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final item = _extractLeadConfigurationMap(decoded);
+      if (item != null) {
+        return LeadConfigurationModel.fromApi(item);
+      }
+    } catch (_) {}
+    return LeadConfigurationModel(
+      id: '',
+      name: normalizedName,
+      isActive: true,
+    );
+  }
+
+  Future<LeadConfigurationModel> updateLeadConfigurationConfig({
+    required String id,
+    required String name,
+    required bool isActive,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    final normalizedName = name.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Configuration id is required.');
+    }
+    if (normalizedName.isEmpty) {
+      throw Exception('Configuration name is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.leadConfigurationConfigDetail
+        .replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(
+      accept: 'application/json',
+      token: resolvedToken,
+    );
+    final payload = jsonEncode(<String, dynamic>{
+      'name': normalizedName,
+      'is_active': isActive,
+    });
+    _logRequest(
+      endpoint: 'updateLeadConfigurationConfig',
+      method: 'PUT',
+      uri: uri,
+      headers: headers,
+      body: payload,
+    );
+
+    final response = await http
+        .put(uri, headers: headers, body: payload)
+        .timeout(_requestTimeout);
+    _logResponse('updateLeadConfigurationConfig', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to update lead configuration.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final item = _extractLeadConfigurationMap(decoded);
+      if (item != null) {
+        return LeadConfigurationModel.fromApi(item);
+      }
+    } catch (_) {}
+    return LeadConfigurationModel(
+      id: normalizedId,
+      name: normalizedName,
+      isActive: isActive,
+    );
+  }
+
+  Future<LeadConfigurationModel> updateLeadConfiguration({
+    required String id,
+    required String name,
+    required bool isActive,
+    String? token,
+  }) {
+    return updateLeadConfigurationConfig(
+      id: id,
+      name: name,
+      isActive: isActive,
+      token: token,
+    );
+  }
+
+  Future<void> deleteLeadConfigurationConfig({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Configuration id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint = ApiConstants.leadConfigurationConfigDetail
+        .replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: '*/*', token: resolvedToken);
+    _logRequest(
+      endpoint: 'deleteLeadConfigurationConfig',
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.delete(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('deleteLeadConfigurationConfig', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to delete lead configuration.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+  }
+
+  Future<void> deleteLeadConfiguration({
+    required String id,
+    String? token,
+  }) {
+    return deleteLeadConfigurationConfig(
+      id: id,
+      token: token,
+    );
+  }
+
   Future<Map<String, dynamic>> createLeadStatus({
     required String key,
     required String label,
@@ -12036,6 +12325,8 @@ class AuthService {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_authTokenStorageKey);
     await preferences.remove(_refreshTokenStorageKey);
+    await preferences.remove(_userRoleStorageKey);
+    await _syncScreenSecurityForRole('');
   }
 
   static Future<void> _restoreTokensFromStorage() async {
@@ -12068,6 +12359,32 @@ class AuthService {
       );
     } else {
       await preferences.remove(_refreshTokenStorageKey);
+    }
+  }
+
+  static Future<void> _persistUserRole(String role) async {
+    final preferences = await SharedPreferences.getInstance();
+    final normalizedRole = role.trim().toLowerCase();
+    if (normalizedRole.isEmpty) {
+      await preferences.remove(_userRoleStorageKey);
+    } else {
+      await preferences.setString(_userRoleStorageKey, normalizedRole);
+    }
+  }
+
+  static Future<void> _syncScreenSecurityForRole(String role) async {
+    final normalizedRole = role.trim().toLowerCase();
+    final shouldSecure = !RoleAccess.isAdminOrSuperAdmin(normalizedRole);
+    try {
+      await _screenSecurityChannel.invokeMethod<void>(
+        'updateScreenSecurity',
+        <String, dynamic>{
+          'role': normalizedRole,
+          'secure': shouldSecure,
+        },
+      );
+    } catch (_) {
+      // Best-effort platform hook.
     }
   }
 

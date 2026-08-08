@@ -231,7 +231,8 @@ class _TeamPageState extends State<TeamPage> {
       );
       final members = users
           .where(_TeamMember.isActiveUser)
-          .where((member) => _currentUserId.isEmpty || member['id'] != _currentUserId)
+          .where((member) =>
+              _currentUserId.isEmpty || member['id'] != _currentUserId)
           .map(_TeamMember.fromApi)
           .toList();
       if (!mounted) {
@@ -275,7 +276,8 @@ class _TeamPageState extends State<TeamPage> {
       setState(() {
         _assignmentMembers = users
             .where(_TeamMember.isActiveUser)
-            .where((member) => _currentUserId.isEmpty || member['id'] != _currentUserId)
+            .where((member) =>
+                _currentUserId.isEmpty || member['id'] != _currentUserId)
             .map(_TeamMember.fromApi)
             .toList();
       });

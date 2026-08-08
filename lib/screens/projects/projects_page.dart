@@ -42,8 +42,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
     _ShareFieldOption(key: 'description', label: 'Description'),
   ];
 
-  final TextEditingController _nameSearchController =
-      TextEditingController();
+  final TextEditingController _nameSearchController = TextEditingController();
   final TextEditingController _citySearchController = TextEditingController();
   final AuthProvider _authProvider = AuthProvider();
   final RegExp _emailPattern =
@@ -106,7 +105,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
         token: _authProvider.currentAuthToken,
         city: _citySearchQuery.trim().isEmpty ? null : _citySearchQuery.trim(),
         status: _selectedStatus,
-        search: _nameSearchQuery.trim().isEmpty ? null : _nameSearchQuery.trim(),
+        search:
+            _nameSearchQuery.trim().isEmpty ? null : _nameSearchQuery.trim(),
         page: requestedPage,
         perPage: _perPage,
       );

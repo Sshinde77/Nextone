@@ -589,7 +589,8 @@ class _UsersPageState extends State<UsersPage> {
                 decoration: const InputDecoration(
                   hintText: 'Search users',
                   hintStyle: TextStyle(color: AppColors.textSecondary),
-                  prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+                  prefixIcon:
+                      Icon(Icons.search, color: AppColors.textSecondary),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(vertical: 14),
                 ),

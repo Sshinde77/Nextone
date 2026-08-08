@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:nextone/constants/app_colors.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/screens/follow_ups/follow_up_form_page.dart';
+import 'package:nextone/screens/leads/lead_configuration_dialog.dart';
 import 'package:nextone/screens/leads/lead_bulk_upload_page.dart';
 import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/screens/leads/lead_form_page.dart';
@@ -85,6 +86,7 @@ class _LeadsPageState extends State<LeadsPage> {
   bool _isSubmittingReassign = false;
   bool _isSubmittingStatus = false;
   bool _isLoadingLeadSources = false;
+  bool _isManageActionsExpanded = false;
   String? _visiblePhoneLeadId;
   String? _expandedQuickActionLeadId;
   String? _selectedAssigneeId;
@@ -1435,6 +1437,19 @@ class _LeadsPageState extends State<LeadsPage> {
     createController.dispose();
   }
 
+  Future<void> _openManageLeadConfigurationDialog() async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
+    await showLeadConfigurationDialog(context);
+  }
+
   Future<void> _openManagePipelineStatusesDialog() async {
     final allowed = await PermissionGuard.allowModuleAction(
       context,
@@ -2620,7 +2635,8 @@ class _LeadsPageState extends State<LeadsPage> {
 
     for (final candidate in candidates) {
       for (final option in projectOptions) {
-        if (option.id == candidate || option.name.toLowerCase() == candidate.toLowerCase()) {
+        if (option.id == candidate ||
+            option.name.toLowerCase() == candidate.toLowerCase()) {
           return option.id;
         }
       }
@@ -2657,7 +2673,9 @@ class _LeadsPageState extends State<LeadsPage> {
     }
     final parts = normalized.split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
     final initials = parts.take(2).map((part) => part[0]).join();
-    return initials.isEmpty ? normalized[0].toUpperCase() : initials.toUpperCase();
+    return initials.isEmpty
+        ? normalized[0].toUpperCase()
+        : initials.toUpperCase();
   }
 
   Future<void> _openLeadRevisitDialog(_LeadModel lead) async {
@@ -2802,7 +2820,8 @@ class _LeadsPageState extends State<LeadsPage> {
                               });
                               if (updatedStatus != null) {
                                 Navigator.of(context).pop();
-                                if (_isFollowUpConversionStatus(updatedStatus)) {
+                                if (_isFollowUpConversionStatus(
+                                    updatedStatus)) {
                                   await _openSingleFollowUpForm(lead);
                                 } else if (_isRevisitStatus(updatedStatus)) {
                                   await _openLeadRevisitDialog(lead);
@@ -4711,9 +4730,48 @@ class _LeadsPageState extends State<LeadsPage> {
         final canManageLeadMetadata =
             RoleAccess.isAdminOrSuperAdmin(_currentRole);
 
-        final addSourceButton = canManageLeadMetadata
+        final manageButton = canManageLeadMetadata
             ? OutlinedButton.icon(
-                onPressed: _openManageLeadSourcesDialog,
+                onPressed: () {
+                  setState(() {
+                    _isManageActionsExpanded = !_isManageActionsExpanded;
+                  });
+                },
+                icon: Icon(
+                  _isManageActionsExpanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  size: 16,
+                ),
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Manage',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  fixedSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  side: const BorderSide(color: AppColors.border),
+                  backgroundColor: AppColors.card,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              )
+            : null;
+
+        final manageSourceButton = canManageLeadMetadata
+            ? OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isManageActionsExpanded = false;
+                  });
+                  _openManageLeadSourcesDialog();
+                },
                 icon: const Icon(Icons.add_circle_outline, size: 16),
                 label: const FittedBox(
                   fit: BoxFit.scaleDown,
@@ -4736,9 +4794,44 @@ class _LeadsPageState extends State<LeadsPage> {
               )
             : null;
 
+        final manageConfigurationButton = canManageLeadMetadata
+            ? OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isManageActionsExpanded = false;
+                  });
+                  _openManageLeadConfigurationDialog();
+                },
+                icon: const Icon(Icons.settings_outlined, size: 16),
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Manage Configuration',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  fixedSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  side: const BorderSide(color: AppColors.border),
+                  backgroundColor: AppColors.card,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              )
+            : null;
+
         final manageStatusButton = canManageLeadMetadata
             ? OutlinedButton.icon(
-                onPressed: _openManagePipelineStatusesDialog,
+                onPressed: () {
+                  setState(() {
+                    _isManageActionsExpanded = false;
+                  });
+                  _openManagePipelineStatusesDialog();
+                },
                 icon: const Icon(Icons.tune_outlined, size: 16),
                 label: const FittedBox(
                   fit: BoxFit.scaleDown,
@@ -4798,25 +4891,54 @@ class _LeadsPageState extends State<LeadsPage> {
         }
 
         Widget secondActionRow() {
-          final widgets = <Widget>[
-            if (addSourceButton != null) Expanded(child: addSourceButton),
-            if (manageStatusButton != null) ...[
-              if (addSourceButton != null) const SizedBox(width: 8),
-              Expanded(child: manageStatusButton),
-            ],
-            if (exportButton != null) ...[
-              if (addSourceButton != null || manageStatusButton != null)
-                const SizedBox(width: 8),
-              Expanded(child: exportButton),
-            ],
-          ];
-
-          if (widgets.isEmpty) {
+          final hasManageActions = canManageLeadMetadata;
+          if (!hasManageActions && exportButton == null) {
             return const SizedBox.shrink();
           }
 
+          final manageSection = hasManageActions
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(width: double.infinity, child: manageButton),
+                    if (_isManageActionsExpanded) ...[
+                      const SizedBox(height: 8),
+                      if (manageSourceButton != null) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: manageSourceButton,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (manageConfigurationButton != null) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: manageConfigurationButton,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (manageStatusButton != null) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: manageStatusButton,
+                        ),
+                      ],
+                    ],
+                  ],
+                )
+              : const SizedBox.shrink();
+
+          if (exportButton == null) {
+            return manageSection;
+          }
+
           return Row(
-            children: widgets,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasManageActions) Expanded(child: manageSection),
+              if (hasManageActions) const SizedBox(width: 8),
+              Expanded(child: exportButton),
+            ],
           );
         }
 
@@ -5777,7 +5899,9 @@ class _LeadRevisitDialogState extends State<_LeadRevisitDialog> {
     }
     final parts = normalized.split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
     final initials = parts.take(2).map((part) => part[0]).join();
-    return initials.isEmpty ? normalized[0].toUpperCase() : initials.toUpperCase();
+    return initials.isEmpty
+        ? normalized[0].toUpperCase()
+        : initials.toUpperCase();
   }
 
   String _projectLabel(String id) {
@@ -5893,8 +6017,7 @@ class _LeadRevisitDialogState extends State<_LeadRevisitDialog> {
       hintStyle: const TextStyle(color: Color(0xFF98A2B3)),
       filled: true,
       fillColor: Colors.white,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Color(0xFFD8E0EA)),

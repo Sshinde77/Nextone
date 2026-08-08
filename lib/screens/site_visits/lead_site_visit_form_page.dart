@@ -20,17 +20,6 @@ class LeadSiteVisitFormPage extends StatefulWidget {
 enum _LeadSiteVisitSection { leadDetails, siteVisit }
 
 class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
-  static const List<String> _configurationOptions = <String>[
-    '1RK',
-    '1BHK',
-    '2BHK',
-    '3BHK',
-    '4BHK',
-    'Penta House / Duplex',
-    'Commercial shop',
-    'Office space',
-  ];
-
   final _authProvider = AuthProvider();
 
   final _nameController = TextEditingController();
@@ -73,6 +62,7 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_LeadSourceOption> _leadSourceOptions = const <_LeadSourceOption>[];
   List<_ProjectOption> _projectOptions = const <_ProjectOption>[];
+  List<String> _configurationOptions = <String>[];
 
   bool get _isLeadSection =>
       _selectedSection == _LeadSiteVisitSection.leadDetails;
@@ -84,6 +74,7 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
     _loadCurrentUserContext();
     _loadAssigneeOptions();
     _loadLeadSourceOptions();
+    _loadConfigurationOptions();
     _loadProjectOptions();
   }
 
@@ -216,6 +207,25 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
         _leadSourceOptions = const <_LeadSourceOption>[];
         _leadSourceLoadError = AppErrorHandler.friendlyMessage(error);
       });
+    }
+  }
+
+  Future<void> _loadConfigurationOptions() async {
+    try {
+      final options = await _authProvider.leadConfigurationsConfig(
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _configurationOptions = options
+            .where((option) => option.isActive)
+            .map((option) => option.name)
+            .toList(growable: false);
+      });
+    } catch (_) {
+      // Keep the form usable if the configuration API is unavailable.
     }
   }
 
@@ -675,6 +685,24 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
   }
 
   Future<void> _openConfigurationSheet() async {
+    try {
+      final options = await _authProvider.leadConfigurationsConfig(
+        token: _authProvider.currentAuthToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      final activeOptions = options
+          .where((option) => option.isActive)
+          .map((option) => option.name)
+          .toList(growable: false);
+      setState(() {
+        _configurationOptions = activeOptions;
+      });
+    } catch (_) {
+      // Keep the picker usable if the configuration API is unavailable.
+    }
+
     final result = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
@@ -1324,8 +1352,8 @@ class _LeadSiteVisitFormPageState extends State<LeadSiteVisitFormPage> {
   }
 
   Widget _buildAssigneeDropdown() {
-    final isEmployeeRole =
-        !RoleAccess.isSuperAdmin(_currentUserRole) && !RoleAccess.isAdmin(_currentUserRole);
+    final isEmployeeRole = !RoleAccess.isSuperAdmin(_currentUserRole) &&
+        !RoleAccess.isAdmin(_currentUserRole);
     return SearchableDropdownField<String>(
       label: 'Assign To',
       value: _selectedAssigneeId,

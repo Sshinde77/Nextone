@@ -75,9 +75,11 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       final leadsResult = await _authProvider.leads(token: token, perPage: 100);
       final projectsResult =
           await _authProvider.projects(token: token, perPage: 100);
-      final usersList = await _authProvider.assignmentUsers(token: token);
       final currentUserId = _extractUserId(profile.data);
       final currentUserName = _extractUserName(profile.data);
+      final usersList = _canSeeAllUsersInAssigneeField(currentRole)
+          ? await _authProvider.users(token: token)
+          : await _authProvider.assignmentUsers(token: token);
 
       setState(() {
         _leads = leadsResult.items;
@@ -182,6 +184,12 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
 
   bool get _canKeepCurrentAssignedUser {
     final normalizedRole = RoleAccess.normalize(_currentRole);
+    return normalizedRole == RoleAccess.admin ||
+        normalizedRole == RoleAccess.superAdmin;
+  }
+
+  bool _canSeeAllUsersInAssigneeField(String role) {
+    final normalizedRole = RoleAccess.normalize(role);
     return normalizedRole == RoleAccess.admin ||
         normalizedRole == RoleAccess.superAdmin;
   }
@@ -461,6 +469,20 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
     return options;
   }
 
+  String _assigneeFieldHint() {
+    if (_canKeepCurrentAssignedUser) {
+      return 'Select user...';
+    }
+    return 'Assignment is fixed for your role';
+  }
+
+  String _assigneeFieldHelperText() {
+    if (_canKeepCurrentAssignedUser) {
+      return 'Select a different user below';
+    }
+    return 'Assignment is fixed for your role and cannot be changed.';
+  }
+
   String _assigneeLabelForId(String id) {
     for (final item in _buildAssigneeOptions()) {
       if (item.value == id) {
@@ -700,11 +722,11 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                         const SizedBox(height: 20),
                         _buildLabel('LEAD *'),
                         const SizedBox(height: 8),
-                          _buildDropdown(
-                            sheetTitle: 'Lead',
-                            value: _selectedLeadId,
-                            hint: 'Select lead...',
-                            items: _leads
+                        _buildDropdown(
+                          sheetTitle: 'Lead',
+                          value: _selectedLeadId,
+                          hint: 'Select lead...',
+                          items: _leads
                               .map(
                                 (e) => SearchableDropdownItem<String>(
                                   value: e['id'].toString(),
@@ -871,7 +893,7 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                                 subtitle: Text(
                                   _keepCurrentAssignedUser
                                       ? 'Site visit will stay with ${_selectedLeadAssignedUserLabel()}'
-                                      : 'Select a different team member below',
+                                      : 'Select a different user below',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: AppColors.textSecondary,
@@ -918,13 +940,13 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
                             _buildDropdown(
                               sheetTitle: 'Assign To',
                               value: _selectedAssigneeId,
-                              hint: 'Select team member...',
+                              hint: _assigneeFieldHint(),
                               items: _buildAssigneeOptions(),
                               enabled: !_isSubmitting &&
                                   !_isLoadingDropdowns &&
                                   _buildAssigneeOptions().isNotEmpty,
                               selectedLabel: _resolveEmployeeAssigneeLabel(),
-                              helperText: 'Select a different team member below',
+                              helperText: _assigneeFieldHelperText(),
                               onChanged: (val) =>
                                   setState(() => _selectedAssigneeId = val),
                             ),
@@ -1057,7 +1079,8 @@ class _SiteVisitFormPageState extends State<SiteVisitFormPage> {
       value: value,
       hintText: hint,
       items: items,
-      enabled: enabled && !_isSubmitting && !_isLoadingDropdowns && items.isNotEmpty,
+      enabled:
+          enabled && !_isSubmitting && !_isLoadingDropdowns && items.isNotEmpty,
       isLoading: _isLoadingDropdowns,
       fieldValidator: validator,
       selectedLabel: selectedLabel,
