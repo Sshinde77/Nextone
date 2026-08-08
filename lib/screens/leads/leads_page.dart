@@ -86,7 +86,6 @@ class _LeadsPageState extends State<LeadsPage> {
   bool _isSubmittingReassign = false;
   bool _isSubmittingStatus = false;
   bool _isLoadingLeadSources = false;
-  bool _isManageActionsExpanded = false;
   String? _visiblePhoneLeadId;
   String? _expandedQuickActionLeadId;
   String? _selectedAssigneeId;
@@ -552,28 +551,41 @@ class _LeadsPageState extends State<LeadsPage> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  SearchableDropdownField<String>(
-                    label: 'Source',
-                    sheetTitle: 'Select source',
-                    value: tempSource ?? '',
-                    hintText: 'All',
-                    items: <SearchableDropdownItem<String>>[
-                      const SearchableDropdownItem<String>(
-                        value: '',
-                        label: 'All',
+                  DropdownButtonFormField<String?>(
+                    initialValue: tempSource,
+                    isExpanded: true,
+                    menuMaxHeight: 320,
+                    alignment: AlignmentDirectional.centerStart,
+                    borderRadius: BorderRadius.circular(14),
+                    dropdownColor: Colors.white,
+                    decoration: _sheetFieldDecoration('Select source').copyWith(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
+                    ),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                    items: <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(
+                          'All sources',
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       ..._sourceOptions.map(
-                        (source) => SearchableDropdownItem<String>(
+                        (source) => DropdownMenuItem<String?>(
                           value: source,
-                          label: source,
+                          child: Text(
+                            source,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
                     ],
-                    enabled: true,
                     onChanged: (value) {
                       setSheetState(() {
-                        tempSource =
-                            value == null || value.isEmpty ? null : value;
+                        tempSource = value;
                       });
                     },
                   ),
@@ -4731,124 +4743,71 @@ class _LeadsPageState extends State<LeadsPage> {
             RoleAccess.isAdminOrSuperAdmin(_currentRole);
 
         final manageButton = canManageLeadMetadata
-            ? OutlinedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _isManageActionsExpanded = !_isManageActionsExpanded;
-                  });
+            ? PopupMenuButton<String>(
+                tooltip: 'Manage',
+                onSelected: (value) {
+                  if (value == 'sources') {
+                    _openManageLeadSourcesDialog();
+                  } else if (value == 'configuration') {
+                    _openManageLeadConfigurationDialog();
+                  } else if (value == 'status') {
+                    _openManagePipelineStatusesDialog();
+                  }
                 },
-                icon: Icon(
-                  _isManageActionsExpanded
-                      ? Icons.keyboard_arrow_up_rounded
-                      : Icons.keyboard_arrow_down_rounded,
-                  size: 16,
+                offset: const Offset(0, 8),
+                color: Colors.white,
+                elevation: 12,
+                surfaceTintColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: const BorderSide(color: Color(0xFFE1E6F5)),
                 ),
-                label: const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'Manage',
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                itemBuilder: (context) => const [
+                  PopupMenuItem<String>(
+                    value: 'sources',
+                    child: Text('Manage Source'),
                   ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  fixedSize: const Size.fromHeight(48),
+                  PopupMenuItem<String>(
+                    value: 'configuration',
+                    child: Text('Manage Configuration'),
+                  ),
+                  PopupMenuItem<String>(
+                    value: 'status',
+                    child: Text('Manage Status'),
+                  ),
+                ],
+                child: Container(
+                  height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
-                  side: const BorderSide(color: AppColors.border),
-                  backgroundColor: AppColors.card,
-                  shape: RoundedRectangleBorder(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
                   ),
-                ),
-              )
-            : null;
-
-        final manageSourceButton = canManageLeadMetadata
-            ? OutlinedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _isManageActionsExpanded = false;
-                  });
-                  _openManageLeadSourcesDialog();
-                },
-                icon: const Icon(Icons.add_circle_outline, size: 16),
-                label: const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'Manage Source',
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  fixedSize: const Size.fromHeight(48),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  side: const BorderSide(color: AppColors.border),
-                  backgroundColor: AppColors.card,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              )
-            : null;
-
-        final manageConfigurationButton = canManageLeadMetadata
-            ? OutlinedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _isManageActionsExpanded = false;
-                  });
-                  _openManageLeadConfigurationDialog();
-                },
-                icon: const Icon(Icons.settings_outlined, size: 16),
-                label: const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'Manage Configuration',
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  fixedSize: const Size.fromHeight(48),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  side: const BorderSide(color: AppColors.border),
-                  backgroundColor: AppColors.card,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              )
-            : null;
-
-        final manageStatusButton = canManageLeadMetadata
-            ? OutlinedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _isManageActionsExpanded = false;
-                  });
-                  _openManagePipelineStatusesDialog();
-                },
-                icon: const Icon(Icons.tune_outlined, size: 16),
-                label: const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'Manage Status',
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  fixedSize: const Size.fromHeight(48),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  side: const BorderSide(color: AppColors.border),
-                  backgroundColor: AppColors.card,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.tune_outlined,
+                          size: 16, color: AppColors.primary),
+                      SizedBox(width: 6),
+                      Text(
+                        'Manage',
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                    ],
                   ),
                 ),
               )
@@ -4896,46 +4855,20 @@ class _LeadsPageState extends State<LeadsPage> {
             return const SizedBox.shrink();
           }
 
-          final manageSection = hasManageActions
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(width: double.infinity, child: manageButton),
-                    if (_isManageActionsExpanded) ...[
-                      const SizedBox(height: 8),
-                      if (manageSourceButton != null) ...[
-                        SizedBox(
-                          width: double.infinity,
-                          child: manageSourceButton,
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      if (manageConfigurationButton != null) ...[
-                        SizedBox(
-                          width: double.infinity,
-                          child: manageConfigurationButton,
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      if (manageStatusButton != null) ...[
-                        SizedBox(
-                          width: double.infinity,
-                          child: manageStatusButton,
-                        ),
-                      ],
-                    ],
-                  ],
-                )
-              : const SizedBox.shrink();
-
           if (exportButton == null) {
-            return manageSection;
+            return hasManageActions
+                ? Row(
+                    children: [
+                      Expanded(child: manageButton!),
+                    ],
+                  )
+                : const SizedBox.shrink();
           }
 
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (hasManageActions) Expanded(child: manageSection),
+              if (hasManageActions) Expanded(child: manageButton!),
               if (hasManageActions) const SizedBox(width: 8),
               Expanded(child: exportButton),
             ],

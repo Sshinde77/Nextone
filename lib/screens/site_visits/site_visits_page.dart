@@ -277,7 +277,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                         color: AppColors.primary,
                         fontSize: _fs(26),
                         fontWeight: FontWeight.bold,
-                      ),
+                      ),   
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
