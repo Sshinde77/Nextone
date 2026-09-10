@@ -14,6 +14,7 @@ import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 import 'package:nextone/widgets/data_card.dart';
 import 'package:nextone/widgets/pagination_widget.dart';
+import 'package:nextone/widgets/searchable_dropdown_field.dart';
 
 class EoiPage extends StatefulWidget {
   const EoiPage({super.key});
@@ -25,6 +26,17 @@ class EoiPage extends StatefulWidget {
 class _EoiPageState extends State<EoiPage> {
   static const int _myEoiTabIndex = 0;
   static const int _teamEoiTabIndex = 1;
+  static const List<String> _statusFlow = <String>[
+    'new',
+    'contacted',
+    'interested',
+    'follow_up',
+    'site_visit_scheduled',
+    'site_visit_done',
+    'negotiation',
+    'booked',
+    'lost',
+  ];
   static const List<String> _defaultSourceOptions = <String>[
     'Facebook',
     'Walk-in',
@@ -34,10 +46,14 @@ class _EoiPageState extends State<EoiPage> {
   final AuthProvider _authProvider = AuthProvider();
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _projectController = TextEditingController();
+  final TextEditingController _reassignNoteController = TextEditingController();
+  final TextEditingController _statusNoteController = TextEditingController();
 
   Timer? _searchDebounce;
   bool _isLoading = true;
   bool _isExporting = false;
+  bool _isSubmittingReassign = false;
+  bool _isSubmittingStatus = false;
   String? _loadError;
   String _currentRole = '';
   int _activeTabIndex = _myEoiTabIndex;
@@ -48,6 +64,9 @@ class _EoiPageState extends State<EoiPage> {
   String _searchQuery = '';
   String? _selectedSource;
   String? _selectedTeamId;
+  String? _selectedNextStatus;
+  String? _selectedAssigneeId;
+  String? _selectedReassignStatus;
   List<_LeadModel> _currentPageLeads = <_LeadModel>[];
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_LeadSourceOption> _leadSources = const <_LeadSourceOption>[];
@@ -107,6 +126,8 @@ class _EoiPageState extends State<EoiPage> {
     _searchDebounce?.cancel();
     _searchController.dispose();
     _projectController.dispose();
+    _reassignNoteController.dispose();
+    _statusNoteController.dispose();
     super.dispose();
   }
 
@@ -1247,6 +1268,285 @@ class _EoiPageState extends State<EoiPage> {
     }
   }
 
+  Future<void> _openStatusSheet(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
+    final statusOptions = _allStatusOptions();
+    if (statusOptions.isEmpty) {
+      _showSnackBar('No statuses available.');
+      return;
+    }
+
+    final current = _normalizeStatus(lead.status);
+    _selectedNextStatus =
+        statusOptions.contains(current) ? current : statusOptions.first;
+    _statusNoteController.clear();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return _buildSheetContainer(
+              title: 'Update Status',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SearchableDropdownField<String>(
+                    label: 'Status',
+                    sheetTitle: 'Update Status',
+                    value: _selectedNextStatus,
+                    hintText: 'Select status',
+                    items: statusOptions
+                        .map(
+                          (status) => SearchableDropdownItem<String>(
+                            value: status,
+                            label: _prettyStatus(status),
+                          ),
+                        )
+                        .toList(),
+                    enabled: !_isSubmittingStatus,
+                    onChanged: (value) {
+                      setSheetState(() {
+                        _selectedNextStatus = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _statusNoteController,
+                    minLines: 2,
+                    maxLines: 3,
+                    decoration: _sheetFieldDecoration('Add note (optional)'),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _isSubmittingStatus
+                          ? null
+                          : () async {
+                              setSheetState(() {
+                                _isSubmittingStatus = true;
+                              });
+                              final updatedStatus =
+                                  await _submitStatusChange(lead);
+                              if (!mounted) {
+                                return;
+                              }
+                              setSheetState(() {
+                                _isSubmittingStatus = false;
+                              });
+                              if (updatedStatus != null) {
+                                Navigator.of(context).pop();
+                              }
+                            },
+                      child: Text(
+                        _isSubmittingStatus ? 'Updating...' : 'Update Status',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<String?> _submitStatusChange(_LeadModel lead) async {
+    if (_selectedNextStatus == null || _selectedNextStatus!.isEmpty) {
+      _showSnackBar('Please select the next status.');
+      return null;
+    }
+
+    try {
+      final updatedStatus = _selectedNextStatus!;
+      await _authProvider.updateLeadStatus(
+        id: lead.id,
+        status: updatedStatus,
+        note: _statusNoteController.text.trim(),
+        token: _authProvider.currentAuthToken,
+      );
+      await _loadEoiLeads();
+      if (!mounted) {
+        return null;
+      }
+      _showSnackBar('Lead status updated successfully.');
+      return updatedStatus;
+    } catch (e) {
+      if (!mounted) {
+        return null;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
+      return null;
+    }
+  }
+
+  Future<void> _openReassignSheet(_LeadModel lead) async {
+    final allowed = await PermissionGuard.allowModuleAction(
+      context,
+      authProvider: _authProvider,
+      module: 'leads',
+      action: 'edit',
+      moduleLabel: 'leads',
+    );
+    if (!allowed) return;
+
+    if (_assigneeOptions.isEmpty) {
+      _showSnackBar('No active assignee available.');
+      return;
+    }
+
+    _reassignNoteController.clear();
+    _selectedAssigneeId = lead.assignedToId.isNotEmpty
+        ? lead.assignedToId
+        : _assigneeOptions.first.id;
+    if (!_assigneeOptions.any((option) => option.id == _selectedAssigneeId)) {
+      _selectedAssigneeId = _assigneeOptions.first.id;
+    }
+    _selectedReassignStatus = _initialReassignStatus(lead.status);
+    final statusItems = _reassignStatusItems();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return _buildSheetContainer(
+              title:
+                  lead.assignedToId.isEmpty ? 'Assign Lead' : 'Reassign Lead',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SearchableDropdownField<String>(
+                    label: 'Assignee',
+                    sheetTitle: lead.assignedToId.isEmpty
+                        ? 'Assign Lead'
+                        : 'Reassign Lead',
+                    value: _selectedAssigneeId,
+                    hintText: 'Select assignee',
+                    items: _assigneeOptions
+                        .map(
+                          (user) => SearchableDropdownItem<String>(
+                            value: user.id,
+                            label: user.name,
+                          ),
+                        )
+                        .toList(),
+                    enabled: !_isSubmittingReassign,
+                    onChanged: (value) {
+                      setSheetState(() {
+                        _selectedAssigneeId = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  SearchableDropdownField<String>(
+                    label: 'Change Status (optional)',
+                    sheetTitle: lead.assignedToId.isEmpty
+                        ? 'Assign Lead'
+                        : 'Reassign Lead',
+                    value: _selectedReassignStatus,
+                    hintText: 'Select status',
+                    items: statusItems,
+                    enabled: !_isSubmittingReassign && statusItems.isNotEmpty,
+                    onChanged: (value) {
+                      setSheetState(() {
+                        _selectedReassignStatus = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _reassignNoteController,
+                    minLines: 2,
+                    maxLines: 3,
+                    decoration: _sheetFieldDecoration('Add note (optional)'),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _isSubmittingReassign
+                          ? null
+                          : () async {
+                              setSheetState(() {
+                                _isSubmittingReassign = true;
+                              });
+                              final reassigned =
+                                  await _submitReassignment(lead);
+                              if (!mounted) {
+                                return;
+                              }
+                              setSheetState(() {
+                                _isSubmittingReassign = false;
+                              });
+                              if (reassigned) {
+                                Navigator.of(context).pop();
+                              }
+                            },
+                      child: Text(
+                        _isSubmittingReassign
+                            ? 'Reassigning...'
+                            : (lead.assignedToId.isEmpty
+                                ? 'Assign Lead'
+                                : 'Reassign Lead'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<bool> _submitReassignment(_LeadModel lead) async {
+    if (_selectedAssigneeId == null || _selectedAssigneeId!.isEmpty) {
+      _showSnackBar('Please select an assignee.');
+      return false;
+    }
+
+    try {
+      await _authProvider.reassignLead(
+        id: lead.id,
+        assignedTo: _selectedAssigneeId!,
+        status: _selectedReassignStatus,
+        reason: _reassignNoteController.text.trim(),
+        token: _authProvider.currentAuthToken,
+      );
+      await _loadEoiLeads();
+      if (!mounted) {
+        return false;
+      }
+      _showSnackBar('Lead reassigned successfully.');
+      return true;
+    } catch (e) {
+      if (!mounted) {
+        return false;
+      }
+      _showSnackBar(AppErrorHandler.friendlyMessage(e));
+      return false;
+    }
+  }
+
   Future<void> _openEditLead(_LeadModel lead) async {
     final allowed = await PermissionGuard.allowModuleAction(
       context,
@@ -1702,6 +2002,16 @@ class _EoiPageState extends State<EoiPage> {
                       onTap: () => _viewLeadDetail(lead.id),
                     ),
                     DataCardAction(
+                      icon: Icons.person_add_alt_1_outlined,
+                      color: AppColors.primary,
+                      onTap: () => _openReassignSheet(lead),
+                    ),
+                    DataCardAction(
+                      icon: Icons.autorenew_rounded,
+                      color: const Color(0xFF14B8A6),
+                      onTap: () => _openStatusSheet(lead),
+                    ),
+                    DataCardAction(
                       icon: Icons.edit_outlined,
                       onTap: () => _openEditLead(lead),
                     ),
@@ -1895,6 +2205,63 @@ class _EoiPageState extends State<EoiPage> {
     );
   }
 
+  String _normalizeStatus(String status) {
+    return status.trim().toLowerCase().replaceAll(RegExp(r'[\s-]+'), '_');
+  }
+
+  List<String> _allStatusOptions() {
+    final apiStatuses = _pipelineStatuses
+        .where((status) => status.isActive && status.key.trim().isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final apiFlow = apiStatuses
+        .map((status) => _normalizeStatus(status.key))
+        .where((status) => status.isNotEmpty)
+        .toList(growable: false);
+    return apiFlow.isNotEmpty ? apiFlow : _statusFlow;
+  }
+
+  String _prettyStatus(String status) {
+    final normalized = _normalizeStatus(status);
+    final configured = _pipelineStatuses.where((item) {
+      return _normalizeStatus(item.key) == normalized;
+    }).toList();
+    if (configured.isNotEmpty && configured.first.label.trim().isNotEmpty) {
+      return configured.first.label;
+    }
+    return normalized
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+  }
+
+  List<SearchableDropdownItem<String>> _reassignStatusItems() {
+    final statuses = _pipelineStatuses
+        .where((status) => status.isActive && status.key.trim().isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return statuses
+        .map(
+          (status) => SearchableDropdownItem<String>(
+            value: _normalizeStatus(status.key),
+            label: status.label.trim().isNotEmpty
+                ? status.label.trim()
+                : _prettyStatus(status.key),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  String? _initialReassignStatus(String currentStatus) {
+    final current = _normalizeStatus(currentStatus);
+    final items = _reassignStatusItems();
+    if (items.any((item) => item.value == current)) {
+      return current;
+    }
+    return null;
+  }
+
   static String _readString(dynamic value, {String fallback = ''}) {
     if (value is String && value.trim().isNotEmpty) {
       return value.trim();
@@ -1907,6 +2274,7 @@ class _LeadModel {
   const _LeadModel({
     required this.id,
     required this.name,
+    required this.assignedToId,
     required this.status,
     required this.priority,
     required this.priorityColor,
@@ -1924,6 +2292,7 @@ class _LeadModel {
 
   final String id;
   final String name;
+  final String assignedToId;
   final String status;
   final String priority;
   final Color priorityColor;
@@ -1954,6 +2323,19 @@ class _LeadModel {
     ].join(' ').trim();
 
     final assigned = json['assigned_to'] ?? json['assignee'];
+    final assignedToId = assigned is Map<String, dynamic>
+        ? _readString(
+            assigned['id'] ??
+                assigned['user_id'] ??
+                assigned['userId'] ??
+                assigned['uuid'],
+          )
+        : _readString(
+            json['assigned_to_id'] ??
+                json['assignedToId'] ??
+                json['assignee_id'] ??
+                json['assigneeId'],
+          );
     final assigneeName = assigned is Map<String, dynamic>
         ? _readString(
             assigned['name'] ??
@@ -1986,6 +2368,7 @@ class _LeadModel {
       name: resolvedName.isNotEmpty
           ? resolvedName
           : (fullName.isNotEmpty ? fullName : 'Unknown Lead'),
+      assignedToId: assignedToId,
       status: _readString(
         json['status'] ?? json['stage'] ?? json['current_status'],
         fallback: 'EOI',
@@ -2110,6 +2493,7 @@ class _LeadSourceOption {
 class _PipelineStatusOption {
   const _PipelineStatusOption({
     required this.id,
+    required this.key,
     required this.label,
     required this.color,
     required this.isActive,
@@ -2117,6 +2501,7 @@ class _PipelineStatusOption {
   });
 
   final String id;
+  final String key;
   final String label;
   final String color;
   final bool isActive;
@@ -2127,6 +2512,8 @@ class _PipelineStatusOption {
       id: _LeadModel._readString(
         json['id'] ?? json['status_id'] ?? json['statusId'],
       ),
+      key:
+          _LeadModel._readString(json['key'] ?? json['value'] ?? json['label']),
       label: _LeadModel._readString(
         json['label'] ?? json['name'] ?? json['status_label'],
       ),

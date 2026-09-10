@@ -2505,6 +2505,7 @@ class AuthService {
     String? to,
     String? search,
     String? project,
+    String? location,
     int page = 1,
     int perPage = 20,
   }) async {
@@ -2534,6 +2535,9 @@ class AuthService {
     }
     if (project != null && project.trim().isNotEmpty) {
       query['project'] = project.trim();
+    }
+    if (location != null && location.trim().isNotEmpty) {
+      query['location'] = location.trim();
     }
 
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.leads}')
@@ -2597,6 +2601,7 @@ class AuthService {
     String? to,
     String? search,
     String? project,
+    String? location,
     int page = 1,
     int perPage = 20,
   }) async {
@@ -2623,6 +2628,9 @@ class AuthService {
     }
     if (project != null && project.trim().isNotEmpty) {
       query['project'] = project.trim();
+    }
+    if (location != null && location.trim().isNotEmpty) {
+      query['location'] = location.trim();
     }
 
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.myLeads}')
@@ -2675,6 +2683,102 @@ class AuthService {
       );
     } catch (_) {
       throw Exception('My leads response format is not valid.');
+    }
+  }
+
+  Future<LeadsListResult> websiteInquiries({
+    String? token,
+    String? status,
+    String? search,
+    String? project,
+    String? from,
+    String? to,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    final resolvedToken = token ?? _authToken;
+    final query = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+
+    if (status != null && status.trim().isNotEmpty) {
+      query['status'] = status.trim();
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
+    if (project != null && project.trim().isNotEmpty) {
+      query['project'] = project.trim();
+    }
+    if (from != null && from.trim().isNotEmpty) {
+      query['from'] = from.trim();
+    }
+    if (to != null && to.trim().isNotEmpty) {
+      query['to'] = to.trim();
+    }
+
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.websiteInquiries}')
+            .replace(queryParameters: query);
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'websiteInquiries',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('websiteInquiries', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch website inquiries.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic body = jsonDecode(response.body);
+      final items = _extractLeadsItems(body);
+      final pagination = _extractPaginationMap(body);
+
+      final resolvedCurrentPage = _readIntFromMap(
+            pagination,
+            ['page', 'current_page', 'currentPage'],
+          ) ??
+          page;
+      final resolvedPerPage = _readIntFromMap(
+            pagination,
+            ['per_page', 'perPage', 'page_size', 'limit'],
+          ) ??
+          perPage;
+      final resolvedTotalItems = _readIntFromMap(
+            pagination,
+            ['total', 'total_items', 'totalItems', 'count'],
+          ) ??
+          items.length;
+      final resolvedTotalPages = _readIntFromMap(
+            pagination,
+            ['total_pages', 'totalPages', 'last_page', 'lastPage'],
+          ) ??
+          _deriveTotalPages(
+            total: resolvedTotalItems,
+            perPage: resolvedPerPage,
+          );
+
+      return LeadsListResult(
+        items: items,
+        currentPage: resolvedCurrentPage,
+        perPage: resolvedPerPage,
+        totalItems: resolvedTotalItems,
+        totalPages: resolvedTotalPages <= 0 ? 1 : resolvedTotalPages,
+      );
+    } catch (_) {
+      throw Exception('Website inquiries response format is not valid.');
     }
   }
 
@@ -5369,6 +5473,7 @@ class AuthService {
     String? token,
     String? status,
     String? search,
+    String? assignedTo,
     int page = 1,
     int perPage = 20,
   }) async {
@@ -5383,6 +5488,9 @@ class AuthService {
     }
     if (search != null && search.trim().isNotEmpty) {
       queryParams['search'] = search.trim();
+    }
+    if (assignedTo != null && assignedTo.trim().isNotEmpty) {
+      queryParams['assigned_to'] = assignedTo.trim();
     }
 
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.sitevisits}')
@@ -5620,6 +5728,7 @@ class AuthService {
     String? token,
     String? status,
     String? search,
+    String? assignedTo,
     int page = 1,
     int perPage = 20,
   }) async {
@@ -5633,6 +5742,9 @@ class AuthService {
     }
     if (search != null && search.trim().isNotEmpty) {
       query['search'] = search.trim();
+    }
+    if (assignedTo != null && assignedTo.trim().isNotEmpty) {
+      query['assigned_to'] = assignedTo.trim();
     }
 
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.siteRevisits}')
@@ -8472,7 +8584,8 @@ class AuthService {
   Future<Map<String, dynamic>> reassignLead({
     required String id,
     required String assignedTo,
-    String note = '',
+    String? status,
+    String reason = '',
     String? token,
   }) async {
     final normalizedId = id.trim();
@@ -8485,15 +8598,20 @@ class AuthService {
       throw Exception('Assigned user id is required.');
     }
 
+    final normalizedStatus = status?.trim();
     final resolvedToken = token ?? _authToken;
     final endpoint =
         ApiConstants.reassignmemberleads.replaceFirst('{id}', normalizedId);
     final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
     final headers = _headers(accept: 'application/json', token: resolvedToken);
-    final body = jsonEncode({
+    final payload = <String, dynamic>{
       'assigned_to': normalizedAssignee,
-      'note': note.trim(),
-    });
+      'reason': reason.trim(),
+    };
+    if (normalizedStatus != null && normalizedStatus.isNotEmpty) {
+      payload['status'] = normalizedStatus;
+    }
+    final body = jsonEncode(payload);
 
     _logRequest(
       endpoint: 'reassignLead',
@@ -8532,7 +8650,9 @@ class AuthService {
     return <String, dynamic>{
       'id': normalizedId,
       'assigned_to': normalizedAssignee,
-      'note': note.trim(),
+      if (normalizedStatus != null && normalizedStatus.isNotEmpty)
+        'status': normalizedStatus,
+      'reason': reason.trim(),
     };
   }
 
@@ -10972,6 +11092,9 @@ class AuthService {
     for (final key in [
       'data',
       'leads',
+      'inquiries',
+      'website_inquiries',
+      'websiteInquiries',
       'projects',
       'items',
       'results',
@@ -10987,6 +11110,9 @@ class AuthService {
     if (data is Map<String, dynamic>) {
       for (final key in [
         'leads',
+        'inquiries',
+        'website_inquiries',
+        'websiteInquiries',
         'projects',
         'items',
         'results',

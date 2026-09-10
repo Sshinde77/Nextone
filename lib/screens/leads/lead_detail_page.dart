@@ -51,6 +51,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   bool _isSubmittingReassign = false;
   String? _selectedNextStatus;
   String? _selectedAssigneeId;
+  String? _selectedReassignStatus;
   String _currentRole = '';
   bool _hasPhoneAccess = false;
   bool _hasPendingPhoneRequest = false;
@@ -1756,7 +1757,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     }
   }
 
-  Future<void> _submitReassignment() async {
+  Future<bool> _submitReassignment() async {
     final allowed = await PermissionGuard.allowModuleAction(
       context,
       authProvider: _authProvider,
@@ -1764,11 +1765,11 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       action: 'edit',
       moduleLabel: 'leads',
     );
-    if (!allowed) return;
+    if (!allowed) return false;
 
     if (_selectedAssigneeId == null || _selectedAssigneeId!.isEmpty) {
       _showSnackBar('Please select an assignee.');
-      return;
+      return false;
     }
     setState(() {
       _isSubmittingReassign = true;
@@ -1778,19 +1779,22 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       await _authProvider.reassignLead(
         id: widget.leadId,
         assignedTo: _selectedAssigneeId!,
-        note: _reassignNoteController.text.trim(),
+        status: _selectedReassignStatus,
+        reason: _reassignNoteController.text.trim(),
         token: _authProvider.currentAuthToken,
       );
       await _fetchLeadDetails();
       if (!mounted) {
-        return;
+        return false;
       }
       _showSnackBar('Lead reassigned successfully.');
+      return true;
     } catch (e) {
       if (!mounted) {
-        return;
+        return false;
       }
       _showSnackBar(AppErrorHandler.friendlyMessage(e));
+      return false;
     } finally {
       if (mounted) {
         setState(() {
@@ -1887,6 +1891,11 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     }
     _reassignNoteController.clear();
     _selectedAssigneeId ??= _assigneeOptions.first.id;
+    if (!_assigneeOptions.any((option) => option.id == _selectedAssigneeId)) {
+      _selectedAssigneeId = _assigneeOptions.first.id;
+    }
+    _selectedReassignStatus = _initialReassignStatus(_lead?.status ?? '');
+    final statusItems = _reassignStatusItems();
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1917,6 +1926,17 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                     setState(() => _selectedAssigneeId = value),
               ),
               const SizedBox(height: 10),
+              SearchableDropdownField<String>(
+                label: 'Change Status (optional)',
+                sheetTitle: 'Reassign Lead',
+                value: _selectedReassignStatus,
+                hintText: 'Select status',
+                items: statusItems,
+                enabled: !_isSubmittingReassign && statusItems.isNotEmpty,
+                onChanged: (value) =>
+                    setState(() => _selectedReassignStatus = value),
+              ),
+              const SizedBox(height: 10),
               TextField(
                 controller: _reassignNoteController,
                 minLines: 2,
@@ -1930,8 +1950,10 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                   onPressed: _isSubmittingReassign
                       ? null
                       : () async {
-                          await _submitReassignment();
-                          if (mounted) Navigator.of(context).pop();
+                          final reassigned = await _submitReassignment();
+                          if (mounted && reassigned) {
+                            Navigator.of(context).pop();
+                          }
                         },
                   child: Text(_isSubmittingReassign
                       ? 'Reassigning...'
@@ -4761,12 +4783,43 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     if (normalized.isEmpty) {
       return 'UNKNOWN';
     }
+    final configured = _pipelineStatuses.where((item) {
+      return _normalizeStatus(item.key) == normalized;
+    }).toList();
+    if (configured.isNotEmpty && configured.first.label.trim().isNotEmpty) {
+      return configured.first.label;
+    }
     return normalized
         .split('_')
         .map((part) => part.isEmpty
             ? part
             : '${part[0].toUpperCase()}${part.substring(1)}')
         .join(' ');
+  }
+
+  List<SearchableDropdownItem<String>> _reassignStatusItems() {
+    return (_pipelineStatuses
+            .where((status) => status.isActive && status.key.trim().isNotEmpty)
+            .toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)))
+        .map(
+          (status) => SearchableDropdownItem<String>(
+            value: _normalizeStatus(status.key),
+            label: status.label.trim().isNotEmpty
+                ? status.label.trim()
+                : _prettyStatus(status.key),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  String? _initialReassignStatus(String currentStatus) {
+    final current = _normalizeStatus(currentStatus);
+    final items = _reassignStatusItems();
+    if (items.any((item) => item.value == current)) {
+      return current;
+    }
+    return null;
   }
 
   bool _isImageUrl(String value) {

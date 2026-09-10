@@ -13,6 +13,7 @@ import 'package:nextone/screens/leads/lead_detail_page.dart';
 import 'package:nextone/utils/app_error_handler.dart';
 import 'package:nextone/utils/export_file_helper.dart';
 import 'package:nextone/utils/permission_guard.dart';
+import 'package:nextone/utils/role_access.dart';
 import 'package:nextone/widgets/app_preloader.dart';
 import 'package:nextone/widgets/crm_app_bar.dart';
 
@@ -81,6 +82,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   bool _isLoadingDocuments = true;
   bool _isLoadingLeads = true;
   bool _isDocumentAction = false;
+  bool _canViewProjectLeads = false;
   String? _error;
   String? _documentsError;
   String? _leadsError;
@@ -92,7 +94,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     super.initState();
     _data = widget.initialData;
     _loadDetail();
-    _loadProjectLeads();
+    _initializeProjectLeadAccess();
   }
 
   @override
@@ -165,7 +167,45 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     }
   }
 
+  Future<void> _initializeProjectLeadAccess() async {
+    try {
+      final role = await RoleAccess.currentRole(_authProvider);
+      final canView = RoleAccess.isAdminOrSuperAdmin(role);
+      if (!mounted) return;
+      setState(() {
+        _canViewProjectLeads = canView;
+        if (!canView) {
+          _isLoadingLeads = false;
+          _projectLeads = const <_ProjectLead>[];
+          _leadsError = null;
+        }
+      });
+      if (canView) {
+        await _loadProjectLeads();
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _canViewProjectLeads = false;
+        _isLoadingLeads = false;
+        _projectLeads = const <_ProjectLead>[];
+        _leadsError = null;
+      });
+    }
+  }
+
   Future<void> _loadProjectLeads({bool showLoading = true}) async {
+    if (!_canViewProjectLeads) {
+      if (mounted) {
+        setState(() {
+          _isLoadingLeads = false;
+          _projectLeads = const <_ProjectLead>[];
+          _leadsError = null;
+        });
+      }
+      return;
+    }
+
     if (showLoading) {
       setState(() {
         _isLoadingLeads = true;
@@ -1403,8 +1443,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       ),
                       const SizedBox(height: 14),
                       _buildDocumentsSection(),
-                      const SizedBox(height: 14),
-                      _buildProjectLeadsSection(),
+                      if (_canViewProjectLeads) ...[
+                        const SizedBox(height: 14),
+                        _buildProjectLeadsSection(),
+                      ],
                     ],
                   ),
                 ),

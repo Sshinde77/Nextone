@@ -121,11 +121,13 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   bool _isCalendarView = false;
   bool _isExporting = false;
   bool _isLoadingVisits = false;
+  bool _isLoadingTeamFilter = false;
   String? _loadError;
   String _currentRole = '';
   Timer? _searchDebounce;
   _VisitScope _selectedScope = _VisitScope.team;
   String _selectedStatus = '';
+  String? _selectedTeamId;
   String _searchQuery = '';
   int _currentPage = 1;
   final int _perPage = 10;
@@ -134,6 +136,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
   late DateTime _focusedMonth;
   late DateTime _selectedDate;
   late List<_SiteVisit> _visits;
+  List<_TeamMemberOption> _teamFilterOptions = const <_TeamMemberOption>[];
 
   @override
   void initState() {
@@ -143,6 +146,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     _selectedDate = DateTime(now.year, now.month, now.day);
     _visits = <_SiteVisit>[];
     _loadAccess();
+    _loadTeamFilterOptions();
     _loadSiteVisits();
   }
 
@@ -277,7 +281,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                         color: AppColors.primary,
                         fontSize: _fs(26),
                         fontWeight: FontWeight.bold,
-                      ),   
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -449,7 +453,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildStatusFilterBar(),
+              Row(
+                children: [
+                  Expanded(child: _buildStatusFilterBar()),
+                  if (!_isMyScope) ...[
+                    SizedBox(width: _s(8)),
+                    Expanded(child: _buildTeamFilterBar()),
+                  ],
+                ],
+              ),
               SizedBox(height: _s(10)),
               revisitButton,
             ],
@@ -459,6 +471,10 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         return Row(
           children: [
             Expanded(child: _buildStatusFilterBar()),
+            if (!_isMyScope) ...[
+              SizedBox(width: _s(10)),
+              Expanded(child: _buildTeamFilterBar()),
+            ],
             SizedBox(width: _s(10)),
             revisitButton,
           ],
@@ -577,6 +593,41 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           icon: const Icon(Icons.keyboard_arrow_down_rounded),
         ),
       ),
+    );
+  }
+
+  Widget _buildTeamFilterBar() {
+    return SearchableDropdownField<String>(
+      key: ValueKey(
+        'site-visits-team-${_selectedTeamId ?? ''}-${_teamFilterOptions.length}',
+      ),
+      label: 'Team Member',
+      sheetTitle: 'Select team member',
+      showFieldLabel: false,
+      value: _selectedTeamId ?? '',
+      hintText: 'All team members',
+      searchHintText: 'Search team member...',
+      items: <SearchableDropdownItem<String>>[
+        const SearchableDropdownItem<String>(
+          value: '',
+          label: 'All team members',
+        ),
+        ..._teamFilterOptions.map(
+          (member) => SearchableDropdownItem<String>(
+            value: member.id,
+            label: member.name,
+          ),
+        ),
+      ],
+      enabled: !_isLoadingVisits && !_isLoadingTeamFilter,
+      isLoading: _isLoadingTeamFilter,
+      onChanged: (value) {
+        setState(() {
+          _selectedTeamId = value == null || value.isEmpty ? null : value;
+          _currentPage = 1;
+        });
+        _loadSiteVisits(page: 1);
+      },
     );
   }
 
@@ -897,6 +948,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
                 if (_isMyScope) return;
                 setState(() {
                   _selectedScope = _VisitScope.myItems;
+                  _selectedTeamId = null;
                   _currentPage = 1;
                 });
                 _loadSiteVisits(page: 1);
@@ -2752,6 +2804,31 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     return members;
   }
 
+  Future<void> _loadTeamFilterOptions() async {
+    setState(() {
+      _isLoadingTeamFilter = true;
+    });
+    try {
+      final members = await _loadActiveTeamMembers();
+      if (!mounted) return;
+      setState(() {
+        _teamFilterOptions = members;
+        _isLoadingTeamFilter = false;
+        if (_selectedTeamId != null &&
+            !members.any((member) => member.id == _selectedTeamId)) {
+          _selectedTeamId = null;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _teamFilterOptions = const <_TeamMemberOption>[];
+        _isLoadingTeamFilter = false;
+        _selectedTeamId = null;
+      });
+    }
+  }
+
   bool _isActiveUser(Map<String, dynamic> user) {
     final value = user['is_active'] ??
         user['isActive'] ??
@@ -2830,6 +2907,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
               status: _selectedStatus.trim().isEmpty
                   ? null
                   : _selectedStatus.trim(),
+              assignedTo: _selectedTeamId,
               search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
               page: targetPage,
               perPage: _perPage,

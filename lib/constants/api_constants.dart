@@ -33,13 +33,14 @@ class ApiConstants {
   //leads Endpoints
   static const String myLeads = '/me/leads';
   static const String leads = '/leads';
+  static const String websiteInquiries = '/website-inquiries';
   static const String createsleads = '/leads';
   static const String leadsdetail = '/leads/{id}';
   static const String deleteleads = '/leads/{id}';
   static const String editleads = '/leads/{id}';
   static const String leadClosingManager = '/leads/{id}/closing-manager';
   static const String updatestatusleads = '/leads/{id}/status';
-  static const String reassignmemberleads = '/leads/{id}/assign';
+  static const String reassignmemberleads = '/leads/{id}/reassign';
   static const String leadsBulkTemplate = '/leads/bulk/template';
   static const String leadsBulkUpload = '/leads/bulk/upload';
   static const String leadsBulkResult = '/leads/bulk/result/{filename}';

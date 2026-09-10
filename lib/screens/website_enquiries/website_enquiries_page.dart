@@ -19,7 +19,6 @@ class WebsiteEnquiriesPage extends StatefulWidget {
 }
 
 class _WebsiteEnquiriesPageState extends State<WebsiteEnquiriesPage> {
-  static const String _websiteSource = 'Website';
   static const List<int> _pageSizeOptions = <int>[10, 20, 50];
 
   final AuthProvider _authProvider = AuthProvider();
@@ -96,9 +95,8 @@ class _WebsiteEnquiriesPageState extends State<WebsiteEnquiriesPage> {
     }
 
     try {
-      final result = await _authProvider.leads(
+      final result = await _authProvider.websiteInquiries(
         token: _authProvider.currentAuthToken,
-        source: _websiteSource,
         status: _selectedStatus,
         search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
         project: _selectedProject,
@@ -108,10 +106,8 @@ class _WebsiteEnquiriesPageState extends State<WebsiteEnquiriesPage> {
         perPage: _pageSize,
       );
 
-      final websiteEnquiries = result.items
-          .map(_WebsiteEnquiry.fromApi)
-          .where((item) => item.source.toLowerCase() == 'website')
-          .toList();
+      final websiteEnquiries =
+          result.items.map(_WebsiteEnquiry.fromApi).toList();
 
       if (!mounted) {
         return;

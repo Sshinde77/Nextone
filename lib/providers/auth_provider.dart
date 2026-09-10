@@ -593,6 +593,7 @@ class AuthProvider {
     String? to,
     String? search,
     String? project,
+    String? location,
     int page = 1,
     int perPage = 20,
   }) {
@@ -605,6 +606,7 @@ class AuthProvider {
       to: to,
       search: search,
       project: project,
+      location: location,
       page: page,
       perPage: perPage,
     );
@@ -618,6 +620,7 @@ class AuthProvider {
     String? to,
     String? search,
     String? project,
+    String? location,
     int page = 1,
     int perPage = 20,
   }) {
@@ -629,6 +632,29 @@ class AuthProvider {
       to: to,
       search: search,
       project: project,
+      location: location,
+      page: page,
+      perPage: perPage,
+    );
+  }
+
+  Future<LeadsListResult> websiteInquiries({
+    String? token,
+    String? status,
+    String? search,
+    String? project,
+    String? from,
+    String? to,
+    int page = 1,
+    int perPage = 20,
+  }) {
+    return _authService.websiteInquiries(
+      token: token,
+      status: status,
+      search: search,
+      project: project,
+      from: from,
+      to: to,
       page: page,
       perPage: perPage,
     );
@@ -1351,6 +1377,7 @@ class AuthProvider {
     String? token,
     String? status,
     String? search,
+    String? assignedTo,
     int page = 1,
     int perPage = 20,
   }) {
@@ -1358,6 +1385,7 @@ class AuthProvider {
       token: token,
       status: status,
       search: search,
+      assignedTo: assignedTo,
       page: page,
       perPage: perPage,
     );
@@ -1392,6 +1420,7 @@ class AuthProvider {
     String? token,
     String? status,
     String? search,
+    String? assignedTo,
     int page = 1,
     int perPage = 20,
   }) {
@@ -1399,6 +1428,7 @@ class AuthProvider {
       token: token,
       status: status,
       search: search,
+      assignedTo: assignedTo,
       page: page,
       perPage: perPage,
     );
@@ -2123,13 +2153,15 @@ class AuthProvider {
   Future<Map<String, dynamic>> reassignLead({
     required String id,
     required String assignedTo,
-    String note = '',
+    String? status,
+    String reason = '',
     String? token,
   }) {
     return _authService.reassignLead(
       id: id,
       assignedTo: assignedTo,
-      note: note,
+      status: status,
+      reason: reason,
       token: token,
     );
   }

@@ -40,21 +40,25 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   Timer? _searchDebounce;
   bool _isExporting = false;
   bool _isLoading = false;
+  bool _isLoadingTeamFilter = false;
   String? _error;
   List<Map<String, dynamic>> _items = const <Map<String, dynamic>>[];
   String _currentRole = '';
   _RevisitScope _selectedScope = _RevisitScope.team;
   String _statusFilter = 'all';
+  String? _selectedTeamId;
   String _searchQuery = '';
   int _currentPage = 1;
   int _totalPages = 1;
   int _totalItems = 0;
   final int _perPage = 10;
+  List<_TeamMemberOption> _teamFilterOptions = const <_TeamMemberOption>[];
 
   @override
   void initState() {
     super.initState();
     _loadAccess();
+    _loadTeamFilterOptions();
     _loadRevisits();
   }
 
@@ -111,6 +115,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
           : await _authProvider.siteRevisits(
               token: _authProvider.currentAuthToken,
               status: apiStatus,
+              assignedTo: _selectedTeamId,
               search: apiSearch,
               page: nextPage,
               perPage: _perPage,
@@ -250,6 +255,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
                 if (_isMyScope) return;
                 setState(() {
                   _selectedScope = _RevisitScope.myItems;
+                  _selectedTeamId = null;
                   _currentPage = 1;
                 });
                 _loadRevisits(page: 1);
@@ -358,64 +364,129 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   }
 
   Widget _buildSearchAndFilter() {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _searchController,
-            onChanged: _onSearchChanged,
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              isDense: true,
-              hintText: 'Search lead, project...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.trim().isNotEmpty
-                  ? IconButton(
-                      onPressed: _clearSearch,
-                      icon: const Icon(Icons.close),
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+    final searchField = TextField(
+      controller: _searchController,
+      onChanged: _onSearchChanged,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: 'Search lead, project...',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: _searchQuery.trim().isNotEmpty
+            ? IconButton(
+                onPressed: _clearSearch,
+                icon: const Icon(Icons.close),
+              )
+            : null,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+    final statusFilter = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _statusFilter,
+          items: const [
+            DropdownMenuItem(value: 'all', child: Text('All')),
+            DropdownMenuItem(value: 'scheduled', child: Text('Scheduled')),
+            DropdownMenuItem(value: 'done', child: Text('Done')),
+            DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+            DropdownMenuItem(value: 'rescheduled', child: Text('Rescheduled')),
+            DropdownMenuItem(value: 'no_show', child: Text('No Show')),
+          ],
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() {
+              _statusFilter = value;
+              _currentPage = 1;
+            });
+            _loadRevisits(page: 1);
+          },
+        ),
+      ),
+    );
+    final refreshButton = IconButton(
+      onPressed: _loadRevisits,
+      icon: const Icon(Icons.refresh),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 620;
+        if (isNarrow) {
+          return Column(
+            children: [
+              searchField,
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: statusFilter),
+                  if (!_isMyScope) ...[
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildTeamFilterBar()),
+                  ],
+                  const SizedBox(width: 8),
+                  refreshButton,
+                ],
               ),
-            ),
-          ),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: searchField),
+            const SizedBox(width: 8),
+            SizedBox(width: 176, child: statusFilter),
+            if (!_isMyScope) ...[
+              const SizedBox(width: 8),
+              SizedBox(width: 220, child: _buildTeamFilterBar()),
+            ],
+            refreshButton,
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildTeamFilterBar() {
+    return SearchableDropdownField<String>(
+      key: ValueKey(
+        'site-revisits-team-${_selectedTeamId ?? ''}-${_teamFilterOptions.length}',
+      ),
+      label: 'Team Member',
+      sheetTitle: 'Select team member',
+      showFieldLabel: false,
+      value: _selectedTeamId ?? '',
+      hintText: 'All team members',
+      searchHintText: 'Search team member...',
+      items: <SearchableDropdownItem<String>>[
+        const SearchableDropdownItem<String>(
+          value: '',
+          label: 'All team members',
         ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(12),
+        ..._teamFilterOptions.map(
+          (member) => SearchableDropdownItem<String>(
+            value: member.id,
+            label: member.name,
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _statusFilter,
-              items: const [
-                DropdownMenuItem(value: 'all', child: Text('All')),
-                DropdownMenuItem(value: 'scheduled', child: Text('Scheduled')),
-                DropdownMenuItem(value: 'done', child: Text('Done')),
-                DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
-                DropdownMenuItem(
-                    value: 'rescheduled', child: Text('Rescheduled')),
-                DropdownMenuItem(value: 'no_show', child: Text('No Show')),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() {
-                  _statusFilter = value;
-                  _currentPage = 1;
-                });
-                _loadRevisits(page: 1);
-              },
-            ),
-          ),
-        ),
-        IconButton(
-          onPressed: _loadRevisits,
-          icon: const Icon(Icons.refresh),
         ),
       ],
+      enabled: !_isLoading && !_isLoadingTeamFilter,
+      isLoading: _isLoadingTeamFilter,
+      onChanged: (value) {
+        setState(() {
+          _selectedTeamId = value == null || value.isEmpty ? null : value;
+          _currentPage = 1;
+        });
+        _loadRevisits(page: 1);
+      },
     );
   }
 
@@ -1114,6 +1185,94 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
         ),
       ],
     );
+  }
+
+  Future<List<_TeamMemberOption>> _loadActiveTeamMembers() async {
+    final usersRaw = await _authProvider.assignmentUsers(
+      token: _authProvider.currentAuthToken,
+    );
+    final membersById = <String, _TeamMemberOption>{};
+
+    for (final raw in usersRaw) {
+      if (!_isActiveUser(raw)) continue;
+      final id = _readString(
+        raw['id'] ?? raw['user_id'] ?? raw['userId'] ?? raw['uuid'],
+        fallback: '',
+      );
+      if (id.isEmpty) continue;
+
+      final baseName = _readString(
+        raw['full_name'] ??
+            raw['name'] ??
+            '${raw['first_name'] ?? ''} ${raw['last_name'] ?? ''}',
+        fallback: 'Unknown',
+      );
+      final readableRole = _roleLabel(raw);
+      membersById[id] = _TeamMemberOption(
+        id: id,
+        name: readableRole.isEmpty ? baseName : '$baseName ($readableRole)',
+      );
+    }
+
+    final members = membersById.values.toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return members;
+  }
+
+  Future<void> _loadTeamFilterOptions() async {
+    setState(() {
+      _isLoadingTeamFilter = true;
+    });
+    try {
+      final members = await _loadActiveTeamMembers();
+      if (!mounted) return;
+      setState(() {
+        _teamFilterOptions = members;
+        _isLoadingTeamFilter = false;
+        if (_selectedTeamId != null &&
+            !members.any((member) => member.id == _selectedTeamId)) {
+          _selectedTeamId = null;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _teamFilterOptions = const <_TeamMemberOption>[];
+        _isLoadingTeamFilter = false;
+        _selectedTeamId = null;
+      });
+    }
+  }
+
+  bool _isActiveUser(Map<String, dynamic> user) {
+    final value =
+        user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'];
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final normalized = _readString(value, fallback: '').toLowerCase();
+    return normalized == 'true' ||
+        normalized == '1' ||
+        normalized == 'yes' ||
+        normalized == 'active';
+  }
+
+  String _roleLabel(Map<String, dynamic> user) {
+    final rawRole = _readString(
+      user['role'] ??
+          user['user_role'] ??
+          user['userRole'] ??
+          user['designation'],
+      fallback: '',
+    );
+    if (rawRole.isEmpty) return '';
+    return rawRole
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .map(
+          (part) =>
+              '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+        )
+        .join(' ');
   }
 
   Future<List<_OriginalVisitOption>> _loadOriginalVisitsForDropdown() async {

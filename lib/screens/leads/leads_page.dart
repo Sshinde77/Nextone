@@ -89,6 +89,7 @@ class _LeadsPageState extends State<LeadsPage> {
   String? _visiblePhoneLeadId;
   String? _expandedQuickActionLeadId;
   String? _selectedAssigneeId;
+  String? _selectedReassignStatus;
   List<_AssigneeOption> _assigneeOptions = const <_AssigneeOption>[];
   List<_LeadSourceOption> _leadSources = const <_LeadSourceOption>[];
   List<_PipelineStatusOption> _pipelineStatuses =
@@ -109,6 +110,7 @@ class _LeadsPageState extends State<LeadsPage> {
   String? _selectedSource;
   String? _selectedTeamId;
   String? _projectSearchQuery;
+  String? _locationSearchQuery;
   String? _selectedNextStatus;
   List<_LeadModel> _currentPageLeads = <_LeadModel>[];
   final Map<String, _LeadPhoneAccess> _leadPhoneAccessById =
@@ -366,6 +368,7 @@ class _LeadsPageState extends State<LeadsPage> {
               source: _selectedSource,
               search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
               project: _projectSearchQuery,
+              location: _locationSearchQuery,
               page: _currentPage,
               perPage: _pageSize,
             )
@@ -376,6 +379,7 @@ class _LeadsPageState extends State<LeadsPage> {
               assignedTo: _selectedTeamId,
               search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
               project: _projectSearchQuery,
+              location: _locationSearchQuery,
               page: _currentPage,
               perPage: _pageSize,
             );
@@ -510,7 +514,9 @@ class _LeadsPageState extends State<LeadsPage> {
     String? tempSource = _selectedSource;
     String? tempTeamId = _isMyLeadsTab ? null : _selectedTeamId;
     String tempProject = _projectSearchQuery ?? '';
+    String tempLocation = _locationSearchQuery ?? '';
     final projectController = TextEditingController(text: tempProject);
+    final locationController = TextEditingController(text: tempLocation);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -601,6 +607,18 @@ class _LeadsPageState extends State<LeadsPage> {
                       tempProject = value;
                     },
                   ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: locationController,
+                    decoration: _sheetFieldDecoration('Search by location'),
+                    textInputAction: TextInputAction.search,
+                    onChanged: (value) {
+                      tempLocation = value;
+                    },
+                    onSubmitted: (value) {
+                      tempLocation = value;
+                    },
+                  ),
                   if (!_isMyLeadsTab) ...[
                     const SizedBox(height: 12),
                     SearchableDropdownField<String>(
@@ -641,6 +659,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                   : null;
                               _selectedSource = null;
                               _projectSearchQuery = null;
+                              _locationSearchQuery = null;
                               _selectedTeamId = null;
                               _currentPage = 1;
                               _selectedLeadIds.clear();
@@ -664,6 +683,10 @@ class _LeadsPageState extends State<LeadsPage> {
                               _projectSearchQuery = tempProject.trim().isEmpty
                                   ? null
                                   : tempProject.trim();
+                              _locationSearchQuery =
+                                  tempLocation.trim().isEmpty
+                                      ? null
+                                      : tempLocation.trim();
                               _selectedTeamId =
                                   _isMyLeadsTab ? null : tempTeamId;
                               _currentPage = 1;
@@ -686,6 +709,7 @@ class _LeadsPageState extends State<LeadsPage> {
       },
     );
     projectController.dispose();
+    locationController.dispose();
   }
 
   Future<void> _openManageLeadSourcesDialog() async {
@@ -3709,6 +3733,8 @@ class _LeadsPageState extends State<LeadsPage> {
     if (!_assigneeOptions.any((option) => option.id == _selectedAssigneeId)) {
       _selectedAssigneeId = _assigneeOptions.first.id;
     }
+    _selectedReassignStatus = _initialReassignStatus(lead.status);
+    final statusItems = _reassignStatusItems();
 
     await showModalBottomSheet<void>(
       context: context,
@@ -3743,6 +3769,22 @@ class _LeadsPageState extends State<LeadsPage> {
                     onChanged: (value) {
                       setSheetState(() {
                         _selectedAssigneeId = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  SearchableDropdownField<String>(
+                    label: 'Change Status (optional)',
+                    sheetTitle: lead.assignedToId.isEmpty
+                        ? 'Assign Lead'
+                        : 'Reassign Lead',
+                    value: _selectedReassignStatus,
+                    hintText: 'Select status',
+                    items: statusItems,
+                    enabled: !_isSubmittingReassign && statusItems.isNotEmpty,
+                    onChanged: (value) {
+                      setSheetState(() {
+                        _selectedReassignStatus = value;
                       });
                     },
                   ),
@@ -3803,7 +3845,8 @@ class _LeadsPageState extends State<LeadsPage> {
       await _authProvider.reassignLead(
         id: lead.id,
         assignedTo: _selectedAssigneeId!,
-        note: _reassignNoteController.text.trim(),
+        status: _selectedReassignStatus,
+        reason: _reassignNoteController.text.trim(),
         token: _authProvider.currentAuthToken,
       );
       await _loadLeads();
@@ -3837,6 +3880,8 @@ class _LeadsPageState extends State<LeadsPage> {
     if (!_assigneeOptions.any((option) => option.id == _selectedAssigneeId)) {
       _selectedAssigneeId = _assigneeOptions.first.id;
     }
+    _selectedReassignStatus = null;
+    final statusItems = _reassignStatusItems();
 
     await showModalBottomSheet<void>(
       context: context,
@@ -3876,6 +3921,20 @@ class _LeadsPageState extends State<LeadsPage> {
                     onChanged: (value) {
                       setSheetState(() {
                         _selectedAssigneeId = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  SearchableDropdownField<String>(
+                    label: 'Change Status (optional)',
+                    sheetTitle: 'Assign Selected Leads',
+                    value: _selectedReassignStatus,
+                    hintText: 'Select status',
+                    items: statusItems,
+                    enabled: !_isSubmittingReassign && statusItems.isNotEmpty,
+                    onChanged: (value) {
+                      setSheetState(() {
+                        _selectedReassignStatus = value;
                       });
                     },
                   ),
@@ -3936,7 +3995,8 @@ class _LeadsPageState extends State<LeadsPage> {
         await _authProvider.reassignLead(
           id: leadId,
           assignedTo: _selectedAssigneeId!,
-          note: _reassignNoteController.text.trim(),
+          status: _selectedReassignStatus,
+          reason: _reassignNoteController.text.trim(),
           token: _authProvider.currentAuthToken,
         );
       }
@@ -4309,6 +4369,32 @@ class _LeadsPageState extends State<LeadsPage> {
         .where((status) => status.isNotEmpty)
         .toList(growable: false);
     return apiFlow.isNotEmpty ? apiFlow : _statusFlow;
+  }
+
+  List<SearchableDropdownItem<String>> _reassignStatusItems() {
+    final statuses = _pipelineStatuses
+        .where((status) => status.isActive && status.key.trim().isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return statuses
+        .map(
+          (status) => SearchableDropdownItem<String>(
+            value: _normalizeStatus(status.key),
+            label: status.label.trim().isNotEmpty
+                ? status.label.trim()
+                : _prettyStatus(status.key),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  String? _initialReassignStatus(String currentStatus) {
+    final current = _normalizeStatus(currentStatus);
+    final items = _reassignStatusItems();
+    if (items.any((item) => item.value == current)) {
+      return current;
+    }
+    return null;
   }
 
   String _prettyStatus(String status) {
