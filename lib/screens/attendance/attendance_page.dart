@@ -1,5 +1,6 @@
 // ignore_for_file: unused_element
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -433,11 +434,7 @@ class _AttendancePageState extends State<AttendancePage> {
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
+      final position = await _getAttendancePosition();
       final address =
           await _resolveAddress(position.latitude, position.longitude);
       final device = _deviceDescription();
@@ -512,9 +509,37 @@ class _AttendancePageState extends State<AttendancePage> {
     return true;
   }
 
+  Future<Position> _getAttendancePosition() async {
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 20),
+        ),
+      );
+    } on TimeoutException {
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) return lastKnown;
+      throw Exception(
+        'Unable to get current location. Please move to an open area and try again.',
+      );
+    } catch (_) {
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) return lastKnown;
+
+      return Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 20),
+        ),
+      );
+    }
+  }
+
   Future<String> _resolveAddress(double latitude, double longitude) async {
     try {
-      final places = await placemarkFromCoordinates(latitude, longitude);
+      final places = await placemarkFromCoordinates(latitude, longitude)
+          .timeout(const Duration(seconds: 8));
       if (places.isEmpty) return 'Unknown location';
       final place = places.first;
       final parts = <String>[
@@ -529,12 +554,19 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Future<String> _prepareAttendancePhotoForUpload(String sourcePath) async {
+    final sourceFile = File(sourcePath);
+    if (!await sourceFile.exists()) {
+      throw Exception('Captured photo is not available. Please try again.');
+    }
+
     final lower = sourcePath.toLowerCase();
     final isAllowed = lower.endsWith('.jpg') ||
         lower.endsWith('.jpeg') ||
         lower.endsWith('.png') ||
         lower.endsWith('.webp');
-    if (isAllowed) {
+
+    final sourceSize = await sourceFile.length();
+    if (isAllowed && sourceSize <= 2500000) {
       return sourcePath;
     }
 
@@ -553,6 +585,10 @@ class _AttendancePageState extends State<AttendancePage> {
       }
     } catch (_) {
       // fallback below
+    }
+
+    if (isAllowed) {
+      return sourcePath;
     }
 
     throw Exception(
@@ -948,14 +984,12 @@ class _AttendancePageState extends State<AttendancePage> {
       final date = DateTime(apiYear, apiMonth, day);
       final isFuture = date.isAfter(today);
       final data = dayMap[day];
-      final status = _readStringFromMap(
-        data ?? const <String, dynamic>{},
-        const ['status'],
-        fallback: '',
-      ).toLowerCase();
+      final status = data == null ? '' : _attendanceStatusForDay(data);
 
       final _CalendarCellState state;
-      if (isFuture) {
+      if (status == 'holiday') {
+        state = _CalendarCellState.holiday;
+      } else if (isFuture) {
         state = _CalendarCellState.off;
       } else if (status == 'present' || status == 'late') {
         state = _CalendarCellState.present;
@@ -1023,7 +1057,10 @@ class _AttendancePageState extends State<AttendancePage> {
       'present': entries.where((entry) => entry.status == 'present').length,
       'absent': entries.where((entry) => entry.status == 'absent').length,
       'late': entries.where((entry) => entry.status == 'late').length,
-      'leave': entries.where((entry) => entry.status == 'leave').length,
+      'leave': entries
+          .where(
+              (entry) => entry.status == 'leave' || entry.status == 'holiday')
+          .length,
     };
   }
 
@@ -1137,6 +1174,7 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   String _historyStatus(Map<String, dynamic> day) {
+    if (_isHolidayAttendance(day)) return 'holiday';
     final rawStatus = _readStringFromMap(
       day,
       const ['status', 'attendance_status', 'attendanceStatus'],
@@ -1229,6 +1267,7 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   String _statusLabel(String status) {
+    if (status.trim().toLowerCase() == 'holiday') return 'Holiday';
     return status
         .replaceAll('_', ' ')
         .split(' ')
@@ -1522,8 +1561,47 @@ class _AttendancePageState extends State<AttendancePage> {
     return _dailySummaryCounts(rows);
   }
 
+  String _attendanceStatusForDay(Map<String, dynamic> day) {
+    if (_isHolidayAttendance(day)) return 'holiday';
+    return _normalizeAttendanceStatus(
+      _readStringFromMap(
+        day,
+        const ['status', 'attendance_status', 'attendanceStatus'],
+        fallback: 'absent',
+      ),
+    );
+  }
+
+  bool _isHolidayAttendance(Map<String, dynamic> source) {
+    final leaveType = _readStringFromMap(
+      source,
+      const ['leave_type', 'leaveType', 'type'],
+      fallback: '',
+    ).trim().toLowerCase();
+    final reason = _readStringFromMap(
+      source,
+      const ['reason', 'remarks', 'note', 'notes'],
+      fallback: '',
+    ).trim().toLowerCase();
+    final status = _readStringFromMap(
+      source,
+      const ['status', 'attendance_status', 'attendanceStatus'],
+      fallback: '',
+    ).trim().toLowerCase();
+    return leaveType == 'holiday' ||
+        status == 'holiday' ||
+        status == 'public_holiday' ||
+        status == 'public holiday' ||
+        reason.contains('holiday') ||
+        reason.contains('weekly off');
+  }
+
   String _attendanceLetter(String status) {
     switch (status.trim().toLowerCase()) {
+      case 'holiday':
+      case 'public_holiday':
+      case 'public holiday':
+        return 'H';
       case 'present':
         return 'P';
       case 'late':
@@ -1551,6 +1629,12 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Color _attendanceBadgeBg(String status, DateTime? date) {
+    switch (status.trim().toLowerCase()) {
+      case 'holiday':
+      case 'public_holiday':
+      case 'public holiday':
+        return const Color(0xFFF3DDFB);
+    }
     if (_isFutureDate(date)) {
       return const Color(0xFFEFF3F8);
     }
@@ -1574,6 +1658,12 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Color _attendanceBadgeFg(String status, DateTime? date) {
+    switch (status.trim().toLowerCase()) {
+      case 'holiday':
+      case 'public_holiday':
+      case 'public holiday':
+        return const Color(0xFFB423D1);
+    }
     if (_isFutureDate(date)) {
       return const Color(0xFF8B98AA);
     }
@@ -1622,16 +1712,14 @@ class _AttendancePageState extends State<AttendancePage> {
     var leave = 0;
 
     for (final row in rows) {
-      final status = _readStringFromMap(
-        _dailyDayForRow(row),
-        const ['status'],
-        fallback: 'absent',
-      ).toLowerCase();
+      final status = _attendanceStatusForDay(_dailyDayForRow(row));
       if (status == 'present') {
         present++;
       } else if (status == 'late') {
         late++;
-      } else if (status == 'on_leave' || status == 'leave') {
+      } else if (status == 'on_leave' ||
+          status == 'leave' ||
+          status == 'holiday') {
         leave++;
       } else if (status != 'weekend') {
         absent++;
@@ -1653,16 +1741,14 @@ class _AttendancePageState extends State<AttendancePage> {
     var leave = 0;
 
     for (final row in rows) {
-      final status = _readStringFromMap(
-        row,
-        const ['status', 'attendance_status'],
-        fallback: 'absent',
-      ).toLowerCase();
+      final status = _attendanceStatusForDay(row);
       if (status == 'present') {
         present++;
       } else if (status == 'late') {
         late++;
-      } else if (status == 'on_leave' || status == 'leave') {
+      } else if (status == 'on_leave' ||
+          status == 'leave' ||
+          status == 'holiday') {
         leave++;
       } else if (status != 'weekend') {
         absent++;
@@ -1751,11 +1837,7 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   String _approvalStatus(Map<String, dynamic> row) {
-    return _readStringFromMap(
-      row,
-      const ['status', 'attendance_status', 'attendanceStatus'],
-      fallback: 'present',
-    );
+    return _attendanceStatusForDay(row);
   }
 
   String _approvalCheckIn(Map<String, dynamic> row) {
@@ -2608,11 +2690,7 @@ class _AttendancePageState extends State<AttendancePage> {
           ...days.map((day) {
             final date = _parseApiDate(day['date']);
             final rowDay = dayByDate[_dateKey(date)] ?? day;
-            final status = _readStringFromMap(
-              rowDay,
-              const ['status'],
-              fallback: 'absent',
-            );
+            final status = _attendanceStatusForDay(rowDay);
             final isFuture = _isFutureDate(date);
             return SizedBox(
               width: dayColumnWidth,
@@ -2880,8 +2958,7 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Widget _buildDailyEmployeeRow(Map<String, dynamic> row, bool compact) {
-    final status =
-        _readStringFromMap(row, const ['status'], fallback: 'absent');
+    final status = _attendanceStatusForDay(row);
     final statusLower = status.toLowerCase();
     final checkIn = _formatTimeValue(_readStringFromMap(
       row,
@@ -3812,7 +3889,17 @@ class _AttendancePageState extends State<AttendancePage> {
           const ['role', 'designation'],
           fallback: 'N/A',
         ),
-        'status': _readStringFromMap(day, const ['status'], fallback: 'absent'),
+        'status': _attendanceStatusForDay(day),
+        'leave_type': _readStringFromMap(
+          day,
+          const ['leave_type', 'leaveType'],
+          fallback: '',
+        ),
+        'reason': _readStringFromMap(
+          day,
+          const ['reason', 'remarks', 'note', 'notes'],
+          fallback: '',
+        ),
         'check_in_time': _readStringFromMap(
           day,
           const ['check_in_time', 'checkInTime'],
@@ -4168,12 +4255,24 @@ class _AttendancePageState extends State<AttendancePage> {
         const ['date', 'attendance_date', 'attendanceDate'],
         fallback: '',
       ),
-      'status': _normalizeAttendanceStatus(
-        _readStringFromMap(
-          source,
-          const ['status', 'attendance_status', 'attendanceStatus'],
-          fallback: checkIn.isNotEmpty ? 'present' : 'absent',
-        ),
+      'status': _isHolidayAttendance(source)
+          ? 'holiday'
+          : _normalizeAttendanceStatus(
+              _readStringFromMap(
+                source,
+                const ['status', 'attendance_status', 'attendanceStatus'],
+                fallback: checkIn.isNotEmpty ? 'present' : 'absent',
+              ),
+            ),
+      'leave_type': _readStringFromMap(
+        source,
+        const ['leave_type', 'leaveType'],
+        fallback: '',
+      ),
+      'reason': _readStringFromMap(
+        source,
+        const ['reason', 'remarks', 'note', 'notes'],
+        fallback: '',
       ),
       'check_in_time': checkIn,
       'check_out_time': _readStringFromMap(
@@ -4241,8 +4340,7 @@ class _AttendancePageState extends State<AttendancePage> {
     var absent = 0;
     var leave = 0;
     for (final day in days) {
-      final status =
-          _readStringFromMap(day, const ['status'], fallback: 'absent');
+      final status = _attendanceStatusForDay(day);
       switch (status) {
         case 'present':
           present++;
@@ -4252,6 +4350,7 @@ class _AttendancePageState extends State<AttendancePage> {
           break;
         case 'on_leave':
         case 'leave':
+        case 'holiday':
           leave++;
           break;
         case 'weekend':
@@ -4330,6 +4429,11 @@ class _AttendancePageState extends State<AttendancePage> {
 
   String _normalizeAttendanceStatus(String status) {
     final normalized = status.trim().toLowerCase();
+    if (normalized == 'holiday' ||
+        normalized == 'public_holiday' ||
+        normalized == 'public holiday') {
+      return 'holiday';
+    }
     if (normalized == 'on leave') return 'on_leave';
     if (normalized == 'checked_in' || normalized == 'checked in') {
       return 'present';
@@ -6551,9 +6655,19 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Widget _statusPreviewChip(String status) {
-    final isPresent = status == 'present';
-    final bg = isPresent ? const Color(0xFFDDF7E9) : const Color(0xFFFFE7E7);
-    final fg = isPresent ? const Color(0xFF0E9A6E) : const Color(0xFFDC2626);
+    final normalized = status.trim().toLowerCase();
+    final isPresent = normalized == 'present';
+    final isHoliday = normalized == 'holiday';
+    final bg = isHoliday
+        ? const Color(0xFFF3DDFB)
+        : isPresent
+            ? const Color(0xFFDDF7E9)
+            : const Color(0xFFFFE7E7);
+    final fg = isHoliday
+        ? const Color(0xFFB423D1)
+        : isPresent
+            ? const Color(0xFF0E9A6E)
+            : const Color(0xFFDC2626);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration:
@@ -6829,23 +6943,30 @@ class _DailyStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lower = status.toLowerCase();
+    final isHoliday = lower == 'holiday' ||
+        lower == 'public_holiday' ||
+        lower == 'public holiday';
     final isPresent = lower == 'present';
     final isLate = lower == 'late';
     final isLeave = lower == 'on_leave' || lower == 'leave';
-    final color = isPresent
-        ? const Color(0xFF0F9D71)
-        : isLate
-            ? const Color(0xFFE07900)
-            : isLeave
-                ? const Color(0xFF5655F6)
-                : const Color(0xFFF04452);
-    final bg = isPresent
-        ? const Color(0xFFDDF7E9)
-        : isLate
-            ? const Color(0xFFFFF2CC)
-            : isLeave
-                ? const Color(0xFFE8EAFE)
-                : const Color(0xFFFFE0E0);
+    final color = isHoliday
+        ? const Color(0xFFB423D1)
+        : isPresent
+            ? const Color(0xFF0F9D71)
+            : isLate
+                ? const Color(0xFFE07900)
+                : isLeave
+                    ? const Color(0xFF5655F6)
+                    : const Color(0xFFF04452);
+    final bg = isHoliday
+        ? const Color(0xFFF3DDFB)
+        : isPresent
+            ? const Color(0xFFDDF7E9)
+            : isLate
+                ? const Color(0xFFFFF2CC)
+                : isLeave
+                    ? const Color(0xFFE8EAFE)
+                    : const Color(0xFFFFE0E0);
     final label = status
         .replaceAll('_', ' ')
         .split(' ')
@@ -7088,10 +7209,11 @@ class _HistoryAttendanceRow extends StatelessWidget {
         );
       case 'leave':
       case 'on_leave':
+      case 'holiday':
         return const _HistoryStatusColors(
-          accent: Color(0xFF4F46E5),
-          foreground: Color(0xFF4F46E5),
-          background: Color(0xFFE8EAFE),
+          accent: Color(0xFFB423D1),
+          foreground: Color(0xFFB423D1),
+          background: Color(0xFFF3DDFB),
         );
       default:
         return const _HistoryStatusColors(
@@ -7590,11 +7712,20 @@ class _ApprovalEmployeeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusLower = status.trim().toLowerCase();
+    final isHoliday = statusLower == 'holiday' ||
+        statusLower == 'public_holiday' ||
+        statusLower == 'public holiday';
     final isPresent = statusLower == 'present' || statusLower == 'checked in';
-    final statusBg =
-        isPresent ? const Color(0xFFDDF7E9) : const Color(0xFFFFE7E7);
-    final statusFg =
-        isPresent ? const Color(0xFF0E9A6E) : const Color(0xFFDC2626);
+    final statusBg = isHoliday
+        ? const Color(0xFFF3DDFB)
+        : isPresent
+            ? const Color(0xFFDDF7E9)
+            : const Color(0xFFFFE7E7);
+    final statusFg = isHoliday
+        ? const Color(0xFFB423D1)
+        : isPresent
+            ? const Color(0xFF0E9A6E)
+            : const Color(0xFFDC2626);
     final statusLabel = status
         .replaceAll('_', ' ')
         .split(' ')
@@ -8223,7 +8354,7 @@ class _LegendChip extends StatelessWidget {
   }
 }
 
-enum _CalendarCellState { present, absent, off }
+enum _CalendarCellState { present, absent, holiday, off }
 
 class _CalendarCell {
   const _CalendarCell({
@@ -8256,6 +8387,7 @@ class _CalendarDayCell extends StatelessWidget {
     Color bgColor;
     Color textColor;
     Color dotColor;
+    String marker = '';
     switch (cell.state) {
       case _CalendarCellState.present:
         bgColor = const Color(0xFFE6F7EF);
@@ -8266,6 +8398,12 @@ class _CalendarDayCell extends StatelessWidget {
         bgColor = const Color(0xFFFBEEEE);
         textColor = const Color(0xFFE24B4B);
         dotColor = const Color(0xFFEF4444);
+        break;
+      case _CalendarCellState.holiday:
+        bgColor = const Color(0xFFF3DDFB);
+        textColor = const Color(0xFFB423D1);
+        dotColor = Colors.transparent;
+        marker = 'H';
         break;
       case _CalendarCellState.off:
         bgColor = const Color(0xFFF4F6FA);
@@ -8302,6 +8440,16 @@ class _CalendarDayCell extends StatelessWidget {
                 height: 6,
                 decoration:
                     BoxDecoration(color: dotColor, shape: BoxShape.circle),
+              ),
+            ] else if (marker.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                marker,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ],
           ],

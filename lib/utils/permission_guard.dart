@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nextone/models/auth_models.dart';
 import 'package:nextone/providers/auth_provider.dart';
 import 'package:nextone/utils/role_access.dart';
 
@@ -10,8 +11,9 @@ class PermissionGuard {
     required String action,
     String? moduleLabel,
   }) async {
+    EffectivePermissionsResult permissions;
     try {
-      await RoleAccess.currentPermissionSet(
+      permissions = await RoleAccess.currentPermissionSet(
         authProvider,
         forceRefresh: true,
       );
@@ -29,6 +31,7 @@ class PermissionGuard {
       return false;
     }
 
+    final normalizedModule = module.trim().toLowerCase();
     final allowed = switch (action.trim().toLowerCase()) {
       'view' => RoleAccess.canViewModule(module),
       'create' => RoleAccess.canCreateModule(module),
@@ -36,6 +39,9 @@ class PermissionGuard {
       'delete' => RoleAccess.canDeleteModule(module),
       'approve' => RoleAccess.canApproveModule(module),
       'export' => RoleAccess.canExportModule(module),
+      'reassign' => normalizedModule == 'leads' &&
+          (RoleAccess.canReassignLeads(permissions.role) ||
+              RoleAccess.canEditModule(module)),
       _ => false,
     };
 

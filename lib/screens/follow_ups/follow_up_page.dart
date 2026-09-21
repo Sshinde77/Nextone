@@ -212,23 +212,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
       return;
     }
 
-    final createdId = _readFollowUpId(payload);
-    final created = _modelFromPayload(
-      payload: payload,
-      id: createdId.isNotEmpty
-          ? createdId
-          : 'FU-${DateTime.now().millisecondsSinceEpoch}',
-      assignee: _personFromPayload(
-        payload,
-        fallbackName: 'You',
-      ),
-    );
-
-    setState(() {
-      _followUps.insert(0, created);
-      _currentPage = 1;
-      _totalItems += 1;
-    });
+    await _loadFollowUps(page: _currentPage);
   }
 
   Future<void> _openCreateFollowUp() async {
@@ -248,20 +232,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
       return;
     }
 
-    final createdId = _readFollowUpId(payload);
-    final created = _modelFromPayload(
-      payload: payload,
-      id: createdId.isNotEmpty
-          ? createdId
-          : 'FU-${DateTime.now().millisecondsSinceEpoch}',
-      assignee: _personFromPayload(payload, fallbackName: 'You'),
-    );
-
-    setState(() {
-      _followUps.insert(0, created);
-      _currentPage = 1;
-      _totalItems += 1;
-    });
+    await _loadFollowUps(page: _currentPage);
   }
 
   Future<void> _openEditFollowUp(_FollowUpModel followUp) async {
@@ -293,20 +264,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
       return;
     }
 
-    final updated = _modelFromPayload(
-      payload: payload,
-      id: followUp.id,
-      assignee: followUp.assignee,
-    );
-
-    final index = _followUps.indexWhere((item) => item.id == followUp.id);
-    if (index < 0) {
-      return;
-    }
-
-    setState(() {
-      _followUps[index] = updated;
-    });
+    await _loadFollowUps(page: _currentPage);
   }
 
   Future<void> _openBulkSiteVisitForm() async {
@@ -360,6 +318,10 @@ class _FollowUpPageState extends State<FollowUpPage> {
         builder: (_) => FollowUpDetailPage(followUpId: followUp.id),
       ),
     );
+    if (!mounted) {
+      return;
+    }
+    await _loadFollowUps(page: _currentPage);
   }
 
   Future<void> _deleteFollowUp(_FollowUpModel followUp) async {
@@ -415,6 +377,10 @@ class _FollowUpPageState extends State<FollowUpPage> {
         _syncBulkSelectionMode();
       });
       _showSnackBar('Follow-up deleted successfully.');
+      final nextPage = _followUps.isEmpty && _currentPage > 1
+          ? _currentPage - 1
+          : _currentPage;
+      await _loadFollowUps(page: nextPage);
     } catch (e) {
       if (!mounted) {
         return;
@@ -506,6 +472,7 @@ class _FollowUpPageState extends State<FollowUpPage> {
           statusColor: const Color(0xFF2E7D32),
         );
       });
+      await _loadFollowUps(page: _currentPage);
       _showSnackBar('Follow-up marked as complete.');
     } catch (e) {
       if (!mounted) {

@@ -2819,6 +2819,11 @@ class AuthService {
   Future<ExportFileResult> exportLeads({
     required String from,
     required String to,
+    String? status,
+    String? source,
+    String? assignedTo,
+    String? project,
+    String? location,
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
@@ -2826,6 +2831,21 @@ class AuthService {
       'from': from.trim(),
       'to': to.trim(),
     };
+    if (status != null && status.trim().isNotEmpty) {
+      query['status'] = status.trim();
+    }
+    if (source != null && source.trim().isNotEmpty) {
+      query['source'] = source.trim();
+    }
+    if (assignedTo != null && assignedTo.trim().isNotEmpty) {
+      query['assigned_to'] = assignedTo.trim();
+    }
+    if (project != null && project.trim().isNotEmpty) {
+      query['project'] = project.trim();
+    }
+    if (location != null && location.trim().isNotEmpty) {
+      query['location'] = location.trim();
+    }
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportLeads}')
         .replace(queryParameters: query);
     final headers = _headers(
@@ -3044,15 +3064,36 @@ class AuthService {
   Future<ExportFileResult> exportSiteVisits({
     required String from,
     required String to,
+    String? status,
+    String? assignedTo,
+    String? managerId,
+    String? projectId,
+    String? leadId,
     String? token,
   }) async {
     final resolvedToken = token ?? _authToken;
-    final uri =
-        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportSiteVisits}')
-            .replace(queryParameters: <String, String>{
+    final query = <String, String>{
       'from': from.trim(),
       'to': to.trim(),
-    });
+    };
+    if (status != null && status.trim().isNotEmpty) {
+      query['status'] = status.trim();
+    }
+    if (assignedTo != null && assignedTo.trim().isNotEmpty) {
+      query['assigned_to'] = assignedTo.trim();
+    }
+    if (managerId != null && managerId.trim().isNotEmpty) {
+      query['manager_id'] = managerId.trim();
+    }
+    if (projectId != null && projectId.trim().isNotEmpty) {
+      query['project_id'] = projectId.trim();
+    }
+    if (leadId != null && leadId.trim().isNotEmpty) {
+      query['lead_id'] = leadId.trim();
+    }
+    final uri =
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.exportSiteVisits}')
+            .replace(queryParameters: query);
     final headers = _headers(
       accept:
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -6670,6 +6711,48 @@ class AuthService {
     if (error != null) {
       throw Exception(error);
     }
+  }
+
+  Future<Map<String, dynamic>> closureDetail({
+    required String id,
+    String? token,
+  }) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) {
+      throw Exception('Closure id is required.');
+    }
+
+    final resolvedToken = token ?? _authToken;
+    final endpoint =
+        ApiConstants.closuresDetail.replaceFirst('{id}', normalizedId);
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = _headers(accept: 'application/json', token: resolvedToken);
+    _logRequest(
+      endpoint: 'closureDetail',
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+    );
+
+    final response =
+        await http.get(uri, headers: headers).timeout(_requestTimeout);
+    _logResponse('closureDetail', response);
+
+    final error = _handleResponse(
+      response,
+      fallbackMessage: 'Unable to fetch closure detail.',
+    );
+    if (error != null) {
+      throw Exception(error);
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      final data = _extractLeadMap(decoded);
+      if (data != null) return data;
+    } catch (_) {}
+
+    throw Exception('Closure detail response format is not valid.');
   }
 
   Future<Map<String, dynamic>> closureLeadDetail({

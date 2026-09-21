@@ -59,10 +59,18 @@ class _ClosureDetailPageState extends State<ClosureDetailPage> {
       _error = null;
     });
     try {
-      final detail = await _authProvider.closureLeadDetail(
-        id: widget.lookupId,
-        token: _authProvider.currentAuthToken,
-      );
+      Map<String, dynamic> detail;
+      try {
+        detail = await _authProvider.closureDetail(
+          id: widget.lookupId,
+          token: _authProvider.currentAuthToken,
+        );
+      } catch (_) {
+        detail = await _authProvider.closureLeadDetail(
+          id: widget.lookupId,
+          token: _authProvider.currentAuthToken,
+        );
+      }
       if (!mounted) return;
       setState(() {
         _data = detail;

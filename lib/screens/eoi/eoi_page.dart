@@ -64,6 +64,7 @@ class _EoiPageState extends State<EoiPage> {
   String _searchQuery = '';
   String? _selectedSource;
   String? _selectedTeamId;
+  String? _locationSearchQuery;
   String? _selectedNextStatus;
   String? _selectedAssigneeId;
   String? _selectedReassignStatus;
@@ -220,6 +221,7 @@ class _EoiPageState extends State<EoiPage> {
               token: _authProvider.currentAuthToken,
               status: 'eoi',
               source: _selectedSource,
+              location: _locationSearchQuery,
               search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
               page: _currentPage,
               perPage: _pageSize,
@@ -229,6 +231,7 @@ class _EoiPageState extends State<EoiPage> {
               status: 'eoi',
               source: _selectedSource,
               assignedTo: _selectedTeamId,
+              location: _locationSearchQuery,
               search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
               page: _currentPage,
               perPage: _pageSize,
@@ -329,6 +332,8 @@ class _EoiPageState extends State<EoiPage> {
   Future<void> _openFiltersSheet() async {
     String? tempSource = _selectedSource;
     String? tempTeamId = _isMyTab ? null : _selectedTeamId;
+    String tempLocation = _locationSearchQuery ?? '';
+    final locationController = TextEditingController(text: tempLocation);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -364,6 +369,18 @@ class _EoiPageState extends State<EoiPage> {
                       });
                     },
                   ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: locationController,
+                    decoration: _sheetFieldDecoration('Search by location'),
+                    textInputAction: TextInputAction.search,
+                    onChanged: (value) {
+                      tempLocation = value;
+                    },
+                    onSubmitted: (value) {
+                      tempLocation = value;
+                    },
+                  ),
                   if (!_isMyTab) ...[
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String?>(
@@ -397,6 +414,7 @@ class _EoiPageState extends State<EoiPage> {
                             setState(() {
                               _selectedSource = null;
                               _selectedTeamId = null;
+                              _locationSearchQuery = null;
                               _currentPage = 1;
                             });
                             Navigator.of(context).pop();
@@ -412,6 +430,10 @@ class _EoiPageState extends State<EoiPage> {
                             setState(() {
                               _selectedSource = tempSource;
                               _selectedTeamId = _isMyTab ? null : tempTeamId;
+                              _locationSearchQuery =
+                                  tempLocation.trim().isEmpty
+                                      ? null
+                                      : tempLocation.trim();
                               _currentPage = 1;
                             });
                             Navigator.of(context).pop();
@@ -429,6 +451,7 @@ class _EoiPageState extends State<EoiPage> {
         );
       },
     );
+    locationController.dispose();
   }
 
   Future<void> _openManageLeadSourcesDialog() async {
@@ -1099,6 +1122,9 @@ class _EoiPageState extends State<EoiPage> {
       final exported = await _authProvider.exportLeads(
         from: from,
         to: to,
+        status: 'eoi',
+        source: _selectedSource,
+        assignedTo: _isMyTab ? null : _selectedTeamId,
         token: _authProvider.currentAuthToken,
       );
       if (!mounted) return;
@@ -1277,6 +1303,7 @@ class _EoiPageState extends State<EoiPage> {
       moduleLabel: 'leads',
     );
     if (!allowed) return;
+    if (!mounted) return;
 
     final statusOptions = _allStatusOptions();
     if (statusOptions.isEmpty) {
@@ -1296,6 +1323,7 @@ class _EoiPageState extends State<EoiPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final sheetNavigator = Navigator.of(context);
             return _buildSheetContainer(
               title: 'Update Status',
               child: Column(
@@ -1348,7 +1376,7 @@ class _EoiPageState extends State<EoiPage> {
                                 _isSubmittingStatus = false;
                               });
                               if (updatedStatus != null) {
-                                Navigator.of(context).pop();
+                                sheetNavigator.pop();
                               }
                             },
                       child: Text(
@@ -1399,10 +1427,11 @@ class _EoiPageState extends State<EoiPage> {
       context,
       authProvider: _authProvider,
       module: 'leads',
-      action: 'edit',
+      action: 'reassign',
       moduleLabel: 'leads',
     );
     if (!allowed) return;
+    if (!mounted) return;
 
     if (_assigneeOptions.isEmpty) {
       _showSnackBar('No active assignee available.');
@@ -1426,6 +1455,7 @@ class _EoiPageState extends State<EoiPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final sheetNavigator = Navigator.of(context);
             return _buildSheetContainer(
               title:
                   lead.assignedToId.isEmpty ? 'Assign Lead' : 'Reassign Lead',
@@ -1497,7 +1527,7 @@ class _EoiPageState extends State<EoiPage> {
                                 _isSubmittingReassign = false;
                               });
                               if (reassigned) {
-                                Navigator.of(context).pop();
+                                sheetNavigator.pop();
                               }
                             },
                       child: Text(
@@ -1611,6 +1641,11 @@ class _EoiPageState extends State<EoiPage> {
         token: _authProvider.currentAuthToken,
       );
       _showSnackBar('Lead deleted successfully.');
+      if (_currentPageLeads.length == 1 && _currentPage > 1) {
+        setState(() {
+          _currentPage -= 1;
+        });
+      }
       _loadEoiLeads();
     } catch (error) {
       _showSnackBar(AppErrorHandler.friendlyMessage(error));

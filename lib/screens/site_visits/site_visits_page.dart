@@ -100,6 +100,96 @@ class _ScheduleRevisitResult {
   final bool statusUpdated;
 }
 
+class _SiteVisitExportFilters {
+  const _SiteVisitExportFilters({
+    required this.dateRange,
+    this.status,
+    this.assignedTo,
+    this.managerId,
+    this.projectId,
+    this.leadId,
+  });
+
+  final DateTimeRange dateRange;
+  final String? status;
+  final String? assignedTo;
+  final String? managerId;
+  final String? projectId;
+  final String? leadId;
+}
+
+class _ExportProjectOption {
+  const _ExportProjectOption({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
+
+  static _ExportProjectOption? tryFromApi(Map<String, dynamic> json) {
+    final id = _readOptionString(
+      json['id'] ?? json['project_id'] ?? json['projectId'] ?? json['uuid'],
+    );
+    final name = _readOptionString(
+      json['name'] ??
+          json['project_name'] ??
+          json['projectName'] ??
+          json['title'],
+    );
+    if (id.isEmpty || name.isEmpty) {
+      return null;
+    }
+    return _ExportProjectOption(id: id, name: name);
+  }
+}
+
+class _ExportLeadOption {
+  const _ExportLeadOption({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
+
+  static _ExportLeadOption? tryFromApi(Map<String, dynamic> json) {
+    final id = _readOptionString(
+      json['id'] ?? json['lead_id'] ?? json['leadId'] ?? json['uuid'],
+    );
+    final firstName =
+        _readOptionString(json['first_name'] ?? json['firstName']);
+    final lastName = _readOptionString(json['last_name'] ?? json['lastName']);
+    final combinedName = [
+      if (firstName.isNotEmpty) firstName,
+      if (lastName.isNotEmpty) lastName,
+    ].join(' ').trim();
+    final fallbackName = _readOptionString(
+      json['name'] ??
+          json['full_name'] ??
+          json['fullName'] ??
+          json['lead_name'] ??
+          json['contact_name'] ??
+          json['customer_name'],
+    );
+    final name = combinedName.isNotEmpty ? combinedName : fallbackName;
+    if (id.isEmpty || name.isEmpty) {
+      return null;
+    }
+    return _ExportLeadOption(id: id, name: name);
+  }
+}
+
+String _readOptionString(dynamic value) {
+  if (value is String) {
+    return value.trim();
+  }
+  if (value is num || value is bool) {
+    return value.toString().trim();
+  }
+  return '';
+}
+
 class _SiteVisitsPageState extends State<SiteVisitsPage> {
   final AuthProvider _authProvider = AuthProvider();
   final TextEditingController _searchController = TextEditingController();
@@ -730,18 +820,37 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     );
   }
 
-  Future<DateTimeRange?> _showExportDateRangeDialog() async {
-    final now = DateTime.now();
-    DateTime? fromDate;
-    DateTime? toDate;
+  Future<_SiteVisitExportFilters?> _showExportDateRangeDialog() async {
+    final today = DateTime.now();
+    final now = DateTime(today.year, today.month, today.day);
+    final loadedTeamOptions = await _loadExportTeamOptions();
+    final projectOptions = await _loadExportProjectOptions();
+    final leadOptions = await _loadExportLeadOptions();
+    if (!mounted) {
+      return null;
+    }
 
-    return showDialog<DateTimeRange>(
+    DateTime? fromDate = now.subtract(const Duration(days: 21));
+    DateTime? toDate = now;
+    String selectedStatus = _selectedStatus;
+    String? selectedAssignedTo = _selectedTeamId;
+    String? selectedManagerId;
+    String? selectedProjectId;
+    String? selectedLeadId;
+
+    final teamOptions = loadedTeamOptions;
+    if (selectedAssignedTo != null &&
+        !teamOptions.any((member) => member.id == selectedAssignedTo)) {
+      selectedAssignedTo = null;
+    }
+
+    final result = await showDialog<_SiteVisitExportFilters>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            String formatDate(DateTime? date) =>
-                date == null ? '' : _formatDateForApi(date);
+            String displayDate(DateTime? date) =>
+                date == null ? '' : _formatDateForDisplay(date);
 
             Future<void> pickFromDate() async {
               final picked = await showDatePicker(
@@ -779,59 +888,304 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
 
             Widget dateField({
               required String label,
-              required String value,
+              required DateTime? value,
               required String placeholder,
               required VoidCallback onTap,
             }) {
-              return InkWell(
-                onTap: onTap,
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: label,
-                    hintText: 'YYYY-MM-DD',
-                    suffixIcon: const Icon(Icons.calendar_today_outlined),
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white,
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  child: Text(value.isEmpty ? placeholder : value),
-                ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: onTap,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InputDecorator(
+                      decoration: _exportFieldDecoration().copyWith(
+                        suffixIcon: const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 18,
+                        ),
+                      ),
+                      child: Text(
+                        displayDate(value).isEmpty
+                            ? placeholder
+                            : displayDate(value),
+                        style: TextStyle(
+                          color: value == null
+                              ? AppColors.textSecondary
+                              : AppColors.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               );
             }
 
             return AlertDialog(
-              title: const Text('Export Site Visits'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
+              title: Row(
                 children: [
-                  dateField(
-                    label: 'Start date',
-                    value: formatDate(fromDate),
-                    placeholder: 'Select start date',
-                    onTap: pickFromDate,
-                  ),
-                  const SizedBox(height: 12),
-                  dateField(
-                    label: 'End date',
-                    value: formatDate(toDate),
-                    placeholder: 'Select end date',
-                    onTap: pickToDate,
+                  const Expanded(child: Text('Export Site Visits')),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded, size: 22),
                   ),
                 ],
+              ),
+              content: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7FAFF),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE5EEF9)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_month_rounded,
+                              size: 22,
+                              color: AppColors.primary,
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Select Date Range',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Choose the period for your export',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: dateField(
+                              label: 'From Date *',
+                              value: fromDate,
+                              placeholder: 'Select start date',
+                              onTap: pickFromDate,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: dateField(
+                              label: 'To Date *',
+                              value: toDate,
+                              placeholder: 'Select end date',
+                              onTap: pickToDate,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 22),
+                      const Text(
+                        'FILTERS (OPTIONAL)',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: selectedStatus,
+                              isExpanded: true,
+                              decoration: _exportFieldDecoration(
+                                labelText: 'Status',
+                              ),
+                              items: _siteVisitStatusDropdownItems(
+                                allLabel: 'All Status',
+                              ),
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  selectedStatus = value ?? '';
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SearchableDropdownField<String>(
+                              label: 'Assigned To',
+                              sheetTitle: 'Select team member',
+                              value: selectedAssignedTo ?? '',
+                              hintText: 'All Team',
+                              searchHintText: 'Search team member...',
+                              items: <SearchableDropdownItem<String>>[
+                                const SearchableDropdownItem<String>(
+                                  value: '',
+                                  label: 'All Team',
+                                ),
+                                ...teamOptions.map(
+                                  (member) => SearchableDropdownItem<String>(
+                                    value: member.id,
+                                    label: member.name,
+                                  ),
+                                ),
+                              ],
+                              enabled: true,
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  selectedAssignedTo =
+                                      value == null || value.isEmpty
+                                          ? null
+                                          : value;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SearchableDropdownField<String>(
+                        label: "Team (manager's sub-tree)",
+                        sheetTitle: 'Select manager sub-tree',
+                        value: selectedManagerId ?? '',
+                        hintText: 'No team filter',
+                        searchHintText: 'Search manager...',
+                        items: <SearchableDropdownItem<String>>[
+                          const SearchableDropdownItem<String>(
+                            value: '',
+                            label: 'No team filter',
+                          ),
+                          ...teamOptions.map(
+                            (member) => SearchableDropdownItem<String>(
+                              value: member.id,
+                              label: member.name,
+                            ),
+                          ),
+                        ],
+                        enabled: true,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            selectedManagerId =
+                                value == null || value.isEmpty ? null : value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      SearchableDropdownField<String>(
+                        label: 'Project',
+                        sheetTitle: 'Select project',
+                        value: selectedProjectId ?? '',
+                        hintText: 'Any project',
+                        searchHintText: 'Search project...',
+                        items: <SearchableDropdownItem<String>>[
+                          const SearchableDropdownItem<String>(
+                            value: '',
+                            label: 'Any project',
+                          ),
+                          ...projectOptions.map(
+                            (project) => SearchableDropdownItem<String>(
+                              value: project.id,
+                              label: project.name,
+                            ),
+                          ),
+                        ],
+                        enabled: projectOptions.isNotEmpty,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            selectedProjectId =
+                                value == null || value.isEmpty ? null : value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      SearchableDropdownField<String>(
+                        label: 'Lead',
+                        sheetTitle: 'Select lead',
+                        value: selectedLeadId ?? '',
+                        hintText: 'Any lead',
+                        searchHintText: 'Search lead...',
+                        items: <SearchableDropdownItem<String>>[
+                          const SearchableDropdownItem<String>(
+                            value: '',
+                            label: 'Any lead',
+                          ),
+                          ...leadOptions.map(
+                            (lead) => SearchableDropdownItem<String>(
+                              value: lead.id,
+                              label: lead.name,
+                            ),
+                          ),
+                        ],
+                        enabled: leadOptions.isNotEmpty,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            selectedLeadId =
+                                value == null || value.isEmpty ? null : value;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Cancel'),
                 ),
-                FilledButton(
+                FilledButton.icon(
                   onPressed: isValidRange
                       ? () => Navigator.of(context).pop(
-                            DateTimeRange(start: fromDate!, end: toDate!),
+                            _SiteVisitExportFilters(
+                              dateRange: DateTimeRange(
+                                start: fromDate!,
+                                end: toDate!,
+                              ),
+                              status: selectedStatus.trim().isEmpty
+                                  ? null
+                                  : selectedStatus.trim(),
+                              assignedTo: selectedAssignedTo,
+                              managerId: selectedManagerId,
+                              projectId: selectedProjectId,
+                              leadId: selectedLeadId,
+                            ),
                           )
                       : null,
-                  child: const Text('Export'),
+                  icon: const Icon(Icons.file_download_outlined, size: 18),
+                  label: const Text('Download'),
                 ),
               ],
             );
@@ -839,6 +1193,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         );
       },
     );
+    return result;
   }
 
   String _formatDateForApi(DateTime date) {
@@ -846,6 +1201,59 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');
     return '$year-$month-$day';
+  }
+
+  String _formatDateForDisplay(DateTime date) {
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}';
+  }
+
+  InputDecoration _exportFieldDecoration({String? labelText}) {
+    return InputDecoration(
+      labelText: labelText,
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+      ),
+    );
+  }
+
+  List<DropdownMenuItem<String>> _siteVisitStatusDropdownItems({
+    required String allLabel,
+  }) {
+    return <DropdownMenuItem<String>>[
+      DropdownMenuItem<String>(value: '', child: Text(allLabel)),
+      for (final status in _VisitStatus.values)
+        DropdownMenuItem<String>(
+          value: _apiStatus(status),
+          child: Text(_statusLabel(status)),
+        ),
+    ];
   }
 
   Widget _buildKpiTile({
@@ -1873,8 +2281,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
     _showSnackBar('Site visit updated successfully.');
   }
 
-  void _openVisitDetails(_SiteVisit visit) {
-    Navigator.of(context).push(
+  Future<void> _openVisitDetails(_SiteVisit visit) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SiteVisitDetailsPage(
           visitId: visit.id,
@@ -1882,11 +2290,15 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         ),
       ),
     );
+    if (!mounted) {
+      return;
+    }
+    await _loadSiteVisits(page: _currentPage);
   }
 
   Future<void> _handleVisitAction(String action, _SiteVisit visit) async {
     if (action == 'view') {
-      _openVisitDetails(visit);
+      await _openVisitDetails(visit);
       return;
     }
     if (action == 'reschedule') {
@@ -2628,6 +3040,7 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
           visit.status = _VisitStatus.completed;
         }
       });
+      await _loadSiteVisits(page: _currentPage);
       _showSnackBar('Feedback submitted.');
     } catch (e) {
       if (!mounted) {
@@ -2826,6 +3239,53 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
         _isLoadingTeamFilter = false;
         _selectedTeamId = null;
       });
+    }
+  }
+
+  Future<List<_ExportProjectOption>> _loadExportProjectOptions() async {
+    try {
+      final result = await _authProvider.projects(
+        token: _authProvider.currentAuthToken,
+        page: 1,
+        perPage: 200,
+      );
+      final options = result.items
+          .map(_ExportProjectOption.tryFromApi)
+          .whereType<_ExportProjectOption>()
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      return options;
+    } catch (_) {
+      return const <_ExportProjectOption>[];
+    }
+  }
+
+  Future<List<_TeamMemberOption>> _loadExportTeamOptions() async {
+    if (_teamFilterOptions.isNotEmpty) {
+      return _teamFilterOptions;
+    }
+    try {
+      return await _loadActiveTeamMembers();
+    } catch (_) {
+      return const <_TeamMemberOption>[];
+    }
+  }
+
+  Future<List<_ExportLeadOption>> _loadExportLeadOptions() async {
+    try {
+      final result = await _authProvider.leads(
+        token: _authProvider.currentAuthToken,
+        page: 1,
+        perPage: 200,
+      );
+      final options = result.items
+          .map(_ExportLeadOption.tryFromApi)
+          .whereType<_ExportLeadOption>()
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      return options;
+    } catch (_) {
+      return const <_ExportLeadOption>[];
     }
   }
 
@@ -3165,8 +3625,8 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       _showSnackBar('You do not have permission to export site visits.');
       return;
     }
-    final range = await _showExportDateRangeDialog();
-    if (!mounted || range == null) {
+    final filters = await _showExportDateRangeDialog();
+    if (!mounted || filters == null) {
       return;
     }
 
@@ -3174,12 +3634,17 @@ class _SiteVisitsPageState extends State<SiteVisitsPage> {
       _isExporting = true;
     });
 
-    final from = _formatDateForApi(range.start);
-    final to = _formatDateForApi(range.end);
+    final from = _formatDateForApi(filters.dateRange.start);
+    final to = _formatDateForApi(filters.dateRange.end);
     try {
       final exported = await _authProvider.exportSiteVisits(
         from: from,
         to: to,
+        status: filters.status,
+        assignedTo: filters.assignedTo,
+        managerId: filters.managerId,
+        projectId: filters.projectId,
+        leadId: filters.leadId,
         token: _authProvider.currentAuthToken,
       );
       if (!mounted) {

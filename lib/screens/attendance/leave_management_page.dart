@@ -508,7 +508,7 @@ class _LeaveManagementPageState extends State<LeaveManagementPage> {
       ),
     );
     if (didApply == true) {
-      await _loadMyLeaves(page: 1);
+      await _loadMyLeaves(page: _myCurrentPage);
       if (!mounted) {
         return;
       }

@@ -945,7 +945,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       MaterialPageRoute(builder: (_) => const ProjectFormPage()),
     );
     if (created == true) {
-      await _loadProjects();
+      await _loadProjects(page: _currentPage);
     }
   }
 
@@ -974,7 +974,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       ),
     );
     if (updated == true) {
-      await _loadProjects();
+      await _loadProjects(page: _currentPage);
     }
   }
 
@@ -985,6 +985,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
             projectId: project.id, initialData: project.toPayload()),
       ),
     );
+    if (!mounted) return;
+    await _loadProjects(page: _currentPage);
   }
 
   Future<void> _deleteProject(_Project project) async {
@@ -1019,7 +1021,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
       );
       if (!mounted) return;
       _showSnackBar('Project deleted successfully.');
-      await _loadProjects();
+      final nextPage = _projects.length == 1 && _currentPage > 1
+          ? _currentPage - 1
+          : _currentPage;
+      await _loadProjects(page: nextPage);
     } catch (error) {
       if (!mounted) return;
       _showSnackBar(AppErrorHandler.friendlyMessage(error));

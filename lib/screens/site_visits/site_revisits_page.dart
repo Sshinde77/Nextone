@@ -886,7 +886,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
 
     final created = await _showScheduleRevisitDialog();
     if (created != true || !mounted) return;
-    await _loadRevisits();
+    await _loadRevisits(page: _currentPage);
     if (!mounted) return;
     _showSnackBar('Re-visit scheduled successfully');
   }
@@ -1245,8 +1245,10 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
   }
 
   bool _isActiveUser(Map<String, dynamic> user) {
-    final value =
-        user['is_active'] ?? user['isActive'] ?? user['active'] ?? user['status'];
+    final value = user['is_active'] ??
+        user['isActive'] ??
+        user['active'] ??
+        user['status'];
     if (value is bool) return value;
     if (value is num) return value != 0;
     final normalized = _readString(value, fallback: '').toLowerCase();
@@ -1626,7 +1628,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     notesController.dispose();
     rescheduleReasonController.dispose();
     if (updated == true && mounted) {
-      await _loadRevisits();
+      await _loadRevisits(page: _currentPage);
       if (!mounted) return;
       _showSnackBar('Re-visit updated');
     }
@@ -1845,7 +1847,7 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
     noteController.dispose();
     closingPersonController.dispose();
     if (updated == true && mounted) {
-      await _loadRevisits();
+      await _loadRevisits(page: _currentPage);
       if (!mounted) return;
       _showSnackBar('Re-visit status updated');
     }
@@ -1961,6 +1963,8 @@ class _SiteRevisitsPageState extends State<SiteRevisitsPage> {
         builder: (_) => SiteRevisitDetailPage(revisitId: id),
       ),
     );
+    if (!mounted) return;
+    await _loadRevisits(page: _currentPage);
   }
 }
 

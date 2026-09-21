@@ -7,6 +7,9 @@ class RoleAccess {
   static const String salesManager = 'sales_manager';
   static const String salesExecutive = 'sales_executive';
   static const String externalCaller = 'external_caller';
+  static const String associate = 'associate';
+  static const String associatePartner = 'associate_partner';
+  static const String teamLeader = 'team_leader';
 
   static const List<String> allRoles = <String>[
     superAdmin,
@@ -14,6 +17,9 @@ class RoleAccess {
     salesManager,
     salesExecutive,
     externalCaller,
+    associate,
+    associatePartner,
+    teamLeader,
   ];
 
   static const List<String> adminAssignableRoles = <String>[
@@ -51,6 +57,15 @@ class RoleAccess {
   static bool isAdminOrSuperAdmin(String role) =>
       isAdmin(role) || isSuperAdmin(role);
   static bool isSalesManager(String role) => normalize(role) == salesManager;
+  static bool canReassignLeads(String role) {
+    final normalized = normalize(role);
+    return normalized == superAdmin ||
+        normalized == admin ||
+        normalized == associate ||
+        normalized == associatePartner ||
+        normalized == teamLeader;
+  }
+
   static bool isTierFour(String role) {
     final normalized = normalize(role);
     return normalized == salesExecutive || normalized == externalCaller;

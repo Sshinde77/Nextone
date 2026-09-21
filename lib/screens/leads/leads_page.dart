@@ -683,10 +683,9 @@ class _LeadsPageState extends State<LeadsPage> {
                               _projectSearchQuery = tempProject.trim().isEmpty
                                   ? null
                                   : tempProject.trim();
-                              _locationSearchQuery =
-                                  tempLocation.trim().isEmpty
-                                      ? null
-                                      : tempLocation.trim();
+                              _locationSearchQuery = tempLocation.trim().isEmpty
+                                  ? null
+                                  : tempLocation.trim();
                               _selectedTeamId =
                                   _isMyLeadsTab ? null : tempTeamId;
                               _currentPage = 1;
@@ -2170,6 +2169,11 @@ class _LeadsPageState extends State<LeadsPage> {
       });
 
       _showSnackBar('Lead deleted successfully.');
+      if (_currentPageLeads.isEmpty && _currentPage > 1) {
+        setState(() {
+          _currentPage -= 1;
+        });
+      }
       await _loadLeads();
     } catch (error) {
       if (!mounted) return;
@@ -3716,7 +3720,7 @@ class _LeadsPageState extends State<LeadsPage> {
       context,
       authProvider: _authProvider,
       module: 'leads',
-      action: 'edit',
+      action: 'reassign',
       moduleLabel: 'leads',
     );
     if (!allowed) return;
@@ -4025,6 +4029,10 @@ class _LeadsPageState extends State<LeadsPage> {
         builder: (_) => LeadDetailPage(leadId: leadId),
       ),
     );
+    if (!mounted) {
+      return;
+    }
+    await _loadLeads();
   }
 
   Future<void> _exportLeads() async {
@@ -4038,8 +4046,8 @@ class _LeadsPageState extends State<LeadsPage> {
         );
       return;
     }
-    final range = await _showExportDateRangeDialog();
-    if (!mounted || range == null) {
+    final filters = await _showExportDateRangeDialog();
+    if (!mounted || filters == null) {
       return;
     }
 
@@ -4047,12 +4055,17 @@ class _LeadsPageState extends State<LeadsPage> {
       _isExporting = true;
     });
 
-    final from = _formatDateForApi(range.start);
-    final to = _formatDateForApi(range.end);
+    final from = _formatDateForApi(filters.dateRange.start);
+    final to = _formatDateForApi(filters.dateRange.end);
     try {
       final exported = await _authProvider.exportLeads(
         from: from,
         to: to,
+        status: filters.status,
+        source: filters.source,
+        assignedTo: filters.assignedTo,
+        project: filters.project,
+        location: filters.location,
         token: _authProvider.currentAuthToken,
       );
       if (!mounted) {
@@ -4144,12 +4157,35 @@ class _LeadsPageState extends State<LeadsPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<DateTimeRange?> _showExportDateRangeDialog() async {
-    final now = DateTime.now();
-    DateTime? fromDate;
-    DateTime? toDate;
+  Future<_LeadExportFilters?> _showExportDateRangeDialog() async {
+    final today = DateTime.now();
+    final now = DateTime(today.year, today.month, today.day);
+    final projectOptions = await _loadRevisitProjectOptions();
+    if (!mounted) {
+      return null;
+    }
+    DateTime? fromDate = now.subtract(const Duration(days: 21));
+    DateTime? toDate = now;
+    String? selectedStatus = _resolvedStatus;
+    String? selectedSource = _selectedSource;
+    String? selectedTeamId = _isMyLeadsTab ? null : _selectedTeamId;
+    String? selectedProjectId;
+    String location = _locationSearchQuery ?? '';
+    final locationController = TextEditingController(text: location);
 
-    return showDialog<DateTimeRange>(
+    if (selectedStatus != null &&
+        !_pipelineStatuses.any((status) => status.key == selectedStatus)) {
+      selectedStatus = null;
+    }
+    if (selectedSource != null && !_sourceOptions.contains(selectedSource)) {
+      selectedSource = null;
+    }
+    if (selectedTeamId != null &&
+        !_assigneeOptions.any((assignee) => assignee.id == selectedTeamId)) {
+      selectedTeamId = null;
+    }
+
+    final result = await showDialog<_LeadExportFilters>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
@@ -4193,72 +4229,283 @@ class _LeadsPageState extends State<LeadsPage> {
 
             return AlertDialog(
               title: const Text('Export Leads'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  InkWell(
-                    onTap: pickFromDate,
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Start date',
-                        hintText: 'YYYY-MM-DD',
-                        suffixIcon: Icon(Icons.calendar_today_outlined),
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      child: Text(
-                        formatDate(fromDate).isEmpty
-                            ? 'Select start date'
-                            : formatDate(fromDate),
-                        style: TextStyle(
-                          color: formatDate(fromDate).isEmpty
-                              ? AppColors.textSecondary
-                              : AppColors.textPrimary,
+              content: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7FAFF),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE5EEF9)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.calendar_month_rounded, size: 22),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Select Date Range',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Choose the period for your export',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: pickToDate,
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'End date',
-                        hintText: 'YYYY-MM-DD',
-                        suffixIcon: Icon(Icons.calendar_today_outlined),
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        filled: true,
-                        fillColor: Colors.white,
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: pickFromDate,
+                              child: InputDecorator(
+                                decoration: const InputDecoration(
+                                  labelText: 'From Date *',
+                                  suffixIcon:
+                                      Icon(Icons.calendar_today_outlined),
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                ),
+                                child: Text(
+                                  formatDate(fromDate).isEmpty
+                                      ? 'Select start date'
+                                      : formatDate(fromDate),
+                                  style: TextStyle(
+                                    color: formatDate(fromDate).isEmpty
+                                        ? AppColors.textSecondary
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: InkWell(
+                              onTap: pickToDate,
+                              child: InputDecorator(
+                                decoration: const InputDecoration(
+                                  labelText: 'To Date *',
+                                  suffixIcon:
+                                      Icon(Icons.calendar_today_outlined),
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                ),
+                                child: Text(
+                                  formatDate(toDate).isEmpty
+                                      ? 'Select end date'
+                                      : formatDate(toDate),
+                                  style: TextStyle(
+                                    color: formatDate(toDate).isEmpty
+                                        ? AppColors.textSecondary
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        formatDate(toDate).isEmpty
-                            ? 'Select end date'
-                            : formatDate(toDate),
+                      const SizedBox(height: 18),
+                      Text(
+                        'FILTERS (OPTIONAL)',
                         style: TextStyle(
-                          color: formatDate(toDate).isEmpty
-                              ? AppColors.textSecondary
-                              : AppColors.textPrimary,
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String?>(
+                              initialValue: selectedStatus,
+                              isExpanded: true,
+                              decoration: _sheetFieldDecoration('Status'),
+                              items: <DropdownMenuItem<String?>>[
+                                const DropdownMenuItem<String?>(
+                                  value: null,
+                                  child: Text('All Status'),
+                                ),
+                                ..._pipelineStatuses
+                                    .where((status) =>
+                                        status.isActive &&
+                                        status.key.trim().isNotEmpty)
+                                    .map(
+                                      (status) => DropdownMenuItem<String?>(
+                                        value: status.key,
+                                        child: Text(
+                                          status.label,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                              ],
+                              onChanged: _isStatusFilterLocked
+                                  ? null
+                                  : (value) {
+                                      setDialogState(() {
+                                        selectedStatus = value;
+                                      });
+                                    },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<String?>(
+                              initialValue: selectedSource,
+                              isExpanded: true,
+                              decoration: _sheetFieldDecoration('Source'),
+                              items: <DropdownMenuItem<String?>>[
+                                const DropdownMenuItem<String?>(
+                                  value: null,
+                                  child: Text('All Sources'),
+                                ),
+                                ..._sourceOptions.map(
+                                  (source) => DropdownMenuItem<String?>(
+                                    value: source,
+                                    child: Text(
+                                      source,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  selectedSource = value;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SearchableDropdownField<String>(
+                              label: 'Assigned To',
+                              sheetTitle: 'Select team member',
+                              value: selectedTeamId ?? '',
+                              hintText: 'All Team',
+                              items: <SearchableDropdownItem<String>>[
+                                const SearchableDropdownItem<String>(
+                                  value: '',
+                                  label: 'All Team',
+                                ),
+                                ..._assigneeOptions.map(
+                                  (assignee) => SearchableDropdownItem<String>(
+                                    value: assignee.id,
+                                    label: assignee.name,
+                                  ),
+                                ),
+                              ],
+                              enabled: !_isMyLeadsTab,
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  selectedTeamId =
+                                      value == null || value.isEmpty
+                                          ? null
+                                          : value;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: locationController,
+                              decoration:
+                                  _sheetFieldDecoration('Location').copyWith(
+                                hintText: 'Any location',
+                              ),
+                              textInputAction: TextInputAction.search,
+                              onChanged: (value) {
+                                location = value;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SearchableDropdownField<String>(
+                        label: 'Project',
+                        sheetTitle: 'Select project',
+                        value: selectedProjectId ?? '',
+                        hintText: 'Any project',
+                        items: <SearchableDropdownItem<String>>[
+                          const SearchableDropdownItem<String>(
+                            value: '',
+                            label: 'Any project',
+                          ),
+                          ...projectOptions.map(
+                            (project) => SearchableDropdownItem<String>(
+                              value: project.id,
+                              label: project.name,
+                            ),
+                          ),
+                        ],
+                        enabled: projectOptions.isNotEmpty,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            selectedProjectId =
+                                value == null || value.isEmpty ? null : value;
+                          });
+                        },
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Cancel'),
                 ),
-                FilledButton(
+                FilledButton.icon(
                   onPressed: isValidRange
                       ? () => Navigator.of(context).pop(
-                            DateTimeRange(start: fromDate!, end: toDate!),
+                            _LeadExportFilters(
+                              dateRange: DateTimeRange(
+                                start: fromDate!,
+                                end: toDate!,
+                              ),
+                              status: selectedStatus,
+                              source: selectedSource,
+                              assignedTo: selectedTeamId,
+                              project: selectedProjectId,
+                              location: location.trim().isEmpty
+                                  ? null
+                                  : location.trim(),
+                            ),
                           )
                       : null,
-                  child: const Text('Export'),
+                  icon: const Icon(Icons.file_download_outlined, size: 18),
+                  label: const Text('Download'),
                 ),
               ],
             );
@@ -4266,6 +4513,8 @@ class _LeadsPageState extends State<LeadsPage> {
         );
       },
     );
+    locationController.dispose();
+    return result;
   }
 
   Widget _buildSheetContainer({
@@ -5605,6 +5854,24 @@ class _ProjectOption {
     }
     return _ProjectOption(id: id, name: name);
   }
+}
+
+class _LeadExportFilters {
+  const _LeadExportFilters({
+    required this.dateRange,
+    this.status,
+    this.source,
+    this.assignedTo,
+    this.project,
+    this.location,
+  });
+
+  final DateTimeRange dateRange;
+  final String? status;
+  final String? source;
+  final String? assignedTo;
+  final String? project;
+  final String? location;
 }
 
 class _PipelineStatusOption {

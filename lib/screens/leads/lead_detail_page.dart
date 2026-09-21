@@ -1762,7 +1762,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
       context,
       authProvider: _authProvider,
       module: 'leads',
-      action: 'edit',
+      action: 'reassign',
       moduleLabel: 'leads',
     );
     if (!allowed) return false;

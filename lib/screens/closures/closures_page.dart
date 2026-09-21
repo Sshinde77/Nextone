@@ -79,7 +79,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
     'Down Payment Plan',
     'Time Linked Plan',
     'Flexi Pay Plan',
-    'Subvention Scheme',
+    'Bank Subvention',
+    'Developer Subvention',
     'Custom',
   ];
   static const List<MapEntry<String, String>> _documentTypeOptions =
@@ -94,7 +95,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
       case 'Flexi Payment Plan':
         return 'Flexi Pay Plan';
       case 'Subvention Plan':
-        return 'Subvention Scheme';
+      case 'Subvention Scheme':
+        return 'Bank Subvention';
       default:
         return value.trim();
     }
@@ -1353,7 +1355,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
     notesController.dispose();
 
     if (created == true && mounted) {
-      await _loadClosures();
+      await _loadClosures(page: _currentPage);
       if (!mounted) return;
       _showSnackBar('Closure created successfully.');
     }
@@ -2062,9 +2064,9 @@ class _ClosuresPageState extends State<ClosuresPage> {
   }
 
   Future<void> _openClosureDetail(Map<String, dynamic> item) async {
-    final leadId = _readString(item['lead_id'], fallback: '');
     final closureId = _readString(item['id'], fallback: '');
-    final lookupId = leadId.isNotEmpty ? leadId : closureId;
+    final leadId = _readString(item['lead_id'], fallback: '');
+    final lookupId = closureId.isNotEmpty ? closureId : leadId;
     if (lookupId.isEmpty) {
       _showInfo('Unable to open detail. Missing id.');
       return;
@@ -2074,6 +2076,8 @@ class _ClosuresPageState extends State<ClosuresPage> {
         builder: (_) => ClosureDetailPage(lookupId: lookupId),
       ),
     );
+    if (!mounted) return;
+    await _loadClosures(page: _currentPage);
   }
 
   void _showInfo(String message) {
@@ -2753,7 +2757,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
     notesController.dispose();
 
     if (updated == true && mounted) {
-      await _loadClosures();
+      await _loadClosures(page: _currentPage);
       if (!mounted) return;
       _showSnackBar('Closure updated successfully.');
     }
@@ -2958,7 +2962,7 @@ class _ClosuresPageState extends State<ClosuresPage> {
 
     noteController.dispose();
     if (updated == true && mounted) {
-      await _loadClosures();
+      await _loadClosures(page: _currentPage);
       if (!mounted) return;
       _showSnackBar('Closure status updated');
     }

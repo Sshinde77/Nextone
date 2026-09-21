@@ -670,11 +670,21 @@ class AuthProvider {
   Future<ExportFileResult> exportLeads({
     required String from,
     required String to,
+    String? status,
+    String? source,
+    String? assignedTo,
+    String? project,
+    String? location,
     String? token,
   }) {
     return _authService.exportLeads(
       from: from,
       to: to,
+      status: status,
+      source: source,
+      assignedTo: assignedTo,
+      project: project,
+      location: location,
       token: token,
     );
   }
@@ -708,11 +718,21 @@ class AuthProvider {
   Future<ExportFileResult> exportSiteVisits({
     required String from,
     required String to,
+    String? status,
+    String? assignedTo,
+    String? managerId,
+    String? projectId,
+    String? leadId,
     String? token,
   }) {
     return _authService.exportSiteVisits(
       from: from,
       to: to,
+      status: status,
+      assignedTo: assignedTo,
+      managerId: managerId,
+      projectId: projectId,
+      leadId: leadId,
       token: token,
     );
   }
@@ -1708,6 +1728,16 @@ class AuthProvider {
       id: id,
       status: status,
       note: note,
+      token: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> closureDetail({
+    required String id,
+    String? token,
+  }) {
+    return _authService.closureDetail(
+      id: id,
       token: token,
     );
   }
